@@ -13,17 +13,16 @@ The implementation is a strong executable and proof-development sketch. The
 positive-key source model has substantial functional-correctness coverage, and
 both extracted implementations behaved correctly in the supplied tests and in
 additional fuzzing. It is not yet a complete formally verified mergeable-map
-library, however. The direct-string source model is missing a documented and
-proved `elements` order, the extracted API does not enforce the proved
-preconditions, and the optimized native extraction is a second implementation
-rather than a proved compilation of the Rocq definitions.
+library, however. The extracted API does not enforce the proved preconditions,
+and the optimized native extraction is a second implementation rather than a
+proved compilation of the Rocq definitions.
 
 The verification claim must therefore be split into three layers:
 
 | Layer | Current status |
 | --- | --- |
 | Pure positive-key Rocq model | Kernel-checked functional map laws, including general `combine`, with no project axioms found in the inspected theorem closure |
-| Pure direct-string Rocq model | Lookup, update, removal, traversal, filtering, structural invariants, general `combine`, biased unions, and extensional `beq` are proved; traversal ordering remains open |
+| Pure direct-string Rocq model | Lookup, update, removal, ordered traversal, filtering, structural invariants, general `combine`, biased unions, and extensional `beq` are proved |
 | Extracted native OCaml | Extensive oracle and invariant testing passes, but the standard numeric/string mappings and 19 explicit handwritten realizers are trusted; neither their refinement nor the Rocq-to-OCaml compilation pipeline is proved here |
 
 Consequently, “formally verified” is accurate for the stated theorems about the
@@ -42,8 +41,8 @@ The following checks passed:
   string `set_correct_wf`, `replace_binding_correct_wf`,
   `join_separated_correct_wf`, `public_combine_fuel_sufficient`,
   `union_left_correct_wf`, `union_right_correct_wf`, `beq_correct_wf`,
-  `beq_extensional_wf`, and `wf_splits_ordered` theorems as closed under the
-  global context;
+  `beq_extensional_wf`, `wf_elements_bit_lex_sorted`, and
+  `wf_splits_ordered` theorems as closed under the global context;
 - additional integer fuzzing used keys across the positive OCaml `int` range,
   including high-bit boundary values, and checked lookup, elements, merge, and
   routing invariants;
@@ -108,8 +107,10 @@ implementation.
 combine law, preserving well-formedness and selecting the preferred binding at
 every key. `beq_correct_wf` gives the pointwise Boolean equality law, while
 `beq_extensional_wf` proves equivalence to identical lookup results when the
-value comparison reflects equality. The documented `elements` ordering is now
-the next pure-model functional gap.
+value comparison reflects equality. `wf_elements_bit_lex_sorted` proves that
+the key projection of `elements` is strongly sorted by the first differing
+prefix-free logical bit, with `false` before `true`; thus every earlier key is
+related to every later key, not merely to its immediate successor.
 
 ### 3. The extracted interface exposes values outside the proof contract
 
@@ -278,6 +279,8 @@ For both tree variants, provide named results for all canonicality properties:
 - [ ] the cached string branch sample is a resident binding; this stronger
   invariant is required by the native constant-time `representative` realizer;
 - [x] keys and bindings in `elements` are unique on well-formed trees;
+- [x] direct-string `elements` is strongly sorted by prefix-free bit-stream
+  lexicographic order (`wf_elements_bit_lex_sorted`);
 - [x] lookup is extensionally equivalent to membership in `elements` on
   well-formed trees;
 - [ ] every value constructed through the public API is well formed; string
@@ -374,8 +377,8 @@ Current API-law status across both key variants:
 - [x] `combine` and specialized union laws for both key variants;
 - [x] Extensional equality and a `beq` correctness theorem for both key
   variants;
-- [ ] The documented `elements` ordering, not only uniqueness: tested for
-  positive keys but not established for direct strings;
+- [x] The documented `elements` ordering, including strong sorting for direct
+  strings;
 - [x] Fold equivalence to the traversal order produced by `elements`;
 - [ ] An extensionality theorem saying equal lookup at every key represents the
   same finite map;
@@ -436,8 +439,8 @@ Current validation status:
 - [x] Combining functions that preserve, transform, or delete left-only,
   right-only, and overlapping bindings;
 - [x] Both specialized unions;
-- [ ] `elements` completeness, uniqueness, and documented order: completeness
-  and uniqueness are checked, but direct-string ordering is not documented;
+- [x] `elements` completeness, uniqueness, and documented order, including
+  byte-lexicographic randomized checks for direct strings;
 - [x] Structural well-formedness of every tested result;
 - [ ] Differential equivalence between pure and optimized extraction backends.
 

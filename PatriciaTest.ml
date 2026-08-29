@@ -266,6 +266,8 @@ let check_string_table round operation keys reference tree =
     keys;
   let actual = S.elements tree in
   let actual_keys = List.map fst actual in
+  if actual_keys <> List.sort_uniq Stdlib.String.compare actual_keys then
+    failwith (Printf.sprintf "string round %d: elements are not byte-lexicographic" round);
   if List.length actual_keys <> List.length (List.sort_uniq compare actual_keys) then
     failwith (Printf.sprintf "string round %d: duplicate element key" round);
   if List.length actual <> Hashtbl.length reference then

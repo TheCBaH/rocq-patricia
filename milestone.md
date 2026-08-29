@@ -46,8 +46,9 @@ thresholds.
 - **done**: derive left- and right-biased union laws.
 - **done**: add string `beq` with pointwise and lookup-extensional correctness
   theorems.
-- **next**: specify and prove the direct-string `elements` ordering.
-- **later**: package standalone finite-map extensionality theorems.
+- **done**: specify the prefix-free bit-lexicographic order and prove that
+  direct-string `elements` is strongly sorted by it on well-formed trees.
+- **next**: package standalone finite-map extensionality theorems.
 
 ## M4: Harden the public extracted API
 
@@ -132,3 +133,8 @@ thresholds.
   checks over differently rebuilt trees. Rocq reports both theorems closed
   under the global context; `make proof`, `make`, the randomized oracle, and
   `make benchmark` passed.
+- **2026-08-29 — direct-string element ordering**: defined `bit_lex_lt` by
+  the first differing prefix-free logical bit and proved
+  `wf_elements_bit_lex_sorted`, which relates every earlier key to every later
+  key. Added randomized byte-lexicographic ordering checks over empty,
+  prefix-related, NUL-containing, non-ASCII, and arbitrary-byte keys.

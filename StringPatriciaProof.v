@@ -1,4 +1,5 @@
-From Stdlib Require Import Arith.Wf_nat Bool Lia List PeanoNat Strings.String.
+From Stdlib Require Import Arith.Wf_nat Bool Lia List PeanoNat Sorting.Sorted
+  Strings.String.
 Import ListNotations.
 
 Require Import StringBits StringPatricia.
@@ -114,6 +115,37 @@ Fixpoint all_keys {A : Type} (P : string -> Prop) (m : t A) : Prop :=
 
 Definition same_prefix (sample key : string) (split : nat) : Prop :=
   forall n, n < split -> bit_at sample n = bit_at key n.
+
+(** The strict order observed by a left-before-right Patricia traversal is
+    lexicographic order on the prefix-free logical bit view: at the first
+    differing position, the left key has [false] and the right key has
+    [true]. *)
+Definition bit_lex_lt (left right : string) : Prop :=
+  exists split,
+    first_diff left right = Some split /\
+    bit_at left split = false /\
+    bit_at right split = true.
+
+(** The scanner specification gives the forward direction (a reported split
+    is first).  This converse packages the form used by traversal and merge:
+    agreement below a split and disagreement at it force that exact split. *)
+Lemma first_diff_at:
+  forall left right split,
+    same_prefix left right split ->
+    bit_at left split <> bit_at right split ->
+    first_diff left right = Some split.
+Proof.
+  intros left right split Hprefix Hbit.
+  assert (Hneq : left <> right).
+  { intro E. subst right. apply Hbit. reflexivity. }
+  destruct (first_diff_unequal_exists left right Hneq) as [differing Hdiff].
+  destruct (first_diff_spec _ _ _ Hdiff) as [Hdifferent Hbefore].
+  assert (Hle : differing <= split).
+  { apply Nat.nlt_ge. intro Hgt. apply Hbit. apply Hbefore. exact Hgt. }
+  assert (Hge : split <= differing).
+  { apply Nat.nlt_ge. intro Hlt. apply Hdifferent. apply Hprefix. exact Hlt. }
+  assert (differing = split) by lia. subst differing. exact Hdiff.
+Qed.
 
 Inductive wf {A : Type} : t A -> Prop :=
 | wf_empty : wf Empty
@@ -257,6 +289,53 @@ Proof.
   intros A m Hwf key value. split.
   - apply get_elements_sound.
   - apply (wf_elements_complete A m Hwf).
+Qed.
+
+Lemma StronglySorted_app_cross:
+  forall (A : Type) (R : A -> A -> Prop) (left right : list A),
+    StronglySorted R left ->
+    StronglySorted R right ->
+    (forall x y, In x left -> In y right -> R x y) ->
+    StronglySorted R (left ++ right).
+Proof.
+  intros A R left right Hleft.
+  induction Hleft as [|x left Hsorted IH Hbefore]; intros Hright Hcross.
+  - exact Hright.
+  - cbn. constructor.
+    + apply IH; [exact Hright|].
+      intros a b Ha Hb. apply Hcross; [now right|exact Hb].
+    + apply Forall_app. split; [exact Hbefore|].
+      apply Forall_forall. intros y Hy. apply Hcross; [now left|exact Hy].
+Qed.
+
+Theorem wf_elements_bit_lex_sorted:
+  forall (A : Type) (m : t A),
+    wf m -> StronglySorted bit_lex_lt (List.map fst (elements m)).
+Proof.
+  intros A m Hwf. induction Hwf as
+      [|key value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr].
+  - cbn [elements elements_aux]. constructor.
+  - cbn [elements elements_aux]. constructor; constructor.
+  - rewrite elements_branch, List.map_app.
+    apply StronglySorted_app_cross; [exact IHl|exact IHr|].
+    intros left_key right_key Hleft Hright.
+    apply in_map_iff in Hleft.
+    destruct Hleft as [[stored_left value_left] [Eleft Hinleft]].
+    apply in_map_iff in Hright.
+    destruct Hright as [[stored_right value_right] [Eright Hinright]].
+    cbn in Eleft, Eright. subst stored_left stored_right.
+    pose proof (proj1 (all_keys_elements _ _ _) Hl
+      left_key value_left Hinleft) as [Hleft_prefix Hleft_bit].
+    pose proof (proj1 (all_keys_elements _ _ _) Hr
+      right_key value_right Hinright) as [Hright_prefix Hright_bit].
+    exists split. split.
+    + apply first_diff_at.
+      * intros n Hn.
+        rewrite <- (Hleft_prefix n Hn), <- (Hright_prefix n Hn).
+        reflexivity.
+      * rewrite Hleft_bit, Hright_bit. discriminate.
+    + now split.
 Qed.
 
 Lemma routed_key_elements:
@@ -1889,27 +1968,6 @@ Proof.
       intros stored H. exact (proj2 H).
     + eapply all_keys_impl; [exact Hold_keys|].
       intros stored H. exact (proj2 H).
-Qed.
-
-(** The scanner specification gives the forward direction (a reported split
-    is first).  This converse packages the form used by merge: agreement
-    below a split and disagreement at it force that exact split. *)
-Lemma first_diff_at:
-  forall left right split,
-    same_prefix left right split ->
-    bit_at left split <> bit_at right split ->
-    first_diff left right = Some split.
-Proof.
-  intros left right split Hprefix Hbit.
-  assert (Hneq : left <> right).
-  { intro E. subst right. apply Hbit. reflexivity. }
-  destruct (first_diff_unequal_exists left right Hneq) as [differing Hdiff].
-  destruct (first_diff_spec _ _ _ Hdiff) as [Hdifferent Hbefore].
-  assert (Hle : differing <= split).
-  { apply Nat.nlt_ge. intro Hgt. apply Hbit. apply Hbefore. exact Hgt. }
-  assert (Hge : split <= differing).
-  { apply Nat.nlt_ge. intro Hlt. apply Hdifferent. apply Hprefix. exact Hlt. }
-  assert (differing = split) by lia. subst differing. exact Hdiff.
 Qed.
 
 (** [join] also handles an empty filtered side.  This version of the disjoint

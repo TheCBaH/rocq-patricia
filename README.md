@@ -87,7 +87,8 @@ The direct-string proof files currently establish, without axioms:
   routing invariant;
 - representative and routed-leaf soundness;
 - two-way agreement between `get` and `elements` on well-formed trees,
-  completeness of lookup, unique element keys, and unique bindings;
+  completeness of lookup, unique element keys, unique bindings, and strong
+  sorting by the prefix-free bit-stream lexicographic order;
 - the general lookup specification for `remove`, structural identity for an
   absent key, plus the corresponding `elements` filtering specification;
 - the unconditional `set` lookup law and well-formedness preservation,
@@ -101,6 +102,9 @@ The direct-string proof files currently establish, without axioms:
 - simultaneous lookup correctness and well-formedness for `combine_fuel` and
   public `combine` under `f None None = None`.
 - pointwise and lookup-extensional correctness of string `beq` on `wf` trees.
+- strong sorting of string `elements`: every earlier key precedes every later
+  key at their first differing prefix-free logical bit (`false` before
+  `true`).
 
 `join_separated_correct_wf` proves the string-tree join law under explicit
 prefix/bit-separation preconditions, including filtered empty sides. The
