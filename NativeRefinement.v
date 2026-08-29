@@ -73,7 +73,7 @@ Proof.
   intros position. unfold encode_position, packed_position.
   replace (16 * (position / 9) + position mod 9)
     with (position mod 9 + (position / 9) * 16) by lia.
-  rewrite Nat.mod_add by lia.
+  rewrite Nat.Div0.mod_add.
   assert (Hsmall : position mod 9 < 16).
   { pose proof (Nat.mod_bound_pos position 9 ltac:(lia) ltac:(lia)); lia. }
   rewrite (Nat.mod_small (position mod 9) 16 Hsmall).
@@ -108,7 +108,7 @@ Proof.
   { rewrite Nat.div_add_l by lia. rewrite Nat.div_small by lia. lia. }
   assert (Hmod : (byte * 9 + tag) mod 9 = tag).
   { replace (byte * 9 + tag) with (tag + byte * 9) by lia.
-    rewrite Nat.mod_add by lia. rewrite Nat.mod_small by lia. reflexivity. }
+    rewrite Nat.Div0.mod_add. rewrite Nat.mod_small by lia. reflexivity. }
   now rewrite Hdiv, Hmod.
 Qed.
 
@@ -191,6 +191,17 @@ Proof.
     + cbn [String.get]. apply IH. cbn in Hbound. lia.
 Qed.
 
+Lemma string_get_in_bounds:
+  forall s byte, byte < String.length s ->
+    exists ch, String.get byte s = Some ch.
+Proof.
+  induction s as [|ch rest IH]; intros byte Hbound.
+  - cbn in Hbound. lia.
+  - destruct byte as [|byte].
+    + exists ch. reflexivity.
+    + cbn [String.get]. apply IH. cbn in Hbound. lia.
+Qed.
+
 Lemma packed_bit_at_past_end:
   forall s token, String.length s <= token / 16 ->
     packed_bit_at s token = false.
@@ -259,10 +270,35 @@ Proof.
     rewrite (Nat.div_small tag 16) by lia. lia. }
   assert (Hmod : (16 * byte + tag) mod 16 = tag).
   { replace (16 * byte + tag) with (tag + byte * 16) by lia.
-    rewrite Nat.mod_add by lia.
+    rewrite Nat.Div0.mod_add.
     rewrite (Nat.mod_small tag 16) by lia. reflexivity. }
   rewrite Hdiv, Hmod.
   symmetry. apply bit_at_logical_position. exact Htag.
+Qed.
+
+Lemma packed_bit_at_marker_spec:
+  forall s byte,
+    packed_bit_at s (packed_position byte 0) = true <->
+      byte < String.length s.
+Proof.
+  intros s byte. unfold packed_bit_at, packed_position.
+  assert (Hdiv : (16 * byte + 0) / 16 = byte).
+  { replace (16 * byte + 0) with (byte * 16) by lia.
+    apply Nat.div_mul. lia. }
+  assert (Hmod : (16 * byte + 0) mod 16 = 0).
+  { replace (16 * byte + 0) with (byte * 16) by lia.
+    apply Nat.Div0.mod_mul. }
+  rewrite Hdiv, Hmod.
+  destruct (String.get byte s) as [ch|] eqn:Hget.
+  - split; intros _.
+    + apply Nat.nle_gt. intros Hbound.
+      rewrite string_get_past_end in Hget by exact Hbound. discriminate.
+    + reflexivity.
+  - split.
+    + discriminate.
+    + intros Hbound. exfalso.
+      destruct (string_get_in_bounds s byte Hbound) as [ch Hsome].
+      rewrite Hsome in Hget. discriminate.
 Qed.
 
 Lemma packed_bit_at_encode:

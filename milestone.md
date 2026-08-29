@@ -75,9 +75,10 @@ thresholds.
   source-level packed `bit_at` worker correct at encoded positions. They also
   prove the valid-token round trip and characterize the packed first difference
   as the unique unequal valid token after an equal prefix; the safe worker also
-  rejects out-of-range byte reads and tags 9–15. Proving the handwritten OCaml
-  primitive/string correspondence and bytewise `first_diff` realizer against
-  these specifications is next.
+  rejects out-of-range byte reads and tags 9–15, while its marker is true
+  exactly for an in-range byte. Proving the handwritten OCaml primitive/string
+  correspondence and bytewise `first_diff` realizer against these
+  specifications is next.
 - **done**: require every well-formed string branch's cached sample to be a
   resident binding and preserve that requirement through all smart operations.
 - **later**: replace handwritten direct `set`, `combine`, and biased-union
@@ -238,3 +239,7 @@ thresholds.
   NUL-containing, high-byte, and long-prefix inputs, and rejects any
   `first_diff` result with an invalid tag. This is focused executable evidence
   for the packed guard contract, not a refinement proof.
+- **2026-08-29 — exact packed continuation marker**: proved that the safe
+  packed worker returns `true` at tag zero exactly when the indexed byte exists,
+  using companion in-bounds and past-end `String.get` laws. This completes the
+  safe model of the native byte-presence guard, but not unsafe-access refinement.
