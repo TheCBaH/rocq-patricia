@@ -181,6 +181,20 @@ let check_string_bits () =
     in
     scan 0
   in
+  let check_packed_bit_guards string =
+    for byte = 0 to Stdlib.String.length string + 2 do
+      for tag = 0 to 15 do
+        let token = (byte lsl 4) lor tag in
+        let expected =
+          if tag <= 8 then reference_bit string ((9 * byte) + tag) else false
+        in
+        if StringBits.bit_at string token <> expected then
+          failwith
+            (Printf.sprintf "packed bit_at guard %S byte %d tag %d"
+               string byte tag)
+      done
+    done
+  in
   let check left right =
     let expected = reference_first_diff left right in
     let actual = StringBits.first_diff left right in
@@ -190,6 +204,10 @@ let check_string_bits () =
            left right
            (match expected with None -> "None" | Some split -> string_of_int split)
            (match actual with None -> "None" | Some split -> string_of_int split));
+    (match actual with
+     | Some token when token land 15 > 8 ->
+         failwith (Printf.sprintf "first_diff returned invalid tag %d" token)
+     | _ -> ());
     let limit = 9 * max (Stdlib.String.length left) (Stdlib.String.length right) + 1 in
     for split = 0 to limit do
       let expected = reference_agrees_before left right split in
@@ -208,7 +226,10 @@ let check_string_bits () =
     done
   done;
   List.iter
-    (fun (left, right) -> check left right; check right left)
+    (fun (left, right) ->
+       check_packed_bit_guards left;
+       check_packed_bit_guards right;
+       check left right; check right left)
     ["", ""; "", "\000"; "a", "a\000"; "prefix", "prefix\255";
      Stdlib.String.make 192 'p', Stdlib.String.make 192 'p' ^ "\128"]
 

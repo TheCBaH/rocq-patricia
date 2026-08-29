@@ -233,3 +233,8 @@ thresholds.
   packed `bit_at` worker returns `false` after the final byte and for every
   invalid tag (9–15). This models the checks surrounding native unsafe access;
   proving their correspondence to that primitive remains open.
+- **2026-08-29 — packed-token guard validation**: the native oracle now checks
+  all sixteen tags for in-range and out-of-range byte indices on empty,
+  NUL-containing, high-byte, and long-prefix inputs, and rejects any
+  `first_diff` result with an invalid tag. This is focused executable evidence
+  for the packed guard contract, not a refinement proof.
