@@ -69,8 +69,11 @@ thresholds.
 
 ## M5: Reduce the trusted native-refinement boundary
 
-- **next**: formalize the finite-width integer and packed string-position
-  representation relations.
+- **in progress**: `NativeRefinement.v` formalizes the 62-bit positive-key
+  domain and the logical-string-position/packed-token codec. Its kernel proofs
+  cover decode-after-encode, valid tags, injectivity, ordering, and semantic
+  transports for `bit_at` and `first_diff`; proving the handwritten OCaml
+  arithmetic and bytewise realizers against those transports is next.
 - **done**: require every well-formed string branch's cached sample to be a
   resident binding and preserve that requirement through all smart operations.
 - **later**: replace handwritten direct `set`, `combine`, and biased-union
@@ -194,3 +197,12 @@ thresholds.
   invariant. `wf_cached_sample_resident` exports the consequence directly. All
   209 proof declarations are closed under the global context; `make`, both
   deterministic test suites, `make benchmark`, and `git diff --check` passed.
+- **2026-08-29 — representation-relation foundation**: added
+  `NativeRefinement.v`, which specifies the 62-bit native positive-key domain
+  and the logical-position to packed-token codec used by string extraction.
+  Its 13 new closed lemmas prove codec validity, decoding, injectivity, order,
+  and semantic transports for packed `bit_at`/`first_diff`. The normal proof
+  target and source-driven assumption audit include this module; `make` passed
+  with 222 declarations closed under the global context, and both deterministic
+  test suites passed. The OCaml realizer refinements are deliberately still
+  pending.

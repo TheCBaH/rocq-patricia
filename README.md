@@ -45,7 +45,10 @@ base-62 strings bounded by `PATRICIA_BENCH_VARIABLE_STRING_MAX_LENGTH`
 `PatriciaBits.v` fixes the proof-side positive-key convention. `StringBits.v`
 defines the prefix-free string bit view (a continuation marker plus eight bits
 per byte and an end marker), so empty strings, embedded zero bytes, and prefix
-keys are distinct. `PatriciaExtract.v` generates implementation backends under
+keys are distinct. `NativeRefinement.v` records the supported 62-bit native
+key domain and the codec between logical string-bit positions and the packed
+native tokens; it proves the codec laws but not the OCaml realizer refinements.
+`PatriciaExtract.v` generates implementation backends under
 `patricia/extracted/`; the build names the map modules `PatriciaInternal` and
 `StringPatriciaInternal`. `PatriciaReferenceExtract.v` separately generates
 the executable Rocq definitions without Patricia-specific custom realizers,
@@ -135,10 +138,10 @@ The direct-string proof files currently establish, without axioms:
   `true`).
 
 The normal build discovers every top-level `Lemma`, `Theorem`, and `Corollary`
-in `PatriciaBits`, `StringBits`, `PatriciaProof`, and `StringPatriciaProof`, then
-runs `Print Assumptions` on each. Validation fails on reported axioms, Rocq
-errors, or any mismatch between discovered declarations and results closed
-under the global context.
+in the source proof modules, including `NativeRefinement`, then runs `Print
+Assumptions` on each. Validation fails on reported axioms, Rocq errors, or any
+mismatch between discovered declarations and results closed under the global
+context.
 
 `join_separated_correct_wf` proves the string-tree join law under explicit
 prefix/bit-separation preconditions, including filtered empty sides. The

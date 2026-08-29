@@ -5,7 +5,7 @@ OCAMLDEP ?= /opt/opam/4.14.3/bin/ocamldep
 ROCQFLAGS := -q -Q . ''
 
 VFILES := PatriciaBits.v Patricia.v PatriciaProof.v \
-	StringBits.v StringPatricia.v StringPatriciaProof.v
+	StringBits.v NativeRefinement.v StringPatricia.v StringPatriciaProof.v
 VOFILES := $(VFILES:.v=.vo)
 PUBLIC_INTERFACES := PatriciaMap.mli StringPatriciaMap.mli
 PUBLIC_IMPLEMENTATIONS := PatriciaMap.ml StringPatriciaMap.ml
@@ -86,6 +86,7 @@ benchmark: ocaml PatriciaBenchmark.ml
 Patricia.vo: PatriciaBits.vo
 PatriciaProof.vo: PatriciaBits.vo Patricia.vo
 StringPatricia.vo: StringBits.vo
+NativeRefinement.vo: PatriciaBits.vo StringBits.vo
 StringPatriciaProof.vo: StringBits.vo StringPatricia.vo
 
 %.vo: %.v

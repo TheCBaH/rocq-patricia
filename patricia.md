@@ -37,9 +37,9 @@ The following checks passed:
   compilation, and the deterministic randomized oracle test;
 - a source scan found no `Admitted`, `admit`, `Axiom`, aborted proof, or similar
   unresolved proof escape in the Patricia sources;
-- the source-driven `Print Assumptions` audit discovered all 209 top-level
-  lemmas, theorems, and corollaries across both bit-specification and map-proof
-  modules and reported every one closed under the global context;
+- the source-driven `Print Assumptions` audit discovers every top-level lemma,
+  theorem, and corollary across the bit-specification, map-proof, and native
+  representation modules, and reports each closed under the global context;
 - additional integer fuzzing used keys across the positive OCaml `int` range,
   including high-bit boundary values, and checked lookup, elements, merge, and
   routing invariants;
@@ -173,9 +173,9 @@ does not inspect either kind of extraction directive.
 
 | Native deviation | What present validation establishes | Formal status and proof route |
 | --- | --- | --- |
-| `positive`, `N`, and `nat` represented by OCaml `int`; Rocq strings represented by OCaml strings | Wrapper tests reject `min_int`, negative values, and zero; accept and round-trip one and `max_int`; and the oracle covers positive keys through `max_int`, byte strings, and valid split positions used by the map | Source theorems use unbounded values. The abstract checked key wrapper enforces the positive native input domain, but a fixed-width key/string representation relation and operation refinements remain to be proved, or the source model must change to `Uint63` and primitive strings. |
-| Integer `word`, prefix, prefix match, routing bit, highest differing bit, and mask ordering | Boundary-key fuzzing and structural checks found no mismatch | These are small, formally provable word lemmas. Prove them against a 63-bit model; equality with the unbounded model then holds for keys in `1 .. max_int`. |
-| Packed string split token `(byte << 4) | tag`, native `bit_at`, and bytewise `first_diff` | `first_diff` is checked for all 65,536 one-byte pairs plus prefix and long-prefix cases; structural tests check `bit_at` routing over NUL, non-ASCII, and randomized strings | This requires a relational theorem, not equality at the same extracted integer: logical position 9 is encoded as token 16, and exported native `bit_at s 9` therefore does not denote pure `bit_at s 9`. Prove `native_bit_at s (encode n) = bit_at s n`, `native_first_diff = option_map encode first_diff`, validity and order preservation of tokens, then hide raw tokens from clients. |
+| `positive`, `N`, and `nat` represented by OCaml `int`; Rocq strings represented by OCaml strings | Wrapper tests reject `min_int`, negative values, and zero; accept and round-trip one and `max_int`; and the oracle covers positive keys through `max_int`, byte strings, and valid split positions used by the map | `NativeRefinement.v` fixes the supported 64-bit non-negative `int` payload domain at 62 bits and names the positive-key relation. It does not yet prove that native arithmetic, shifts, or the bounded string representation refine the unbounded source operations. |
+| Integer `word`, prefix, prefix match, routing bit, highest differing bit, and mask ordering | Boundary-key fuzzing and structural checks found no mismatch | These are small, formally provable word lemmas. Prove them against the supported 62-bit non-negative OCaml-`int` payload model; equality with the unbounded model then holds for keys in `1 .. max_int`. |
+| Packed string split token `(byte << 4) | tag`, native `bit_at`, and bytewise `first_diff` | `first_diff` is checked for all 65,536 one-byte pairs plus prefix and long-prefix cases; structural tests check `bit_at` routing over NUL, non-ASCII, and randomized strings | `NativeRefinement.v` proves the logical `9*b+t` to packed `16*b+t` codec, valid-tag property, injectivity, byte/tag order, and semantic transports for `bit_at` and `first_diff`. The native bytewise realizers have not yet been proved to implement those transports; logical position 9 remains token 16, so direct equality at the same extracted integer is intentionally false. |
 | A branch sample returned as its constant-time `representative` | `wf_branch` now requires `resident sample (Branch ...)`, and every smart constructor and public-operation preservation theorem discharges that premise; structural tests independently check the property | Cached-sample residency is now kernel-checked (`wf_cached_sample_resident`). This justifies the native result as an actual binding, but it does not make it definitionally equal to the source representative, which may select a different resident key; consumers still require a refinement argument based on representative independence. |
 | Exception-based one-descent string `set` | Existing/fresh-key oracle tests and structural checks pass | Define a source worker returning either a rebuilt tree or a discriminator to bubble upward, prove it equivalent to `set`, and extract it. Proving the exact local-exception OCaml code instead requires a target-language logic supporting exceptions. |
 | Fuel-free integer and string `combine` | Randomized merges agree with reference maps; both source `combine` definitions are proved | Define well-founded recursion over `size left + size right`, prove its equations and equivalence to sufficiently fuelled `combine_fuel`, and extract that definition. |
@@ -442,13 +442,17 @@ and establish bounds for:
   functions that encode and decode logical positions.
 - [x] Enforce the generic-combine finite-map condition through three explicit
   one-sided/overlap callbacks.
+- [x] Specify the 62-bit native positive-key domain and the logical/packed
+  string-position codec in Rocq.  The target arithmetic and bytewise-realizer
+  refinement proofs remain open.
 - [ ] Add a CompCert `TREE` adapter only after its required laws are enumerated and
   proved.
 - [x] Make extraction reproducible through the normal build and ensure generated
   files are never hand-edited.
 - [x] Run `Print Assumptions` over every top-level proof declaration during the
   normal build, with count checking so new declarations are included
-  automatically. Repository-level CI wiring remains separate.
+  automatically. The audit includes `NativeRefinement.v`; repository-level CI
+  wiring remains separate.
 
 ### Phase 8: expand automated validation
 
