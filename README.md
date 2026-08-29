@@ -15,28 +15,32 @@ Run:
 make -C patricia
 ```
 
-For a native-code comparison with OCaml's standard-library AVL tree, run:
+For a native-code comparison with OCaml's standard-library AVL tree and hash
+table, run:
 
 ```sh
 make -C patricia benchmark
 ```
 
-The comparison verifies each measured Patricia result against `Stdlib.Map` and
-reports build, lookup, membership, traversal (`elements`), add, update, and
-present/absent remove time, retained heap words per binding, and allocated
-words. Failed Patricia deletions additionally check physical root identity. It also
-reports checked generic-combine leaf/tree transformations and deletions, plus
-allocation and time for left-biased unions with disjoint and half-overlapping inputs.  Integer keys and
-independent 3-, 4-, and 5-character ASCII-alphanumeric string key sets are
-measured separately.
+The comparison verifies each measured Patricia and `Stdlib.Hashtbl` result
+against `Stdlib.Map`. It reports build, lookup, membership, traversal
+(`elements`), add, update, and present/absent remove time, retained heap words
+per binding, and allocated words. Failed Patricia deletions additionally check
+physical root identity. It also reports checked generic-combine leaf/tree
+transformations and deletions, plus allocation and time for left-biased unions
+with disjoint and half-overlapping inputs. Integer keys; independent 3-, 4-,
+and 5-character ASCII-alphanumeric string key sets; and a variable-length
+string case are measured separately.
 The default is 10,000 bindings per input tree; set `PATRICIA_BENCH_SIZE` to
 change it (the three-character case permits at most 119,164 bindings per
 input tree, because each benchmark also constructs a disjoint tree).  Reported
 figures are benchmark evidence, not machine-independent pass/fail limits or
-formal complexity proofs.  Set `PATRICIA_BENCH_STRING_LENGTHS` to a
-comma-separated subset of positive key lengths when a requested size exceeds
-a shorter key space; for example, use `4,5` at one million bindings and `5`
-at ten million.
+formal complexity proofs. The default fixed-length cases omit lengths too
+short for the requested pair of disjoint input ranges. Set
+`PATRICIA_BENCH_STRING_LENGTHS` to a comma-separated subset of positive key
+lengths to select fixed-width cases explicitly. The variable-width case uses
+base-62 strings bounded by `PATRICIA_BENCH_VARIABLE_STRING_MAX_LENGTH`
+(default `128`); increase that bound when its key space is too small.
 
 `PatriciaBits.v` fixes the proof-side positive-key convention. `StringBits.v`
 defines the prefix-free string bit view (a continuation marker plus eight bits
