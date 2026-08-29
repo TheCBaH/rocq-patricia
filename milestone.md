@@ -69,9 +69,10 @@ thresholds.
 
 ## M5: Reduce the trusted native-refinement boundary
 
-- **later**: formalize the finite-width integer and packed string-position
+- **next**: formalize the finite-width integer and packed string-position
   representation relations.
-- **next**: strengthen the string invariant with cached-sample residency.
+- **done**: require every well-formed string branch's cached sample to be a
+  resident binding and preserve that requirement through all smart operations.
 - **later**: replace handwritten direct `set`, `combine`, and biased-union
   realizers with proved source-level workers or prove their refinements.
 - **done**: discover every top-level proof declaration and run `Print Assumptions`
@@ -183,6 +184,13 @@ thresholds.
 - **2026-08-29 — exhaustive assumption audit**: the normal build now discovers
   every top-level `Lemma`, `Theorem`, and `Corollary` in the two bit modules and
   two map-proof modules, runs `Print Assumptions` for each, and fails on axioms,
-  Rocq errors, anomalies, or a declaration/result count mismatch. All 206
-  current declarations are closed under the global context; `make`, both
+  Rocq errors, anomalies, or a declaration/result count mismatch. All
+  then-current declarations were closed under the global context; `make`, both
+  deterministic test suites, `make benchmark`, and `git diff --check` passed.
+- **2026-08-29 — cached-sample residency invariant**: `wf_branch` now carries
+  `resident sample (Branch ...)`, defined as a successful lookup of the cached
+  key. Smart branch collapse, mapping/filtering, removal, existing and fresh
+  insertion, join, generic combine, and both unions all preserve the stronger
+  invariant. `wf_cached_sample_resident` exports the consequence directly. All
+  209 proof declarations are closed under the global context; `make`, both
   deterministic test suites, `make benchmark`, and `git diff --check` passed.

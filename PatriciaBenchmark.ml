@@ -34,9 +34,22 @@ let benchmark_size =
 
 let lookup_repetitions = 3
 
+let string_key_space_at_least length required =
+  let rec loop remaining capacity =
+    if capacity >= required then true
+    else if remaining = 0 then false
+    else loop (remaining - 1) (capacity * 62)
+  in
+  loop length 1
+
+let has_string_key_space length =
+  (* Each workload builds two disjoint input ranges. *)
+  string_key_space_at_least length (2 * benchmark_size)
+
 let string_key_lengths =
   match Sys.getenv_opt "PATRICIA_BENCH_STRING_LENGTHS" with
-  | None -> [3; 4; 5]
+  | None ->
+      List.filter has_string_key_space [3; 4; 5]
   | Some value ->
       let parse length =
         try
@@ -50,6 +63,12 @@ let string_key_lengths =
       let lengths = List.map parse (Stdlib.String.split_on_char ',' value) in
       if lengths = [] then
         invalid_arg "PATRICIA_BENCH_STRING_LENGTHS must not be empty";
+      List.iter
+        (fun length ->
+           if not (has_string_key_space length) then
+             invalid_arg
+               "PATRICIA_BENCH_STRING_LENGTHS contains a key length that cannot hold two disjoint input ranges")
+        lengths;
       lengths
 
 type build_measurement = {
@@ -142,6 +161,17 @@ let patricia_cardinal map =
 let string_patricia_cardinal map =
   StringPatricia.fold (fun count _ _ -> count + 1) map 0
 
+(* [List.map] in the supported OCaml version uses one stack frame per input
+   element.  Benchmark validation processes lists as large as the configured
+   map cardinality, so keep this conversion stack-safe. *)
+let int_bindings_of_patricia bindings =
+  let rec loop reversed = function
+    | [] -> List.rev reversed
+    | (key, value) :: rest ->
+        loop ((Patricia.Key.to_int key, value) :: reversed) rest
+  in
+  loop [] bindings
+
 let check_int_equivalent keys patricia avl =
   Array.iter
     (fun key ->
@@ -176,11 +206,7 @@ let string_patricia_combiner : (int, int, int) StringPatricia.combiner = {
 }
 
 let check_int_bindings context patricia avl =
-  let bindings =
-    List.map
-      (fun (key, value) -> Patricia.Key.to_int key, value)
-      (Patricia.elements patricia)
-  in
+  let bindings = int_bindings_of_patricia (Patricia.elements patricia) in
   if bindings <> Int_avl.bindings avl then
     failwith (context ^ " differs from Stdlib.Map.merge")
 
@@ -316,11 +342,7 @@ let time_int_elements patricia avl =
   let avl_bindings, avl_measurement =
     measure_operation (fun () -> Int_avl.bindings avl)
   in
-  let patricia_bindings =
-    List.map
-      (fun (key, value) -> Patricia.Key.to_int key, value)
-      patricia_bindings
-  in
+  let patricia_bindings = int_bindings_of_patricia patricia_bindings in
   if patricia_bindings <> avl_bindings then
     failwith "integer elements differ from Stdlib.Map bindings";
   report_operation "elements" patricia_measurement avl_measurement benchmark_size

@@ -535,11 +535,11 @@ A sensible development path is:
 **Expected impact:** likely useful for removal, join, and union; magnitude is
 not yet measured.
 
-Every `Branch` already stores `sample`. However, the current invariant only
-states that descendant keys agree with `sample` before the split; it does not
-state that `sample` is itself a binding in the subtree. Consequently,
-`representative` cannot simply return the stored field under the current proof
-contract.
+Every `Branch` already stores `sample`. The strengthened `wf_branch` now states
+both the routing-prefix conditions and `resident sample (Branch ...)`, meaning
+lookup of the cached sample succeeds. Every branch-building preservation proof,
+including deletion, filtering, insertion, combine, and biased union, maintains
+that property. `wf_cached_sample_resident` exposes it directly.
 
 There are three implementation choices:
 
@@ -550,11 +550,11 @@ There are three implementation choices:
 3. avoid recomputing the sample when the old sample is known not to have been
    removed, and search only when it becomes invalid.
 
-The first choice gives the simplest runtime read but increases proof
-obligations for every branch-building operation. It does not increase the node
-size because the sample field already exists. The second may introduce
-transient pairs. The third minimizes structural changes but adds conditional
-logic and string equality.
+The first choice is now implemented. It gives the simplest runtime read and
+does not increase the node size because the sample field already exists. The
+remaining refinement obligation is subtler than residency: the pure
+representative descent and cached read may choose different resident keys, so
+native consumers must be shown independent of that choice.
 
 An alternative is to remove the sample field and find representatives by
 descent. That would reduce tree nodes toward seven words per binding, but it
@@ -685,7 +685,7 @@ extraction boundary.
 Rocq proof files and both extractions, audits every top-level proof declaration
 with `Print Assumptions`, rebuilds the bytecode clients, and runs both
 `PatriciaTest.ml` and the optimized/reference differential suite. The audit
-currently reports all 206 declarations closed under the global context.
+currently reports all 209 declarations closed under the global context.
 The test suite differentially checks the packed `first_diff` scanner against
 the logical nine-bit model for all 65,536 pairs of one-byte strings. It also
 covers empty strings, prefixes, embedded NULs, non-ASCII bytes, and long

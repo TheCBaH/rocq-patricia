@@ -190,10 +190,12 @@ Extract Constant StringBits.agrees_before_bounded =>
                  split_byte split_tag (byte + 1)
      in scan left right left_length right_length common split_byte split_tag 0)".
 
-(** Every branch built by the public operations caches a resident key in its
-    sample field.  Use that cache in native code rather than walking to a
-    leaf.  The pure [representative] remains the specification for arbitrary
-    constructor-built values. *)
+(** Every well-formed branch caches a resident key in its sample field;
+    [StringPatriciaProof.wf_cached_sample_resident] exposes that invariant, and
+    all public-operation preservation theorems maintain it.  Use the cache in
+    native code rather than walking to a leaf.  The pure [representative] may
+    select a different resident key, so full native refinement must rely on
+    representative-choice independence rather than definitional equality. *)
 Extract Constant StringPatricia.representative =>
   "(function
      | Empty -> None

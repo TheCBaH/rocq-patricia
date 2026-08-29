@@ -104,7 +104,8 @@ Proof.
 Qed.
 
 (** A well-formed branch separates all keys in its left and right subtrees at
-    [split], and every key below it shares the sample's preceding bits. *)
+    [split], every key below it shares the sample's preceding bits, and the
+    cached sample is itself a resident binding. *)
 
 Fixpoint all_keys {A : Type} (P : string -> Prop) (m : t A) : Prop :=
   match m with
@@ -115,6 +116,12 @@ Fixpoint all_keys {A : Type} (P : string -> Prop) (m : t A) : Prop :=
 
 Definition same_prefix (sample key : string) (split : nat) : Prop :=
   forall n, n < split -> bit_at sample n = bit_at key n.
+
+(** Native branches use their cached sample as a constant-time
+    representative.  Residency states the semantic property required by that
+    realization: looking up the sample in the represented map succeeds. *)
+Definition resident {A : Type} (key : string) (m : t A) : Prop :=
+  exists value, get key m = Some value.
 
 (** The strict order observed by a left-before-right Patricia traversal is
     lexicographic order on the prefix-free logical bit view: at the first
@@ -159,7 +166,17 @@ Inductive wf {A : Type} : t A -> Prop :=
       same_prefix sample key split /\ bit_at key split = false) ltree ->
     all_keys (fun key =>
       same_prefix sample key split /\ bit_at key split = true) rtree ->
+    resident sample (Branch sample split ltree rtree) ->
     wf (Branch sample split ltree rtree).
+
+Theorem wf_cached_sample_resident:
+  forall (A : Type) sample split (ltree rtree : t A),
+    wf (Branch sample split ltree rtree) ->
+    resident sample (Branch sample split ltree rtree).
+Proof.
+  intros A sample split ltree rtree Hwf.
+  inversion Hwf. assumption.
+Qed.
 
 (** Finite-map equality is observational equality of lookup, not structural
     equality of Patricia trees. *)
@@ -287,7 +304,7 @@ Lemma wf_elements_complete:
 Proof.
   intros A m Hwf. induction Hwf as
       [|stored stored_value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr]; intros key value Hin.
+       Hnel Hner Hl Hr Hresident]; intros key value Hin.
   - cbn [elements elements_aux] in Hin. contradiction.
   - cbn [elements elements_aux] in Hin.
     destruct Hin as [E|Hnone]; [|contradiction]. inversion E; subst.
@@ -364,7 +381,7 @@ Theorem wf_elements_bit_lex_sorted:
 Proof.
   intros A m Hwf. induction Hwf as
       [|key value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr].
+       Hnel Hner Hl Hr Hresident].
   - cbn [elements elements_aux]. constructor.
   - cbn [elements elements_aux]. constructor; constructor.
   - rewrite elements_branch, List.map_app.
@@ -422,7 +439,7 @@ Lemma wf_elements_keys_nodup:
 Proof.
   intros A m Hwf. induction Hwf as
       [|key value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr].
+       Hnel Hner Hl Hr Hresident].
   - cbn [elements elements_aux]. constructor.
   - cbn [elements elements_aux].
     constructor; [intro H; inversion H|constructor].
@@ -565,7 +582,7 @@ Proof.
   revert outer_sample bound side.
   induction Hwf as
       [|key value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr]; intros outer_sample bound side Hall; cbn in *.
+       Hnel Hner Hl Hr Hresident]; intros outer_sample bound side Hall; cbn in *.
   - exact I.
   - exact I.
   - destruct Hall as [Houter_left Houter_right].
@@ -612,7 +629,7 @@ Theorem wf_splits_ordered:
 Proof.
   intros A m Hwf. induction Hwf as
       [|key value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr]; cbn.
+       Hnel Hner Hl Hr Hresident]; cbn.
   - exact I.
   - exact I.
   - repeat split; try assumption.
@@ -816,6 +833,31 @@ Proof.
          end; cbn [get]; rewrite E; reflexivity.
 Qed.
 
+Lemma representative_resident_wf:
+  forall (A : Type) (m : t A) key,
+    wf m -> representative m = Some key -> resident key m.
+Proof.
+  intros A m key Hwf Hrep.
+  destruct (representative_elements A m key Hrep) as [value Hin].
+  exists value. now apply (wf_elements_complete A m Hwf).
+Qed.
+
+Lemma branch_sample_resident:
+  forall (A : Type) sample split (ltree rtree : t A),
+    wf ltree ->
+    representative ltree = Some sample ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) ltree ->
+    resident sample (Branch sample split ltree rtree).
+Proof.
+  intros A sample split ltree rtree Hwf Hrep Hall.
+  destruct (representative_resident_wf A ltree sample Hwf Hrep)
+    as [value Hget].
+  pose proof (representative_all_keys A _ ltree sample Hall Hrep)
+    as [_ Hbit].
+  exists value. cbn [get]. now rewrite Hbit.
+Qed.
+
 Lemma branch_wf:
   forall (A : Type) sample split (ltree rtree : t A),
     wf ltree -> wf rtree ->
@@ -861,6 +903,10 @@ Proof.
     + exact Hner.
     + apply Hleft_rebase. reflexivity.
     + apply Hright_rebase. reflexivity.
+    + apply branch_sample_resident with (ltree := Leaf left_key left_value).
+      * exact Hwl.
+      * reflexivity.
+      * apply Hleft_rebase. reflexivity.
   - cbn. apply wf_branch.
     + exact Hwl.
     + exact Hwr.
@@ -868,6 +914,10 @@ Proof.
     + exact Hner.
     + apply Hleft_rebase. reflexivity.
     + apply Hright_rebase. reflexivity.
+    + apply branch_sample_resident with (ltree := Leaf left_key left_value).
+      * exact Hwl.
+      * reflexivity.
+      * apply Hleft_rebase. reflexivity.
   - destruct (representative (Branch left_sample left_split left_left left_right))
       eqn:Erep.
     + apply wf_branch.
@@ -877,6 +927,11 @@ Proof.
       * exact Hner.
       * apply Hleft_rebase. reflexivity.
       * apply Hright_rebase. reflexivity.
+      * apply branch_sample_resident with
+          (ltree := Branch left_sample left_split left_left left_right).
+        -- exact Hwl.
+        -- exact Erep.
+        -- apply Hleft_rebase. reflexivity.
     + exfalso. apply Hnel. reflexivity.
   - destruct (representative (Branch left_sample left_split left_left left_right))
       eqn:Erep.
@@ -887,6 +942,11 @@ Proof.
       * exact Hner.
       * apply Hleft_rebase. reflexivity.
       * apply Hright_rebase. reflexivity.
+      * apply branch_sample_resident with
+          (ltree := Branch left_sample left_split left_left left_right).
+        -- exact Hwl.
+        -- exact Erep.
+        -- apply Hleft_rebase. reflexivity.
     + exfalso. apply Hnel. reflexivity.
 Qed.
 
@@ -978,7 +1038,7 @@ Lemma wf_representative_none:
 Proof.
   intros A m Hwf. induction Hwf as
       [|key value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr]; intros Hrep; cbn in Hrep.
+       Hnel Hner Hl Hr Hresident]; intros Hrep; cbn in Hrep.
   - reflexivity.
   - discriminate.
   - destruct (representative ltree) eqn:Eleft.
@@ -1010,7 +1070,7 @@ Theorem remove_reference_wf:
 Proof.
   intros A key m Hwf. induction Hwf as
       [|stored value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr]; cbn [remove_reference].
+       Hnel Hner Hl Hr Hresident]; cbn [remove_reference].
   - constructor.
   - destruct (String.eqb key stored); constructor.
   - destruct (bit_at key split).
@@ -1043,7 +1103,7 @@ Theorem get_remove_reference:
 Proof.
   intros A key query m Hwf. induction Hwf as
       [|stored value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr].
+       Hnel Hner Hl Hr Hresident].
   - cbn. destruct (String.eqb query key); reflexivity.
   - cbn [remove_reference get]. destruct (String.string_dec query key) as [->|Hqk].
     + rewrite String.eqb_refl. destruct (String.eqb key stored) eqn:Eks;
@@ -1160,7 +1220,7 @@ Theorem map_wf:
 Proof.
   intros A B f m Hwf. induction Hwf as
       [|key value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr]; cbn [map].
+       Hnel Hner Hl Hr Hresident]; cbn [map].
   - constructor.
   - constructor.
   - apply wf_branch.
@@ -1170,6 +1230,11 @@ Proof.
     + rewrite representative_map. exact Hner.
     + apply (proj2 (all_keys_map A B _ f ltree)). exact Hl.
     + apply (proj2 (all_keys_map A B _ f rtree)). exact Hr.
+    + destruct Hresident as [sample_value Hsample].
+      exists (f sample sample_value).
+      change (get sample (map f (Branch sample split ltree rtree)) =
+        Some (f sample sample_value)).
+      now rewrite get_map, Hsample.
 Qed.
 
 (** Filtering is the first missing merge dependency.  Unlike [map], it may
@@ -1196,7 +1261,7 @@ Theorem map_filter_wf:
 Proof.
   intros A B f m Hwf. induction Hwf as
       [|key value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr]; cbn [map_filter].
+       Hnel Hner Hl Hr Hresident]; cbn [map_filter].
   - constructor.
   - destruct (f key value); constructor.
   - apply branch_wf_general.
@@ -1214,7 +1279,7 @@ Theorem get_map_filter_wf:
 Proof.
   intros A B f m Hwf. induction Hwf as
       [|key value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr]; intros query.
+       Hnel Hner Hl Hr Hresident]; intros query.
   - reflexivity.
   - cbn [map_filter get]. destruct (f key value) as [result|] eqn:Eresult;
       destruct (String.eqb query key) eqn:Equery; cbn.
@@ -1320,7 +1385,7 @@ Theorem replace_same_correct_wf:
 Proof.
   intros A key value m Hwf. induction Hwf as
       [|stored stored_value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr]; intros Hrouted.
+       Hnel Hner Hl Hr Hresident]; intros Hrouted.
   - discriminate.
   - cbn in Hrouted. inversion Hrouted; subst stored. split; [constructor|].
     intros query. cbn [replace get]. destruct (String.eqb query key); reflexivity.
@@ -1329,6 +1394,16 @@ Proof.
       * cbn [replace]. rewrite Ekey. apply wf_branch; try assumption.
         -- rewrite representative_replace_same by exact Hrouted. exact Hner.
         -- apply all_keys_replace_same with (key := key); assumption.
+        -- unfold resident in Hresident |- *.
+           destruct Hresident as [sample_value Hsample].
+           destruct (String.eqb sample key) eqn:Esample.
+           ++ apply String.eqb_eq in Esample. subst sample.
+              exists value. cbn [get]. rewrite Ekey, Hgetreplace.
+              now rewrite String.eqb_refl.
+           ++ exists sample_value. cbn [get] in Hsample |- *.
+              destruct (bit_at sample split) eqn:Esample_bit.
+              ** rewrite Hgetreplace, Esample. exact Hsample.
+              ** exact Hsample.
       * intros query. cbn [replace]. rewrite Ekey.
         destruct (bit_at query split) eqn:Equery.
         -- cbn [get]. rewrite Equery. apply Hgetreplace.
@@ -1339,6 +1414,16 @@ Proof.
       * cbn [replace]. rewrite Ekey. apply wf_branch; try assumption.
         -- rewrite representative_replace_same by exact Hrouted. exact Hnel.
         -- apply all_keys_replace_same with (key := key); assumption.
+        -- unfold resident in Hresident |- *.
+           destruct Hresident as [sample_value Hsample].
+           destruct (String.eqb sample key) eqn:Esample.
+           ++ apply String.eqb_eq in Esample. subst sample.
+              exists value. cbn [get]. rewrite Ekey, Hgetreplace.
+              now rewrite String.eqb_refl.
+           ++ exists sample_value. cbn [get] in Hsample |- *.
+              destruct (bit_at sample split) eqn:Esample_bit.
+              ** exact Hsample.
+              ** rewrite Hgetreplace, Esample. exact Hsample.
       * intros query. cbn [replace]. rewrite Ekey.
         destruct (bit_at query split) eqn:Equery.
         -- assert (Hneq : query <> key).
@@ -1409,6 +1494,7 @@ Proof.
     + cbn. split.
       * unfold same_prefix. intros n Hn. reflexivity.
       * exact Ekey.
+    + exists value. cbn [get]. now rewrite Ekey, String.eqb_refl.
   - apply wf_branch.
     + constructor.
     + exact Hwf.
@@ -1420,6 +1506,7 @@ Proof.
     + eapply all_keys_impl; [exact Hall|].
       intros stored [Hprefix Hbit]. split; [exact Hprefix|].
       exact Hbit.
+    + exists value. cbn [get]. now rewrite Ekey, String.eqb_refl.
 Qed.
 
 Lemma get_branch_at_leaf:
@@ -1503,7 +1590,7 @@ Proof.
   intros A key value differing m routed Hwf.
   induction Hwf as
       [|stored stored_value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr]; intros Hrouted Hdiff.
+       Hnel Hner Hl Hr Hresident]; intros Hrouted Hdiff.
   - discriminate.
   - cbn in Hrouted. inversion Hrouted; subst routed.
     destruct (first_diff_spec _ _ _ Hdiff) as [Hbits Hbefore].
@@ -1591,6 +1678,16 @@ Proof.
               rewrite Hgetinsert. now rewrite String.eqb_refl.
            ++ exact Hl.
            ++ apply all_keys_insert_at; assumption.
+           ++ unfold resident in Hresident |- *.
+              destruct Hresident as [sample_value Hsample].
+              destruct (String.eqb sample key) eqn:Esample.
+              ** apply String.eqb_eq in Esample. subst sample.
+                 exists value. cbn [get]. rewrite Ekey, Hgetinsert.
+                 now rewrite String.eqb_refl.
+              ** exists sample_value. cbn [get] in Hsample |- *.
+                 destruct (bit_at sample split).
+                 --- rewrite Hgetinsert, Esample. exact Hsample.
+                 --- exact Hsample.
         -- intro query. cbn [insert_at]. rewrite Ebefore, Ekey.
            destruct (bit_at query split) eqn:Equery.
            ++ cbn [get]. rewrite Equery. exact (Hgetinsert query).
@@ -1651,6 +1748,16 @@ Proof.
            ++ exact Hner.
            ++ apply all_keys_insert_at; assumption.
            ++ exact Hr.
+           ++ unfold resident in Hresident |- *.
+              destruct Hresident as [sample_value Hsample].
+              destruct (String.eqb sample key) eqn:Esample.
+              ** apply String.eqb_eq in Esample. subst sample.
+                 exists value. cbn [get]. rewrite Ekey, Hgetinsert.
+                 now rewrite String.eqb_refl.
+              ** exists sample_value. cbn [get] in Hsample |- *.
+                 destruct (bit_at sample split).
+                 --- exact Hsample.
+                 --- rewrite Hgetinsert, Esample. exact Hsample.
         -- intro query. cbn [insert_at]. rewrite Ebefore, Ekey.
            destruct (bit_at query split) eqn:Equery.
            ++ assert (Hneq : query <> key).
@@ -1665,7 +1772,7 @@ Lemma wf_routed_key_none:
 Proof.
   intros A m probe Hwf. induction Hwf as
       [|stored stored_value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr]; intros Hrouted.
+       Hnel Hner Hl Hr Hresident]; intros Hrouted.
   - reflexivity.
   - discriminate.
   - cbn [routed_key] in Hrouted. destruct (bit_at probe split).
@@ -1930,6 +2037,7 @@ Lemma branch_at_wf:
   forall (A : Type) sample split (fresh old : t A),
     wf fresh -> wf old ->
     representative fresh <> None -> representative old <> None ->
+    resident sample fresh ->
     all_keys (fun stored =>
       same_prefix sample stored split /\
       bit_at stored split = bit_at sample split) fresh ->
@@ -1939,7 +2047,7 @@ Lemma branch_at_wf:
     wf (branch_at sample split fresh old).
 Proof.
   intros A sample split fresh old Hfresh Hold Hfresh_nonempty Hold_nonempty
-    Hfresh_keys Hold_keys.
+    Hsample_resident Hfresh_keys Hold_keys.
   unfold branch_at. destruct (bit_at sample split) eqn:Esample.
   - apply wf_branch.
     + exact Hold.
@@ -1950,6 +2058,8 @@ Proof.
       intros stored [Hprefix Hbit]. split; [exact Hprefix|exact Hbit].
     + eapply all_keys_impl; [exact Hfresh_keys|].
       intros stored [Hprefix Hbit]. split; [exact Hprefix|exact Hbit].
+    + destruct Hsample_resident as [value Hget].
+      exists value. cbn [get]. now rewrite Esample.
   - apply wf_branch.
     + exact Hfresh.
     + exact Hold.
@@ -1959,6 +2069,8 @@ Proof.
       intros stored [Hprefix Hbit]. split; [exact Hprefix|exact Hbit].
     + eapply all_keys_impl; [exact Hold_keys|].
       intros stored [Hprefix Hbit]. split; [exact Hprefix|exact Hbit].
+    + destruct Hsample_resident as [value Hget].
+      exists value. cbn [get]. now rewrite Esample.
 Qed.
 
 Lemma get_branch_at:
@@ -2022,7 +2134,8 @@ Proof.
     Hdiff Hfresh_keys Hold_keys.
   unfold join. rewrite Hfresh_rep, Hold_rep, Hdiff.
   split.
-  - apply branch_at_wf; try assumption; congruence.
+  - eapply branch_at_wf; try eassumption; try congruence.
+    now apply (representative_resident_wf A fresh fresh_key Hfresh Hfresh_rep).
   - intro query. apply get_branch_at.
     + eapply all_keys_impl; [exact Hfresh_keys|].
       intros stored H. exact (proj2 H).
@@ -2237,9 +2350,9 @@ Proof.
            ++ cbn [get]. destruct (bit_at key left_split);
                 [apply Hgetoutr|apply Hgetoutl].
            ++ eapply all_keys_impl; [exact Houtl|].
-              intros stored H. exact (proj2 H).
+              intros stored Hstored. exact (proj2 Hstored).
            ++ eapply all_keys_impl; [exact Houtr|].
-              intros stored H. exact (proj2 H).
+              intros stored Hstored. exact (proj2 Hstored).
       * assert (Emin : Nat.min left_split left_split = left_split) by
           apply Nat.min_id.
         destruct (branches_disjoint_prefix A B left_sample left_split
@@ -2307,9 +2420,9 @@ Proof.
                          discriminate. }
                        now rewrite Eright.
                  --- eapply all_keys_impl; [exact Hmap|].
-                     intros stored H. exact (proj2 H).
+                     intros stored Hstored. exact (proj2 Hstored).
                  --- eapply all_keys_impl; [exact Hout|].
-                     intros stored H. exact (proj2 H).
+                     intros stored Hstored. exact (proj2 Hstored).
            ++ destruct (IH f left_left
                 (Branch right_sample right_split right_left right_right)
                 Hnone Hwll Hwr Hslall) as [Hwout Hgetout].
@@ -2349,9 +2462,9 @@ Proof.
                        now rewrite Eright.
                      +++ rewrite (Hgetout key). reflexivity.
                  --- eapply all_keys_impl; [exact Hout|].
-                     intros stored H. exact (proj2 H).
+                     intros stored Hstored. exact (proj2 Hstored).
                  --- eapply all_keys_impl; [exact Hmap|].
-                     intros stored H. exact (proj2 H).
+                     intros stored Hstored. exact (proj2 Hstored).
         -- assert (Emin : Nat.min left_split right_split = left_split) by
              (apply Nat.min_l; lia).
            destruct (branches_disjoint_prefix A B left_sample left_split
@@ -2423,9 +2536,9 @@ Proof.
                          discriminate. }
                        now rewrite Eleft.
                  --- eapply all_keys_impl; [exact Hmap|].
-                     intros stored H. exact (proj2 H).
+                     intros stored Hstored. exact (proj2 Hstored).
                  --- eapply all_keys_impl; [exact Hout|].
-                     intros stored H. exact (proj2 H).
+                     intros stored Hstored. exact (proj2 Hstored).
            ++ destruct (IH f
                 (Branch left_sample left_split left_left left_right)
                 right_left Hnone Hwl Hwrl Hsal) as [Hwout Hgetout].
@@ -2466,9 +2579,9 @@ Proof.
                        now rewrite Eleft.
                      +++ rewrite (Hgetout key). reflexivity.
                  --- eapply all_keys_impl; [exact Hout|].
-                     intros stored H. exact (proj2 H).
+                     intros stored Hstored. exact (proj2 Hstored).
                  --- eapply all_keys_impl; [exact Hmap|].
-                     intros stored H. exact (proj2 H).
+                     intros stored Hstored. exact (proj2 Hstored).
         -- assert (Emin : Nat.min left_split right_split = right_split) by
              (apply Nat.min_r; lia).
            destruct (branches_disjoint_prefix A B left_sample left_split

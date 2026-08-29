@@ -37,7 +37,7 @@ The following checks passed:
   compilation, and the deterministic randomized oracle test;
 - a source scan found no `Admitted`, `admit`, `Axiom`, aborted proof, or similar
   unresolved proof escape in the Patricia sources;
-- the source-driven `Print Assumptions` audit discovered all 206 top-level
+- the source-driven `Print Assumptions` audit discovered all 209 top-level
   lemmas, theorems, and corollaries across both bit-specification and map-proof
   modules and reported every one closed under the global context;
 - additional integer fuzzing used keys across the positive OCaml `int` range,
@@ -176,7 +176,7 @@ does not inspect either kind of extraction directive.
 | `positive`, `N`, and `nat` represented by OCaml `int`; Rocq strings represented by OCaml strings | Wrapper tests reject `min_int`, negative values, and zero; accept and round-trip one and `max_int`; and the oracle covers positive keys through `max_int`, byte strings, and valid split positions used by the map | Source theorems use unbounded values. The abstract checked key wrapper enforces the positive native input domain, but a fixed-width key/string representation relation and operation refinements remain to be proved, or the source model must change to `Uint63` and primitive strings. |
 | Integer `word`, prefix, prefix match, routing bit, highest differing bit, and mask ordering | Boundary-key fuzzing and structural checks found no mismatch | These are small, formally provable word lemmas. Prove them against a 63-bit model; equality with the unbounded model then holds for keys in `1 .. max_int`. |
 | Packed string split token `(byte << 4) | tag`, native `bit_at`, and bytewise `first_diff` | `first_diff` is checked for all 65,536 one-byte pairs plus prefix and long-prefix cases; structural tests check `bit_at` routing over NUL, non-ASCII, and randomized strings | This requires a relational theorem, not equality at the same extracted integer: logical position 9 is encoded as token 16, and exported native `bit_at s 9` therefore does not denote pure `bit_at s 9`. Prove `native_bit_at s (encode n) = bit_at s n`, `native_first_diff = option_map encode first_diff`, validity and order preservation of tokens, then hide raw tokens from clients. |
-| A branch sample returned as its constant-time `representative` | Structural tests check that samples in public-operation results are resident keys | Existing `wf` only constrains the sample's prefix; it does not say the sample is resident. Strengthen the invariant with sample residency and prove every constructor preserves it, or keep the source representative descent. Without that stronger invariant, this realizer is not equivalent even on every currently `wf` tree. |
+| A branch sample returned as its constant-time `representative` | `wf_branch` now requires `resident sample (Branch ...)`, and every smart constructor and public-operation preservation theorem discharges that premise; structural tests independently check the property | Cached-sample residency is now kernel-checked (`wf_cached_sample_resident`). This justifies the native result as an actual binding, but it does not make it definitionally equal to the source representative, which may select a different resident key; consumers still require a refinement argument based on representative independence. |
 | Exception-based one-descent string `set` | Existing/fresh-key oracle tests and structural checks pass | Define a source worker returning either a rebuilt tree or a discriminator to bubble upward, prove it equivalent to `set`, and extract it. Proving the exact local-exception OCaml code instead requires a target-language logic supporting exceptions. |
 | Fuel-free integer and string `combine` | Randomized merges agree with reference maps; both source `combine` definitions are proved | Define well-founded recursion over `size left + size right`, prove its equations and equivalence to sufficiently fuelled `combine_fuel`, and extract that definition. |
 | Specialized biased unions and physical-identity (`==`) sharing | Disjoint and overlap results agree with `Stdlib.Map`; allocation demonstrates sharing | Prove the semantic union law for a source-level specialized algorithm. Functional correctness does not prove physical sharing; a sharing/allocation claim needs a cost or heap semantics. A source worker can return a `changed` certificate to justify returning the original tree without relying on target physical equality. |
@@ -298,15 +298,15 @@ For both tree variants, provide named results for all canonicality properties:
 - [x] descendant split positions are strictly ordered relative to ancestors
   (`wf_splits_ordered` for direct strings);
 - [x] pure representatives are actual bindings (`representative_elements`);
-- [ ] the cached string branch sample is a resident binding; this stronger
-  invariant is required by the native constant-time `representative` realizer;
+- [x] the cached string branch sample is a resident binding
+  (`wf_cached_sample_resident`), preserved by all proved smart operations;
 - [x] keys and bindings in `elements` are unique on well-formed trees;
 - [x] direct-string `elements` is strongly sorted by prefix-free bit-stream
   lexicographic order (`wf_elements_bit_lex_sorted`);
 - [x] lookup is extensionally equivalent to membership in `elements` on
   well-formed trees;
-- [ ] every value constructed through the public API is well formed; string
-  `join` and merge are still missing preservation proofs.
+- [x] every value constructed through the public API is well formed, including
+  string `join`, generic combine, and both specialized unions.
 
 The direct-string split-order consequence is now exposed as a named theorem,
 so merge proofs can rely on it without reproving the contradiction between an

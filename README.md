@@ -102,7 +102,8 @@ The direct-string proof files currently establish, without axioms:
   bounded scanner, and a proof that the two Boolean results are equal;
 - a structural routing invariant for string trees and preservation of that
   invariant by smart branch collapse, `remove`, key-aware `map`, and general
-  `set`, including fresh-key insertion;
+  `set`, including fresh-key insertion; every branch's cached sample is now a
+  resident binding under the same invariant;
 - strict increase of descendant string split positions, derived from that
   routing invariant;
 - representative and routed-leaf soundness;
