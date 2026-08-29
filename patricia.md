@@ -23,7 +23,7 @@ The verification claim must therefore be split into three layers:
 | --- | --- |
 | Pure positive-key Rocq model | Kernel-checked functional map laws, including general `combine` and finite-map extensionality, with no project axioms found in the inspected theorem closure |
 | Pure direct-string Rocq model | Lookup, update, removal, ordered traversal, filtering, structural invariants, general `combine`, biased unions, and finite-map extensionality are proved |
-| Extracted native OCaml | Extensive oracle and invariant testing passes, but the standard numeric/string mappings and 19 explicit handwritten realizers are trusted; neither their refinement nor the Rocq-to-OCaml compilation pipeline is proved here |
+| Extracted native OCaml | Extensive oracle, invariant, and optimized-versus-proof-aligned differential testing passes, but the standard numeric/string mappings and 19 explicit handwritten realizers are trusted; neither their refinement nor the Rocq-to-OCaml compilation pipeline is proved here |
 
 Consequently, “formally verified” is accurate for the stated theorems about the
 pure definitions. It is not yet accurate as an end-to-end claim about the
@@ -37,13 +37,9 @@ The following checks passed:
   compilation, and the deterministic randomized oracle test;
 - a source scan found no `Admitted`, `admit`, `Axiom`, aborted proof, or similar
   unresolved proof escape in the Patricia sources;
-- `Print Assumptions` reported the inspected integer `combine_correct_wf` and
-  string `set_correct_wf`, `replace_binding_correct_wf`,
-  `join_separated_correct_wf`, `public_combine_fuel_sufficient`,
-  `union_left_correct_wf`, `union_right_correct_wf`, `beq_correct_wf`,
-  both variants' `equiv_elements_wf` and `beq_extensional_wf`, plus string
-  `wf_elements_bit_lex_sorted` and `wf_splits_ordered`, as closed under the
-  global context;
+- the source-driven `Print Assumptions` audit discovered all 206 top-level
+  lemmas, theorems, and corollaries across both bit-specification and map-proof
+  modules and reported every one closed under the global context;
 - additional integer fuzzing used keys across the positive OCaml `int` range,
   including high-bit boundary values, and checked lookup, elements, merge, and
   routing invariants;
@@ -242,7 +238,7 @@ machine code require an OCaml/Clight semantics and a verified compiler or a
 separate deductive verification of the target code. Testing can reduce risk but
 cannot turn those target constructs into kernel-checked theorems.
 
-### 5. Repository tests now cover functional boundaries, but not extraction refinement
+### 5. Repository tests now exercise the extraction-refinement boundary
 
 The deterministic randomized harness now exercises integer keys at every
 native bit boundary through `max_int`, and it checks elements, branch routing,
@@ -252,11 +248,23 @@ cases; it validates elements, split order, sample membership, routing, both
 biased unions, and combining functions that delete one-sided or overlapping
 bindings.
 
-Still missing are a differential test against a proof-aligned extracted
-reference, direct contract tests for separately exported low-level functions,
-and CI wiring. Merge timing and allocation benchmarks now exist in
-`patricia-bench.md`. All tests remain supporting evidence only; they do not
-validate the custom extraction constants formally.
+`PatriciaReferenceExtract.v` now retains a second executable backend generated
+from the Rocq definitions without any Patricia-specific `Extract Constant`
+realizers. The build packs its generated modules under `PatriciaReference`, so
+the regular test target can link them beside the optimized modules without
+name collisions. Deterministic differential workloads compare bindings,
+lookups, membership, updates, removals, mapping/filtering, general combine,
+both biased unions, folds, and equality for integer and arbitrary-byte string
+keys. Low-level checks translate between logical string-bit positions and the
+optimized packed tokens before comparing `bit_at`, `first_diff`, and both
+prefix-agreement functions.
+
+The standard native integer/string extraction mappings are shared by both
+backends and remain trusted. Passing differential tests is supporting evidence
+against errors in the handwritten Patricia optimizations; it is not a formal
+refinement theorem or a verification of the extraction pipeline. Repository CI
+wiring also remains to be added. Merge timing and allocation benchmarks exist
+in `patricia-bench.md`.
 
 ## Roadmap to complete functional verification
 
@@ -438,8 +446,9 @@ and establish bounds for:
   proved.
 - [x] Make extraction reproducible through the normal build and ensure generated
   files are never hand-edited.
-- [ ] Run `Print Assumptions` over every exported correctness theorem in CI, not
-  only selected examples.
+- [x] Run `Print Assumptions` over every top-level proof declaration during the
+  normal build, with count checking so new declarations are included
+  automatically. Repository-level CI wiring remains separate.
 
 ### Phase 8: expand automated validation
 
@@ -458,7 +467,8 @@ Current validation status:
 - [x] `elements` completeness, uniqueness, and documented order, including
   byte-lexicographic randomized checks for direct strings;
 - [x] Structural well-formedness of every tested result;
-- [ ] Differential equivalence between pure and optimized extraction backends.
+- [x] Differential equivalence testing between proof-aligned and optimized
+  extraction backends, including logical/packed string-position translation.
 
 - [x] Add benchmarks that separately report runtime and allocation for disjoint
   and overlapping merges. `make -C patricia benchmark` compares extracted

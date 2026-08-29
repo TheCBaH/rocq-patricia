@@ -64,17 +64,18 @@ thresholds.
 - **done**: replace the raw two-option public `combine` callback with explicit
   `left_only`, `right_only`, and `both` cases, making absence from both inputs
   unrepresentable and enforcing the finite-map contract at the wrapper boundary.
-- **next**: retain a proof-aligned extraction backend for differential tests.
+- **done**: retain a separately packed backend extracted directly from the Rocq
+  definitions and compare it with the optimized backend during the normal build.
 
 ## M5: Reduce the trusted native-refinement boundary
 
 - **later**: formalize the finite-width integer and packed string-position
   representation relations.
-- **later**: strengthen the string invariant with cached-sample residency.
+- **next**: strengthen the string invariant with cached-sample residency.
 - **later**: replace handwritten direct `set`, `combine`, and biased-union
   realizers with proved source-level workers or prove their refinements.
-- **later**: run `Print Assumptions` for every exported correctness theorem in
-  automated validation.
+- **done**: discover every top-level proof declaration and run `Print Assumptions`
+  for all of them during normal automated validation.
 
 ## Validation log
 
@@ -171,3 +172,17 @@ thresholds.
   so supported callers cannot violate `f None None = None`. Wrapper tests cover
   all three callbacks, including overlap deletion; `make`, the randomized
   oracle, and `make benchmark` passed.
+- **2026-08-29 — proof-aligned differential backend**:
+  `PatriciaReferenceExtract.v` generates the executable Rocq definitions with
+  no Patricia-specific custom realizers, and the build packs the result under
+  `PatriciaReference` so it can coexist with the optimized modules. The normal
+  build compares updates, removals, maps, filtering, combine, both unions,
+  folds, equality, lookup/membership, and logical-versus-packed string bit
+  operations across the two backends. `make`, both deterministic test suites,
+  `make benchmark`, and `git diff --check` passed.
+- **2026-08-29 — exhaustive assumption audit**: the normal build now discovers
+  every top-level `Lemma`, `Theorem`, and `Corollary` in the two bit modules and
+  two map-proof modules, runs `Print Assumptions` for each, and fails on axioms,
+  Rocq errors, anomalies, or a declaration/result count mismatch. All 206
+  current declarations are closed under the global context; `make`, both
+  deterministic test suites, `make benchmark`, and `git diff --check` passed.

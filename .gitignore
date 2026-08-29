@@ -7,3 +7,4 @@
 *.cmo
 *.lia.cache
 /patricia-test
+/patricia-differential-test

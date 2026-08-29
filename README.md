@@ -43,9 +43,12 @@ defines the prefix-free string bit view (a continuation marker plus eight bits
 per byte and an end marker), so empty strings, embedded zero bytes, and prefix
 keys are distinct. `PatriciaExtract.v` generates implementation backends under
 `patricia/extracted/`; the build names the map modules `PatriciaInternal` and
-`StringPatriciaInternal`. The supported OCaml interfaces are the handwritten
-`PatriciaMap` and `StringPatriciaMap` modules. Their `.mli` files make map types
-abstract and expose only smart map operations; generated constructors, routing
+`StringPatriciaInternal`. `PatriciaReferenceExtract.v` separately generates
+the executable Rocq definitions without Patricia-specific custom realizers,
+packs them under `PatriciaReference`, and links them beside the optimized
+modules for deterministic differential testing. The supported OCaml interfaces
+are the handwritten `PatriciaMap` and `StringPatriciaMap` modules. Their `.mli`
+files make map types abstract and expose only smart map operations; generated constructors, routing
 metadata, packed string positions, fuel/change workers, and merge helpers stay
 behind that boundary. The structural oracle intentionally uses the internal
 modules, while the comparison benchmark uses only the abstract interfaces.
@@ -126,6 +129,12 @@ The direct-string proof files currently establish, without axioms:
   key at their first differing prefix-free logical bit (`false` before
   `true`).
 
+The normal build discovers every top-level `Lemma`, `Theorem`, and `Corollary`
+in `PatriciaBits`, `StringBits`, `PatriciaProof`, and `StringPatriciaProof`, then
+runs `Print Assumptions` on each. Validation fails on reported axioms, Rocq
+errors, or any mismatch between discovered declarations and results closed
+under the global context.
+
 `join_separated_correct_wf` proves the string-tree join law under explicit
 prefix/bit-separation preconditions, including filtered empty sides. The
 specialized left- and right-biased union laws are derived from the generic
@@ -139,6 +148,11 @@ the same map operations and structural routing invariants over empty strings,
 embedded NUL bytes, prefix-related strings, non-ASCII bytes, long common
 prefixes, and generated arbitrary byte strings. These are executable tests,
 not Rocq proofs or complete validation of the custom extraction constants.
+The normal `make` also compares the optimized and proof-aligned backends over
+map updates, removals, filtering, generic combination, both biased unions,
+folding, equality, and lookup. It directly compares string bit operations by
+encoding logical positions to native packed tokens and decoding first
+differences back to logical positions.
 
 This is a design sketch, not a drop-in `Maps.TREE` implementation. Constructors
 remain visible only in the explicitly internal generated modules used by the

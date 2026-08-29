@@ -644,6 +644,13 @@ work has two defensible tracks.
 - Replace only the extracted `first_diff` and possibly `bit_at` implementations.
 - Differential-test the optimized functions against a pure extracted backend.
 
+The third step is now implemented by `PatriciaReferenceExtract.v` and
+`PatriciaDifferentialTest.ml`. The reference retains the executable Rocq
+algorithms while sharing the standard native integer/string mappings. The test
+translates packed positions to logical ranks and compares low-level bit
+operations as well as complete map workloads. This detects disagreements but
+does not reduce the trusted base by itself.
+
 This is fast to implement but does not reduce the trusted computing base. A
 packed discriminator is awkward on this track because the extracted tree field
 would no longer have the same direct representation as the proof-side `nat`
@@ -675,8 +682,10 @@ extraction boundary.
 ### Build, proof, and oracle validation
 
 `make -C patricia all` completed successfully on 2026-08-29. It recompiles the
-Rocq proof files and extraction, rebuilds the bytecode client, and runs
-`PatriciaTest.ml`, which finished with `Patricia randomized oracle test: ok`.
+Rocq proof files and both extractions, audits every top-level proof declaration
+with `Print Assumptions`, rebuilds the bytecode clients, and runs both
+`PatriciaTest.ml` and the optimized/reference differential suite. The audit
+currently reports all 206 declarations closed under the global context.
 The test suite differentially checks the packed `first_diff` scanner against
 the logical nine-bit model for all 65,536 pairs of one-byte strings. It also
 covers empty strings, prefixes, embedded NULs, non-ASCII bytes, and long
@@ -746,7 +755,8 @@ variants. The extracted backends are now internal modules behind abstract
 only validated positive native keys. Their public generic-`combine` APIs split
 the represented-key cases into `left_only`, `right_only`, and `both` callbacks;
 absence from both maps is handled internally as absence, enforcing the proof
-contract by construction.
+contract by construction. A separately packed, proof-aligned extraction is now
+retained and compared with the optimized backend during every normal build.
 
 The completed scale runs confirm the key architectural result: specialized
 biased union fixes the former whole-tree traversal and rebuilding path, while
@@ -767,6 +777,10 @@ refinements inside Rocq.
   correctness coverage.
 - `PatriciaExtract.v`: native OCaml realizations of string bit access,
   first-difference scanning, and bounded prefix comparison.
+- `PatriciaReferenceExtract.v`: proof-aligned reference extraction without
+  Patricia-specific custom realizers.
+- `PatriciaDifferentialTest.ml`: direct optimized/reference comparisons for
+  low-level string bits and full integer/string map workloads.
 - `PatriciaBenchmark.ml`: benchmark workloads, correctness checks, timing, and
   allocation methodology.
 - `patricia-bench.md`: recorded 10K through 1M baseline results and the
