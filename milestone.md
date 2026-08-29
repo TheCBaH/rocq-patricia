@@ -73,10 +73,10 @@ thresholds.
   domain and the logical-string-position/packed-token codec. Its kernel proofs
   cover decode-after-encode, valid tags, injectivity, ordering, and a safe
   source-level packed `bit_at` worker correct at encoded positions. They also
-  characterize the packed first difference as the unique unequal encoded bit
-  after an equal prefix. Proving the handwritten OCaml primitive/string
-  correspondence and bytewise `first_diff` realizer against these
-  specifications is next.
+  prove the valid-token round trip and characterize the packed first difference
+  as the unique unequal valid token after an equal prefix. Proving the
+  handwritten OCaml primitive/string correspondence and bytewise `first_diff`
+  realizer against these specifications is next.
 - **done**: require every well-formed string branch's cached sample to be a
   resident binding and preserve that requirement through all smart operations.
 - **later**: replace handwritten direct `set`, `combine`, and biased-union
@@ -222,3 +222,9 @@ thresholds.
   transported the result to the safe packed `bit_at` worker at encoded tokens.
   This records the prefix-loop invariant required by a future bytewise scan;
   it does not yet verify the handwritten native string access or scan.
+- **2026-08-29 — exact packed-token specification**: proved that decoding then
+  re-encoding any valid packed token is identity, and used this to state both
+  directions of `packed_first_diff` directly over native tokens: its result is
+  valid, differs at that token, and agrees at every earlier encoded position.
+  The theorem rules out invalid tag results but is not yet a bytewise-scan
+  refinement.

@@ -112,6 +112,17 @@ Proof.
   now rewrite Hdiv, Hmod.
 Qed.
 
+Lemma encode_decode_position:
+  forall token, valid_packed_position token ->
+    encode_position (decode_position token) = token.
+Proof.
+  intros token Hvalid.
+  unfold decode_position.
+  rewrite encode_logical_position by exact Hvalid.
+  unfold packed_position.
+  symmetry. apply Nat.div_mod_eq.
+Qed.
+
 Lemma packed_position_injective:
   forall byte1 tag1 byte2 tag2,
     tag1 < 9 -> tag2 < 9 ->
@@ -288,6 +299,55 @@ Proof.
   apply first_diff_characterization.
   - now rewrite <- !packed_bit_at_encode.
   - intros n Hn. rewrite <- !packed_bit_at_encode. apply Hbefore. exact Hn.
+Qed.
+
+(** A native split token is meaningful only when its tag is one of the nine
+    source positions in a byte.  On that domain, this is the exact packed
+    counterpart of [StringBits.first_diff_spec]: the returned token differs,
+    and every earlier *valid* token (represented here by [encode_position])
+    agrees. *)
+Lemma packed_first_diff_decoded_spec:
+  forall left right token,
+    packed_first_diff left right = Some token ->
+    valid_packed_position token /\
+    packed_bit_at left token <> packed_bit_at right token /\
+    (forall position, position < decode_position token ->
+      packed_bit_at left (encode_position position) =
+        packed_bit_at right (encode_position position)).
+Proof.
+  intros left right token Hfirst.
+  assert (Hvalid : valid_packed_position token).
+  { unfold packed_first_diff in Hfirst.
+    destruct (StringBits.first_diff left right) as [position|] eqn:E;
+      cbn in Hfirst; try discriminate.
+    injection Hfirst as Htoken. subst token. apply encode_position_valid. }
+  assert (Hencoded : packed_first_diff left right =
+      Some (encode_position (decode_position token))).
+  { now rewrite encode_decode_position. }
+  apply packed_first_diff_spec in Hencoded.
+  destruct (StringBits.first_diff_spec left right (decode_position token)
+    Hencoded) as [Hdiff Hbefore].
+  split; [exact Hvalid|]. split.
+  - rewrite <- (encode_decode_position token Hvalid).
+    now rewrite !packed_bit_at_encode.
+  - intros position Hposition.
+    rewrite !packed_bit_at_encode. apply Hbefore. exact Hposition.
+Qed.
+
+Lemma packed_first_diff_decoded_characterization:
+  forall left right token,
+    valid_packed_position token ->
+    packed_bit_at left token <> packed_bit_at right token ->
+    (forall position, position < decode_position token ->
+      packed_bit_at left (encode_position position) =
+        packed_bit_at right (encode_position position)) ->
+    packed_first_diff left right = Some token.
+Proof.
+  intros left right token Hvalid Hdiff Hbefore.
+  rewrite <- (encode_decode_position token Hvalid).
+  apply packed_first_diff_characterization.
+  - rewrite <- (encode_decode_position token Hvalid) in Hdiff. exact Hdiff.
+  - exact Hbefore.
 Qed.
 
 Lemma packed_first_diff_valid:
