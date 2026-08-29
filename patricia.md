@@ -1,6 +1,6 @@
 # Patricia-tree review and formal-verification roadmap
 
-Review date: 2026-08-28
+Review date: 2026-08-29
 
 ## Scope and verdict
 
@@ -10,13 +10,25 @@ Rocq proofs, OCaml extraction directives, and the randomized OCaml test
 harness.
 
 The implementation is a strong executable and proof-development sketch. The
-positive-key implementation has substantial functional-correctness coverage,
-and both extracted implementations behaved correctly in the supplied tests
-and in additional fuzzing. It is not yet a complete formally verified
-mergeable-map library, however. The direct-string implementation is missing
-merge proofs, the extracted API does not enforce the proved preconditions, and
-the optimized native merge and union extraction remains a trusted refinement
-rather than a proved correspondence with the fuelled Rocq model.
+positive-key source model has substantial functional-correctness coverage, and
+both extracted implementations behaved correctly in the supplied tests and in
+additional fuzzing. It is not yet a complete formally verified mergeable-map
+library, however. The direct-string source model is missing merge proofs, the
+extracted API does not enforce the proved preconditions, and the optimized
+native extraction is a second implementation rather than a proved compilation
+of the Rocq definitions.
+
+The verification claim must therefore be split into three layers:
+
+| Layer | Current status |
+| --- | --- |
+| Pure positive-key Rocq model | Kernel-checked functional map laws, including general `combine`, with no project axioms found in the inspected theorem closure |
+| Pure direct-string Rocq model | Lookup, update, removal, traversal, filtering, and structural invariants are proved; general `combine` and union remain open |
+| Extracted native OCaml | Extensive oracle and invariant testing passes, but the standard numeric/string mappings and 19 explicit handwritten realizers are trusted; neither their refinement nor the Rocq-to-OCaml compilation pipeline is proved here |
+
+Consequently, “formally verified” is accurate for the stated theorems about the
+pure definitions. It is not yet accurate as an end-to-end claim about the
+optimized OCaml library.
 
 ## Validation results
 
@@ -37,8 +49,15 @@ The following checks passed:
   bytes, and checked lookup, elements, merge, branch separation, prefix
   agreement, non-empty children, and increasing split positions.
 
-No functional counterexample was found by these checks. Fuzzing is supporting
-evidence only; it does not close the proof gaps described below.
+No functional counterexample was found for the public map operations exercised
+by these checks. There is, however, a deliberate pointwise mismatch in the raw
+low-level API: pure `bit_at "ab" 9` is `true` (the second byte's continuation
+marker), while extracted `StringBits.bit_at "ab" 9` is `false` because native
+position 9 is an invalid packed tag and logical position 9 is represented by
+token 16. Internal map operations consistently use packed tokens, but the
+separately exported function does not retain its source-level type contract.
+Fuzzing is supporting evidence only; it does not close the proof gaps described
+below.
 
 ## Review findings
 
@@ -115,25 +134,86 @@ Recommended correction:
 The Rocq model uses unbounded `positive`, `N`, and `nat`, while the optimized
 OCaml implementation uses bounded `int`, native shifts, and native strings.
 `bit_at`, `first_diff`, prefix matching, routing bits, highest-differing-bit
-selection, direct `combine`, and specialized biased union are replaced with
-handwritten OCaml realizers. Rocq proves the pure definitions, not the
-equivalence of these replacements.
+selection, cached representatives, fused string insertion, direct `combine`,
+and specialized biased union are replaced with handwritten OCaml realizers.
+Rocq proves the pure definitions, not the equivalence of these replacements.
+
+This is not merely a general warning about extraction. The
+[Rocq extraction manual](https://rocq-prover.org/doc/master/refman/addendum/extraction.html)
+states that realizing strings are copied into generated files and that their
+correctness is the user's responsibility. The imported
+[`ExtrOcamlNatInt`](https://rocq-prover.org/doc/master/stdlib/Stdlib.extraction.ExtrOcamlNatInt.html)
+and
+[`ExtrOcamlZInt`](https://rocq-prover.org/doc/v9.0/stdlib/Stdlib.extraction.ExtrOcamlZInt.html)
+modules likewise describe their native arithmetic realizers as uncertified and
+warn about overflow. Successful `Print Assumptions` output for a source theorem
+does not inspect either kind of extraction directive.
+
+#### Deviation-by-deviation audit
+
+| Native deviation | What present validation establishes | Formal status and proof route |
+| --- | --- | --- |
+| `positive`, `N`, and `nat` represented by OCaml `int`; Rocq strings represented by OCaml strings | Tests cover positive keys through `max_int`, byte strings, and valid split positions used by the map | Source theorems use unbounded values. State a fixed-width key/string representation relation and prove every operation within it, or change the source model to `Uint63` and primitive strings. Inputs outside the relation must be rejected by the wrapper. |
+| Integer `word`, prefix, prefix match, routing bit, highest differing bit, and mask ordering | Boundary-key fuzzing and structural checks found no mismatch | These are small, formally provable word lemmas. Prove them against a 63-bit model; equality with the unbounded model then holds for keys in `1 .. max_int`. |
+| Packed string split token `(byte << 4) | tag`, native `bit_at`, and bytewise `first_diff` | `first_diff` is checked for all 65,536 one-byte pairs plus prefix and long-prefix cases; structural tests check `bit_at` routing over NUL, non-ASCII, and randomized strings | This requires a relational theorem, not equality at the same extracted integer: logical position 9 is encoded as token 16, and exported native `bit_at s 9` therefore does not denote pure `bit_at s 9`. Prove `native_bit_at s (encode n) = bit_at s n`, `native_first_diff = option_map encode first_diff`, validity and order preservation of tokens, then hide raw tokens from clients. |
+| A branch sample returned as its constant-time `representative` | Structural tests check that samples in public-operation results are resident keys | Existing `wf` only constrains the sample's prefix; it does not say the sample is resident. Strengthen the invariant with sample residency and prove every constructor preserves it, or keep the source representative descent. Without that stronger invariant, this realizer is not equivalent even on every currently `wf` tree. |
+| Exception-based one-descent string `set` | Existing/fresh-key oracle tests and structural checks pass | Define a source worker returning either a rebuilt tree or a discriminator to bubble upward, prove it equivalent to `set`, and extract it. Proving the exact local-exception OCaml code instead requires a target-language logic supporting exceptions. |
+| Fuel-free integer and string `combine` | Randomized merges agree with reference maps; integer source `combine` is proved, string source `combine` is not | Define well-founded recursion over `size left + size right`, prove its equations and equivalence to sufficiently fuelled `combine_fuel`, and extract that definition. The string functional proof must be completed first or alongside it. |
+| Specialized biased unions and physical-identity (`==`) sharing | Disjoint and overlap results agree with `Stdlib.Map`; allocation demonstrates sharing | Prove the semantic union law for a source-level specialized algorithm. Functional correctness does not prove physical sharing; a sharing/allocation claim needs a cost or heap semantics. A source worker can return a `changed` certificate to justify returning the original tree without relying on target physical equality. |
+
+The packed-token and cached-representative rows are the most important subtle
+cases. They are representation refinements, not pointwise replacements of the
+same source values. A differential test of public maps can validate their
+composition while still missing a bad direct call to the separately exported
+`StringBits.bit_at` or `StringPatricia.representative`.
 
 The current documentation states this honestly, and the extra fuzzing found no
 mismatch. Nevertheless, an implementation using unproved `Extract Constant`
 refinements cannot be described as end-to-end formally verified.
 
-There are two defensible completion choices:
+There are three defensible completion choices:
 
-1. **Verified baseline:** retain standard extraction of the pure Rocq
-   definitions. This minimizes the trusted boundary but may be slower.
-2. **Verified native refinement:** introduce an explicit finite-width word and
+1. **Proof-aligned baseline:** retain ordinary extraction of the pure Rocq
+   definitions. This removes the handwritten algorithm substitutions and is a
+   useful differential oracle, but ordinary extraction and `ocamlopt` still
+   remain in the trusted computing base.
+2. **Source-level native model:** use Rocq's specified 63-bit integers and
+   primitive byte strings, prove the optimized algorithms over those types, and
+   extract the proved definitions. Rocq documents these primitives and their
+   OCaml mappings, although their primitive implementations remain explicit
+   trusted axioms in `Print Assumptions`; see the
+   [primitive-object documentation](https://rocq-prover.org/doc/V9.2.0/refman/language/core/primitive.html).
+3. **Verified native refinement:** introduce an explicit finite-width word and
    byte-string model, prove refinement lemmas for every native operation, and
    connect the OCaml primitives to that model through a separately audited or
    verified foreign-function boundary.
 
-Keeping both backends is useful: the pure backend can serve as an executable
-reference oracle for differential tests of the optimized backend.
+Keeping both backends is useful: the proof-aligned backend can serve as an
+executable reference oracle for differential tests of the optimized backend.
+For a stronger compilation story, CertiCoq targets CompCert Clight, and the
+2025 [verified Coq/C FFI work](https://doi.org/10.1145/3704860) shows how
+external primitives can receive formal specifications. This is a possible
+architecture, not a drop-in completion: the
+[CertiCoq project](https://certicoq.org/) still describes parts of its compiler
+verification as work in progress.
+
+#### Can the current deviations be formally proved?
+
+Yes for their functional behavior, but not by attaching a proof to the current
+`Extract Constant` strings. The practical route is:
+
+1. define each optimized algorithm and finite representation in Rocq;
+2. prove a refinement theorem to the existing pure map specification;
+3. extract that proved definition, leaving only a small primitive interface;
+4. give that interface a formal target-language specification or accept it as
+   an explicitly enumerated trusted boundary.
+
+The direct merge, specialized union, packed scanner, cached representative,
+and fused set all admit such source-level proofs. Exact claims about OCaml
+exceptions, `String.unsafe_get`, physical equality, allocation, and generated
+machine code require an OCaml/Clight semantics and a verified compiler or a
+separate deductive verification of the target code. Testing can reduce risk but
+cannot turn those target constructs into kernel-checked theorems.
 
 ### 5. Repository tests now cover functional boundaries, but not extraction refinement
 
@@ -145,9 +225,11 @@ cases; it validates elements, split order, sample membership, routing, both
 biased unions, and combining functions that delete one-sided or overlapping
 bindings.
 
-Still missing are a differential test against a pure extracted reference,
-benchmarks/allocation checks for merge behavior, and CI wiring. The tests are
-supporting evidence only and do not validate the custom extraction constants.
+Still missing are a differential test against a proof-aligned extracted
+reference, direct contract tests for separately exported low-level functions,
+and CI wiring. Merge timing and allocation benchmarks now exist in
+`patricia-bench.md`. All tests remain supporting evidence only; they do not
+validate the custom extraction constants formally.
 
 ## Roadmap to complete functional verification
 
@@ -180,7 +262,9 @@ For both tree variants, provide named results for all canonicality properties:
 - [x] the left and right subtrees have opposite routing bits;
 - [x] descendant split positions are strictly ordered relative to ancestors
   (`wf_splits_ordered` for direct strings);
-- [x] representatives are actual bindings (`representative_elements`);
+- [x] pure representatives are actual bindings (`representative_elements`);
+- [ ] the cached string branch sample is a resident binding; this stronger
+  invariant is required by the native constant-time `representative` realizer;
 - [x] keys and bindings in `elements` are unique on well-formed trees;
 - [x] lookup is extensionally equivalent to membership in `elements` on
   well-formed trees;
@@ -318,6 +402,8 @@ and establish bounds for:
   it.
 - [ ] Add checked conversions for native integer keys.
 - [ ] Prevent clients from constructing malformed values or supplying fuel.
+- [ ] Hide packed split tokens and low-level bit functions, or expose wrapper
+  functions that encode and decode logical positions.
 - [ ] Add a CompCert `TREE` adapter only after its required laws are enumerated and
   proved.
 - [x] Make extraction reproducible through the normal build and ensure generated
@@ -363,7 +449,7 @@ the following hold:
    contract.
 5. The relationship between the proved model and native OCaml primitives is
    either itself verified or clearly excluded from the formal claim, with a
-   pure verified backend retained.
+   proof-aligned reference backend retained.
 6. No runtime whole-tree fuel calculation defeats the promised fast merge.
 7. All exported theorems pass assumption auditing, all extraction targets
    build reproducibly, and the expanded oracle and invariant tests pass in CI.

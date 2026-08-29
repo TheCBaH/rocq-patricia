@@ -45,11 +45,14 @@ The recommendations are implemented for native OCaml execution in
 the semantic specification; the optimized realizers extend the explicit
 trusted extraction boundary already used for native string access.
 
-All implementation stages and their decision gates are closed. The full
-Rocq/extraction/OCaml oracle suite passes, and the native comparison benchmark
-passes at 10,000, 100,000, and 1,000,000 bindings per input tree. The timing
-tables in this document are observations from individual runs; the maintained
-cross-size measurements and reproduction commands are in `patricia-bench.md`.
+The original implementation stages and their decision gates are closed. A
+follow-up allocation audit found one remaining merge-prefix hotspot:
+`agrees_before` still obtains its Boolean answer by calling allocation-producing
+`first_diff`. The full Rocq/extraction/OCaml oracle suite passes, and the native
+comparison benchmark passes at 10,000, 100,000, and 1,000,000 bindings per
+input tree. The timing tables in this document are observations from individual
+runs; the maintained cross-size measurements and reproduction commands are in
+`patricia-bench.md`.
 
 The extracted implementation now:
 
@@ -59,7 +62,9 @@ The extracted implementation now:
 - performs `set` routing and persistent reconstruction in one descent;
 - reads branch samples as constant-time representatives for trees produced by
   the public operations;
-- executes generic `combine` without computing or carrying runtime fuel; and
+- executes generic `combine` without computing or carrying runtime fuel;
+- implements `agrees_before` through `first_diff`, which is correct on valid
+  packed tokens but allocates during overlapping string unions; and
 - uses `String.unsafe_get` only after explicit common-length or byte-index
   bounds establish safety.
 
@@ -81,12 +86,40 @@ gave the following observations (not regression thresholds):
 | Disjoint left union | 680.9 us, 429,098 words | 0.95 us, 351 words |
 | Half-overlap left union | 500.0 us, 425,586 words | 55.1 us, 40,330 words |
 
-The benchmark evidence establishes the union diagnosis and validates the
-completed native implementation at scale. Focused primitive timings and
-instrumented structural counters were useful investigation ideas, but are not
-required to establish the completed semantic and allocation gates: the
-optimized extraction removes the identified repeated decoding, bit scanning,
-second descent, representative descent, and runtime-fuel work directly.
+The benchmark evidence establishes the original union diagnosis and validates
+the native implementation at scale. It also makes the residual string-overlap
+allocation visible; the next section isolates that cost.
+
+## Remaining priority: bounded `agrees_before`
+
+Four-character half-overlap union allocates 40,330, 400,347, and 4,000,362
+words at 10K, 100K, and 1M bindings. The approximately four-word-per-binding
+progression comes from prefix compatibility checks even though the union's
+physical-identity tests reuse the left subtrees.
+
+The current extracted function is:
+
+```ocaml
+let agrees_before left right split =
+  match first_diff left right with
+  | Some differing -> split <= differing
+  | None -> true
+```
+
+It scans beyond `split` when the samples remain equal and materializes an
+option result that the caller immediately converts to `bool`. A temporary,
+uncommitted generated-code experiment instead compared whole bytes only up to
+`split >> 4`, masked the high bits preceding the final tag, and returned a
+Boolean directly. On the checked 100K four-character workload it reduced
+half-overlap allocation from 400,347 words to 143 words; the single-run time
+changed from 0.538 ms to 0.479 ms, and the randomized oracle test passed. The
+experiment was reverted after measurement.
+
+Implement this first in `StringBits.v` as a bounded scanner and prove it equal
+to logical `agrees_before`. The packed native realization then needs the
+position-encoding refinement theorem described in `patricia.md`. This both
+removes the measured allocation and avoids introducing one more unproved
+algorithmic override.
 
 ## Baseline representation and routing
 
@@ -671,11 +704,11 @@ observations, not portable regression thresholds.
    recurses directly without carrying proof-side fuel.
 
 The previously proposed primitive microbenchmarks and side-effecting internal
-counters are not retained as completion gates. The implemented algorithms
-remove the corresponding operations structurally, while the end-to-end,
-allocation, scale, differential, and oracle checks above validate the exposed
-behavior. They remain appropriate diagnostic tooling only if a future
-regression needs finer attribution.
+counters remain diagnostic tooling rather than completion gates. Allocation
+scaling was sufficient to isolate the remaining `agrees_before` cost; a
+physical-sharing counter would still be useful when expanding the union
+workloads beyond ordered ranges. The oracle checks validate exposed behavior
+empirically, not end-to-end formal refinement of the native realizers.
 
 ## Final recommendation
 
@@ -683,15 +716,16 @@ Keep bit-level Patricia routing: it handles arbitrary byte strings correctly
 and retains a measured lookup advantage. The native implementation now uses a
 packed critical-byte token, bytewise-XOR first-difference discovery, a
 one-descent `set`, cached constant-time representatives, fuel-free generic
-combine, and structurally sharing biased union.
+combine, and structurally sharing biased union. The next implementation change
+should be the proved bounded `agrees_before` scanner above.
 
 The completed scale runs confirm the key architectural result: specialized
 biased union fixes the former whole-tree traversal and rebuilding path, while
 the string-operation changes preserve the eight-word representation and pass
-the extraction, differential, structural, and map-oracle checks. The remaining
-limitation is deliberate and documented: these OCaml extraction overrides are
-trusted refinements of the pure Rocq specification, not proofs of refinement
-inside Rocq.
+the extraction, differential, structural, and map-oracle checks. Two
+limitations remain: `agrees_before` still allocates linearly on the measured
+string-overlap path, and the OCaml extraction overrides are trusted refinements
+of the pure Rocq specification rather than proved refinements inside Rocq.
 
 ## Source basis
 
@@ -705,6 +739,7 @@ inside Rocq.
   first-difference scanning.
 - `PatriciaBenchmark.ml`: benchmark workloads, correctness checks, timing, and
   allocation methodology.
-- `patricia-bench.md`: recorded 10K through 10M benchmark results.
+- `patricia-bench.md`: recorded 10K through 1M benchmark results and the
+  follow-up `agrees_before` experiment.
 - `patricia.md`: verification review, trusted-boundary analysis, and the
   existing recommendation to separate biased union from generic combine.

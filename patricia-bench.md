@@ -120,9 +120,130 @@ half-overlap also stays below 500 words: on these ordered ranges, the native
 algorithm can share both the left map and the right map's disjoint tail rather
 than rebuilding their bindings. The string half-overlap allocation grows with
 the input size, but remains about 39% of the AVL allocation at one million
-bindings. Timings grow with size for the overlap cases, as expected for work
-that must inspect or retain those bindings. This is empirical behavior of
-these inputs, not a machine-independent complexity guarantee.
+bindings. Unlike the integer result, however, its near-exact progression from
+40,330 to 400,347 to 4,000,362 words shows a residual allocation proportional
+to the number of compared string branches. Timings grow with size for the
+overlap cases. This is empirical behavior of these inputs, not a
+machine-independent complexity guarantee.
+
+## Implementation changes suggested by the benchmark
+
+### 1. Replace `agrees_before` with a bounded, allocation-free native scan
+
+This is the highest-confidence remaining optimization. Extracted
+`StringBits.agrees_before` currently calls `first_diff`, which scans until the
+first difference and returns `Some differing`; the caller only needs a Boolean
+answer about positions before the current split. On identical or deeply shared
+prefixes that performs unnecessary scanning and creates a short-lived option
+value at each compared branch.
+
+The allocation sequence above is the signature of that path: approximately
+four words per binding while the physical-identity checks ultimately return
+the already existing left subtree. A temporary, uncommitted generated-code
+experiment replaced it with a closed tail-recursive byte scan that:
+
+- compares only bytes strictly before `split >> 4`;
+- masks the relevant high bits of the final byte for tags 1 through 8; and
+- returns `bool` directly, without calling `first_diff`.
+
+At 100,000 four-character bindings, the same checked half-overlap workload
+changed from 400,347 allocated words and 0.538 ms to 143 words and 0.479 ms.
+The deterministic randomized oracle test also passed. The timing difference is
+only one sample and should be remeasured; the reduction to constant-sized
+allocation is the dependable result. This experiment was reverted after the
+measurement, so the recorded implementation still has the hotspot.
+
+For verification, define a bounded scanner in `StringBits.v`, prove it
+equivalent to `agrees_before`, and then either extract that definition or prove
+the packed-token implementation under the representation relation described in
+`patricia.md`. Adding another unproved extraction string would improve runtime
+but enlarge the existing trusted boundary.
+
+### 2. Make `elements` accumulator-based
+
+Both tree modules currently compute:
+
+```coq
+elements left ++ elements right
+```
+
+`++` copies the complete left result at every branch. The total work and list
+allocation are therefore proportional to the sum of left-subtree sizes over
+the tree, up to `O(n * height)` rather than `O(n)`. Replace it with an
+accumulator traversal such as `elements_aux tree tail`; the existing fold and
+elements proofs can be restated around the accumulator lemma. The current
+benchmark does not time `elements`, so add that workload before and after this
+change.
+
+### 3. Preserve identity for absent removal and no-op updates
+
+`remove` rebuilds every branch on the routed path even when the reached leaf
+has a different key. The benchmark removes only present keys and therefore
+does not reveal this cost. A worker returning `(tree, changed)` or native
+physical-identity checks can return the original root for an absent removal.
+Likewise, an optional `set_if_changed`/`update` API supplied with value equality
+can avoid rebuilding an existing binding whose value is unchanged. This is
+especially relevant to persistent compiler data-flow maps, where converged
+updates and failed deletions are common.
+
+### 4. Fuse generic-combine leaf cases
+
+For a leaf/tree pair, native `combine` first maps the whole tree and then calls
+`get` plus `set` or `remove` for the leaf key. Arbitrary one-sided combining
+functions do require visiting the other tree, but mapping and replacement can
+be fused in one traversal. This should reduce temporary allocation and one
+routing pass. Add a benchmark for generic combine with transformations and
+deletions; biased union no longer exercises this path.
+
+### 5. Add allocation-free membership and bulk construction APIs
+
+The lookup measurements allocate about two words per operation for both
+implementations because the result is an option. A direct `mem` traversal and,
+where suitable, a raising or callback-based find API can avoid that result
+allocation. The current `mem` delegates to `get`, so it does not obtain this
+benefit.
+
+Build uses repeated persistent `set` over already sorted ranges. A proved
+`of_sorted_array` or `of_sorted_list` builder could construct the Patricia
+shape directly with less allocation. It should be reported separately from
+incremental insertion because it answers a different API question.
+
+### 6. Treat retained size as a representation tradeoff
+
+Both Patricia variants retain eight words per binding versus six for
+`Stdlib.Map`. The classic four-field branch layout is the same basic layout
+presented by Okasaki and Gill in
+[Fast Mergeable Integer Maps](<Okasaki and Gill - 1998 - Fast Mergeable Integer Maps.pdf>).
+Reducing it requires a representation change, not a local expression rewrite:
+for example, omit the integer prefix and route to a final leaf comparison, pack
+the prefix/discriminator in a fixed-width backend, or remove the string sample
+and accept representative descent. Each choice trades memory against lookup,
+join, or merge work and requires new invariant proofs. Pursue it only if
+retained memory dominates the target CompCert workload.
+
+## Benchmark changes needed to evaluate those updates
+
+The present benchmark is a useful checked smoke benchmark, but a performance
+decision should add:
+
+- calibrated batches and multiple samples for union, reporting median and
+  dispersion instead of timing one sub-millisecond operation with
+  `Unix.gettimeofday`;
+- random insertion order, successful and unsuccessful lookups/removals,
+  subset/no-op union, equal maps, sparse overlap, and adversarial long-prefix
+  strings in addition to consecutive ranges;
+- separate `elements`, `mem`, generic `combine`, and bulk-build workloads;
+- physical-sharing counters or retained-node checks, so low allocation is
+  attributed to reused nodes rather than inferred only from GC totals;
+- a proof-aligned extraction backend beside the optimized backend, making
+  performance cost and differential semantic validation visible together; and
+- pinned compiler configuration. These results used OCaml 4.14.3 without
+  Flambda, so compiler changes must not be confused with data-structure changes.
+
+The local paper motivates Patricia maps specifically by lookup, insertion, and
+fast merge. The benchmark should keep those headline operations, while the
+additional cases prevent the ordered-range union result from standing in for
+all map workloads.
 
 ## Current implementation boundary
 
