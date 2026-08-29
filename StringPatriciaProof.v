@@ -1902,6 +1902,437 @@ Proof.
   - rewrite Hnone in Hget. congruence.
 Qed.
 
+Lemma all_keys_map_left:
+  forall (A B C : Type) (P : string -> Prop)
+      (f : option A -> option B -> option C) (m : t A),
+    all_keys P m -> all_keys P (map_left f m).
+Proof.
+  intros. unfold map_left. now apply all_keys_map_filter.
+Qed.
+
+Lemma all_keys_map_right:
+  forall (A B C : Type) (P : string -> Prop)
+      (f : option A -> option B -> option C) (m : t B),
+    all_keys P m -> all_keys P (map_right f m).
+Proof.
+  intros. unfold map_right. now apply all_keys_map_filter.
+Qed.
+
+(** Once two inputs are separated at one bit, their one-sided maps remain
+    separated.  Consequently [join] implements the generic merge law: the
+    apparently left-biased lookup cannot discard a right result because no
+    key can occur in both inputs. *)
+Lemma combine_join_separated_correct_wf:
+  forall (A B C : Type) (f : option A -> option B -> option C)
+      sample split (left : t A) (right : t B),
+    f None None = None -> wf left -> wf right ->
+    all_keys (fun key =>
+      same_prefix sample key split /\
+      bit_at key split = bit_at sample split) left ->
+    all_keys (fun key =>
+      same_prefix sample key split /\
+      bit_at key split = negb (bit_at sample split)) right ->
+    wf (join (map_left f left) (map_right f right)) /\
+    forall key,
+      get key (join (map_left f left) (map_right f right)) =
+      f (get key left) (get key right).
+Proof.
+  intros A B C f sample split left right Hnone Hwl Hwr Hleft Hright.
+  destruct (@map_left_correct_wf A B C f left Hnone Hwl) as [Hwml Hml].
+  destruct (@map_right_correct_wf A B C f right Hnone Hwr) as [Hwmr Hmr].
+  assert (Hmapped_left : all_keys (fun key =>
+      same_prefix sample key split /\
+      bit_at key split = bit_at sample split) (map_left f left)).
+  { eapply all_keys_map_left. exact Hleft. }
+  assert (Hmapped_right : all_keys (fun key =>
+      same_prefix sample key split /\
+      bit_at key split = negb (bit_at sample split)) (map_right f right)).
+  { eapply all_keys_map_right. exact Hright. }
+  destruct (join_separated_correct_wf C sample split
+    (map_left f left) (map_right f right)
+    Hwml Hwmr Hmapped_left Hmapped_right) as [Hwj Hjoin].
+  split; [exact Hwj|]. intro key. rewrite Hjoin, Hml, Hmr.
+  destruct (get key left) as [left_value|] eqn:Eleft;
+    destruct (get key right) as [right_value|] eqn:Eright.
+  - pose proof (all_keys_get A _ left key left_value Hleft Eleft)
+      as [_ Hleft_bit].
+    pose proof (all_keys_get B _ right key right_value Hright Eright)
+      as [_ Hright_bit].
+    exfalso. rewrite Hleft_bit in Hright_bit.
+    now destruct (bit_at sample split) in Hright_bit.
+  - now destruct (f (Some left_value) None).
+  - now rewrite Hnone.
+  - now rewrite Hnone.
+Qed.
+
+Theorem combine_fuel_correct_wf:
+  forall (A B C : Type) fuel
+      (f : option A -> option B -> option C) (left : t A) (right : t B),
+    f None None = None ->
+    wf left -> wf right ->
+    combine_fuel_sufficient fuel left right ->
+    wf (combine_fuel fuel f left right) /\
+    forall key,
+      get key (combine_fuel fuel f left right) =
+      f (get key left) (get key right).
+Proof.
+  intros A B C fuel. induction fuel as [|fuel IH];
+    intros f left right Hnone Hwl Hwr Hfuel; [contradiction|].
+  destruct left as [|left_key left_value
+      |left_sample left_split left_left left_right];
+    destruct right as [|right_key right_value
+      |right_sample right_split right_left right_right].
+  - cbn [combine_fuel map_right map_filter get].
+    split; [constructor|]. intro key. symmetry. exact Hnone.
+  - cbn [combine_fuel]. now apply map_right_correct_wf.
+  - cbn [combine_fuel]. now apply map_right_correct_wf.
+  - cbn [combine_fuel]. now apply map_left_correct_wf.
+  - cbn [combine_fuel]. now apply combine_leaf_left_correct_wf.
+  - cbn [combine_fuel]. now apply combine_leaf_left_correct_wf.
+  - cbn [combine_fuel]. now apply map_left_correct_wf.
+  - cbn [combine_fuel]. now apply combine_leaf_right_correct_wf.
+  - cbn in Hfuel.
+    destruct Hfuel as [Hsll [Hsrr [Hslall [Hslarr [Hsal Hsar]]]]].
+    inversion Hwl as
+      [| |? ? ? ? Hwll Hwlr Hnell Hnelr Hall Halr]; subst.
+    inversion Hwr as
+      [| |? ? ? ? Hwrl Hwrr Hnerl Hnerr Harl Harr]; subst.
+    cbn [combine_fuel].
+    destruct (left_split =? right_split) eqn:Esplits.
+    + apply Nat.eqb_eq in Esplits. subst right_split.
+      destruct (agrees_before_bounded left_sample right_sample left_split)
+        eqn:Eagrees.
+      * pose proof ((proj1 (agrees_before_bounded_spec
+          left_sample right_sample left_split)) Eagrees) as Hsamples.
+        destruct (IH f left_left right_left Hnone Hwll Hwrl Hsll)
+          as [Hwoutl Hgetoutl].
+        destruct (IH f left_right right_right Hnone Hwlr Hwrr Hsrr)
+          as [Hwoutr Hgetoutr].
+        assert (Harl' : all_keys (fun key =>
+            same_prefix left_sample key left_split /\
+            bit_at key left_split = false) right_left).
+        { eapply all_keys_equal_split_rebase; eauto. }
+        assert (Harr' : all_keys (fun key =>
+            same_prefix left_sample key left_split /\
+            bit_at key left_split = true) right_right).
+        { eapply all_keys_equal_split_rebase; eauto. }
+        assert (Houtl : all_keys (fun key =>
+            same_prefix left_sample key left_split /\
+            bit_at key left_split = false)
+            (combine_fuel fuel f left_left right_left)).
+        { eapply all_keys_of_combine_lookup; eauto. }
+        assert (Houtr : all_keys (fun key =>
+            same_prefix left_sample key left_split /\
+            bit_at key left_split = true)
+            (combine_fuel fuel f left_right right_right)).
+        { eapply all_keys_of_combine_lookup; eauto. }
+        split.
+        -- now apply branch_wf_general.
+        -- intro key.
+           rewrite get_branch.
+           ++ cbn [get]. destruct (bit_at key left_split);
+                [apply Hgetoutr|apply Hgetoutl].
+           ++ eapply all_keys_impl; [exact Houtl|].
+              intros stored H. exact (proj2 H).
+           ++ eapply all_keys_impl; [exact Houtr|].
+              intros stored H. exact (proj2 H).
+      * assert (Emin : Nat.min left_split left_split = left_split) by
+          apply Nat.min_id.
+        destruct (branches_disjoint_prefix A B left_sample left_split
+          (Branch left_sample left_split left_left left_right)
+          right_sample left_split
+          (Branch right_sample left_split right_left right_right)
+          (branch_all_prefix A left_sample left_split left_left left_right
+            Hall Halr)
+          (branch_all_prefix B right_sample left_split right_left right_right
+            Harl Harr)) as [differing [Hdiff [Hleft Hright]]].
+        -- now rewrite Emin.
+        -- eapply combine_join_separated_correct_wf; eauto.
+    + destruct (left_split <? right_split) eqn:Eorder.
+      * apply Nat.ltb_lt in Eorder.
+        destruct (agrees_before_bounded left_sample right_sample left_split)
+          eqn:Eagrees.
+        -- pose proof ((proj1 (agrees_before_bounded_spec
+             left_sample right_sample left_split)) Eagrees) as Hsamples.
+           assert (Hright_prefix : all_keys
+             (fun key => same_prefix right_sample key right_split)
+             (Branch right_sample right_split right_left right_right)).
+           { now apply branch_all_prefix. }
+           assert (Hcontained : all_keys (fun key =>
+               same_prefix left_sample key left_split /\
+               bit_at key left_split = bit_at right_sample left_split)
+               (Branch right_sample right_split right_left right_right)).
+           { eapply all_keys_contained_prefix; eauto. }
+           destruct (bit_at right_sample left_split) eqn:Eside.
+           ++ destruct (@map_left_correct_wf A B C f left_left Hnone Hwll)
+                as [Hwmap Hgetmap].
+              destruct (IH f left_right
+                (Branch right_sample right_split right_left right_right)
+                Hnone Hwlr Hwr Hslarr) as [Hwout Hgetout].
+              assert (Hmap : all_keys (fun key =>
+                  same_prefix left_sample key left_split /\
+                  bit_at key left_split = false) (map_left f left_left)).
+              { eapply all_keys_map_left. exact Hall. }
+              assert (Hout : all_keys (fun key =>
+                  same_prefix left_sample key left_split /\
+                  bit_at key left_split = true)
+                  (combine_fuel fuel f left_right
+                    (Branch right_sample right_split right_left right_right))).
+              { eapply all_keys_of_combine_lookup; eauto. }
+              split.
+              ** now apply branch_wf_general.
+              ** intro key. rewrite get_branch.
+                 --- change
+                       ((if bit_at key left_split
+                         then get key (combine_fuel fuel f left_right
+                           (Branch right_sample right_split
+                             right_left right_right))
+                         else get key (map_left f left_left)) =
+                        f (if bit_at key left_split
+                           then get key left_right else get key left_left)
+                          (get key (Branch right_sample right_split
+                            right_left right_right))).
+                     destruct (bit_at key left_split) eqn:Ekey.
+                     +++ rewrite (Hgetout key). reflexivity.
+                     +++ rewrite Hgetmap.
+                       assert (Eright : get key
+                         (Branch right_sample right_split right_left right_right) =
+                         None).
+                       { eapply get_none_if_all_keys; [exact Hcontained|].
+                         intros [_ Hbit]. rewrite Ekey in Hbit.
+                         discriminate. }
+                       now rewrite Eright.
+                 --- eapply all_keys_impl; [exact Hmap|].
+                     intros stored H. exact (proj2 H).
+                 --- eapply all_keys_impl; [exact Hout|].
+                     intros stored H. exact (proj2 H).
+           ++ destruct (IH f left_left
+                (Branch right_sample right_split right_left right_right)
+                Hnone Hwll Hwr Hslall) as [Hwout Hgetout].
+              destruct (@map_left_correct_wf A B C f left_right Hnone Hwlr)
+                as [Hwmap Hgetmap].
+              assert (Hout : all_keys (fun key =>
+                  same_prefix left_sample key left_split /\
+                  bit_at key left_split = false)
+                  (combine_fuel fuel f left_left
+                    (Branch right_sample right_split right_left right_right))).
+              { eapply all_keys_of_combine_lookup; eauto. }
+              assert (Hmap : all_keys (fun key =>
+                  same_prefix left_sample key left_split /\
+                  bit_at key left_split = true) (map_left f left_right)).
+              { eapply all_keys_map_left. exact Halr. }
+              split.
+              ** now apply branch_wf_general.
+              ** intro key. rewrite get_branch.
+                 --- change
+                       ((if bit_at key left_split
+                         then get key (map_left f left_right)
+                         else get key (combine_fuel fuel f left_left
+                           (Branch right_sample right_split
+                             right_left right_right))) =
+                        f (if bit_at key left_split
+                           then get key left_right else get key left_left)
+                          (get key (Branch right_sample right_split
+                            right_left right_right))).
+                     destruct (bit_at key left_split) eqn:Ekey.
+                     +++ rewrite Hgetmap.
+                       assert (Eright : get key
+                         (Branch right_sample right_split right_left right_right) =
+                         None).
+                       { eapply get_none_if_all_keys; [exact Hcontained|].
+                         intros [_ Hbit]. rewrite Ekey in Hbit.
+                         discriminate. }
+                       now rewrite Eright.
+                     +++ rewrite (Hgetout key). reflexivity.
+                 --- eapply all_keys_impl; [exact Hout|].
+                     intros stored H. exact (proj2 H).
+                 --- eapply all_keys_impl; [exact Hmap|].
+                     intros stored H. exact (proj2 H).
+        -- assert (Emin : Nat.min left_split right_split = left_split) by
+             (apply Nat.min_l; lia).
+           destruct (branches_disjoint_prefix A B left_sample left_split
+             (Branch left_sample left_split left_left left_right)
+             right_sample right_split
+             (Branch right_sample right_split right_left right_right)
+             (branch_all_prefix A left_sample left_split left_left left_right
+               Hall Halr)
+             (branch_all_prefix B right_sample right_split right_left right_right
+               Harl Harr)) as [differing [Hdiff [Hleft Hright]]].
+           ++ now rewrite Emin.
+           ++ eapply combine_join_separated_correct_wf; eauto.
+      * apply Nat.ltb_ge in Eorder.
+        assert (Hreverse : right_split < left_split) by
+          (apply Nat.eqb_neq in Esplits; lia).
+        destruct (agrees_before_bounded left_sample right_sample right_split)
+          eqn:Eagrees.
+        -- pose proof ((proj1 (agrees_before_bounded_spec
+             left_sample right_sample right_split)) Eagrees) as Hsamples.
+           assert (Hleft_prefix : all_keys
+             (fun key => same_prefix left_sample key left_split)
+             (Branch left_sample left_split left_left left_right)).
+           { now apply branch_all_prefix. }
+           assert (Hcontained : all_keys (fun key =>
+               same_prefix right_sample key right_split /\
+               bit_at key right_split = bit_at left_sample right_split)
+               (Branch left_sample left_split left_left left_right)).
+           { eapply all_keys_contained_prefix; eauto.
+             unfold same_prefix in *. intros n Hn.
+             symmetry. now apply Hsamples. }
+           destruct (bit_at left_sample right_split) eqn:Eside.
+           ++ destruct (@map_right_correct_wf A B C f right_left Hnone Hwrl)
+                as [Hwmap Hgetmap].
+              destruct (IH f
+                (Branch left_sample left_split left_left left_right)
+                right_right Hnone Hwl Hwrr Hsar) as [Hwout Hgetout].
+              assert (Hmap : all_keys (fun key =>
+                  same_prefix right_sample key right_split /\
+                  bit_at key right_split = false) (map_right f right_left)).
+              { eapply all_keys_map_right. exact Harl. }
+              assert (Hout : all_keys (fun key =>
+                  same_prefix right_sample key right_split /\
+                  bit_at key right_split = true)
+                  (combine_fuel fuel f
+                    (Branch left_sample left_split left_left left_right)
+                    right_right)).
+              { eapply all_keys_of_combine_lookup; eauto. }
+              split.
+              ** now apply branch_wf_general.
+              ** intro key. rewrite get_branch.
+                 --- change
+                       ((if bit_at key right_split
+                         then get key (combine_fuel fuel f
+                           (Branch left_sample left_split left_left left_right)
+                           right_right)
+                         else get key (map_right f right_left)) =
+                        f (get key (Branch left_sample left_split
+                             left_left left_right))
+                          (if bit_at key right_split
+                           then get key right_right else get key right_left)).
+                     destruct (bit_at key right_split) eqn:Ekey.
+                     +++ rewrite (Hgetout key). reflexivity.
+                     +++ rewrite Hgetmap.
+                       assert (Eleft : get key
+                         (Branch left_sample left_split left_left left_right) =
+                         None).
+                       { eapply get_none_if_all_keys; [exact Hcontained|].
+                         intros [_ Hbit]. rewrite Ekey in Hbit.
+                         discriminate. }
+                       now rewrite Eleft.
+                 --- eapply all_keys_impl; [exact Hmap|].
+                     intros stored H. exact (proj2 H).
+                 --- eapply all_keys_impl; [exact Hout|].
+                     intros stored H. exact (proj2 H).
+           ++ destruct (IH f
+                (Branch left_sample left_split left_left left_right)
+                right_left Hnone Hwl Hwrl Hsal) as [Hwout Hgetout].
+              destruct (@map_right_correct_wf A B C f right_right Hnone Hwrr)
+                as [Hwmap Hgetmap].
+              assert (Hout : all_keys (fun key =>
+                  same_prefix right_sample key right_split /\
+                  bit_at key right_split = false)
+                  (combine_fuel fuel f
+                    (Branch left_sample left_split left_left left_right)
+                    right_left)).
+              { eapply all_keys_of_combine_lookup; eauto. }
+              assert (Hmap : all_keys (fun key =>
+                  same_prefix right_sample key right_split /\
+                  bit_at key right_split = true) (map_right f right_right)).
+              { eapply all_keys_map_right. exact Harr. }
+              split.
+              ** now apply branch_wf_general.
+              ** intro key. rewrite get_branch.
+                 --- change
+                       ((if bit_at key right_split
+                         then get key (map_right f right_right)
+                         else get key (combine_fuel fuel f
+                           (Branch left_sample left_split left_left left_right)
+                           right_left)) =
+                        f (get key (Branch left_sample left_split
+                             left_left left_right))
+                          (if bit_at key right_split
+                           then get key right_right else get key right_left)).
+                     destruct (bit_at key right_split) eqn:Ekey.
+                     +++ rewrite Hgetmap.
+                       assert (Eleft : get key
+                         (Branch left_sample left_split left_left left_right) =
+                         None).
+                       { eapply get_none_if_all_keys; [exact Hcontained|].
+                         intros [_ Hbit]. rewrite Ekey in Hbit.
+                         discriminate. }
+                       now rewrite Eleft.
+                     +++ rewrite (Hgetout key). reflexivity.
+                 --- eapply all_keys_impl; [exact Hout|].
+                     intros stored H. exact (proj2 H).
+                 --- eapply all_keys_impl; [exact Hmap|].
+                     intros stored H. exact (proj2 H).
+        -- assert (Emin : Nat.min left_split right_split = right_split) by
+             (apply Nat.min_r; lia).
+           destruct (branches_disjoint_prefix A B left_sample left_split
+             (Branch left_sample left_split left_left left_right)
+             right_sample right_split
+             (Branch right_sample right_split right_left right_right)
+             (branch_all_prefix A left_sample left_split left_left left_right
+               Hall Halr)
+             (branch_all_prefix B right_sample right_split right_left right_right
+               Harl Harr)) as [differing [Hdiff [Hleft Hright]]].
+           ++ now rewrite Emin.
+           ++ eapply combine_join_separated_correct_wf; eauto.
+Qed.
+
+Theorem combine_correct_wf:
+  forall (A B C : Type) (f : option A -> option B -> option C)
+      (left : t A) (right : t B),
+    f None None = None -> wf left -> wf right ->
+    wf (combine f left right) /\
+    forall key,
+      get key (combine f left right) = f (get key left) (get key right).
+Proof.
+  intros. unfold combine. eapply combine_fuel_correct_wf; eauto.
+  apply public_combine_fuel_sufficient.
+Qed.
+
+Theorem union_left_correct_wf:
+  forall (A : Type) (left right : t A),
+    wf left -> wf right ->
+    wf (union_left left right) /\
+    forall key,
+      get key (union_left left right) =
+      match get key left with
+      | Some value => Some value
+      | None => get key right
+      end.
+Proof.
+  intros A left right Hleft Hright.
+  unfold union_left.
+  destruct (combine_correct_wf A A A
+    (fun x y => match x with Some _ => x | None => y end)
+    left right eq_refl Hleft Hright) as [Hwf Hget].
+  split; [exact Hwf|].
+  intro key. rewrite Hget.
+  now destruct (get key left).
+Qed.
+
+Theorem union_right_correct_wf:
+  forall (A : Type) (left right : t A),
+    wf left -> wf right ->
+    wf (union_right left right) /\
+    forall key,
+      get key (union_right left right) =
+      match get key right with
+      | Some value => Some value
+      | None => get key left
+      end.
+Proof.
+  intros A left right Hleft Hright.
+  unfold union_right.
+  destruct (combine_correct_wf A A A
+    (fun x y => match y with Some _ => y | None => x end)
+    left right eq_refl Hleft Hright) as [Hwf Hget].
+  split; [exact Hwf|].
+  intro key. rewrite Hget.
+  now destruct (get key right).
+Qed.
+
 Definition sample : t nat :=
   set "alpha" 1 (set "alphabet" 2 (set "" 3 (set "beta" 4 empty)))%string.
 

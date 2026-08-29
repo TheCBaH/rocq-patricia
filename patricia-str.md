@@ -398,10 +398,9 @@ erase termination evidence.
 This option addresses the measured 84,000x disjoint-union time gap at ten
 million bindings. No routing micro-optimization is in the same impact class.
 
-Proof work is substantial because the general string `combine` and union laws
-are currently open. A specialized proof may nevertheless be simpler than
-finishing generic combine first: it has identity one-sided behavior and fewer
-filter-collapse cases.
+The general string `combine` law is now proved. The specialized union proof
+remains distinct because its native algorithm has identity one-sided behavior
+and fewer filter-collapse cases.
 
 ### 2. Scan `first_diff` byte by byte
 
@@ -739,7 +738,8 @@ and retains a measured lookup advantage. The native implementation now uses a
 packed critical-byte token, bytewise-XOR first-difference discovery, a
 one-descent `set`, cached constant-time representatives, fuel-free generic
 combine, a bounded prefix scanner, and structurally sharing biased union. The
-next implementation priority is the direct-string generic-combine proof.
+direct-string biased-union laws are now proved; extensional equality and its
+Boolean reflection are the next proof priority.
 
 The completed scale runs confirm the key architectural result: specialized
 biased union fixes the former whole-tree traversal and rebuilding path, while

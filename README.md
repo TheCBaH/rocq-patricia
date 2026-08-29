@@ -98,11 +98,13 @@ The direct-string proof files currently establish, without axioms:
 - well-formedness and lookup laws for fused left- and right-leaf
   generic-combine workers under `f None None = None`.
 - sufficiency of the public combine fuel bound for every recursive-call shape.
+- simultaneous lookup correctness and well-formedness for `combine_fuel` and
+  public `combine` under `f None None = None`.
 
 `join_separated_correct_wf` proves the string-tree join law under explicit
-prefix/bit-separation preconditions, including filtered empty sides. Generic
-`combine` remains a proof obligation; the randomized string tests exercise it,
-but are not substitutes for its general Rocq specification.
+prefix/bit-separation preconditions, including filtered empty sides. The
+specialized left- and right-biased union laws are derived from the generic
+combine theorem.
 
 It then runs deterministic randomized OCaml tests against reference maps. The
 positive suite exercises point updates, removal, generic and deletion-capable

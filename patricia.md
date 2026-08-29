@@ -13,17 +13,17 @@ The implementation is a strong executable and proof-development sketch. The
 positive-key source model has substantial functional-correctness coverage, and
 both extracted implementations behaved correctly in the supplied tests and in
 additional fuzzing. It is not yet a complete formally verified mergeable-map
-library, however. The direct-string source model is missing merge proofs, the
-extracted API does not enforce the proved preconditions, and the optimized
-native extraction is a second implementation rather than a proved compilation
-of the Rocq definitions.
+library, however. The direct-string source model is missing extensional
+equality, the extracted API does not enforce the proved preconditions, and the
+optimized native extraction is a second implementation rather than a proved
+compilation of the Rocq definitions.
 
 The verification claim must therefore be split into three layers:
 
 | Layer | Current status |
 | --- | --- |
 | Pure positive-key Rocq model | Kernel-checked functional map laws, including general `combine`, with no project axioms found in the inspected theorem closure |
-| Pure direct-string Rocq model | Lookup, update, removal, traversal, filtering, and structural invariants are proved; general `combine` and union remain open |
+| Pure direct-string Rocq model | Lookup, update, removal, traversal, filtering, structural invariants, general `combine`, and biased unions are proved; extensional equality remains open |
 | Extracted native OCaml | Extensive oracle and invariant testing passes, but the standard numeric/string mappings and 19 explicit handwritten realizers are trusted; neither their refinement nor the Rocq-to-OCaml compilation pipeline is proved here |
 
 Consequently, “formally verified” is accurate for the stated theorems about the
@@ -39,9 +39,10 @@ The following checks passed:
 - a source scan found no `Admitted`, `admit`, `Axiom`, aborted proof, or similar
   unresolved proof escape in the Patricia sources;
 - `Print Assumptions` reported the inspected integer `combine_correct_wf` and
-  string `set_correct_wf`, `replace_binding_correct_wf`, and
-  `join_separated_correct_wf`, `public_combine_fuel_sufficient`, and
-  `wf_splits_ordered` theorems as closed under the global context;
+  string `set_correct_wf`, `replace_binding_correct_wf`,
+  `join_separated_correct_wf`, `public_combine_fuel_sufficient`,
+  `union_left_correct_wf`, `union_right_correct_wf`, and `wf_splits_ordered`
+  theorems as closed under the global context;
 - additional integer fuzzing used keys across the positive OCaml `int` range,
   including high-bit boundary values, and checked lookup, elements, merge, and
   routing invariants;
@@ -85,24 +86,27 @@ algorithm or a refinement theorem connecting the direct extracted recursion
 to the existing fuelled specification.  A cost semantics is additionally
 needed before making a formal asymptotic claim.
 
-### 2. The direct-string core is only partially verified
+### 2. The direct-string biased unions are verified
 
 The string proofs cover the bit view, first-difference scan, lookup/elements
-agreement, removal, mapping, and general `set`, including fresh-key insertion.
-They do not yet establish the general laws for:
-
-- `combine_fuel` and public `combine`;
-- the specialized string unions.
+agreement, removal, mapping, general `set`, generic `combine`, and both biased
+unions, including fresh-key insertion and every branch-prefix relationship.
 
 The general `set_correct_wf` theorem establishes well-formedness and the
 pointwise lookup law for both fresh and existing keys, and
-`replace_binding_correct_wf` derives the update-or-remove law. The public
-fuel bound is proved sufficient for all recursive shapes, while
+`replace_binding_correct_wf` derives the update-or-remove law. The public fuel
+bound is proved sufficient for all recursive shapes,
+`combine_fuel_correct_wf` proves the generic pointwise lookup law and
+well-formedness simultaneously, and
 `join_separated_correct_wf` establishes the left-biased join law for explicitly
 separated well-formed trees, including empty filtered sides. Randomized merge
-success still does not establish the general merge specification.
+testing remains supporting evidence for the separately extracted native
+implementation.
 
-This is the largest functional-verification gap.
+`union_left_correct_wf` and `union_right_correct_wf` specialize the generic
+combine law, preserving well-formedness and selecting the preferred binding at
+every key. Extensional equality and its Boolean reflection are now the next
+pure-model functional gap.
 
 ### 3. The extracted interface exposes values outside the proof contract
 
@@ -160,7 +164,7 @@ does not inspect either kind of extraction directive.
 | Packed string split token `(byte << 4) | tag`, native `bit_at`, and bytewise `first_diff` | `first_diff` is checked for all 65,536 one-byte pairs plus prefix and long-prefix cases; structural tests check `bit_at` routing over NUL, non-ASCII, and randomized strings | This requires a relational theorem, not equality at the same extracted integer: logical position 9 is encoded as token 16, and exported native `bit_at s 9` therefore does not denote pure `bit_at s 9`. Prove `native_bit_at s (encode n) = bit_at s n`, `native_first_diff = option_map encode first_diff`, validity and order preservation of tokens, then hide raw tokens from clients. |
 | A branch sample returned as its constant-time `representative` | Structural tests check that samples in public-operation results are resident keys | Existing `wf` only constrains the sample's prefix; it does not say the sample is resident. Strengthen the invariant with sample residency and prove every constructor preserves it, or keep the source representative descent. Without that stronger invariant, this realizer is not equivalent even on every currently `wf` tree. |
 | Exception-based one-descent string `set` | Existing/fresh-key oracle tests and structural checks pass | Define a source worker returning either a rebuilt tree or a discriminator to bubble upward, prove it equivalent to `set`, and extract it. Proving the exact local-exception OCaml code instead requires a target-language logic supporting exceptions. |
-| Fuel-free integer and string `combine` | Randomized merges agree with reference maps; integer source `combine` is proved, string source `combine` is not | Define well-founded recursion over `size left + size right`, prove its equations and equivalence to sufficiently fuelled `combine_fuel`, and extract that definition. The string functional proof must be completed first or alongside it. |
+| Fuel-free integer and string `combine` | Randomized merges agree with reference maps; both source `combine` definitions are proved | Define well-founded recursion over `size left + size right`, prove its equations and equivalence to sufficiently fuelled `combine_fuel`, and extract that definition. |
 | Specialized biased unions and physical-identity (`==`) sharing | Disjoint and overlap results agree with `Stdlib.Map`; allocation demonstrates sharing | Prove the semantic union law for a source-level specialized algorithm. Functional correctness does not prove physical sharing; a sharing/allocation claim needs a cost or heap semantics. A source worker can return a `changed` certificate to justify returning the original tree without relying on target physical equality. |
 
 The packed-token and cached-representative rows are the most important subtle
@@ -343,9 +347,9 @@ filtered sides. Remaining work:
 1. [x] Prove representative and prefix-agreement lemmas for equal-split,
    containment, and disjoint-prefix cases;
 2. [x] Define and prove sufficiency of the recursive-call fuel measure;
-3. [ ] Prove `combine_fuel` correctness and well-formedness simultaneously;
-4. [ ] Lift the result to public `combine` under `f None None = None`;
-5. [ ] Derive left- and right-biased union laws.
+3. [x] Prove `combine_fuel` correctness and well-formedness simultaneously;
+4. [x] Lift the result to public `combine` under `f None None = None`;
+5. [x] Derive left- and right-biased union laws.
 
 The main final theorem should be:
 

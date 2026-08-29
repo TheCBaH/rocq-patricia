@@ -40,11 +40,11 @@ thresholds.
 
 - **done**: prove the equal-split, containment, and disjoint-prefix lemmas
   needed by merge.
-- **next**: prove `combine_fuel` lookup correctness and well-formedness.
-- **later**: lift the result to public `combine` under
+- **done**: prove `combine_fuel` lookup correctness and well-formedness.
+- **done**: lift the result to public `combine` under
   `f None None = None`.
-- **later**: derive left- and right-biased union laws.
-- **later**: add string extensional equality/`beq`, documented `elements`
+- **done**: derive left- and right-biased union laws.
+- **next**: add string extensional equality/`beq`, documented `elements`
   ordering, and finite-map extensionality theorems.
 
 ## M4: Harden the public extracted API
@@ -114,3 +114,13 @@ thresholds.
   result produces the `all_keys` hypotheses consumed directly by
   `join_separated_correct_wf`. `make proof`, `make`, the randomized oracle,
   and `make benchmark` passed.
+- **2026-08-29 — direct-string generic combine**: proved simultaneous lookup
+  correctness and well-formedness for every sufficiently fuelled
+  `combine_fuel`, covering equal roots, either containment direction, failed
+  prefix agreement, filtered empty sides, and leaf fusion. Lifted the result
+  to public `combine` under `f None None = None`; `make proof`, `make`, the
+  randomized oracle, and `make benchmark` passed.
+- **2026-08-29 — direct-string biased unions**: derived left- and right-biased
+  lookup and well-formedness laws from the generic `combine` theorem. Rocq
+  reports both exported theorems closed under the global context; `make proof`,
+  `make`, the randomized oracle, and `make benchmark` passed.

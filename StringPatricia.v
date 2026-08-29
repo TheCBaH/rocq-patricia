@@ -231,10 +231,8 @@ Fixpoint combine_fuel {A B C : Type}
       match a, b with
       | Empty, _ => map_right f b
       | _, Empty => map_left f a
-      | Leaf ka va, _ =>
-          replace_binding ka (f (Some va) (get ka b)) (map_right f b)
-      | _, Leaf kb vb =>
-          replace_binding kb (f (get kb a) (Some vb)) (map_left f a)
+      | Leaf ka va, _ => combine_leaf_left f ka va b
+      | _, Leaf kb vb => combine_leaf_right f a kb vb
       | Branch sample_a split_a left_a right_a,
         Branch sample_b split_b left_b right_b =>
           if split_a =? split_b then
