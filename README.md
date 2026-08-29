@@ -41,8 +41,16 @@ at ten million.
 `PatriciaBits.v` fixes the proof-side positive-key convention. `StringBits.v`
 defines the prefix-free string bit view (a continuation marker plus eight bits
 per byte and an end marker), so empty strings, embedded zero bytes, and prefix
-keys are distinct. `PatriciaExtract.v` generates both APIs under
-`patricia/extracted/`. Native extraction maps integer keys, prefixes, masks,
+keys are distinct. `PatriciaExtract.v` generates implementation backends under
+`patricia/extracted/`; the build names the map modules `PatriciaInternal` and
+`StringPatriciaInternal`. The supported OCaml interfaces are the handwritten
+`PatriciaMap` and `StringPatriciaMap` modules. Their `.mli` files make map types
+abstract and expose only smart map operations; generated constructors, routing
+metadata, packed string positions, fuel/change workers, and merge helpers stay
+behind that boundary. The structural oracle intentionally uses the internal
+modules, while the comparison benchmark uses only the abstract interfaces.
+
+Native extraction maps integer keys, prefixes, masks,
 and routing operations to OCaml `int`. String branch discriminators are packed
 as a byte index and four-bit tag, first differences are found in one bytewise
 pass, bounded prefix checks scan only through their split, updates route only
@@ -126,8 +134,10 @@ prefixes, and generated arbitrary byte strings. These are executable tests,
 not Rocq proofs or complete validation of the custom extraction constants.
 
 This is a design sketch, not a drop-in `Maps.TREE` implementation. Constructors
-remain visible. The integer proofs use unbounded positive keys, while extraction
-uses bounded OCaml `int`; callers must therefore supply keys in
+remain visible only in the explicitly internal generated modules used by the
+structural tests; supported clients use abstract map types. The integer proofs
+use unbounded positive keys, while extraction uses bounded OCaml `int`; callers
+must therefore supply keys in
 `1 .. max_int`. The string tree uses native OCaml strings and proof-side
 logical bit positions; native extraction represents positions as packed
 byte/tag integer tokens. Native extraction also replaces proof-side fuelled

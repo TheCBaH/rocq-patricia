@@ -54,11 +54,12 @@ thresholds.
 
 ## M4: Harden the public extracted API
 
-- **next**: generate an internal module and expose abstract map types through
-  a handwritten wrapper interface.
-- **later**: validate native integer keys and hide constructors, fuel, packed
-  split tokens, and proof-internal helpers.
-- **later**: document and enforce the public `combine` contract.
+- **done**: generate explicitly named internal modules and expose abstract map
+  types through handwritten `PatriciaMap` and `StringPatriciaMap` interfaces;
+  constructors, fuel/change workers, packed split tokens, and proof-internal
+  helpers are absent from the supported API.
+- **next**: validate native integer keys at the public wrapper boundary.
+- **later**: strengthen and enforce the documented public `combine` contract.
 - **later**: retain a proof-aligned extraction backend for differential tests.
 
 ## M5: Reduce the trusted native-refinement boundary
@@ -147,3 +148,10 @@ thresholds.
   relation; structural equality is deliberately not claimed. `make proof`,
   `make`, the randomized oracle, and `make benchmark` passed, and Rocq reports
   the exported extensionality theorems closed under the global context.
+- **2026-08-29 — abstract extracted API**: the build now renames generated map
+  backends to `PatriciaInternal` and `StringPatriciaInternal` and compiles
+  handwritten wrappers whose `.mli` files keep both map types abstract. Public
+  signatures contain only proved smart operations; constructors, routing
+  metadata, packed positions, and proof-internal workers remain internal. The
+  oracle adds wrapper-level functional checks, and the native benchmark now
+  uses only the abstract interfaces. `make` and `make benchmark` passed.

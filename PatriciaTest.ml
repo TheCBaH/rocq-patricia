@@ -1,4 +1,4 @@
-open Patricia
+open PatriciaInternal
 
 let positive_of_int n =
   if n <= 0 then invalid_arg "positive_of_int" else n
@@ -147,7 +147,7 @@ let check_int_wide_keys () =
     check_int_table round "wide union_right" keys expected_right (union_right !left !right)
   done
 
-module S = StringPatricia
+module S = StringPatriciaInternal
 
 let string_of_bytes bytes =
   Bytes.init (Array.length bytes) (fun i -> Char.chr bytes.(i))
@@ -349,8 +349,54 @@ let check_string_keys () =
     check_string_table round "union_right" keys expected_right (S.union_right !left !right)
   done
 
+let check_abstract_interfaces () =
+  let module I = PatriciaMap in
+  let integers : int I.t =
+    I.empty
+    |> I.set 7 70
+    |> I.set 3 30
+    |> I.set 7 71
+  in
+  if I.is_empty integers || not (I.mem 7 integers)
+     || I.get 7 integers <> Some 71 then
+    failwith "abstract integer interface update failed";
+  let mapped = I.map (fun key value -> key + value) integers in
+  let filtered = I.map_filter
+      (fun key value -> if key = 3 then None else Some value) mapped in
+  if I.elements filtered <> [7, 78]
+     || I.fold (fun count _ _ -> count + 1) filtered 0 <> 1 then
+    failwith "abstract integer interface traversal failed";
+  let combined = I.combine merge_options filtered (I.singleton 9 90) in
+  if I.elements combined <> [7, 78; 9, 90]
+     || not (I.beq ( = ) combined (I.union_left filtered (I.singleton 9 90)))
+     || not (I.is_empty (I.remove 7 (I.remove 9 combined))) then
+    failwith "abstract integer interface combine failed";
+  let module S = StringPatriciaMap in
+  let strings : int S.t =
+    S.empty
+    |> S.set "" 0
+    |> S.set "a\000b" 1
+    |> S.set "\255" 2
+    |> S.set "a\000b" 3
+  in
+  if S.is_empty strings || not (S.mem "" strings)
+     || S.get "a\000b" strings <> Some 3 then
+    failwith "abstract string interface update failed";
+  let mapped = S.map (fun key value -> Stdlib.String.length key + value) strings in
+  let filtered = S.map_filter
+      (fun key value -> if key = "" then None else Some value) mapped in
+  if S.fold (fun count _ _ -> count + 1) filtered 0 <> 2 then
+    failwith "abstract string interface traversal failed";
+  let singleton = S.singleton "z" 9 in
+  let combined = S.combine merge_options filtered singleton in
+  if S.get "z" combined <> Some 9
+     || not (S.beq ( = ) combined (S.union_right filtered singleton))
+     || S.get "a\000b" (S.remove "a\000b" combined) <> None then
+    failwith "abstract string interface combine failed"
+
 let () =
   Random.init 0x504154;
+  check_abstract_interfaces ();
   check_string_bits ();
   for round = 1 to 250 do
     let left_ref = Array.make 256 None in

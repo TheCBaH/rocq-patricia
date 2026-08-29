@@ -741,8 +741,10 @@ combine, a bounded prefix scanner, and structurally sharing biased union. The
 direct-string biased-union and extensional-`beq` laws are now proved, as is
 strong sorting of `elements` by the prefix-free bit-stream lexicographic
 order. Lookup-based finite-map extensionality is also packaged for both key
-variants. Hardening the extracted API behind abstract map types is the next
-implementation priority.
+variants. The extracted backends are now internal modules behind abstract
+`PatriciaMap` and `StringPatriciaMap` interfaces; checked native positive keys
+and stronger enforcement of the public generic-`combine` contract are the next
+API-hardening priorities.
 
 The completed scale runs confirm the key architectural result: specialized
 biased union fixes the former whole-tree traversal and rebuilding path, while

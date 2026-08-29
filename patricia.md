@@ -117,7 +117,7 @@ the key projection of `elements` is strongly sorted by the first differing
 prefix-free logical bit, with `false` before `true`; thus every earlier key is
 related to every later key, not merely to its immediate successor.
 
-### 3. The extracted interface exposes values outside the proof contract
+### 3. The raw extracted backend exposes values outside the proof contract
 
 Separate extraction exposes the tree constructors and internal dependencies,
 including `branch`, `join`, `insert_at`, `replace_binding`, and
@@ -129,16 +129,17 @@ including `branch`, `join`, `insert_at`, `replace_binding`, and
 - pass a combining function that violates `f None None = None` and then expect
   the finite-map lookup theorem.
 
-The README documents part of this boundary, but the generated types do not
-enforce it. Complete library verification requires an abstract public type and
-an interface that makes malformed trees unrepresentable to clients.
+The generated types do not enforce the proof boundary and are therefore named
+`PatriciaInternal` and `StringPatriciaInternal` by the build. Supported clients
+instead compile against handwritten `PatriciaMap.mli` and
+`StringPatriciaMap.mli` interfaces. Their map types are abstract and their
+operation set excludes constructors, representatives, branch/join helpers,
+change workers, low-level bit operations, packed split tokens, and combine
+workers. The structural oracle retains deliberate access to the internal
+modules; the benchmark exercises the wrappers.
 
-Recommended correction:
+Remaining correction:
 
-- add a handwritten wrapper `.mli` with abstract map types;
-- expose only proved smart constructors and operations;
-- hide fuel, branch construction, representatives, and proof-internal merge
-  helpers;
 - use an abstract validated positive key type, or explicitly choose and verify
   a different native integer key domain;
 - document `combine`'s finite-map condition in the public API, and provide
@@ -417,11 +418,11 @@ and establish bounds for:
 
 ### Phase 7: harden extraction and integration
 
-- [ ] Generate an internal module and place an abstract handwritten wrapper around
-  it.
+- [x] Generate internal modules and place abstract handwritten wrappers around
+  them.
 - [ ] Add checked conversions for native integer keys.
-- [ ] Prevent clients from constructing malformed values or supplying fuel.
-- [ ] Hide packed split tokens and low-level bit functions, or expose wrapper
+- [x] Prevent supported clients from constructing malformed values or supplying fuel.
+- [x] Hide packed split tokens and low-level bit functions, or expose wrapper
   functions that encode and decode logical positions.
 - [ ] Add a CompCert `TREE` adapter only after its required laws are enumerated and
   proved.

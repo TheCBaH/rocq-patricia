@@ -15,6 +15,11 @@ module String_avl = Map.Make (struct
   let compare = Stdlib.String.compare
 end)
 
+(* Benchmarks exercise the supported abstract interfaces, not the generated
+   implementation modules used by the structural oracle test. *)
+module Patricia = PatriciaMap
+module StringPatricia = StringPatriciaMap
+
 let benchmark_size =
   match Sys.getenv_opt "PATRICIA_BENCH_SIZE" with
   | None -> 10_000
@@ -127,18 +132,11 @@ let build_avl_string keys =
     (fun map key -> String_avl.add key (Stdlib.String.length key) map)
     String_avl.empty keys
 
-(* [size] in the extracted APIs counts constructors, not bindings. *)
-let rec patricia_cardinal = function
-  | Patricia.Empty -> 0
-  | Patricia.Leaf _ -> 1
-  | Patricia.Branch (_, _, left, right) ->
-      patricia_cardinal left + patricia_cardinal right
+let patricia_cardinal map =
+  Patricia.fold (fun count _ _ -> count + 1) map 0
 
-let rec string_patricia_cardinal = function
-  | StringPatricia.Empty -> 0
-  | StringPatricia.Leaf _ -> 1
-  | StringPatricia.Branch (_, _, left, right) ->
-      string_patricia_cardinal left + string_patricia_cardinal right
+let string_patricia_cardinal map =
+  StringPatricia.fold (fun count _ _ -> count + 1) map 0
 
 let check_int_equivalent keys patricia avl =
   Array.iter
