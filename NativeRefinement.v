@@ -178,6 +178,39 @@ Definition packed_bit_at (s : string) (token : nat) : bool :=
       end
   end.
 
+(** These two lemmas isolate the guards in the native [bit_at] realizer.
+    They are stated with safe [String.get]; connecting that operation to the
+    target's bounded unsafe access remains a target-language obligation. *)
+Lemma string_get_past_end:
+  forall s byte, String.length s <= byte -> String.get byte s = None.
+Proof.
+  induction s as [|ch rest IH]; intros byte Hbound.
+  - reflexivity.
+  - destruct byte as [|byte].
+    + cbn in Hbound. lia.
+    + cbn [String.get]. apply IH. cbn in Hbound. lia.
+Qed.
+
+Lemma packed_bit_at_past_end:
+  forall s token, String.length s <= token / 16 ->
+    packed_bit_at s token = false.
+Proof.
+  intros s token Hbound. unfold packed_bit_at.
+  rewrite string_get_past_end by exact Hbound. reflexivity.
+Qed.
+
+Lemma packed_bit_at_invalid_tag:
+  forall s token, 9 <= token mod 16 -> packed_bit_at s token = false.
+Proof.
+  intros s token Htag. unfold packed_bit_at.
+  destruct (String.get (token / 16) s) as [ch|] eqn:Hget; [|reflexivity].
+  destruct (token mod 16) as [|offset].
+  - lia.
+  - replace (offset <? 8) with false by
+      (symmetry; apply Nat.ltb_ge; lia).
+    reflexivity.
+Qed.
+
 Definition packed_first_diff (left right : string) : option nat :=
   option_map encode_position (StringBits.first_diff left right).
 

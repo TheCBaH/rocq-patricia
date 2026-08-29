@@ -74,9 +74,10 @@ thresholds.
   cover decode-after-encode, valid tags, injectivity, ordering, and a safe
   source-level packed `bit_at` worker correct at encoded positions. They also
   prove the valid-token round trip and characterize the packed first difference
-  as the unique unequal valid token after an equal prefix. Proving the
-  handwritten OCaml primitive/string correspondence and bytewise `first_diff`
-  realizer against these specifications is next.
+  as the unique unequal valid token after an equal prefix; the safe worker also
+  rejects out-of-range byte reads and tags 9–15. Proving the handwritten OCaml
+  primitive/string correspondence and bytewise `first_diff` realizer against
+  these specifications is next.
 - **done**: require every well-formed string branch's cached sample to be a
   resident binding and preserve that requirement through all smart operations.
 - **later**: replace handwritten direct `set`, `combine`, and biased-union
@@ -228,3 +229,7 @@ thresholds.
   valid, differs at that token, and agrees at every earlier encoded position.
   The theorem rules out invalid tag results but is not yet a bytewise-scan
   refinement.
+- **2026-08-29 — safe packed-read guards**: proved the safe source-level
+  packed `bit_at` worker returns `false` after the final byte and for every
+  invalid tag (9–15). This models the checks surrounding native unsafe access;
+  proving their correspondence to that primitive remains open.
