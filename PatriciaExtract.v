@@ -25,37 +25,190 @@ Extract Constant PatriciaBits.highest_differing_bit =>
      in log2 (left lxor right) 0)".
 Extract Constant PatriciaBits.mask_above => "(fun high low -> low < high)".
 
-(** Proof-side definitions remain pure Rocq.  These extraction refinements
-    give the direct string implementation constant-time byte access and a
-    single allocation-free first-difference scan over native OCaml strings. *)
+(** Proof-side definitions remain pure Rocq.  Extracted string branches use a
+    packed critical-bit token [(byte_index << 4) | tag], where tag zero is the
+    continuation marker and tags 1--8 are the byte's bits from most to least
+    significant.  Token order is the order of the proof-side logical bit
+    positions, but routing needs only shifts and masks rather than division
+    and remainder by nine. *)
 Extract Constant StringBits.bit_at =>
   "(fun s n ->
-     let byte = n / 9 and offset = n mod 9 in
-     if byte >= Stdlib.String.length s then false
-     else if offset = 0 then true
-     else ((Char.code (Stdlib.String.get s byte) lsr (8 - offset)) land 1) <> 0)".
+     let byte = n lsr 4 and tag = n land 15 in
+     byte < Stdlib.String.length s &&
+       (tag = 0 ||
+        (tag <= 8 &&
+         ((Char.code (Stdlib.String.unsafe_get s byte) lsr (8 - tag)) land 1) <> 0)))".
 
 Extract Constant StringBits.first_diff =>
   "(fun left right ->
-     if left = right then None else
-     let limit = 9 * max (Stdlib.String.length left) (Stdlib.String.length right) + 1 in
-     let bit s n =
-       let byte = n / 9 and offset = n mod 9 in
-       if byte >= Stdlib.String.length s then false
-       else if offset = 0 then true
-       else ((Char.code (Stdlib.String.get s byte) lsr (8 - offset)) land 1) <> 0
-     in
-     let rec scan n =
-       if n >= limit then None
-       else if bit left n <> bit right n then Some n else scan (n + 1)
+     if left == right then None else
+     let left_length = Stdlib.String.length left
+     and right_length = Stdlib.String.length right in
+     let common = if left_length < right_length then left_length else right_length in
+     let rec scan byte =
+       if byte = common then
+         if left_length = right_length then None else Some (byte lsl 4)
+       else
+         let difference =
+           Char.code (Stdlib.String.unsafe_get left byte) lxor
+           Char.code (Stdlib.String.unsafe_get right byte)
+         in
+         if difference = 0 then scan (byte + 1)
+         else
+           let rec leading_zeroes count mask =
+             if difference land mask <> 0 then count
+             else leading_zeroes (count + 1) (mask lsr 1)
+           in
+           Some ((byte lsl 4) lor (1 + leading_zeroes 0 128))
      in scan 0)".
+
+(** Every branch built by the public operations caches a resident key in its
+    sample field.  Use that cache in native code rather than walking to a
+    leaf.  The pure [representative] remains the specification for arbitrary
+    constructor-built values. *)
+Extract Constant StringPatricia.representative =>
+  "(function
+     | Empty -> None
+     | Leaf (key, _) -> Some key
+     | Branch (sample, _, _, _) -> Some sample)".
+
+(** Fuse routed-leaf discovery with persistent reconstruction.  A local
+    exception carries a fresh key's discriminator up to the first ancestor
+    below which it belongs.  Existing-key replacement and fresh insertion
+    therefore each route through the input only once. *)
+Extract Constant StringPatricia.set =>
+  "(fun key value root ->
+     let fresh = Leaf (key, value) in
+     let exception Fresh_key of int in
+     let rec descend tree =
+       match tree with
+       | Empty -> fresh
+       | Leaf (stored, _) ->
+           (match first_diff key stored with
+            | None -> fresh
+            | Some differing -> raise (Fresh_key differing))
+       | Branch (sample, split, left, right) ->
+           if bit_at key split then
+             (try Branch (sample, split, left, descend right) with
+              | (Fresh_key differing as pending) ->
+                  if differing < split then raise pending
+                  else Branch (sample, split, left,
+                         branch_at key differing fresh right))
+           else
+             (try Branch (sample, split, descend left, right) with
+              | (Fresh_key differing as pending) ->
+                  if differing < split then raise pending
+                  else Branch (sample, split,
+                         branch_at key differing fresh left, right))
+     in
+     try descend root with
+     | Fresh_key differing -> branch_at key differing fresh root)".
+
+(** The proof-side fuel establishes termination, but need not survive
+    extraction.  Every recursive native call consumes a branch from at least
+    one input, so generic combine can execute directly without first walking
+    both trees to compute their sizes. *)
+Extract Constant StringPatricia.combine =>
+  "(fun combine_values first second ->
+     let rec merge left right =
+       match left, right with
+       | Empty, tree -> map_right combine_values tree
+       | tree, Empty -> map_left combine_values tree
+       | Leaf (key, value), tree ->
+           replace_binding key
+             (combine_values (Some value) (get key tree))
+             (map_right combine_values tree)
+       | tree, Leaf (key, value) ->
+           replace_binding key
+             (combine_values (get key tree) (Some value))
+             (map_left combine_values tree)
+       | Branch (sample_left, split_left, left_left, right_left),
+         Branch (sample_right, split_right, left_right, right_right) ->
+           if split_left = split_right then
+             if agrees_before sample_left sample_right split_left then
+               branch sample_left split_left
+                 (merge left_left left_right) (merge right_left right_right)
+             else join (map_left combine_values left) (map_right combine_values right)
+           else if split_left < split_right then
+             if agrees_before sample_left sample_right split_left then
+               if bit_at sample_right split_left then
+                 branch sample_left split_left (map_left combine_values left_left)
+                   (merge right_left right)
+               else
+                 branch sample_left split_left (merge left_left right)
+                   (map_left combine_values right_left)
+             else join (map_left combine_values left) (map_right combine_values right)
+           else if agrees_before sample_left sample_right split_right then
+             if bit_at sample_left split_right then
+               branch sample_right split_right (map_right combine_values left_right)
+                 (merge left right_right)
+             else
+               branch sample_right split_right (merge left left_right)
+                 (map_right combine_values right_right)
+           else join (map_left combine_values left) (map_right combine_values right)
+     in merge first second)".
+
+(** Biased union has identity behavior on one-sided subtrees, so it can share
+    them instead of going through generic [combine].  Disjoint prefixes are
+    joined immediately; containment recurses only into the possibly
+    overlapping child. *)
+Extract Constant StringPatricia.union_left =>
+  "(fun first second ->
+     let rec union left right =
+       match left, right with
+       | Empty, tree | tree, Empty -> tree
+       | (Leaf (left_key, _) as leaf), Leaf (right_key, _) when left_key = right_key ->
+           leaf
+       | Leaf (key, value), tree -> set key value tree
+       | tree, Leaf (key, value) ->
+           (match get key tree with
+            | Some _ -> tree
+            | None -> set key value tree)
+       | (Branch (sample_left, split_left, left_left, right_left) as left_tree),
+         (Branch (sample_right, split_right, left_right, right_right) as right_tree) ->
+           if split_left = split_right then
+             if agrees_before sample_left sample_right split_left then
+               let merged_left = union left_left left_right in
+               let merged_right = union right_left right_right in
+               if merged_left == left_left && merged_right == right_left then left_tree
+               else Branch (sample_left, split_left, merged_left, merged_right)
+             else join left_tree right_tree
+           else if split_left < split_right then
+             if agrees_before sample_left sample_right split_left then
+               if bit_at sample_right split_left then
+                 let merged = union right_left right_tree in
+                 if merged == right_left then left_tree
+                 else Branch (sample_left, split_left, left_left, merged)
+               else
+                 let merged = union left_left right_tree in
+                 if merged == left_left then left_tree
+                 else Branch (sample_left, split_left, merged, right_left)
+             else join left_tree right_tree
+           else if agrees_before sample_left sample_right split_right then
+             if bit_at sample_left split_right then
+               let merged = union left_tree right_right in
+               if merged == right_right then right_tree
+               else Branch (sample_right, split_right, left_right, merged)
+             else
+               let merged = union left_tree left_right in
+               if merged == left_right then right_tree
+               else Branch (sample_right, split_right, merged, right_right)
+           else join left_tree right_tree
+     in union first second)".
+
+Extract Constant StringPatricia.union_right =>
+  "(fun first second -> union_left second first)".
 
 Separate Extraction
   Patricia.empty Patricia.is_empty Patricia.singleton Patricia.get Patricia.mem
   Patricia.set Patricia.remove Patricia.combine
   Patricia.union_left Patricia.union_right
   Patricia.map Patricia.fold Patricia.elements Patricia.beq
+  StringBits.bit_at StringBits.first_diff StringBits.agrees_before
   StringPatricia.empty StringPatricia.is_empty StringPatricia.singleton
+  StringPatricia.representative StringPatricia.branch StringPatricia.branch_at
+  StringPatricia.join StringPatricia.map_filter StringPatricia.map_left
+  StringPatricia.map_right StringPatricia.replace_binding
   StringPatricia.get StringPatricia.mem StringPatricia.set StringPatricia.remove
   StringPatricia.combine StringPatricia.union_left StringPatricia.union_right
   StringPatricia.map StringPatricia.fold StringPatricia.elements.

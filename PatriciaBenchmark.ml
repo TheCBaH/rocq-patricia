@@ -27,6 +27,24 @@ let benchmark_size =
 
 let lookup_repetitions = 3
 
+let string_key_lengths =
+  match Sys.getenv_opt "PATRICIA_BENCH_STRING_LENGTHS" with
+  | None -> [3; 4; 5]
+  | Some value ->
+      let parse length =
+        try
+          let parsed = int_of_string length in
+          if parsed <= 0 then
+            invalid_arg "PATRICIA_BENCH_STRING_LENGTHS lengths must be positive";
+          parsed
+        with Failure _ ->
+          invalid_arg "PATRICIA_BENCH_STRING_LENGTHS must be comma-separated integers"
+      in
+      let lengths = List.map parse (Stdlib.String.split_on_char ',' value) in
+      if lengths = [] then
+        invalid_arg "PATRICIA_BENCH_STRING_LENGTHS must not be empty";
+      lengths
+
 type build_measurement = {
   seconds : float;
   allocated_words : float;
@@ -430,5 +448,5 @@ let () =
     "Patricia versus Stdlib.Map (AVL), %d bindings per input tree\n\n"
     benchmark_size;
   benchmark_int ();
-  List.iter benchmark_strings [3; 4; 5];
+  List.iter benchmark_strings string_key_lengths;
   print_endline "Patricia comparison benchmark: ok"

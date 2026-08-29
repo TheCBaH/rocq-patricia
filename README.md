@@ -31,15 +31,20 @@ The default is 10,000 bindings per input tree; set `PATRICIA_BENCH_SIZE` to
 change it (the three-character case permits at most 119,164 bindings per
 input tree, because each benchmark also constructs a disjoint tree).  Reported
 figures are benchmark evidence, not machine-independent pass/fail limits or
-formal complexity proofs.
+formal complexity proofs.  Set `PATRICIA_BENCH_STRING_LENGTHS` to a
+comma-separated subset of positive key lengths when a requested size exceeds
+a shorter key space; for example, use `4,5` at one million bindings and `5`
+at ten million.
 
 `PatriciaBits.v` fixes the proof-side positive-key convention. `StringBits.v`
 defines the prefix-free string bit view (a continuation marker plus eight bits
 per byte and an end marker), so empty strings, embedded zero bytes, and prefix
 keys are distinct. `PatriciaExtract.v` generates both APIs under
 `patricia/extracted/`. Native extraction maps integer keys, prefixes, masks,
-and routing operations to OCaml `int`, and maps string bit lookup and
-first-difference scanning to allocation-free operations on OCaml strings.
+and routing operations to OCaml `int`. String branch discriminators are packed
+as a byte index and four-bit tag, first differences are found in one bytewise
+pass, updates route only once, branch samples provide constant-time
+representatives, and biased unions share one-sided and disjoint subtrees.
 
 The positive-key proof file currently establishes, without axioms:
 
@@ -97,12 +102,13 @@ keys at every native bit boundary through `max_int`. The string suite checks
 the same map operations and structural routing invariants over empty strings,
 embedded NUL bytes, prefix-related strings, non-ASCII bytes, long common
 prefixes, and generated arbitrary byte strings. These are executable tests,
-not Rocq proofs or validation of the custom extraction constants.
+not Rocq proofs or complete validation of the custom extraction constants.
 
 This is a design sketch, not a drop-in `Maps.TREE` implementation. Constructors
 remain visible. The integer proofs use unbounded positive keys, while extraction
 uses bounded OCaml `int`; callers must therefore supply keys in
-`1 .. max_int`. The string tree uses native OCaml strings and integer bit
-positions. These custom extraction refinements form an explicit
+`1 .. max_int`. The string tree uses native OCaml strings and proof-side
+logical bit positions; native extraction represents positions as packed
+byte/tag integer tokens. These custom extraction refinements form an explicit
 performance/correctness boundary: their equivalence to the pure Rocq functions
 is trusted, rather than proved inside Rocq.

@@ -153,11 +153,54 @@ let string_of_bytes bytes =
   Bytes.init (Array.length bytes) (fun i -> Char.chr bytes.(i))
   |> Bytes.unsafe_to_string
 
+let check_string_bits () =
+  let pack position =
+    ((position / 9) lsl 4) lor (position mod 9)
+  in
+  let reference_bit string position =
+    let byte = position / 9 and tag = position mod 9 in
+    if byte >= Stdlib.String.length string then false
+    else if tag = 0 then true
+    else (Char.code (Stdlib.String.unsafe_get string byte) land (1 lsl (8 - tag))) <> 0
+  in
+  let reference_first_diff left right =
+    let limit = 9 * max (Stdlib.String.length left) (Stdlib.String.length right) + 1 in
+    let rec scan position =
+      if position = limit then None
+      else if reference_bit left position <> reference_bit right position
+      then Some (pack position)
+      else scan (position + 1)
+    in
+    scan 0
+  in
+  let check left right =
+    let expected = reference_first_diff left right in
+    let actual = StringBits.first_diff left right in
+    if actual <> expected then
+      failwith
+        (Printf.sprintf "first_diff %S %S: expected %s, got %s"
+           left right
+           (match expected with None -> "None" | Some split -> string_of_int split)
+           (match actual with None -> "None" | Some split -> string_of_int split))
+  in
+  for left = 0 to 255 do
+    for right = 0 to 255 do
+      check (Stdlib.String.make 1 (Char.chr left)) (Stdlib.String.make 1 (Char.chr right))
+    done
+  done;
+  List.iter
+    (fun (left, right) -> check left right; check right left)
+    ["", ""; "", "\000"; "a", "a\000"; "prefix", "prefix\255";
+     Stdlib.String.make 192 'p', Stdlib.String.make 192 'p' ^ "\128"]
+
 let check_string_structure round tree =
+  let next_token token =
+    if token land 15 = 8 then ((token lsr 4) + 1) lsl 4 else token + 1
+  in
   let rec agrees sample key split bit =
     if bit = split then true
     else if StringBits.bit_at sample bit <> StringBits.bit_at key bit then false
-    else agrees sample key split (bit + 1)
+    else agrees sample key split (next_token bit)
   in
   let rec check parent_split = function
     | S.Empty -> []
@@ -270,6 +313,7 @@ let check_string_keys () =
 
 let () =
   Random.init 0x504154;
+  check_string_bits ();
   for round = 1 to 250 do
     let left_ref = Array.make 256 None in
     let right_ref = Array.make 256 None in
