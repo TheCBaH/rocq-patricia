@@ -22,10 +22,11 @@ make -C patricia benchmark
 ```
 
 The comparison verifies each measured Patricia result against `Stdlib.Map` and
-reports build and lookup time, retained heap words per binding, and allocated
-words.  It also reports allocation and time for left-biased unions with
-disjoint and half-overlapping inputs.  Integer keys and independent 3-, 4-,
-and 5-character ASCII-alphanumeric string key sets are measured separately.
+reports build, lookup, add, update, and remove time, retained heap words per
+binding, and allocated words.  It also reports allocation and time for
+left-biased unions with disjoint and half-overlapping inputs.  Integer keys and
+independent 3-, 4-, and 5-character ASCII-alphanumeric string key sets are
+measured separately.
 The default is 10,000 bindings per input tree; set `PATRICIA_BENCH_SIZE` to
 change it (the three-character case permits at most 119,164 bindings per
 input tree, because each benchmark also constructs a disjoint tree).  Reported

@@ -198,6 +198,122 @@ let time_string_lookups keys patricia avl =
   report_operation "lookup" patricia_measurement avl_measurement
     (benchmark_size * lookup_repetitions)
 
+let time_int_mutations keys fresh_keys patricia avl =
+  let all_keys = Array.append keys fresh_keys in
+  let patricia_added, patricia_add =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key -> Patricia.set key key map)
+          patricia fresh_keys)
+  in
+  let avl_added, avl_add =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key -> Int_avl.add key key map)
+          avl fresh_keys)
+  in
+  if patricia_cardinal patricia_added <> 2 * benchmark_size
+     || Int_avl.cardinal avl_added <> 2 * benchmark_size then
+    failwith "integer additions produced the wrong cardinality";
+  check_int_equivalent all_keys patricia_added avl_added;
+  report_operation "add keys" patricia_add avl_add benchmark_size;
+  let patricia_updated, patricia_update =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key -> Patricia.set key (-key) map)
+          patricia keys)
+  in
+  let avl_updated, avl_update =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key -> Int_avl.add key (-key) map)
+          avl keys)
+  in
+  check_int_equivalent keys patricia_updated avl_updated;
+  Array.iter
+    (fun key ->
+       if Patricia.get key patricia_updated <> Some (-key)
+          || Int_avl.find_opt key avl_updated <> Some (-key) then
+         failwith "integer update did not replace the binding")
+    keys;
+  report_operation "update keys" patricia_update avl_update benchmark_size;
+  let patricia_removed, patricia_remove =
+    measure_operation (fun () ->
+        Array.fold_left (fun map key -> Patricia.remove key map) patricia keys)
+  in
+  let avl_removed, avl_remove =
+    measure_operation (fun () ->
+        Array.fold_left (fun map key -> Int_avl.remove key map) avl keys)
+  in
+  if patricia_cardinal patricia_removed <> 0 || Int_avl.cardinal avl_removed <> 0 then
+    failwith "integer removals produced a non-empty map";
+  Array.iter
+    (fun key ->
+       if Patricia.get key patricia_removed <> None
+          || Int_avl.find_opt key avl_removed <> None then
+         failwith "integer removal did not delete the binding")
+    keys;
+  report_operation "remove keys" patricia_remove avl_remove benchmark_size
+
+let time_string_mutations keys fresh_keys patricia avl =
+  let all_keys = Array.append keys fresh_keys in
+  let patricia_added, patricia_add =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key -> StringPatricia.set key (Stdlib.String.length key) map)
+          patricia fresh_keys)
+  in
+  let avl_added, avl_add =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key -> String_avl.add key (Stdlib.String.length key) map)
+          avl fresh_keys)
+  in
+  if string_patricia_cardinal patricia_added <> 2 * benchmark_size
+     || String_avl.cardinal avl_added <> 2 * benchmark_size then
+    failwith "string additions produced the wrong cardinality";
+  check_string_equivalent all_keys patricia_added avl_added;
+  report_operation "add keys" patricia_add avl_add benchmark_size;
+  let updated_value key = -Stdlib.String.length key in
+  let patricia_updated, patricia_update =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key -> StringPatricia.set key (updated_value key) map)
+          patricia keys)
+  in
+  let avl_updated, avl_update =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key -> String_avl.add key (updated_value key) map)
+          avl keys)
+  in
+  check_string_equivalent keys patricia_updated avl_updated;
+  Array.iter
+    (fun key ->
+       if StringPatricia.get key patricia_updated <> Some (updated_value key)
+          || String_avl.find_opt key avl_updated <> Some (updated_value key) then
+         failwith "string update did not replace the binding")
+    keys;
+  report_operation "update keys" patricia_update avl_update benchmark_size;
+  let patricia_removed, patricia_remove =
+    measure_operation (fun () ->
+        Array.fold_left (fun map key -> StringPatricia.remove key map) patricia keys)
+  in
+  let avl_removed, avl_remove =
+    measure_operation (fun () ->
+        Array.fold_left (fun map key -> String_avl.remove key map) avl keys)
+  in
+  if string_patricia_cardinal patricia_removed <> 0
+     || String_avl.cardinal avl_removed <> 0 then
+    failwith "string removals produced a non-empty map";
+  Array.iter
+    (fun key ->
+       if StringPatricia.get key patricia_removed <> None
+          || String_avl.find_opt key avl_removed <> None then
+         failwith "string removal did not delete the binding")
+    keys;
+  report_operation "remove keys" patricia_remove avl_remove benchmark_size
+
 let benchmark_int () =
   let left_keys = Array.init benchmark_size (fun index -> index + 1) in
   let disjoint_keys = Array.init benchmark_size (fun index -> benchmark_size + index + 1) in
@@ -213,6 +329,7 @@ let benchmark_int () =
   check_int_equivalent left_keys patricia_left avl_left;
   report_build "Integer keys" patricia_build avl_build;
   time_int_lookups left_keys patricia_left avl_left;
+  time_int_mutations left_keys disjoint_keys patricia_left avl_left;
   let patricia_disjoint = build_patricia_int disjoint_keys in
   let avl_disjoint = build_avl_int disjoint_keys in
   let patricia_merged, patricia_merge =
@@ -274,6 +391,7 @@ let benchmark_strings length =
   check_string_equivalent left_keys patricia_left avl_left;
   report_build (Printf.sprintf "String keys (%d characters)" length) patricia_build avl_build;
   time_string_lookups left_keys patricia_left avl_left;
+  time_string_mutations left_keys disjoint_keys patricia_left avl_left;
   let patricia_disjoint = build_patricia_string disjoint_keys in
   let avl_disjoint = build_avl_string disjoint_keys in
   let patricia_merged, patricia_merge =
