@@ -45,10 +45,10 @@ The recommendations are implemented for native OCaml execution in
 the semantic specification; the optimized realizers extend the explicit
 trusted extraction boundary already used for native string access.
 
-The original implementation stages and their decision gates are closed. A
-follow-up allocation audit found one remaining merge-prefix hotspot:
-`agrees_before` still obtains its Boolean answer by calling allocation-producing
-`first_diff`. The full Rocq/extraction/OCaml oracle suite passes, and the native
+The original implementation stages and their decision gates are closed. The
+follow-up merge-prefix hotspot is now removed: combine and biased union use a
+bounded `agrees_before` worker rather than materializing a `first_diff` result.
+The full Rocq/extraction/OCaml oracle suite passes, and the native
 comparison benchmark passes at 10,000, 100,000, and 1,000,000 bindings per
 input tree. The timing tables in this document are observations from individual
 runs; the maintained cross-size measurements and reproduction commands are in
@@ -63,19 +63,23 @@ The extracted implementation now:
 - reads branch samples as constant-time representatives for trees produced by
   the public operations;
 - executes generic `combine` without computing or carrying runtime fuel;
+- fuses an overlapping leaf's transformation or deletion into the generic
+  combine mapping pass;
 - traverses membership directly without allocating an intermediate `option`;
 - produces `elements` with a linear accumulator traversal;
 - propagates failed deletion as `None` and returns the original root without
   rebuilding its routed path;
-- implements `agrees_before` through `first_diff`, which is correct on valid
-  packed tokens but allocates during overlapping string unions; and
+- uses a closed byte-bounded `agrees_before` scan that returns `bool` directly;
+  the source worker has an exact prefix law and is proved equal to logical
+  `agrees_before`; and
 - uses `String.unsafe_get` only after explicit common-length or byte-index
   bounds establish safety.
 
-`PatriciaTest.ml` independently checks the packed scanner against the logical
-nine-bit reference encoding for every pair of one-byte strings, covers prefix
-and long-common-prefix cases, and continues to validate randomized map results
-and structural invariants against reference maps.
+`PatriciaTest.ml` independently checks the packed first-difference and bounded
+prefix scanners against the logical nine-bit reference encoding for every pair
+of one-byte strings and every valid split, covers prefix and long-common-prefix
+cases, and continues to validate randomized map results and structural
+invariants against reference maps.
 
 A before/after native run with 10,000 five-byte keys on the analysis machine
 gave the following observations (not regression thresholds):
@@ -94,14 +98,14 @@ The benchmark evidence establishes the original union diagnosis and validates
 the native implementation at scale. It also makes the residual string-overlap
 allocation visible; the next section isolates that cost.
 
-## Remaining priority: bounded `agrees_before`
+## Completed follow-up: bounded `agrees_before`
 
 Four-character half-overlap union allocates 40,330, 400,347, and 4,000,362
 words at 10K, 100K, and 1M bindings. The approximately four-word-per-binding
 progression comes from prefix compatibility checks even though the union's
 physical-identity tests reuse the left subtrees.
 
-The current extracted function is:
+The previous extracted function was:
 
 ```ocaml
 let agrees_before left right split =
@@ -110,20 +114,21 @@ let agrees_before left right split =
   | None -> true
 ```
 
-It scans beyond `split` when the samples remain equal and materializes an
+It scanned beyond `split` when the samples remained equal and materialized an
 option result that the caller immediately converts to `bool`. A temporary,
 uncommitted generated-code experiment instead compared whole bytes only up to
 `split >> 4`, masked the high bits preceding the final tag, and returned a
 Boolean directly. On the checked 100K four-character workload it reduced
 half-overlap allocation from 400,347 words to 143 words; the single-run time
 changed from 0.538 ms to 0.479 ms, and the randomized oracle test passed. The
-experiment was reverted after measurement.
-
-Implement this first in `StringBits.v` as a bounded scanner and prove it equal
-to logical `agrees_before`. The packed native realization then needs the
-position-encoding refinement theorem described in `patricia.md`. This both
-removes the measured allocation and avoids introducing one more unproved
-algorithmic override.
+experiment was initially reverted after measurement. It is now implemented as
+`agrees_before_from`/`agrees_before_bounded` in `StringBits.v`; the exact prefix
+law and equality with logical `agrees_before` are kernel-checked. The native
+packed realization is explicitly documented in `PatriciaExtract.v` and guarded
+by the exhaustive packed-split oracle. Fresh checked runs reduced the same
+four-character overlap allocation from 40,330 to 128 words at 10K bindings and
+from 400,347 to 143 words at 100K bindings. The corresponding single-run times
+were 0.051 ms and 0.532 ms; allocation is the stable conclusion.
 
 ## Baseline representation and routing
 
@@ -352,6 +357,13 @@ Computing the fuel traverses every node before merging. The branch cases then
 use `map_left` and `map_right` for one-sided subtrees. Those operations must
 visit every binding for an arbitrary combining function because it may change
 or delete one-sided values.
+
+The extracted direct recursion now delegates leaf/tree and tree/leaf cases to
+proved source workers. When the leaf key overlaps, a key-aware `map_filter`
+applies the two-sided result during the required whole-tree transformation,
+instead of materializing that binding and then traversing a second path to
+replace or remove it. The absent-key case retains the ordinary mapped-tree
+insertion path.
 
 Biased union does not have that requirement. For left-biased union, a subtree
 that occurs only on the left or right can be returned unchanged, and two
@@ -709,10 +721,13 @@ observations, not portable regression thresholds.
 4. **Representative and generic combine:** public-operation branches use their
    cached samples as constant-time representatives, and extracted `combine`
    recurses directly without carrying proof-side fuel.
+5. **Bounded prefix checks:** source combine calls the proved bounded worker;
+   its packed native realization compares only bytes and high bits before the
+   split and returns a Boolean without per-call allocation.
 
 The previously proposed primitive microbenchmarks and side-effecting internal
 counters remain diagnostic tooling rather than completion gates. Allocation
-scaling was sufficient to isolate the remaining `agrees_before` cost; a
+scaling was sufficient to isolate and remove the `agrees_before` cost; a
 physical-sharing counter would still be useful when expanding the union
 workloads beyond ordered ranges. The oracle checks validate exposed behavior
 empirically, not end-to-end formal refinement of the native realizers.
@@ -723,16 +738,17 @@ Keep bit-level Patricia routing: it handles arbitrary byte strings correctly
 and retains a measured lookup advantage. The native implementation now uses a
 packed critical-byte token, bytewise-XOR first-difference discovery, a
 one-descent `set`, cached constant-time representatives, fuel-free generic
-combine, and structurally sharing biased union. The next implementation change
-should be the proved bounded `agrees_before` scanner above.
+combine, a bounded prefix scanner, and structurally sharing biased union. The
+next implementation priority is the direct-string generic-combine proof.
 
 The completed scale runs confirm the key architectural result: specialized
 biased union fixes the former whole-tree traversal and rebuilding path, while
 the string-operation changes preserve the eight-word representation and pass
-the extraction, differential, structural, and map-oracle checks. Two
-limitations remain: `agrees_before` still allocates linearly on the measured
-string-overlap path, and the OCaml extraction overrides are trusted refinements
-of the pure Rocq specification rather than proved refinements inside Rocq.
+the extraction, differential, structural, and map-oracle checks. The measured
+string-overlap allocation is now constant-sized. The principal remaining
+limitation is that packed-position and other OCaml extraction overrides are
+trusted refinements of the pure Rocq specification rather than proved
+refinements inside Rocq.
 
 ## Source basis
 
@@ -742,11 +758,11 @@ of the pure Rocq specification rather than proved refinements inside Rocq.
   representatives, generic combine, and biased-union definitions.
 - `StringPatriciaProof.v`: routing invariant, split ordering, and current
   correctness coverage.
-- `PatriciaExtract.v`: native OCaml realizations of string bit access and
-  first-difference scanning.
+- `PatriciaExtract.v`: native OCaml realizations of string bit access,
+  first-difference scanning, and bounded prefix comparison.
 - `PatriciaBenchmark.ml`: benchmark workloads, correctness checks, timing, and
   allocation methodology.
-- `patricia-bench.md`: recorded 10K through 1M benchmark results and the
-  follow-up `agrees_before` experiment.
+- `patricia-bench.md`: recorded 10K through 1M baseline results and the
+  completed bounded-`agrees_before` follow-up.
 - `patricia.md`: verification review, trusted-boundary analysis, and the
   existing recommendation to separate biased union from generic combine.

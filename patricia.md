@@ -66,7 +66,9 @@ below.
 The Rocq definitions still calculate `S (size left + size right)` as fuel;
 this makes their termination argument and existing proofs straightforward.
 The native extraction now replaces `combine` with direct structural recursion,
-so it does not compute that bound at runtime.  It also replaces `union_left`
+so it does not compute that bound at runtime. Its leaf/tree cases delegate to
+source-level workers with proved lookup and well-formedness laws, fusing an
+overlapping replacement into the mapping pass. It also replaces `union_left`
 with a specialized structural algorithm in both the integer and string
 backends (`union_right` reverses its arguments).  Disjoint prefixes are joined
 immediately, one-sided subtrees are reused, and only a changed recursive path
@@ -208,8 +210,11 @@ Yes for their functional behavior, but not by attaching a proof to the current
 4. give that interface a formal target-language specification or accept it as
    an explicitly enumerated trusted boundary.
 
-The direct merge, specialized union, packed scanner, cached representative,
-and fused set all admit such source-level proofs. Exact claims about OCaml
+The bounded prefix scanner now has a source-level specification and equality
+proof; its packed target realization still depends on the documented position
+relation. The direct merge, specialized union, first-difference scanner,
+cached representative, and fused set still need such source-level refinement
+proofs. Exact claims about OCaml
 exceptions, `String.unsafe_get`, physical equality, allocation, and generated
 machine code require an OCaml/Clight semantics and a verified compiler or a
 separate deductive verification of the target code. Testing can reduce risk but
@@ -335,7 +340,7 @@ unconditional `set` and `remove` theorems, and
 `join_separated_correct_wf` covers the disjoint join case, including collapsed
 filtered sides. Remaining work:
 
-1. [ ] Prove representative and prefix-agreement lemmas for equal-split,
+1. [x] Prove representative and prefix-agreement lemmas for equal-split,
    containment, and disjoint-prefix cases;
 2. [x] Define and prove sufficiency of the recursive-call fuel measure;
 3. [ ] Prove `combine_fuel` correctness and well-formedness simultaneously;

@@ -19,27 +19,28 @@ Status legend: **done**, **in progress**, **next**, **later**.
 - **done**: preserve physical identity for absent removals with a source-level
   worker that reports whether anything changed; prove lookup and
   well-formedness preservation and check extracted physical identity.
-- **next**: add checked generic-`combine` workloads and fuse its leaf/tree
+- **done**: add checked generic-`combine` workloads and fuse its leaf/tree
   mapping and replacement passes.
 
-M1 completion requires `make`, the deterministic oracle test, and the native
-benchmark to pass after each item.  Performance observations are evidence,
-not machine-independent thresholds.
+Each M1 item passed `make`, the deterministic oracle test, and the native
+benchmark. Performance observations are evidence, not machine-independent
+thresholds.
 
 ## M2: Remove the remaining string-union allocation hotspot
 
-- **later**: define a bounded `agrees_before` scanner in `StringBits.v`.
-- **later**: prove it equivalent to logical `agrees_before`.
-- **later**: provide and validate the packed-token native realization without
-  widening the undocumented extraction contract.
-- **later**: rerun the 10K and 100K half-overlap allocation measurements and
+- **done**: define a bounded `agrees_before` scanner in `StringBits.v`.
+- **done**: prove its exact prefix specification and equivalence to logical
+  `agrees_before`.
+- **done**: provide and document the packed-token native realization, with an
+  exhaustive one-byte/valid-split differential oracle.
+- **done**: rerun the 10K and 100K half-overlap allocation measurements and
   update `patricia-bench.md`.
 
 ## M3: Complete direct-string functional proofs
 
-- **later**: prove the equal-split, containment, and disjoint-prefix lemmas
+- **done**: prove the equal-split, containment, and disjoint-prefix lemmas
   needed by merge.
-- **later**: prove `combine_fuel` lookup correctness and well-formedness.
+- **next**: prove `combine_fuel` lookup correctness and well-formedness.
 - **later**: lift the result to public `combine` under
   `f None None = None`.
 - **later**: derive left- and right-biased union laws.
@@ -88,3 +89,28 @@ not machine-independent thresholds.
 - The source `Some changed` signal increases allocation for successful
   removals; `patricia-bench.md` records the measured tradeoff and leaves a
   physical-child-identity extraction refinement for later evaluation.
+- **2026-08-29 — fused generic-combine leaf cases**: added checked leaf/tree
+  and tree/leaf workloads whose one-sided bindings are transformed and whose
+  overlapping binding is deleted. `make proof`, `make`, the randomized oracle,
+  and `make benchmark` passed.
+- Source-level integer and string workers now fuse overlapping replacement
+  into `map_filter`; their lookup and `wf` laws are proved under
+  `f None None = None`. At 10,000 bindings, allocation fell from 120,128 to
+  120,027 words for integer cases and from 140,170 to 140,023 words for string
+  cases. Single-run timings remained too noisy for a stronger conclusion.
+- **2026-08-29 — bounded string prefix scanner**: added
+  `agrees_before_from`, proved its exact prefix law and
+  `agrees_before_bounded_eq`, and routed pure and native string combine/union
+  through the bounded worker. `make proof`, `make`, the deterministic oracle,
+  and `make benchmark` passed.
+- The packed native scanner compares only complete bytes and the relevant
+  high bits before the split. Four-character half-overlap union allocation
+  fell from 40,330 to 128 words at 10,000 bindings and from 400,347 to 143
+  words at 100,000 bindings. The checked single-run times were 0.051 ms and
+  0.532 ms respectively; these timings are observations, not thresholds.
+- **2026-08-29 — string merge prefix cases**: proved whole-branch prefix
+  extraction, equal-split sample rebasing, deeper-root containment, and
+  disjoint-root separation at the exact first differing bit. The disjoint
+  result produces the `all_keys` hypotheses consumed directly by
+  `join_separated_correct_wf`. `make proof`, `make`, the randomized oracle,
+  and `make benchmark` passed.

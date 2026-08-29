@@ -63,6 +63,9 @@ default `PATRICIA_BENCH_SIZE=10000`, so each input map has 10,000 bindings.
   remove one absent key repeatedly, and remove all keys are timed independently.
 - Membership alternates complete passes over present and disjoint absent keys;
   `elements` is checked against the corresponding AVL bindings.
+- Generic combine is measured in both leaf/tree orientations. Its function
+  transforms every one-sided value and deletes the overlapping binding; full
+  bindings are checked against `Stdlib.Map.merge`.
 - A disjoint left-biased union joins ranges `[1, n]` and `[n+1, 2n]`; the
   overlap workload joins `[1, n]` and `[n/2+1, 3n/2]`. Both use
   `union_left`; the expected binding counts are checked.
@@ -76,6 +79,8 @@ default `PATRICIA_BENCH_SIZE=10000`, so each input map has 10,000 bindings.
 All allocation and retained-size figures are OCaml heap words. Times are a
 single run; `0.000 ms` means that the measured interval rounded to zero at the
 clock precision, not that the operation took no time.
+These tables are the pre-bounded-scanner baseline; the completed follow-up and
+fresh 10K/100K overlap measurements appear below.
 
 ### Integer keys
 
@@ -109,9 +114,9 @@ AVL at every tested length. Patricia allocation for string add, update, and
 remove was respectively 772,433, 923,171, and 441,976 words; the AVL figures
 were 1,087,954, 785,116, and 433,420 words.
 
-## Scaling with tree size
+## Baseline scaling with tree size
 
-The following additional runs completed with the same result checks:
+The following pre-bounded-scanner runs completed with the same result checks:
 
 ```sh
 PATRICIA_BENCH_SIZE=100000 make -C patricia benchmark
@@ -139,14 +144,14 @@ the two disjoint one-million-key inputs. Each table entry is Patricia / AVL.
 | 100,000 | 9.707 / 17.163 | 73.5 / 101.5 | 8.00 / 6.00 | 0.002 / 0.007 | 406 / 3,620 | 0.520 / 1.498 | 400,347 / 965,872 |
 | 1,000,000 | 106.824 / 191.229 | 82.7 / 126.8 | 8.00 / 6.00 | 0.004 / 0.011 | 405 / 4,940 | 5.882 / 25.838 | 4,000,362 / 10,193,264 |
 
-The retained representation remains exactly 8 Patricia words per binding and
+These baseline results retained exactly 8 Patricia words per binding and
 6 AVL words per binding. Lookup cost rises moderately over the 100-fold size
 increase: from 41.0 to 48.8 ns for integer Patricia and from 66.6 to 82.7 ns
 for four-character string Patricia. The AVL lookup increase is larger in this
 sample (82.9 to 122.1 ns and 78.9 to 126.8 ns respectively), but these three
 points are not an asymptotic proof.
 
-The disjoint-union allocation stays effectively constant over this range,
+The disjoint-union allocation stayed effectively constant over this range,
 which is consistent with a direct join that reuses both input subtrees. Integer
 half-overlap also stays below 500 words: on these ordered ranges, the native
 algorithm can share both the left map and the right map's disjoint tail rather
@@ -160,14 +165,13 @@ machine-independent complexity guarantee.
 
 ## Implementation changes suggested by the benchmark
 
-### 1. Replace `agrees_before` with a bounded, allocation-free native scan
+### 1. Bounded, allocation-free `agrees_before` completed
 
-This is the highest-confidence remaining optimization. Extracted
-`StringBits.agrees_before` currently calls `first_diff`, which scans until the
-first difference and returns `Some differing`; the caller only needs a Boolean
-answer about positions before the current split. On identical or deeply shared
-prefixes that performs unnecessary scanning and creates a short-lived option
-value at each compared branch.
+The previous extracted `StringBits.agrees_before` called `first_diff`, which
+scanned until the first difference and returned `Some differing`; the caller
+only needed a Boolean answer about positions before the current split. On
+identical or deeply shared prefixes that performed unnecessary scanning and
+created a short-lived option value at each compared branch.
 
 The allocation sequence above is the signature of that path: approximately
 four words per binding while the physical-identity checks ultimately return
@@ -178,18 +182,24 @@ experiment replaced it with a closed tail-recursive byte scan that:
 - masks the relevant high bits of the final byte for tags 1 through 8; and
 - returns `bool` directly, without calling `first_diff`.
 
-At 100,000 four-character bindings, the same checked half-overlap workload
-changed from 400,347 allocated words and 0.538 ms to 143 words and 0.479 ms.
-The deterministic randomized oracle test also passed. The timing difference is
-only one sample and should be remeasured; the reduction to constant-sized
-allocation is the dependable result. This experiment was reverted after the
-measurement, so the recorded implementation still has the hotspot.
+`StringBits.v` now defines the bounded worker, proves its exact prefix
+specification, and proves it equal to logical `agrees_before`. String combine
+uses that source function. Its packed native realization is a closed
+tail-recursive byte scan, so calls do not allocate a closure or an option.
+The exhaustive oracle checks every one-byte pair at every valid packed split.
 
-For verification, define a bounded scanner in `StringBits.v`, prove it
-equivalent to `agrees_before`, and then either extract that definition or prove
-the packed-token implementation under the representation relation described in
-`patricia.md`. Adding another unproved extraction string would improve runtime
-but enlarge the existing trusted boundary.
+Fresh checked results are:
+
+| Four-character bindings per input | Before time / allocation | Bounded time / allocation | AVL time / allocation |
+| ---: | ---: | ---: | ---: |
+| 10,000 | 0.049 ms / 40,330 words | 0.051 ms / 128 words | 0.089 ms / 81,324 words |
+| 100,000 | 0.520 ms / 400,347 words | 0.532 ms / 143 words | 1.615 ms / 965,872 words |
+
+The single-run timing differences are noise-level observations. The reduction
+from per-binding to fixed measurement-sized allocation is the dependable
+result. The packed-position relation remains part of the already documented
+native extraction boundary; the bounded algorithm itself now has a source
+definition and equivalence proof.
 
 ### 2. Accumulator-based `elements` completed
 
@@ -219,14 +229,25 @@ supplied with value equality could additionally avoid rebuilding an existing
 binding whose value is unchanged. This remains relevant to persistent compiler
 data-flow maps, where converged updates are common.
 
-### 4. Fuse generic-combine leaf cases
+### 4. Generic-combine leaf cases completed
 
-For a leaf/tree pair, native `combine` first maps the whole tree and then calls
-`get` plus `set` or `remove` for the leaf key. Arbitrary one-sided combining
-functions do require visiting the other tree, but mapping and replacement can
-be fused in one traversal. This should reduce temporary allocation and one
-routing pass. Add a benchmark for generic combine with transformations and
-deletions; biased union no longer exercises this path.
+For an overlapping leaf/tree pair, native `combine` previously mapped the
+whole tree and then called `remove` or `set` for the leaf key. Both maps now
+provide proved source-level `combine_leaf_left` and `combine_leaf_right`
+workers. A key-aware `map_filter` performs the overlapping transformation or
+deletion during the required mapping pass, eliminating the subsequent
+replacement path. The absent-key branch retains mapped-tree insertion.
+
+The checked workload transforms all one-sided values and deletes one
+overlapping binding. Allocation is deterministic in these runs; the individual
+sub-millisecond timings are too noisy to support a speedup claim.
+
+| 10K workload | Before | Fused | Reduction |
+| --- | ---: | ---: | ---: |
+| Integer leaf/tree | 120,128 words | 120,027 words | 101 words |
+| Integer tree/leaf | 120,128 words | 120,027 words | 101 words |
+| 4-character leaf/tree | 140,170 words | 140,023 words | 147 words |
+| 4-character tree/leaf | 140,170 words | 140,023 words | 147 words |
 
 ### 5. Allocation-free membership completed; bulk construction remains
 
@@ -264,8 +285,8 @@ decision should add:
 - random insertion order, successful and unsuccessful lookups/removals,
   subset/no-op union, equal maps, sparse overlap, and adversarial long-prefix
   strings in addition to consecutive ranges;
-- separate generic-`combine` and bulk-build workloads (the benchmark now
-  includes `elements` and mixed hit/miss `mem`);
+- a bulk-build workload (the benchmark now includes generic leaf/tree
+  `combine`, `elements`, and mixed hit/miss `mem`);
 - physical-sharing counters or retained-node checks, so low allocation is
   attributed to reused nodes rather than inferred only from GC totals;
 - a proof-aligned extraction backend beside the optimized backend, making

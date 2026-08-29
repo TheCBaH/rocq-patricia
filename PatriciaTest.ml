@@ -173,6 +173,14 @@ let check_string_bits () =
     in
     scan 0
   in
+  let reference_agrees_before left right split =
+    let rec scan position =
+      position = split
+      || (reference_bit left position = reference_bit right position
+          && scan (position + 1))
+    in
+    scan 0
+  in
   let check left right =
     let expected = reference_first_diff left right in
     let actual = StringBits.first_diff left right in
@@ -181,7 +189,18 @@ let check_string_bits () =
         (Printf.sprintf "first_diff %S %S: expected %s, got %s"
            left right
            (match expected with None -> "None" | Some split -> string_of_int split)
-           (match actual with None -> "None" | Some split -> string_of_int split))
+           (match actual with None -> "None" | Some split -> string_of_int split));
+    let limit = 9 * max (Stdlib.String.length left) (Stdlib.String.length right) + 1 in
+    for split = 0 to limit do
+      let expected = reference_agrees_before left right split in
+      let packed_split = pack split in
+      let actual = StringBits.agrees_before_bounded left right packed_split in
+      if actual <> expected then
+        failwith
+          (Printf.sprintf
+             "agrees_before_bounded %S %S %d: expected %b, got %b"
+             left right packed_split expected actual)
+    done
   in
   for left = 0 to 255 do
     for right = 0 to 255 do

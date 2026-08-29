@@ -25,8 +25,8 @@ The comparison verifies each measured Patricia result against `Stdlib.Map` and
 reports build, lookup, membership, traversal (`elements`), add, update, and
 present/absent remove time, retained heap words per binding, and allocated
 words. Failed Patricia deletions additionally check physical root identity. It also
-reports allocation and time for
-left-biased unions with disjoint and half-overlapping inputs.  Integer keys and
+reports checked generic-combine leaf/tree transformations and deletions, plus
+allocation and time for left-biased unions with disjoint and half-overlapping inputs.  Integer keys and
 independent 3-, 4-, and 5-character ASCII-alphanumeric string key sets are
 measured separately.
 The default is 10,000 bindings per input tree; set `PATRICIA_BENCH_SIZE` to
@@ -45,8 +45,9 @@ keys are distinct. `PatriciaExtract.v` generates both APIs under
 `patricia/extracted/`. Native extraction maps integer keys, prefixes, masks,
 and routing operations to OCaml `int`. String branch discriminators are packed
 as a byte index and four-bit tag, first differences are found in one bytewise
-pass, updates route only once, branch samples provide constant-time
-representatives, and biased unions share one-sided and disjoint subtrees.
+pass, bounded prefix checks scan only through their split, updates route only
+once, branch samples provide constant-time representatives, and biased unions
+share one-sided and disjoint subtrees.
 
 The positive-key proof file currently establishes, without axioms:
 
@@ -59,6 +60,8 @@ The positive-key proof file currently establishes, without axioms:
   identity when the removed key is absent;
 - lookup correctness and `wf` preservation by `map_filter`, `map_left`, and
   `map_right`;
+- lookup correctness and `wf` preservation for fused left- and right-leaf
+  generic-combine workers;
 - `fold` agreement with `elements`;
 - `elements` soundness, completeness on `wf` trees, and unique keys;
 - extensional correctness of `beq` on `wf` trees;
@@ -75,7 +78,8 @@ The direct-string proof files currently establish, without axioms:
 - an exact specification of the bounded first-difference scan: unequal
   strings have a differing position, the bits differ there, and every earlier
   bit agrees;
-- the logical specification of `agrees_before`;
+- the logical specification of `agrees_before`, an exact specification of its
+  bounded scanner, and a proof that the two Boolean results are equal;
 - a structural routing invariant for string trees and preservation of that
   invariant by smart branch collapse, `remove`, key-aware `map`, and general
   `set`, including fresh-key insertion;
@@ -91,6 +95,8 @@ The direct-string proof files currently establish, without axioms:
 - `fold` agreement with `elements`, the key-aware `map` lookup law, and
   well-formedness/lookup laws for `map_filter`, `map_left`, and `map_right`
   (the latter two under `f None None = None`).
+- well-formedness and lookup laws for fused left- and right-leaf
+  generic-combine workers under `f None None = None`.
 - sufficiency of the public combine fuel bound for every recursive-call shape.
 
 `join_separated_correct_wf` proves the string-tree join law under explicit

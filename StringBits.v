@@ -48,6 +48,23 @@ Definition agrees_before (left right : string) (split : nat) : bool :=
   | Some differing => split <=? differing
   end.
 
+(** [agrees_before] only needs to establish equality below [split].  This
+    bounded worker stops there instead of computing and materializing the
+    first differing position. *)
+Fixpoint agrees_before_from
+    (fuel position : nat) (left right : string) : bool :=
+  match fuel with
+  | 0 => true
+  | S fuel' =>
+      if Bool.eqb (bit_at left position) (bit_at right position)
+      then agrees_before_from fuel' (S position) left right
+      else false
+  end.
+
+Definition agrees_before_bounded
+    (left right : string) (split : nat) : bool :=
+  agrees_before_from split 0 left right.
+
 Lemma first_diff_same:
   forall s, first_diff s s = None.
 Proof.
@@ -58,6 +75,35 @@ Lemma agrees_before_refl:
   forall s split, agrees_before s s split = true.
 Proof.
   intros. unfold agrees_before. now rewrite first_diff_same.
+Qed.
+
+Lemma agrees_before_from_spec:
+  forall fuel position left right,
+    agrees_before_from fuel position left right = true <->
+    forall n, position <= n < position + fuel ->
+      bit_at left n = bit_at right n.
+Proof.
+  induction fuel as [|fuel IH]; intros position left right; cbn.
+  - split; intros; [lia | reflexivity].
+  - destruct (Bool.eqb (bit_at left position) (bit_at right position)) eqn:E.
+    + apply Bool.eqb_prop in E. rewrite IH. split.
+      * intros H n Hrange. destruct (Nat.eq_dec n position) as [->|Hneq].
+        -- exact E.
+        -- apply H. lia.
+      * intros H n Hrange. apply H. lia.
+    + split.
+      * discriminate.
+      * intros H. exfalso. apply (proj1 (Bool.eqb_false_iff _ _) E).
+        apply H. lia.
+Qed.
+
+Lemma agrees_before_bounded_spec:
+  forall left right split,
+    agrees_before_bounded left right split = true <->
+    forall n, n < split -> bit_at left n = bit_at right n.
+Proof.
+  intros left right split. unfold agrees_before_bounded.
+  rewrite agrees_before_from_spec. split; intros H n Hn; apply H; lia.
 Qed.
 
 (** The bit view is injective.  Notice that this is a theorem about the
@@ -250,4 +296,27 @@ Proof.
     + intros Hbefore. destruct (first_diff_spec _ _ _ E) as [Hdiff _].
       apply Nat.nlt_ge. intros Hd. apply Hdiff. apply Hbefore. exact Hd.
   - apply first_diff_none_iff in E. subst. split; intros; [reflexivity|reflexivity].
+Qed.
+
+Theorem agrees_before_bounded_eq:
+  forall left right split,
+    agrees_before_bounded left right split = agrees_before left right split.
+Proof.
+  intros left right split.
+  destruct (agrees_before_bounded left right split) eqn:Hbounded,
+           (agrees_before left right split) eqn:Hlogical;
+    try reflexivity.
+  - assert (Hprefix : forall n, n < split ->
+        bit_at left n = bit_at right n).
+    { apply (proj1 (agrees_before_bounded_spec left right split)).
+      exact Hbounded. }
+    assert (agrees_before left right split = true) as Htrue.
+    { apply agrees_before_spec. exact Hprefix. }
+    congruence.
+  - assert (Hprefix : forall n, n < split ->
+        bit_at left n = bit_at right n).
+    { apply (proj1 (agrees_before_spec left right split)). exact Hlogical. }
+    assert (agrees_before_bounded left right split = true) as Htrue.
+    { apply agrees_before_bounded_spec. exact Hprefix. }
+    congruence.
 Qed.

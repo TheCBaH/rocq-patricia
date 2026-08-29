@@ -404,6 +404,132 @@ Proof.
   rewrite <- (Hnew n Hn). apply Hkey. exact Hn.
 Qed.
 
+Lemma same_prefix_refl:
+  forall sample split, same_prefix sample sample split.
+Proof.
+  unfold same_prefix. intros. reflexivity.
+Qed.
+
+Lemma same_prefix_shrink:
+  forall left right outer inner,
+    same_prefix left right outer -> inner <= outer ->
+    same_prefix left right inner.
+Proof.
+  unfold same_prefix. intros left right outer inner Hprefix Hle n Hn.
+  apply Hprefix. lia.
+Qed.
+
+(** Equal branch splits may use either resident sample.  Rebase the second
+    tree's invariant onto the first sample without changing its routing
+    side. *)
+Lemma all_keys_equal_split_rebase:
+  forall (A : Type) left_sample right_sample split side (m : t A),
+    same_prefix left_sample right_sample split ->
+    all_keys (fun key =>
+      same_prefix right_sample key split /\ bit_at key split = side) m ->
+    all_keys (fun key =>
+      same_prefix left_sample key split /\ bit_at key split = side) m.
+Proof.
+  intros A left_sample right_sample split side m Hsamples Hall.
+  eapply all_keys_impl; [exact Hall|].
+  intros key [Hprefix Hbit]. split; [|exact Hbit].
+  unfold same_prefix in *. intros n Hn.
+  rewrite (Hsamples n Hn). now apply Hprefix.
+Qed.
+
+Lemma branch_all_prefix:
+  forall (A : Type) sample split (ltree rtree : t A),
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) ltree ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) rtree ->
+    all_keys (fun key => same_prefix sample key split)
+      (Branch sample split ltree rtree).
+Proof.
+  intros A sample split ltree rtree Hleft Hright. cbn. split.
+  - eapply all_keys_impl; [exact Hleft|]. intros key H. exact (proj1 H).
+  - eapply all_keys_impl; [exact Hright|]. intros key H. exact (proj1 H).
+Qed.
+
+(** Below a branch's own split, all of its keys have the sample's bit.  This
+    is the containment fact used when one merge root lies below the other. *)
+Lemma all_keys_contained_prefix:
+  forall (A : Type) outer_sample inner_sample outer_split inner_split
+      (m : t A),
+    same_prefix outer_sample inner_sample outer_split ->
+    outer_split < inner_split ->
+    all_keys (fun key => same_prefix inner_sample key inner_split) m ->
+    all_keys (fun key =>
+      same_prefix outer_sample key outer_split /\
+      bit_at key outer_split = bit_at inner_sample outer_split) m.
+Proof.
+  intros A outer_sample inner_sample outer_split inner_split m
+    Hsamples Hlt Hall.
+  eapply all_keys_impl; [exact Hall|].
+  intros key Hprefix. split.
+  - unfold same_prefix in *. intros n Hn.
+    rewrite (Hsamples n Hn). apply Hprefix. lia.
+  - symmetry. apply Hprefix. lia.
+Qed.
+
+Lemma agrees_before_bounded_false_first_diff:
+  forall left right split,
+    agrees_before_bounded left right split = false ->
+    exists differing,
+      first_diff left right = Some differing /\ differing < split.
+Proof.
+  intros left right split Hdisagree.
+  rewrite agrees_before_bounded_eq in Hdisagree.
+  unfold agrees_before in Hdisagree.
+  destruct (first_diff left right) as [differing|] eqn:Hdiff.
+  - exists differing. split; [reflexivity|].
+    now apply Nat.leb_gt.
+  - discriminate.
+Qed.
+
+(** A failed prefix comparison before the shallower root yields one exact
+    split that separates every key in the two trees.  The result is already
+    in the shape consumed by [join_separated_correct_wf]. *)
+Lemma branches_disjoint_prefix:
+  forall (A B : Type) left_sample left_split (left : t A)
+      right_sample right_split (right : t B),
+    all_keys (fun key => same_prefix left_sample key left_split) left ->
+    all_keys (fun key => same_prefix right_sample key right_split) right ->
+    agrees_before_bounded left_sample right_sample
+      (Nat.min left_split right_split) = false ->
+    exists differing,
+      first_diff left_sample right_sample = Some differing /\
+      all_keys (fun key =>
+        same_prefix left_sample key differing /\
+        bit_at key differing = bit_at left_sample differing) left /\
+      all_keys (fun key =>
+        same_prefix left_sample key differing /\
+        bit_at key differing = negb (bit_at left_sample differing)) right.
+Proof.
+  intros A B left_sample left_split left right_sample right_split right
+    Hleft Hright Hdisagree.
+  destruct (agrees_before_bounded_false_first_diff _ _ _ Hdisagree)
+    as [differing [Hdiff Hlt]].
+  destruct (first_diff_spec _ _ _ Hdiff) as [Hbit Hbefore].
+  assert (Hlt_left : differing < left_split) by
+    (eapply Nat.lt_le_trans; [exact Hlt|apply Nat.le_min_l]).
+  assert (Hlt_right : differing < right_split) by
+    (eapply Nat.lt_le_trans; [exact Hlt|apply Nat.le_min_r]).
+  exists differing. split; [exact Hdiff|]. split.
+  - eapply all_keys_contained_prefix.
+    + apply same_prefix_refl.
+    + exact Hlt_left.
+    + exact Hleft.
+  - eapply all_keys_impl; [exact Hright|].
+    intros key Hprefix. split.
+    + unfold same_prefix in *. intros n Hn.
+      rewrite (Hbefore n Hn). apply Hprefix. lia.
+    + assert (Hkey : bit_at key differing = bit_at right_sample differing).
+      { symmetry. apply Hprefix. exact Hlt_right. }
+      rewrite Hkey. destruct (bit_at left_sample differing),
+        (bit_at right_sample differing); cbn in *; congruence.
+Qed.
+
 Lemma all_keys_branch:
   forall (A : Type) (P : string -> Prop) sample split (ltree rtree : t A),
     all_keys P ltree -> all_keys P rtree ->

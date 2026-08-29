@@ -29,7 +29,8 @@ Extract Constant PatriciaBits.mask_above => "(fun high low -> low < high)".
     merge can recurse directly: every recursive call consumes a branch from at
     least one input.  Keeping the fuel calculation out of the extracted hot
     path is important for disjoint maps, where walking both whole trees just
-    to derive a bound would otherwise dominate the actual join. *)
+    to derive a bound would otherwise dominate the actual join.  The proved
+    leaf workers fuse an overlapping replacement into their mapping pass. *)
 Extract Constant Patricia.combine =>
   "(fun combine_values first second ->
      let rec merge left right =
@@ -156,6 +157,39 @@ Extract Constant StringBits.first_diff =>
            Some ((byte lsl 4) lor (1 + leading_zeroes 0 128))
      in scan 0)".
 
+(** The source worker is proved equal to logical [agrees_before].  Under the
+    existing packed-position refinement, scan complete bytes strictly before
+    the split byte and only the relevant high bits of its final byte.  This
+    returns the Boolean directly and does not allocate a [first_diff] option. *)
+Extract Constant StringBits.agrees_before_bounded =>
+  "(fun left right split ->
+     let split_byte = split lsr 4
+     and split_tag = split land 15
+     and left_length = Stdlib.String.length left
+     and right_length = Stdlib.String.length right in
+     let common =
+       if left_length < right_length then left_length else right_length
+     in
+     let rec scan left right left_length right_length common
+                  split_byte split_tag byte =
+       if byte = split_byte then
+         if split_tag = 0 then true
+         else
+           let left_present = byte < left_length
+           and right_present = byte < right_length in
+           if left_present <> right_present then false
+           else if not left_present then true
+           else
+             let mask = (255 lsl (9 - split_tag)) land 255 in
+             ((Char.code (Stdlib.String.unsafe_get left byte) lxor
+               Char.code (Stdlib.String.unsafe_get right byte)) land mask) = 0
+       else if byte = common then left_length = right_length
+       else if Stdlib.String.unsafe_get left byte <>
+                    Stdlib.String.unsafe_get right byte then false
+       else scan left right left_length right_length common
+                 split_byte split_tag (byte + 1)
+     in scan left right left_length right_length common split_byte split_tag 0)".
+
 (** Every branch built by the public operations caches a resident key in its
     sample field.  Use that cache in native code rather than walking to a
     leaf.  The pure [representative] remains the specification for arbitrary
@@ -201,7 +235,8 @@ Extract Constant StringPatricia.set =>
 (** The proof-side fuel establishes termination, but need not survive
     extraction.  Every recursive native call consumes a branch from at least
     one input, so generic combine can execute directly without first walking
-    both trees to compute their sizes. *)
+    both trees to compute their sizes.  The proved leaf workers fuse an
+    overlapping replacement into their mapping pass. *)
 Extract Constant StringPatricia.combine =>
   "(fun combine_values first second ->
      let rec merge left right =
@@ -215,12 +250,12 @@ Extract Constant StringPatricia.combine =>
        | Branch (sample_left, split_left, left_left, right_left),
          Branch (sample_right, split_right, left_right, right_right) ->
            if split_left = split_right then
-             if agrees_before sample_left sample_right split_left then
+             if agrees_before_bounded sample_left sample_right split_left then
                branch sample_left split_left
                  (merge left_left left_right) (merge right_left right_right)
              else join (map_left combine_values left) (map_right combine_values right)
            else if split_left < split_right then
-             if agrees_before sample_left sample_right split_left then
+             if agrees_before_bounded sample_left sample_right split_left then
                if bit_at sample_right split_left then
                  branch sample_left split_left (map_left combine_values left_left)
                    (merge right_left right)
@@ -228,7 +263,7 @@ Extract Constant StringPatricia.combine =>
                  branch sample_left split_left (merge left_left right)
                    (map_left combine_values right_left)
              else join (map_left combine_values left) (map_right combine_values right)
-           else if agrees_before sample_left sample_right split_right then
+           else if agrees_before_bounded sample_left sample_right split_right then
              if bit_at sample_left split_right then
                branch sample_right split_right (map_right combine_values left_right)
                  (merge left right_right)
@@ -257,14 +292,14 @@ Extract Constant StringPatricia.union_left =>
        | (Branch (sample_left, split_left, left_left, right_left) as left_tree),
          (Branch (sample_right, split_right, left_right, right_right) as right_tree) ->
            if split_left = split_right then
-             if agrees_before sample_left sample_right split_left then
+             if agrees_before_bounded sample_left sample_right split_left then
                let merged_left = union left_left left_right in
                let merged_right = union right_left right_right in
                if merged_left == left_left && merged_right == right_left then left_tree
                else Branch (sample_left, split_left, merged_left, merged_right)
              else join left_tree right_tree
            else if split_left < split_right then
-             if agrees_before sample_left sample_right split_left then
+             if agrees_before_bounded sample_left sample_right split_left then
                if bit_at sample_right split_left then
                  let merged = union right_left right_tree in
                  if merged == right_left then left_tree
@@ -274,7 +309,7 @@ Extract Constant StringPatricia.union_left =>
                  if merged == left_left then left_tree
                  else Branch (sample_left, split_left, merged, right_left)
              else join left_tree right_tree
-           else if agrees_before sample_left sample_right split_right then
+           else if agrees_before_bounded sample_left sample_right split_right then
              if bit_at sample_left split_right then
                let merged = union left_tree right_right in
                if merged == right_right then right_tree
@@ -298,6 +333,7 @@ Separate Extraction
   Patricia.union_left Patricia.union_right
   Patricia.map Patricia.fold Patricia.elements Patricia.beq
   StringBits.bit_at StringBits.first_diff StringBits.agrees_before
+  StringBits.agrees_before_bounded
   StringPatricia.empty StringPatricia.is_empty StringPatricia.singleton
   StringPatricia.representative StringPatricia.branch StringPatricia.branch_at
   StringPatricia.join StringPatricia.map_filter StringPatricia.map_left
