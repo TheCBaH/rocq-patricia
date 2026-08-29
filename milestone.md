@@ -72,9 +72,11 @@ thresholds.
 - **in progress**: `NativeRefinement.v` formalizes the 62-bit positive-key
   domain and the logical-string-position/packed-token codec. Its kernel proofs
   cover decode-after-encode, valid tags, injectivity, ordering, and a safe
-  source-level packed `bit_at` worker correct at encoded positions. Proving
-  the handwritten OCaml primitive/string correspondence and bytewise
-  `first_diff` realizer against these specifications is next.
+  source-level packed `bit_at` worker correct at encoded positions. They also
+  characterize the packed first difference as the unique unequal encoded bit
+  after an equal prefix. Proving the handwritten OCaml primitive/string
+  correspondence and bytewise `first_diff` realizer against these
+  specifications is next.
 - **done**: require every well-formed string branch's cached sample to be a
   resident binding and preserve that requirement through all smart operations.
 - **later**: replace handwritten direct `set`, `combine`, and biased-union
@@ -215,3 +217,8 @@ thresholds.
   `union_right` against the reference map. This closes the previously missing
   merge-shape validation item; it is test coverage, not a refinement proof of
   the handwritten native merge.
+- **2026-08-29 — canonical packed first difference**: proved that any unequal
+  logical bit preceded by an equal logical prefix is exactly `first_diff`, and
+  transported the result to the safe packed `bit_at` worker at encoded tokens.
+  This records the prefix-loop invariant required by a future bytewise scan;
+  it does not yet verify the handwritten native string access or scan.

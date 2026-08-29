@@ -251,6 +251,45 @@ Proof.
   - split; discriminate.
 Qed.
 
+(** The source scanner has a canonical result: an unequal bit following an
+    equal prefix is not merely a possible split, but its unique first split.
+    This is the form needed to refine a bytewise worker, whose loop invariant
+    naturally records the already-compared prefix. *)
+Lemma first_diff_characterization:
+  forall left right position,
+    StringBits.bit_at left position <> StringBits.bit_at right position ->
+    (forall n, n < position ->
+      StringBits.bit_at left n = StringBits.bit_at right n) ->
+    StringBits.first_diff left right = Some position.
+Proof.
+  intros left right position Hdiff Hbefore.
+  destruct (StringBits.first_diff left right) as [differing|] eqn:Hfirst.
+  - destruct (StringBits.first_diff_spec left right differing Hfirst)
+      as [Hfirst_diff Hfirst_before].
+    destruct (Nat.lt_trichotomy position differing) as [Hlt | [Heq | Hgt]].
+    + exfalso. apply Hdiff. apply Hfirst_before. exact Hlt.
+    + subst differing. reflexivity.
+    + exfalso. apply Hfirst_diff. apply Hbefore. exact Hgt.
+  - apply StringBits.first_diff_none_iff in Hfirst. subst right.
+    exfalso. apply Hdiff. reflexivity.
+Qed.
+
+Lemma packed_first_diff_characterization:
+  forall left right position,
+    packed_bit_at left (encode_position position) <>
+      packed_bit_at right (encode_position position) ->
+    (forall n, n < position ->
+      packed_bit_at left (encode_position n) =
+        packed_bit_at right (encode_position n)) ->
+    packed_first_diff left right = Some (encode_position position).
+Proof.
+  intros left right position Hdiff Hbefore.
+  apply packed_first_diff_spec.
+  apply first_diff_characterization.
+  - now rewrite <- !packed_bit_at_encode.
+  - intros n Hn. rewrite <- !packed_bit_at_encode. apply Hbefore. exact Hn.
+Qed.
+
 Lemma packed_first_diff_valid:
   forall left right token,
     packed_first_diff left right = Some token -> valid_packed_position token.
