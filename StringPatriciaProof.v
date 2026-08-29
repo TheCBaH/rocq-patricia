@@ -161,6 +161,25 @@ Inductive wf {A : Type} : t A -> Prop :=
       same_prefix sample key split /\ bit_at key split = true) rtree ->
     wf (Branch sample split ltree rtree).
 
+(** Finite-map equality is observational equality of lookup, not structural
+    equality of Patricia trees. *)
+Definition equiv {A : Type} (left right : t A) : Prop :=
+  forall key, get key left = get key right.
+
+Lemma equiv_refl:
+  forall (A : Type) (m : t A), equiv m m.
+Proof. intros A m key. reflexivity. Qed.
+
+Lemma equiv_sym:
+  forall (A : Type) (left right : t A),
+    equiv left right -> equiv right left.
+Proof. intros A left right H key. symmetry. apply H. Qed.
+
+Lemma equiv_trans:
+  forall (A : Type) (left middle right : t A),
+    equiv left middle -> equiv middle right -> equiv left right.
+Proof. intros A left middle right Hlm Hmr key. rewrite Hlm. apply Hmr. Qed.
+
 Fixpoint splits_after {A : Type} (bound : nat) (m : t A) : Prop :=
   match m with
   | Empty | Leaf _ _ => True
@@ -289,6 +308,37 @@ Proof.
   intros A m Hwf key value. split.
   - apply get_elements_sound.
   - apply (wf_elements_complete A m Hwf).
+Qed.
+
+Theorem equiv_elements_wf:
+  forall (A : Type) (left right : t A),
+    wf left -> wf right ->
+    equiv left right <->
+    forall key value,
+      In (key, value) (elements left) <->
+      In (key, value) (elements right).
+Proof.
+  intros A left right Hleft Hright. split.
+  - intros Hequiv key value.
+    rewrite <- (@wf_elements_spec A left Hleft key value),
+      <- (@wf_elements_spec A right Hright key value).
+    unfold equiv in Hequiv. now rewrite Hequiv.
+  - intros Hbindings key. unfold equiv.
+    destruct (get key left) as [left_value|] eqn:Eleft;
+      destruct (get key right) as [right_value|] eqn:Eright;
+      try reflexivity.
+    + pose proof (proj1 (Hbindings key left_value)
+        (@get_elements_sound A left key left_value Eleft)) as Hin.
+      pose proof (@wf_elements_complete A right Hright key left_value Hin) as E.
+      congruence.
+    + pose proof (proj1 (Hbindings key left_value)
+        (@get_elements_sound A left key left_value Eleft)) as Hin.
+      pose proof (@wf_elements_complete A right Hright key left_value Hin) as E.
+      congruence.
+    + pose proof (proj2 (Hbindings key right_value)
+        (@get_elements_sound A right key right_value Eright)) as Hin.
+      pose proof (@wf_elements_complete A left Hleft key right_value Hin) as E.
+      congruence.
 Qed.
 
 Lemma StronglySorted_app_cross:
@@ -483,6 +533,16 @@ Proof.
       destruct (get key right) as [right_value|] eqn:Eright;
       cbn in Hlookup |- *; try congruence; try exact I.
     apply (proj2 (Heq left_value right_value)). congruence.
+Qed.
+
+Corollary beq_equiv_wf:
+  forall (A : Type) (eqA : A -> A -> bool) (left right : t A),
+    (forall x y, eqA x y = true <-> x = y) ->
+    wf left -> wf right ->
+    beq eqA left right = true <-> equiv left right.
+Proof.
+  intros A eqA left right Heq Hleft Hright.
+  apply (beq_extensional_wf A eqA left right Heq Hleft Hright).
 Qed.
 
 Lemma representative_all_keys:

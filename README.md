@@ -64,7 +64,9 @@ The positive-key proof file currently establishes, without axioms:
   generic-combine workers;
 - `fold` agreement with `elements`;
 - `elements` soundness, completeness on `wf` trees, and unique keys;
-- extensional correctness of `beq` on `wf` trees;
+- lookup-based finite-map equivalence, its equivalence-relation laws, its
+  exact correspondence with binding membership, and extensional correctness
+  of `beq` on `wf` trees;
 - sufficiency of the public combine fuel bound for every recursive call shape;
 - general lookup correctness and `wf` preservation by `combine_fuel` and the
   public `combine`, for the standard finite-map condition
@@ -102,6 +104,9 @@ The direct-string proof files currently establish, without axioms:
 - simultaneous lookup correctness and well-formedness for `combine_fuel` and
   public `combine` under `f None None = None`.
 - pointwise and lookup-extensional correctness of string `beq` on `wf` trees.
+- lookup-based finite-map equivalence, its equivalence-relation laws, its
+  exact correspondence with binding membership, and equivalence with an
+  equality-reflecting string `beq`.
 - strong sorting of string `elements`: every earlier key precedes every later
   key at their first differing prefix-free logical bit (`false` before
   `true`).

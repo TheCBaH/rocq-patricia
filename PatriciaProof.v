@@ -25,6 +25,25 @@ Inductive wf {A : Type} : t A -> Prop :=
     all_keys (fun k => matches_prefix k p mask = true /\ zero_bit k mask = false) r ->
     wf (Branch p mask l r).
 
+(** Finite-map equality is observational equality of lookup, not structural
+    equality of Patricia trees. *)
+Definition equiv {A : Type} (left right : t A) : Prop :=
+  forall key, get key left = get key right.
+
+Lemma equiv_refl:
+  forall (A : Type) (m : t A), equiv m m.
+Proof. intros A m key. reflexivity. Qed.
+
+Lemma equiv_sym:
+  forall (A : Type) (left right : t A),
+    equiv left right -> equiv right left.
+Proof. intros A left right H key. symmetry. apply H. Qed.
+
+Lemma equiv_trans:
+  forall (A : Type) (left middle right : t A),
+    equiv left middle -> equiv middle right -> equiv left right.
+Proof. intros A left middle right Hlm Hmr key. rewrite Hlm. apply Hmr. Qed.
+
 Lemma get_empty:
   forall (A : Type) k, @get A k empty = None.
 Proof. reflexivity. Qed.
@@ -205,6 +224,37 @@ Proof.
   - now apply elements_sound.
 Qed.
 
+Theorem equiv_elements_wf:
+  forall (A : Type) (left right : t A),
+    wf left -> wf right ->
+    equiv left right <->
+    forall key value,
+      In (key, value) (elements left) <->
+      In (key, value) (elements right).
+Proof.
+  intros A left right Hleft Hright. split.
+  - intros Hequiv key value.
+    rewrite (@elements_spec_wf A left Hleft key value),
+      (@elements_spec_wf A right Hright key value).
+    unfold equiv in Hequiv. now rewrite Hequiv.
+  - intros Hbindings key. unfold equiv.
+    destruct (get key left) as [left_value|] eqn:Eleft;
+      destruct (get key right) as [right_value|] eqn:Eright;
+      try reflexivity.
+    + pose proof (proj1 (Hbindings key left_value)
+        (@elements_sound A left key left_value Eleft)) as Hin.
+      pose proof (@elements_complete_wf A right Hright key left_value Hin) as E.
+      congruence.
+    + pose proof (proj1 (Hbindings key left_value)
+        (@elements_sound A left key left_value Eleft)) as Hin.
+      pose proof (@elements_complete_wf A right Hright key left_value Hin) as E.
+      congruence.
+    + pose proof (proj2 (Hbindings key right_value)
+        (@elements_sound A right key right_value Eright)) as Hin.
+      pose proof (@elements_complete_wf A left Hleft key right_value Hin) as E.
+      congruence.
+Qed.
+
 Theorem elements_keys_nodup_wf:
   forall (A : Type) (m : t A), wf m ->
     NoDup (List.map (@fst positive A) (elements m)).
@@ -276,6 +326,30 @@ Proof.
       pose proof (@elements_complete_wf A right Hright key value Hin) as Er.
       specialize (Hpoint key). rewrite Er in Hpoint.
       destruct (get key left); cbn in Hpoint |- *; [exact Hpoint|contradiction].
+Qed.
+
+Corollary beq_extensional_wf:
+  forall (A : Type) (eqA : A -> A -> bool) (left right : t A),
+    (forall x y, eqA x y = true <-> x = y) ->
+    wf left -> wf right ->
+    beq eqA left right = true <-> equiv left right.
+Proof.
+  intros A eqA left right Heq Hleft Hright.
+  rewrite (@beq_correct_wf A eqA left right Hleft Hright).
+  unfold equiv. split.
+  - intros Hpoint key. specialize (Hpoint key).
+    destruct (get key left) as [left_value|] eqn:Eleft;
+      destruct (get key right) as [right_value|] eqn:Eright;
+      cbn in Hpoint.
+    + apply (proj1 (Heq left_value right_value)) in Hpoint. now subst.
+    + contradiction.
+    + contradiction.
+    + reflexivity.
+  - intros Hlookup key. specialize (Hlookup key).
+    destruct (get key left) as [left_value|] eqn:Eleft;
+      destruct (get key right) as [right_value|] eqn:Eright;
+      cbn in Hlookup |- *; try congruence; try exact I.
+    apply (proj2 (Heq left_value right_value)). congruence.
 Qed.
 
 Lemma all_keys_none:

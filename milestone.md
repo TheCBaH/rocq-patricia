@@ -48,11 +48,13 @@ thresholds.
   theorems.
 - **done**: specify the prefix-free bit-lexicographic order and prove that
   direct-string `elements` is strongly sorted by it on well-formed trees.
-- **next**: package standalone finite-map extensionality theorems.
+- **done**: package lookup-based finite-map equivalence for both key variants,
+  prove its equivalence-relation laws and exact correspondence with binding
+  membership, and connect equality-reflecting `beq` to it.
 
 ## M4: Harden the public extracted API
 
-- **later**: generate an internal module and expose abstract map types through
+- **next**: generate an internal module and expose abstract map types through
   a handwritten wrapper interface.
 - **later**: validate native integer keys and hide constructors, fuel, packed
   split tokens, and proof-internal helpers.
@@ -138,3 +140,10 @@ thresholds.
   `wf_elements_bit_lex_sorted`, which relates every earlier key to every later
   key. Added randomized byte-lexicographic ordering checks over empty,
   prefix-related, NUL-containing, non-ASCII, and arbitrary-byte keys.
+- **2026-08-29 — finite-map extensionality**: packaged lookup equality as
+  `equiv` for both key variants, proved reflexivity, symmetry, transitivity,
+  and equivalence to identical binding membership in `elements` on
+  well-formed trees. Equality-reflecting `beq` is proved equivalent to this
+  relation; structural equality is deliberately not claimed. `make proof`,
+  `make`, the randomized oracle, and `make benchmark` passed, and Rocq reports
+  the exported extensionality theorems closed under the global context.

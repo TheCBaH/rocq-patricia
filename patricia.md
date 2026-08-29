@@ -21,8 +21,8 @@ The verification claim must therefore be split into three layers:
 
 | Layer | Current status |
 | --- | --- |
-| Pure positive-key Rocq model | Kernel-checked functional map laws, including general `combine`, with no project axioms found in the inspected theorem closure |
-| Pure direct-string Rocq model | Lookup, update, removal, ordered traversal, filtering, structural invariants, general `combine`, biased unions, and extensional `beq` are proved |
+| Pure positive-key Rocq model | Kernel-checked functional map laws, including general `combine` and finite-map extensionality, with no project axioms found in the inspected theorem closure |
+| Pure direct-string Rocq model | Lookup, update, removal, ordered traversal, filtering, structural invariants, general `combine`, biased unions, and finite-map extensionality are proved |
 | Extracted native OCaml | Extensive oracle and invariant testing passes, but the standard numeric/string mappings and 19 explicit handwritten realizers are trusted; neither their refinement nor the Rocq-to-OCaml compilation pipeline is proved here |
 
 Consequently, “formally verified” is accurate for the stated theorems about the
@@ -41,8 +41,9 @@ The following checks passed:
   string `set_correct_wf`, `replace_binding_correct_wf`,
   `join_separated_correct_wf`, `public_combine_fuel_sufficient`,
   `union_left_correct_wf`, `union_right_correct_wf`, `beq_correct_wf`,
-  `beq_extensional_wf`, `wf_elements_bit_lex_sorted`, and
-  `wf_splits_ordered` theorems as closed under the global context;
+  both variants' `equiv_elements_wf` and `beq_extensional_wf`, plus string
+  `wf_elements_bit_lex_sorted` and `wf_splits_ordered`, as closed under the
+  global context;
 - additional integer fuzzing used keys across the positive OCaml `int` range,
   including high-bit boundary values, and checked lookup, elements, merge, and
   routing invariants;
@@ -107,7 +108,11 @@ implementation.
 combine law, preserving well-formedness and selecting the preferred binding at
 every key. `beq_correct_wf` gives the pointwise Boolean equality law, while
 `beq_extensional_wf` proves equivalence to identical lookup results when the
-value comparison reflects equality. `wf_elements_bit_lex_sorted` proves that
+value comparison reflects equality. Both variants package lookup equality as
+`equiv`, prove its equivalence-relation laws, and prove
+`equiv_elements_wf`: on well-formed trees it holds exactly when every binding
+has the same membership in both `elements` lists. `wf_elements_bit_lex_sorted`
+proves that
 the key projection of `elements` is strongly sorted by the first differing
 prefix-free logical bit, with `false` before `true`; thus every earlier key is
 related to every later key, not merely to its immediate successor.
@@ -380,8 +385,8 @@ Current API-law status across both key variants:
 - [x] The documented `elements` ordering, including strong sorting for direct
   strings;
 - [x] Fold equivalence to the traversal order produced by `elements`;
-- [ ] An extensionality theorem saying equal lookup at every key represents the
-  same finite map;
+- [x] Extensionality theorems packaging equal lookup at every key as finite-map
+  equivalence and characterizing it by binding membership;
 - [ ] Any laws required by the intended CompCert `TREE` adapter.
 
 If structural equality of canonical trees is desired, prove that separately;
