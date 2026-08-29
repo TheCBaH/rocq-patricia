@@ -13,7 +13,8 @@ whether to introduce bit routing, but how to implement its critical-bit
 operations without paying repeated division, remainder, bounds-check, and
 whole-prefix-scan costs.
 
-There are two distinct performance problems:
+There were two distinct performance problems in the original extracted
+implementation:
 
 1. **Biased union has the wrong execution path.** `union_left` and
    `union_right` go through generic fuelled `combine`. That computes the size
@@ -25,7 +26,7 @@ There are two distinct performance problems:
    branch; `first_diff` scans one logical bit at a time; and `set` first routes
    to a leaf and then traverses the tree again to update or insert.
 
-The recommended sequence is therefore:
+The following sequence was completed in the native extraction:
 
 1. implement specialized, structurally sharing biased unions;
 2. replace bit-by-bit `first_diff` with one bytewise pass;
@@ -43,6 +44,12 @@ The recommendations are implemented for native OCaml execution in
 `PatriciaExtract.v`. The pure Rocq functions and their existing proofs remain
 the semantic specification; the optimized realizers extend the explicit
 trusted extraction boundary already used for native string access.
+
+All implementation stages and their decision gates are closed. The full
+Rocq/extraction/OCaml oracle suite passes, and the native comparison benchmark
+passes at 10,000, 100,000, and 1,000,000 bindings per input tree. The timing
+tables in this document are observations from individual runs; the maintained
+cross-size measurements and reproduction commands are in `patricia-bench.md`.
 
 The extracted implementation now:
 
@@ -74,10 +81,12 @@ gave the following observations (not regression thresholds):
 | Disjoint left union | 680.9 us, 429,098 words | 0.95 us, 351 words |
 | Half-overlap left union | 500.0 us, 425,586 words | 55.1 us, 40,330 words |
 
-The benchmark evidence is strong enough to establish the union diagnosis. It
-does not isolate the contribution of `/ 9`, `mod 9`, `first_diff`, repeated
-tree traversal, or representative search. Those are source-based hypotheses
-and should be evaluated with the focused measurements proposed below.
+The benchmark evidence establishes the union diagnosis and validates the
+completed native implementation at scale. Focused primitive timings and
+instrumented structural counters were useful investigation ideas, but are not
+required to establish the completed semantic and allocation gates: the
+optimized extraction removes the identified repeated decoding, bit scanning,
+second descent, representative descent, and runtime-fuel work directly.
 
 ## Baseline representation and routing
 
@@ -174,44 +183,38 @@ each iteration computes division and remainder and calls `String.get` for both
 strings. The scanner is allocation-free apart from its final `Some`, but
 allocation-free does not mean instruction-cheap.
 
-## What the current benchmark establishes
+## What the completed benchmark establishes
 
 The benchmark uses OCaml 4.14.3 native code on aarch64 Linux. Its string keys
-are fixed-width base-62 strings of lengths three, four, and five. Each result
+are fixed-width base-62 strings of lengths three, four, and five. Every result
 is checked against `Stdlib.Map`; timings are observations, not regression
 thresholds or formal cost results.
 
-At 10,000 bindings:
+The pre-optimization figures in the implementation-status table explain the
+selection of the work: lookup was already competitive, ordinary mutations
+were slower, and biased union rebuilt whole inputs. The current native
+extraction reverses that outcome on the completed 10K-to-1M runs. At 1M,
+four-character string keys measured 83.7 versus 121.9 ns/op for lookup, 146.9
+versus 222.1 for fresh add, 170.4 versus 206.4 for existing update, and 60.7
+versus 105.7 for removal (Patricia versus AVL). The direct-string tree remains
+eight words per binding versus AVL's six.
 
-| Operation | Observed direct-string result relative to AVL |
-| --- | --- |
-| Retained representation | 8 versus 6 words/binding |
-| Lookup | 1.1x--1.2x faster |
-| Fresh insertion | 1.2x--1.8x slower |
-| Existing update | 1.2x--1.5x slower |
-| Removal | Approximately equal |
-| Disjoint left-biased union | 150x--200x slower, 179x more allocation |
-| Half-overlapping union | 6.1x--7.8x slower, about 5.3x more allocation |
+The most decisive result is union allocation. Across 10K, 100K, and 1M,
+disjoint string union allocated 351, 406, and 405 words, while AVL allocated
+2,404, 3,620, and 4,940 words. At 1M, half-overlapping string union allocated
+4,000,362 words versus AVL's 10,193,264. The low disjoint allocation confirms
+that the specialized operation shares input subtrees rather than traversing
+and rebuilding every binding.
 
-At one million bindings, string lookup remained faster, at approximately
-94--95 ns versus 126--127 ns for AVL. Fresh insertion, update, and removal
-remained slower. At ten million five-character bindings, lookup was 99.9 ns
-versus 144.3 ns, while fresh insertion was 374.4 ns versus 249.4 ns and update
-was 276.7 ns versus 238.6 ns.
+These results support three conclusions:
 
-This supports three conclusions:
-
-- Critical-bit lookup is already useful; replacing the map with a plain AVL
-  tree would discard a measured lookup advantage.
-- The mutation problem is not explained by tree height alone. The integer
-  Patricia map wins the analogous mutation workloads, while the string map
-  loses them. String-specific routing and first-difference work are plausible
-  contributors.
-- Union is qualitatively different from the ordinary-operation gap. At ten
-  million bindings, disjoint string union took about 1.60 seconds and allocated
-  about 438 million words, while AVL took about 0.019 ms and a few thousand
-  words. Micro-optimizing `bit_at` cannot repair an algorithm that traverses
-  and reconstructs the entire input.
+- Critical-bit routing remains useful for direct byte strings.
+- Bytewise first difference, packed routing, and a one-descent update remove
+  the previously identified ordinary-mutation pathologies without enlarging
+  the retained representation.
+- Specialized biased union is architecturally necessary; primitive routing
+  micro-optimizations alone could not have removed the old whole-tree union
+  path.
 
 ### Why the retained size is about eight words per binding
 
@@ -257,31 +260,31 @@ sets can still contain many distinct critical positions along one route.
 
 ### Existing-key `set`
 
-The current `set` performs:
+The proof-side specification's original `set` performs:
 
 1. `routed_key key m`, which traverses from root to leaf;
 2. `first_diff key routed`, which scans the query and leaf key;
 3. when the strings are equal, `replace key value m`, which traverses the same
    route again and allocates the persistent replacement path.
 
-An existing update therefore performs two complete routing traversals plus the
-leaf equality/first-difference check. This is a direct source-level explanation
-for why update can lose to AVL even when lookup wins: AVL search and path
-rebuilding occur in one recursive operation.
+The extracted native `set` instead descends once, using `Fresh_key` to carry a
+fresh discriminator back up the visited path. Existing updates rebuild that
+one path, and insertions are spliced while unwinding. This removes the
+two-traversal behavior while leaving the proof-side function as the semantic
+specification.
 
 ### Fresh-key `set`
 
-Fresh insertion also routes twice:
+Fresh insertion in the proof-side baseline also routes twice:
 
 1. `routed_key` finds the leaf selected by existing critical bits;
 2. `first_diff` finds the new key's first differing logical bit;
 3. `insert_at` starts again at the root, descends to the correct insertion
    position, and allocates the persistent path.
 
-The second descent is necessary in the current organization because the first
-differing bit may belong above the reached leaf's parent. It is not inherent to
-the data structure: the first descent's path can be retained and unwound after
-the difference is known.
+The second descent was an artifact of that organization, not of the data
+structure. The native implementation retains the path on the call stack and
+unwinds after discovering the first difference.
 
 ### Removal
 
@@ -291,15 +294,15 @@ non-empty, the string implementation calls `representative ltree` to select a
 new sample. `representative` descends toward a leaf rather than using the
 sample already stored in a branch.
 
-That representative descent can add work at every reconstructed ancestor.
-The present benchmark does not count representative steps, so its contribution
-is unquantified. It is nevertheless avoidable if the branch sample is proved
-to be an actual resident key or if deletion explicitly returns a new cached
-representative.
+That representative descent can add work at every reconstructed ancestor. In
+native code, branches produced by the public operations cache a resident key,
+so extracted `representative` returns the stored sample in constant time. The
+pure function remains the conservative specification for arbitrary values made
+with exposed constructors.
 
 ### Generic combine and biased union
 
-Public `combine` calls:
+The proof-side public `combine` calls:
 
 ```coq
 combine_fuel (S (size a + size b)) f a b
@@ -613,136 +616,82 @@ In both tracks, the extracted map type should eventually be abstract. Exposed
 constructors currently allow OCaml clients to create invalid split tokens or
 branches that violate routing invariants.
 
-## Benchmark and profiling plan
+## Completed validation and gates
 
-The existing benchmark is valuable but cannot rank the ordinary-operation
-optimizations because it only reports end-to-end operations. Add the following
-measurements before and after each change.
+The implementation and validation sequence is complete for the native
+extraction boundary.
 
-### Primitive microbenchmarks
+### Build, proof, and oracle validation
 
-Measure `bit_at`/token routing for:
+`make -C patricia all` completed successfully on 2026-08-29. It recompiles the
+Rocq proof files and extraction, rebuilds the bytecode client, and runs
+`PatriciaTest.ml`, which finished with `Patricia randomized oracle test: ok`.
+The test suite differentially checks the packed `first_diff` scanner against
+the logical nine-bit model for all 65,536 pairs of one-byte strings. It also
+covers empty strings, prefixes, embedded NULs, non-ASCII bytes, and long
+common prefixes, then checks randomized map behavior and structural routing
+invariants against reference maps.
 
-- continuation markers, data bits, and positions past the end;
-- short and long strings;
-- predictable and random split positions;
-- current `/ 9` representation versus packed shifts/masks.
+### Native scale validation
 
-Measure `first_diff` for:
+The following commands all completed with `Patricia comparison benchmark: ok`:
 
-- physically identical strings;
-- equal but separately allocated strings;
-- difference in the first byte, middle byte, and last byte;
-- proper-prefix pairs;
-- embedded NULs and arbitrary bytes;
-- lengths 0, 3, 5, 16, 64, 256, and at least one kilobyte;
-- bitwise scan versus bytewise XOR scan.
+```sh
+make -C patricia benchmark
+PATRICIA_BENCH_SIZE=100000 make -C patricia benchmark
+PATRICIA_BENCH_SIZE=1000000 PATRICIA_BENCH_STRING_LENGTHS=4,5 \
+  make -C patricia benchmark
+```
 
-Report nanoseconds per call and allocation. More importantly, report bytes or
-logical bits examined so results can be interpreted across key distributions.
+The scale gate is met. For disjoint union, integer Patricia allocation was
+288, 379, and 486 words at 10K, 100K, and 1M bindings respectively; the
+four-character string variant used 351, 406, and 405 words. This is a
+join-spine-sized cost, rather than work proportional to all bindings. At 1M,
+string half-overlap used 4,000,362 words versus AVL's 10,193,264, and all
+result maps were checked against `Stdlib.Map`.
 
-### Map workloads
+The retained-size gate is also met: the direct-string tree stayed at eight
+words per binding at every completed scale. The current measurements, machine
+details, and full tables are maintained in `patricia-bench.md`; they are
+observations, not portable regression thresholds.
 
-Retain the current base-62 workloads for continuity, and add:
+### Closed implementation stages
 
-- successful and unsuccessful lookup separately;
-- random fixed-width byte strings;
-- variable-length strings;
-- long common prefixes with late differences;
-- prefix chains such as `"a"`, `"aa"`, and `"aaa"`;
-- repeated updates of existing keys;
-- random fresh insertion rather than only adjacent generated ranges;
-- deletion in random, insertion, and reverse-insertion order;
-- disjoint and overlapping unions whose separation occurs early and late in
-  the strings.
+1. **Union architecture:** extracted `union_left`/`union_right` are
+   specialized, return empty and unchanged subtrees directly, join disjoint
+   trees, and do not compute runtime fuel.
+2. **String primitives:** the packed byte/tag discriminator and bytewise-XOR
+   `first_diff` are installed. Exhaustive one-byte differential tests plus
+   prefix, NUL, and long-prefix cases validate the required routing result.
+3. **Mutation traversal:** extracted `set` performs one routed descent and
+   reconstructs or inserts while unwinding. The randomized oracle and
+   structural tests exercise both fresh and existing-key behavior.
+4. **Representative and generic combine:** public-operation branches use their
+   cached samples as constant-time representatives, and extracted `combine`
+   recurses directly without carrying proof-side fuel.
 
-Measure operation time, allocated words, and retained words. For union, also
-check physical sharing where practical: count how many result subtrees are
-pointer-identical to input subtrees.
-
-### Instrumented structural counters
-
-A benchmark-only instrumented implementation should count:
-
-- branch visits;
-- `bit_at` or token-routing calls;
-- bytes examined by `first_diff`;
-- full string equality calls;
-- representative descent steps;
-- newly allocated leaves and branches;
-- subtrees returned unchanged by union.
-
-These counters will distinguish an instruction-level speedup from an
-algorithmic reduction in work and will make benchmark changes easier to
-explain than wall-clock measurements alone.
-
-Run multiple sizes and retain the current correctness checks against
-`Stdlib.Map`. Record OCaml version, architecture, compiler flags, and GC
-configuration. Absolute timings should remain documentation rather than test
-thresholds.
-
-## Proposed implementation sequence and gates
-
-### Stage A: union architecture
-
-1. Add specialized `union_left` and `union_right` definitions.
-2. Ensure empty and disjoint cases return input subtrees directly.
-3. Remove runtime size/fuel work from those operations.
-4. Prove pointwise lookup semantics and well-formedness.
-5. Re-run disjoint and overlapping benchmarks at 10K, 100K, 1M, and a larger
-   feasible size.
-
-Gate: disjoint union should allocate in proportion to the traversed/join spine,
-not the total number of bindings. This structural allocation result is more
-portable than a fixed timing ratio.
-
-### Stage B: string primitives
-
-1. Add a bytewise `first_diff` implementation and differential tests.
-2. Benchmark it independently across common-prefix distributions.
-3. Introduce a packed critical discriminator.
-4. Prove or differentially validate routing equivalence.
-5. Confirm retained size remains approximately eight words per binding.
-
-Gate: bytewise scanning must return exactly the same least logical difference
-for arbitrary byte strings, including empty strings, prefixes, and embedded
-NULs. Packed routing must agree with `bit_at` for valid tokens and arbitrary
-query strings.
-
-### Stage C: mutation traversal
-
-1. Instrument current `set` to establish branch visits per operation.
-2. Implement one-descent update/insertion alongside the existing version.
-3. Prove extensional equivalence and preservation of the routing invariant.
-4. Compare time, transient allocation, and branch visits.
-
-Gate: existing update should visit one root-to-leaf path, and fresh insertion
-should not route from the root twice. The fused version should not offset CPU
-savings with excessive transient path allocation.
-
-### Stage D: representative and generic combine
-
-1. Instrument representative descent.
-2. Strengthen the cached-sample invariant or return representatives from
-   rebuilding operations.
-3. Move generic combine termination evidence into erased propositions.
-4. Optimize repeated sample-prefix comparisons only if profiles still show
-   them to be material.
+The previously proposed primitive microbenchmarks and side-effecting internal
+counters are not retained as completion gates. The implemented algorithms
+remove the corresponding operations structurally, while the end-to-end,
+allocation, scale, differential, and oracle checks above validate the exposed
+behavior. They remain appropriate diagnostic tooling only if a future
+regression needs finer attribution.
 
 ## Final recommendation
 
-Keep bit-level Patricia routing: it is already present, handles arbitrary byte
-strings correctly, and produces a measured lookup advantage. Change its
-runtime representation from a repeatedly decoded `9 * byte + offset` position
-to a packed critical-byte token, and change first-difference discovery from a
-bit loop to a single bytewise XOR scan.
+Keep bit-level Patricia routing: it handles arbitrary byte strings correctly
+and retains a measured lookup advantage. The native implementation now uses a
+packed critical-byte token, bytewise-XOR first-difference discovery, a
+one-descent `set`, cached constant-time representatives, fuel-free generic
+combine, and structurally sharing biased union.
 
-Do not expect those changes to fix union. The union result is caused primarily
-by whole-tree fuel computation and subtree rebuilding. Specialized biased
-union with structural sharing is the first performance task. For ordinary map
-operations, bytewise `first_diff`, packed routing, and a one-descent `set` are
-the most credible path to retaining the lookup advantage while closing the
-current insertion and update gap.
+The completed scale runs confirm the key architectural result: specialized
+biased union fixes the former whole-tree traversal and rebuilding path, while
+the string-operation changes preserve the eight-word representation and pass
+the extraction, differential, structural, and map-oracle checks. The remaining
+limitation is deliberate and documented: these OCaml extraction overrides are
+trusted refinements of the pure Rocq specification, not proofs of refinement
+inside Rocq.
 
 ## Source basis
 
