@@ -1,4 +1,4 @@
-From Stdlib Require Import Lia NArith PArith PeanoNat Strings.String.
+From Stdlib Require Import Lia NArith PArith PeanoNat Strings.Ascii Strings.String.
 Require Import PatriciaBits StringBits.
 
 (** * The representation boundary used by the native extraction
@@ -222,6 +222,121 @@ Proof.
     reflexivity.
 Qed.
 
+(** At a byte which is already known to differ, the native scanner obtains
+    the first differing character bit from an XOR and its leading zeroes.
+    This safe source-level worker expresses precisely that choice by walking
+    the eight most-significant-first bits.  The target arithmetic used for
+    XOR and leading-zeroes is still a separate refinement obligation. *)
+Fixpoint ascii_first_diff_from
+    (fuel offset : nat) (left right : Ascii.ascii) : option nat :=
+  match fuel with
+  | 0 => None
+  | S fuel' =>
+      if Bool.eqb (StringBits.ascii_bit left offset)
+          (StringBits.ascii_bit right offset)
+      then ascii_first_diff_from fuel' (S offset) left right
+      else Some offset
+  end.
+
+Definition ascii_first_diff (left right : Ascii.ascii) : option nat :=
+  ascii_first_diff_from 8 0 left right.
+
+Lemma ascii_first_diff_from_none:
+  forall fuel offset left right,
+    ascii_first_diff_from fuel offset left right = None <->
+    forall n, offset <= n < offset + fuel ->
+      StringBits.ascii_bit left n = StringBits.ascii_bit right n.
+Proof.
+  induction fuel as [|fuel IH]; intros offset left right; cbn.
+  - split; intros; [lia | reflexivity].
+  - destruct (Bool.eqb (StringBits.ascii_bit left offset)
+      (StringBits.ascii_bit right offset)) eqn:E.
+    + apply Bool.eqb_prop in E. rewrite IH. split.
+      * intros H n Hrange. destruct (Nat.eq_dec n offset) as [->|Hneq].
+        -- exact E.
+        -- apply H. lia.
+      * intros H n Hrange. apply H. lia.
+    + split.
+      * discriminate.
+      * intros H. exfalso. apply (proj1 (Bool.eqb_false_iff _ _) E).
+        apply H. lia.
+Qed.
+
+Lemma ascii_first_diff_from_some:
+  forall fuel offset left right differing,
+    ascii_first_diff_from fuel offset left right = Some differing ->
+    offset <= differing < offset + fuel /\
+    StringBits.ascii_bit left differing <>
+      StringBits.ascii_bit right differing /\
+    (forall n, offset <= n < differing ->
+      StringBits.ascii_bit left n = StringBits.ascii_bit right n).
+Proof.
+  induction fuel as [|fuel IH]; intros offset left right differing H; cbn in H.
+  - discriminate.
+  - destruct (Bool.eqb (StringBits.ascii_bit left offset)
+      (StringBits.ascii_bit right offset)) eqn:E.
+    + apply Bool.eqb_prop in E.
+      specialize (IH (S offset) left right differing H).
+      destruct IH as [Hrange [Hdiff Hbefore]].
+      split; [lia|]. split; [assumption|]. intros n Hn.
+      destruct (Nat.eq_dec n offset) as [->|Hneq]; [exact E|].
+      apply Hbefore. lia.
+    + inversion H; subst differing.
+      split; [lia|]. split; [apply (proj1 (Bool.eqb_false_iff _ _) E)|].
+      intros; lia.
+Qed.
+
+Lemma ascii_first_diff_unequal_exists:
+  forall left right,
+    left <> right -> exists differing, ascii_first_diff left right = Some differing.
+Proof.
+  intros left right Hneq. unfold ascii_first_diff.
+  destruct (ascii_first_diff_from 8 0 left right) as [differing|] eqn:H.
+  - eauto.
+  - exfalso. apply Hneq. apply StringBits.ascii_bit_ext. intros n Hn.
+    apply (proj1 (ascii_first_diff_from_none 8 0 left right) H).
+    lia.
+Qed.
+
+Lemma ascii_first_diff_characterization:
+  forall left right differing,
+    StringBits.ascii_bit left differing <>
+      StringBits.ascii_bit right differing ->
+    (forall n, n < differing ->
+      StringBits.ascii_bit left n = StringBits.ascii_bit right n) ->
+    ascii_first_diff left right = Some differing.
+Proof.
+  intros left right differing Hdiff Hbefore.
+  destruct (ascii_first_diff left right) as [first|] eqn:Hfirst.
+  - destruct (ascii_first_diff_from_some 8 0 left right first Hfirst)
+      as [Hrange [Hfirstdiff Hfirstbefore]].
+    destruct (Nat.lt_trichotomy differing first) as [Hlt | [Heq | Hgt]].
+    + exfalso. apply Hdiff. apply Hfirstbefore. lia.
+    + subst first. reflexivity.
+    + exfalso. apply Hfirstdiff. apply Hbefore. exact Hgt.
+  - pose proof (proj1 (ascii_first_diff_from_none 8 0 left right) Hfirst)
+      as Hall.
+    assert (Heq : left = right).
+    { apply StringBits.ascii_bit_ext. intros n Hn. apply Hall. lia. }
+    subst right. exfalso. apply Hdiff. reflexivity.
+Qed.
+
+(** A safe structural counterpart of the native bytewise scanner.  The
+    recursive call consumes one byte from each common prefix; a mismatching
+    byte is resolved by [ascii_first_diff], while unequal lengths select the
+    continuation-marker tag [0]. *)
+Fixpoint bytewise_first_diff (left right : string) : option nat :=
+  match left, right with
+  | EmptyString, EmptyString => None
+  | EmptyString, String _ _ => Some 0
+  | String _ _, EmptyString => Some 0
+  | String left_ch left_tail, String right_ch right_tail =>
+      if Ascii.eqb left_ch right_ch
+      then option_map (fun token => 16 + token)
+             (bytewise_first_diff left_tail right_tail)
+      else option_map S (ascii_first_diff left_ch right_ch)
+  end.
+
 Definition packed_first_diff (left right : string) : option nat :=
   option_map encode_position (StringBits.first_diff left right).
 
@@ -428,4 +543,94 @@ Proof.
   destruct (StringBits.first_diff left right) as [position|] eqn:E;
     cbn in H; try discriminate.
   injection H as H. subst token. apply encode_position_valid.
+Qed.
+
+Lemma encode_position_next_byte:
+  forall position,
+    encode_position (9 + position) = 16 + encode_position position.
+Proof.
+  intros position. unfold encode_position, packed_position.
+  assert (Hdiv : (9 + position) / 9 = S (position / 9)).
+  { replace (9 + position) with (1 * 9 + position) by lia.
+    rewrite Nat.div_add_l by lia. lia. }
+  assert (Hmod : (9 + position) mod 9 = position mod 9).
+  { replace (9 + position) with (position + 1 * 9) by lia.
+    rewrite Nat.Div0.mod_add. reflexivity. }
+  rewrite Hdiv, Hmod. lia.
+Qed.
+
+Lemma bytewise_first_diff_correct:
+  forall left right,
+    bytewise_first_diff left right = packed_first_diff left right.
+Proof.
+  induction left as [|left_ch left_tail IH]; intros right;
+    destruct right as [|right_ch right_tail].
+  - reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - cbn. destruct (Ascii.eqb left_ch right_ch) eqn:Hchar.
+    + apply Ascii.eqb_eq in Hchar. subst right_ch.
+      rewrite IH.
+      destruct (packed_first_diff left_tail right_tail) as [token|] eqn:Htail.
+      * assert (Hsource : exists position,
+            StringBits.first_diff left_tail right_tail = Some position /\
+            token = encode_position position).
+        { unfold packed_first_diff in Htail.
+          destruct (StringBits.first_diff left_tail right_tail) as [position|]
+            eqn:Hfirst; cbn in Htail.
+          - injection Htail as Htoken. subst token. eauto.
+          - discriminate. }
+        destruct Hsource as [position [Hfirst Htoken]]. subst token.
+        change (Some (16 + encode_position position) =
+          packed_first_diff (String left_ch left_tail)
+            (String left_ch right_tail)).
+        rewrite <- (encode_position_next_byte position).
+        symmetry. apply (proj2 (packed_first_diff_spec _ _ _)).
+        apply first_diff_characterization.
+        -- rewrite !StringBits.bit_at_cons_tail.
+           destruct (StringBits.first_diff_spec _ _ _ Hfirst) as [Hdiff _].
+           exact Hdiff.
+        -- intros n Hn. destruct (n <? 9) eqn:Hsmall.
+           ++ destruct n as [|offset].
+              ** reflexivity.
+              ** rewrite !StringBits.bit_at_cons_character by
+                    (apply Nat.ltb_lt in Hsmall; lia).
+                 reflexivity.
+           ++ assert (Hdecomp : n = 9 + (n - 9)) by
+                 (apply Nat.ltb_ge in Hsmall; lia).
+              rewrite Hdecomp, !StringBits.bit_at_cons_tail.
+              destruct (StringBits.first_diff_spec _ _ _ Hfirst) as [_ Hbefore].
+              apply Hbefore. lia.
+      * assert (Hsource : StringBits.first_diff left_tail right_tail = None).
+        { unfold packed_first_diff in Htail.
+          destruct (StringBits.first_diff left_tail right_tail); cbn in Htail;
+            [discriminate|exact Htail]. }
+        apply StringBits.first_diff_none_iff in Hsource. subst right_tail.
+        unfold packed_first_diff. now rewrite StringBits.first_diff_same.
+    + assert (Hneq : left_ch <> right_ch).
+      { apply Ascii.eqb_neq. exact Hchar. }
+      destruct (ascii_first_diff_unequal_exists left_ch right_ch Hneq)
+        as [offset Hoffset].
+      change (option_map S (ascii_first_diff left_ch right_ch) =
+        packed_first_diff (String left_ch left_tail)
+          (String right_ch right_tail)).
+      rewrite Hoffset.
+      change (Some (S offset) =
+        packed_first_diff (String left_ch left_tail)
+          (String right_ch right_tail)).
+      assert (Hoffset_spec := ascii_first_diff_from_some 8 0
+        left_ch right_ch offset Hoffset).
+      destruct Hoffset_spec as [Hrange [Hdiff Hbefore]].
+      assert (Hencode : encode_position (S offset) = S offset).
+      { unfold encode_position, packed_position.
+        rewrite Nat.div_small by lia.
+        rewrite Nat.mod_small by lia. reflexivity. }
+      rewrite <- Hencode.
+      symmetry. apply (proj2 (packed_first_diff_spec _ _ _)).
+      apply first_diff_characterization.
+      * rewrite !StringBits.bit_at_cons_character by lia. exact Hdiff.
+      * intros n Hn. destruct n as [|n].
+        -- reflexivity.
+        -- rewrite !StringBits.bit_at_cons_character by lia.
+           apply Hbefore. lia.
 Qed.
