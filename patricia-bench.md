@@ -22,6 +22,36 @@ allocation is the more dependable signal for those operations.
 These are measurements from one machine, not complexity proofs or regression
 thresholds.
 
+### Small-operation follow-up
+
+A later 10,000-binding run added checked mixed hit/miss membership and
+`elements` workloads after implementing direct `mem` traversal and
+accumulator-based traversal in both source models. A subsequent run added
+failed deletion after implementing identity-preserving `remove`. The fixed 61-word
+membership figure is benchmark overhead across 60,000 operations; unlike
+`get`, membership no longer allocates an `option` per hit. `elements`
+allocation is linear in its 10,000-pair result list and matches
+`Stdlib.Map.bindings` in this run. Each failed-deletion workload repeatedly
+uses one just-outside key, verifies the returned Patricia root with OCaml
+physical identity, and allocates only the fixed 26-word measurement overhead.
+
+| Key/workload | Patricia time | AVL time | Patricia allocation | AVL allocation |
+| --- | ---: | ---: | ---: | ---: |
+| Integer membership | 24.0 ns/op | 85.3 ns/op | 61 | 61 |
+| Integer `elements` | 3.8 ns/binding | 2.5 ns/binding | 60,026 | 60,026 |
+| 4-character membership | 63.1 ns/op | 79.8 ns/op | 61 | 61 |
+| 4-character `elements` | 2.9 ns/binding | 2.4 ns/binding | 60,026 | 60,026 |
+| Integer absent removal | 12.3 ns/op | 88.2 ns/op | 26 | 26 |
+| 4-character absent removal | 17.1 ns/op | 84.4 ns/op | 26 | 26 |
+
+The source-level `Some changed` signal adds an option block at each rebuilt
+level of a successful deletion. In the same run, removing every present key
+allocated 452,101 words for integer Patricia and 588,290 words for string
+Patricia, compared with 308,608 and 441,976 in the earlier table below. A
+future extraction refinement could use physical child identity as the native
+change signal, but this implementation deliberately does not widen the trusted
+extraction boundary for that tradeoff.
+
 ## Workloads and method
 
 The source is [`PatriciaBenchmark.ml`](PatriciaBenchmark.ml). It uses the
@@ -30,7 +60,9 @@ default `PATRICIA_BENCH_SIZE=10000`, so each input map has 10,000 bindings.
 - Integer keys are consecutive positive OCaml integers. String keys are
   fixed-width base-62 strings of lengths 3, 4, and 5.
 - Build, lookup (three complete passes), add fresh keys, update existing keys,
-  and remove all keys are timed independently.
+  remove one absent key repeatedly, and remove all keys are timed independently.
+- Membership alternates complete passes over present and disjoint absent keys;
+  `elements` is checked against the corresponding AVL bindings.
 - A disjoint left-biased union joins ranges `[1, n]` and `[n+1, 2n]`; the
   overlap workload joins `[1, n]` and `[n/2+1, 3n/2]`. Both use
   `union_left`; the expected binding counts are checked.
@@ -159,32 +191,33 @@ the packed-token implementation under the representation relation described in
 `patricia.md`. Adding another unproved extraction string would improve runtime
 but enlarge the existing trusted boundary.
 
-### 2. Make `elements` accumulator-based
+### 2. Accumulator-based `elements` completed
 
-Both tree modules currently compute:
+Both tree modules previously computed:
 
 ```coq
 elements left ++ elements right
 ```
 
-`++` copies the complete left result at every branch. The total work and list
-allocation are therefore proportional to the sum of left-subtree sizes over
-the tree, up to `O(n * height)` rather than `O(n)`. Replace it with an
-accumulator traversal such as `elements_aux tree tail`; the existing fold and
-elements proofs can be restated around the accumulator lemma. The current
-benchmark does not time `elements`, so add that workload before and after this
-change.
+`++` copied the complete left result at every branch. Both implementations now
+use `elements_aux tree tail`. `elements_aux_spec` recovers the append law used
+by the existing fold, soundness, completeness, and uniqueness proofs, and the
+benchmark checks the resulting bindings. The follow-up table above records
+linear output-list allocation at 10,000 bindings.
 
-### 3. Preserve identity for absent removal and no-op updates
+### 3. Absent-removal identity completed; no-op updates remain
 
-`remove` rebuilds every branch on the routed path even when the reached leaf
-has a different key. The benchmark removes only present keys and therefore
-does not reveal this cost. A worker returning `(tree, changed)` or native
-physical-identity checks can return the original root for an absent removal.
-Likewise, an optional `set_if_changed`/`update` API supplied with value equality
-can avoid rebuilding an existing binding whose value is unchanged. This is
-especially relevant to persistent compiler data-flow maps, where converged
-updates and failed deletions are common.
+Both maps now use `remove_changed`, where `None` reports an absent key and
+`Some tree` carries a real deletion. `remove_absent_identity` proves that a
+failed deletion returns the original source tree, while the existing lookup
+and well-formedness laws are retained. The native benchmark checks physical
+root identity and fixed allocation after 10,000 failed deletions.
+
+The benchmark already has a separate `update keys` case that replaces and
+checks every existing binding. An optional `set_if_changed`/`update` API
+supplied with value equality could additionally avoid rebuilding an existing
+binding whose value is unchanged. This remains relevant to persistent compiler
+data-flow maps, where converged updates are common.
 
 ### 4. Fuse generic-combine leaf cases
 
@@ -195,13 +228,12 @@ be fused in one traversal. This should reduce temporary allocation and one
 routing pass. Add a benchmark for generic combine with transformations and
 deletions; biased union no longer exercises this path.
 
-### 5. Add allocation-free membership and bulk construction APIs
+### 5. Allocation-free membership completed; bulk construction remains
 
 The lookup measurements allocate about two words per operation for both
-implementations because the result is an option. A direct `mem` traversal and,
-where suitable, a raising or callback-based find API can avoid that result
-allocation. The current `mem` delegates to `get`, so it does not obtain this
-benefit.
+implementations because the result is an option. Both `mem` implementations
+now traverse directly, and `mem_get` proves agreement with `get`; mixed
+present/absent benchmark passes allocate only fixed measurement overhead.
 
 Build uses repeated persistent `set` over already sorted ranges. A proved
 `of_sorted_array` or `of_sorted_list` builder could construct the Patricia
@@ -232,7 +264,8 @@ decision should add:
 - random insertion order, successful and unsuccessful lookups/removals,
   subset/no-op union, equal maps, sparse overlap, and adversarial long-prefix
   strings in addition to consecutive ranges;
-- separate `elements`, `mem`, generic `combine`, and bulk-build workloads;
+- separate generic-`combine` and bulk-build workloads (the benchmark now
+  includes `elements` and mixed hit/miss `mem`);
 - physical-sharing counters or retained-node checks, so low allocation is
   attributed to reused nodes rather than inferred only from GC totals;
 - a proof-aligned extraction backend beside the optimized backend, making

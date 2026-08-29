@@ -42,11 +42,22 @@ Proof.
   intros. simpl. apply Pos.eqb_neq in H. now rewrite H.
 Qed.
 
+Lemma mem_get:
+  forall (A : Type) k (m : t A),
+    mem k m = match get k m with Some _ => true | None => false end.
+Proof.
+  intros A k m. induction m as [|j value|p mask ltree IHl rtree IHr]; cbn.
+  - reflexivity.
+  - now destruct (Pos.eqb k j).
+  - destruct (matches_prefix k p mask); cbn; [|reflexivity].
+    now destruct (zero_bit k mask).
+Qed.
+
 Lemma mem_spec:
   forall (A : Type) k (m : t A),
     mem k m = true <-> exists v, get k m = Some v.
 Proof.
-  intros A k m. unfold mem. destruct (get k m) eqn:E; split; intros H.
+  intros A k m. rewrite mem_get. destruct (get k m) eqn:E; split; intros H.
   - now exists a.
   - reflexivity.
   - discriminate.
@@ -109,15 +120,40 @@ Proof.
       simpl; assumption || reflexivity.
 Qed.
 
+Lemma elements_aux_spec:
+  forall (A : Type) (m : t A) tail,
+    elements_aux m tail = elements m ++ tail.
+Proof.
+  intros A m. induction m as [|key value|p mask ltree IHl rtree IHr];
+    intros tail; cbn [elements].
+  - reflexivity.
+  - reflexivity.
+  - change (elements_aux ltree (elements_aux rtree tail) =
+      elements_aux ltree (elements_aux rtree []) ++ tail).
+    rewrite !IHl, !IHr.
+    now rewrite List.app_nil_r, List.app_assoc.
+Qed.
+
+Lemma elements_branch:
+  forall (A : Type) p mask (ltree rtree : t A),
+    elements (Branch p mask ltree rtree) = elements ltree ++ elements rtree.
+Proof.
+  intros. change (elements_aux ltree (elements_aux rtree []) =
+    elements ltree ++ elements rtree).
+  rewrite elements_aux_spec, elements_aux_spec.
+  now rewrite List.app_nil_r.
+Qed.
+
 Lemma fold_elements:
   forall (A B : Type) (f : B -> positive -> A -> B) (m : t A) acc,
     fold f m acc =
     List.fold_left (fun a kv => f a (fst kv) (snd kv)) (elements m) acc.
 Proof.
-  intros A B f m. induction m as [|k v|p mask l IHl r IHr]; intros acc; simpl.
+  intros A B f m. induction m as [|k v|p mask l IHl r IHr]; intros acc.
   - reflexivity.
   - reflexivity.
-  - rewrite List.fold_left_app. now rewrite <- IHl, <- IHr.
+  - cbn [fold]. rewrite elements_branch, List.fold_left_app.
+    now rewrite <- IHl, <- IHr.
 Qed.
 
 Lemma elements_sound:
@@ -125,11 +161,13 @@ Lemma elements_sound:
     get key m = Some value -> In (key, value) (elements m).
 Proof.
   intros A m. induction m as [|stored data|p mask l IHl r IHr];
-    intros key value Hget; cbn in *.
+    intros key value Hget.
   - discriminate.
-  - destruct (Pos.eqb key stored) eqn:E; inversion Hget; subst.
+  - cbn [get elements elements_aux] in *.
+    destruct (Pos.eqb key stored) eqn:E; inversion Hget; subst.
     apply Pos.eqb_eq in E. subst. now left.
-  - destruct (matches_prefix key p mask) eqn:P; try discriminate.
+  - cbn [get] in Hget. rewrite elements_branch.
+    destruct (matches_prefix key p mask) eqn:P; try discriminate.
     destruct (zero_bit key mask) eqn:Z.
     + apply in_or_app. left. now apply IHl.
     + apply in_or_app. right. now apply IHr.
@@ -142,11 +180,13 @@ Proof.
   intros A m Hwf.
   induction Hwf as
       [|stored data|p mask l r Hwl IHl Hwr IHr Hnel Hner Hall Har];
-    intros key value Hin; cbn in *.
-  - contradiction.
-  - destruct Hin as [Heq|[]]. inversion Heq; subst.
-    now rewrite Pos.eqb_refl.
-  - apply in_app_or in Hin. destruct Hin as [Hin|Hin].
+    intros key value Hin.
+  - cbn [elements elements_aux] in Hin. contradiction.
+  - cbn [elements elements_aux] in Hin.
+    destruct Hin as [Heq|[]]. inversion Heq; subst.
+    cbn [get]. now rewrite Pos.eqb_refl.
+  - rewrite elements_branch in Hin. cbn [get].
+    apply in_app_or in Hin. destruct Hin as [Hin|Hin].
     + pose proof (IHl _ _ Hin) as Hget.
       pose proof (Hall _ _ Hget) as [P Z].
       now rewrite P, Z.
@@ -171,10 +211,11 @@ Theorem elements_keys_nodup_wf:
 Proof.
   intros A m Hwf.
   induction Hwf as
-      [|stored data|p mask l r Hwl IHl Hwr IHr Hnel Hner Hall Har]; cbn.
-  - constructor.
-  - constructor; [intro H; inversion H|constructor].
-  - rewrite List.map_app. apply NoDup_app; auto.
+      [|stored data|p mask l r Hwl IHl Hwr IHr Hnel Hner Hall Har].
+  - cbn [elements elements_aux]. constructor.
+  - cbn [elements elements_aux].
+    constructor; [intro H; inversion H|constructor].
+  - rewrite elements_branch, List.map_app. apply NoDup_app; auto.
     intros key Hinl Hinr.
     apply in_map_iff in Hinl. destruct Hinl as [[kl vl] [Hkl Hinl]]. cbn in Hkl.
     apply in_map_iff in Hinr. destruct Hinr as [[kr vr] [Hkr Hinr]]. cbn in Hkr.
@@ -191,12 +232,15 @@ Lemma forallb_elements:
     forallb test m = true <->
     forall key value, In (key, value) (elements m) -> test key value = true.
 Proof.
-  intros A test m. induction m as [|key value|p mask l IHl r IHr]; cbn.
-  - split; intros; [contradiction|reflexivity].
+  intros A test m. induction m as [|key value|p mask l IHl r IHr].
+  - cbn [forallb elements elements_aux].
+    split; intros; [contradiction|reflexivity].
   - split.
-    + intros H k v [Heq|[]]. now inversion Heq; subst.
+    + cbn [forallb elements elements_aux].
+      intros H k v [Heq|[]]. now inversion Heq; subst.
     + intros H. exact (H key value (or_introl eq_refl)).
-  - rewrite Bool.andb_true_iff, IHl, IHr. split.
+  - cbn [forallb]. rewrite elements_branch, Bool.andb_true_iff, IHl, IHr.
+    split.
     + intros [Hl Hr] key value Hin. apply in_app_or in Hin.
       destruct Hin; auto.
     + intros H. split; intros key value Hin; apply H; apply in_or_app; auto.
@@ -835,11 +879,89 @@ Proof.
   - apply Hall with value. congruence.
 Qed.
 
-Theorem remove_correct_wf:
+Lemma nonempty_not_empty:
+  forall (A : Type) (m : t A), nonempty m -> m <> Empty.
+Proof.
+  intros A m [key [value Hget]] ->. discriminate.
+Qed.
+
+Lemma branch_unchanged:
+  forall (A : Type) p mask (l r : t A),
+    nonempty l -> nonempty r -> branch p mask l r = Branch p mask l r.
+Proof.
+  intros A p mask l r Hnl Hnr. unfold branch.
+  destruct l.
+  - exfalso. now apply (nonempty_not_empty Hnl).
+  - destruct r.
+    + exfalso. now apply (nonempty_not_empty Hnr).
+    + reflexivity.
+    + reflexivity.
+  - destruct r.
+    + exfalso. now apply (nonempty_not_empty Hnr).
+    + reflexivity.
+    + reflexivity.
+Qed.
+
+Lemma remove_reference_changed_wf:
   forall (A : Type) removed (m : t A), wf m ->
-    wf (remove removed m) /\
+    remove_reference removed m =
+      match remove_changed removed m with
+      | None => m
+      | Some changed => changed
+      end.
+Proof.
+  intros A removed m Hwf.
+  induction Hwf as
+      [|stored value|p mask l r Hwl IHl Hwr IHr Hnl Hnr Hall Har].
+  - reflexivity.
+  - cbn [remove_reference remove_changed].
+    now destruct (Pos.eqb removed stored).
+  - cbn [remove_reference remove_changed].
+    destruct (matches_prefix removed p mask) eqn:RP; [|reflexivity].
+    destruct (zero_bit removed mask) eqn:RZ.
+    + destruct (remove_changed removed l) as [changed|] eqn:E; cbn.
+      * now rewrite IHl.
+      * rewrite IHl. now apply branch_unchanged.
+    + destruct (remove_changed removed r) as [changed|] eqn:E; cbn.
+      * now rewrite IHr.
+      * rewrite IHr. now apply branch_unchanged.
+Qed.
+
+Lemma remove_eq_reference:
+  forall (A : Type) removed (m : t A), wf m ->
+    remove removed m = remove_reference removed m.
+Proof.
+  intros A removed m Hwf. unfold remove.
+  symmetry. now apply remove_reference_changed_wf.
+Qed.
+
+Lemma remove_changed_none_of_get_none:
+  forall (A : Type) removed (m : t A),
+    get removed m = None -> remove_changed removed m = None.
+Proof.
+  intros A removed m.
+  induction m as [|stored value|p mask l IHl r IHr]; intro Hget.
+  - reflexivity.
+  - cbn [get remove_changed] in *.
+    now destruct (Pos.eqb removed stored).
+  - cbn [get remove_changed] in *.
+    destruct (matches_prefix removed p mask); [|reflexivity].
+    destruct (zero_bit removed mask); [now rewrite IHl|now rewrite IHr].
+Qed.
+
+Theorem remove_absent_identity:
+  forall (A : Type) removed (m : t A),
+    get removed m = None -> remove removed m = m.
+Proof.
+  intros A removed m Hget. unfold remove.
+  now rewrite (remove_changed_none_of_get_none removed m Hget).
+Qed.
+
+Theorem remove_reference_correct_wf:
+  forall (A : Type) removed (m : t A), wf m ->
+    wf (remove_reference removed m) /\
     forall key,
-      get key (remove removed m) =
+      get key (remove_reference removed m) =
       if Pos.eqb key removed then None else get key m.
 Proof.
   intros A removed m Hwf.
@@ -847,8 +969,8 @@ Proof.
       [|stored value|p mask l r Hwl IHl Hwr IHr Hnl Hnr Hall Har].
   - split; [constructor|]. intros. cbn. destruct (Pos.eqb key removed); reflexivity.
   - split.
-    + cbn [remove]. destruct (Pos.eqb removed stored); constructor.
-    + intros key. cbn [remove]. destruct (Pos.eqb removed stored) eqn:RS.
+    + cbn [remove_reference]. destruct (Pos.eqb removed stored); constructor.
+    + intros key. cbn [remove_reference]. destruct (Pos.eqb removed stored) eqn:RS.
       * apply Pos.eqb_eq in RS. subst stored. cbn [get].
         destruct (Pos.eqb key removed) eqn:KR; auto.
       * cbn [get].
@@ -859,11 +981,11 @@ Proof.
     + destruct (zero_bit removed mask) eqn:RZ.
       * assert (Hall' : all_keys
           (fun k => matches_prefix k p mask = true /\ zero_bit k mask = true)
-          (remove removed l)).
+          (remove_reference removed l)).
         { eapply all_keys_after_remove; eauto. }
         split.
-        { cbn [remove]. rewrite RP, RZ. now apply branch_wf. }
-        intros key. cbn [remove]. rewrite RP, RZ.
+        { cbn [remove_reference]. rewrite RP, RZ. now apply branch_wf. }
+        intros key. cbn [remove_reference]. rewrite RP, RZ.
         rewrite get_branch by assumption.
         cbn [get].
         destruct (Pos.eqb key removed) eqn:KR.
@@ -873,11 +995,11 @@ Proof.
         rewrite Hgetl, KR. reflexivity.
       * assert (Har' : all_keys
           (fun k => matches_prefix k p mask = true /\ zero_bit k mask = false)
-          (remove removed r)).
+          (remove_reference removed r)).
         { eapply all_keys_after_remove; eauto. }
         split.
-        { cbn [remove]. rewrite RP, RZ. now apply branch_wf. }
-        intros key. cbn [remove]. rewrite RP, RZ.
+        { cbn [remove_reference]. rewrite RP, RZ. now apply branch_wf. }
+        intros key. cbn [remove_reference]. rewrite RP, RZ.
         rewrite get_branch by assumption.
         cbn [get].
         destruct (Pos.eqb key removed) eqn:KR.
@@ -885,10 +1007,22 @@ Proof.
         destruct (matches_prefix key p mask) eqn:KP; [destruct (zero_bit key mask) eqn:KZ|];
           cbn; rewrite ?KP, ?KZ; auto.
         rewrite Hgetr, KR. reflexivity.
-    + split; [cbn [remove]; rewrite RP; constructor; assumption|].
-      intros key. cbn [remove]. rewrite RP.
+    + split; [cbn [remove_reference]; rewrite RP; constructor; assumption|].
+      intros key. cbn [remove_reference]. rewrite RP.
       destruct (Pos.eqb key removed) eqn:KR; auto.
       apply Pos.eqb_eq in KR. subst key. cbn [get]. now rewrite RP.
+Qed.
+
+Theorem remove_correct_wf:
+  forall (A : Type) removed (m : t A), wf m ->
+    wf (remove removed m) /\
+    forall key,
+      get key (remove removed m) =
+      if Pos.eqb key removed then None else get key m.
+Proof.
+  intros A removed m Hwf.
+  rewrite remove_eq_reference by exact Hwf.
+  now apply remove_reference_correct_wf.
 Qed.
 
 Lemma replace_binding_correct_wf:

@@ -63,6 +63,10 @@ The extracted implementation now:
 - reads branch samples as constant-time representatives for trees produced by
   the public operations;
 - executes generic `combine` without computing or carrying runtime fuel;
+- traverses membership directly without allocating an intermediate `option`;
+- produces `elements` with a linear accumulator traversal;
+- propagates failed deletion as `None` and returns the original root without
+  rebuilding its routed path;
 - implements `agrees_before` through `first_diff`, which is correct on valid
   packed tokens but allocates during overlapping string unions; and
 - uses `String.unsafe_get` only after explicit common-length or byte-index
@@ -275,8 +279,9 @@ one-integer discriminator avoids that regression.
 ### Lookup and membership
 
 `get` executes one `bit_at query split` per visited branch, then one string
-equality at the reached leaf. `mem` merely interprets the result of `get` and
-does not add another traversal.
+equality at the reached leaf. `mem` now follows the same route directly and
+returns a Boolean at the leaf, avoiding the intermediate `option` allocated by
+successful `get` calls.
 
 The relevant costs are:
 
@@ -321,7 +326,9 @@ unwinds after discovering the first difference.
 
 ### Removal
 
-`remove` performs one routed traversal and reconstructs the path. The smart
+`remove_changed` performs one routed traversal and returns `None` when the key
+is absent, allowing public `remove` to return the original root. A successful
+deletion propagates `Some changed` while reconstructing the path. The smart
 `branch` collapses a node if either child becomes empty. When both children are
 non-empty, the string implementation calls `representative ltree` to select a
 new sample. `representative` descends toward a leaf rather than using the

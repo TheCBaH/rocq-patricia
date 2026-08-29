@@ -20,11 +20,22 @@ Proof.
   intros. cbn [get singleton]. apply String.eqb_neq in H. now rewrite H.
 Qed.
 
+Lemma mem_get:
+  forall (A : Type) key (m : t A),
+    mem key m = match get key m with Some _ => true | None => false end.
+Proof.
+  intros A key m.
+  induction m as [|stored value|sample split ltree IHl rtree IHr]; cbn.
+  - reflexivity.
+  - now destruct (String.eqb key stored).
+  - now destruct (bit_at key split).
+Qed.
+
 Lemma mem_spec:
   forall (A : Type) key (m : t A),
     mem key m = true <-> exists value, get key m = Some value.
 Proof.
-  intros A key m. unfold mem. destruct (get key m) eqn:E; split; intros H.
+  intros A key m. rewrite mem_get. destruct (get key m) eqn:E; split; intros H.
   - now exists a.
   - split; intros; reflexivity.
   - discriminate.
@@ -52,16 +63,43 @@ Proof.
   - destruct (bit_at key split); assumption.
 Qed.
 
+Lemma elements_aux_spec:
+  forall (A : Type) (m : t A) tail,
+    elements_aux m tail = elements m ++ tail.
+Proof.
+  intros A m.
+  induction m as [|key value|sample split ltree IHl rtree IHr];
+    intros tail; cbn [elements].
+  - reflexivity.
+  - reflexivity.
+  - change (elements_aux ltree (elements_aux rtree tail) =
+      elements_aux ltree (elements_aux rtree []) ++ tail).
+    rewrite !IHl, !IHr.
+    now rewrite List.app_nil_r, List.app_assoc.
+Qed.
+
+Lemma elements_branch:
+  forall (A : Type) sample split (ltree rtree : t A),
+    elements (Branch sample split ltree rtree) =
+      elements ltree ++ elements rtree.
+Proof.
+  intros. change (elements_aux ltree (elements_aux rtree []) =
+    elements ltree ++ elements rtree).
+  rewrite elements_aux_spec, elements_aux_spec.
+  now rewrite List.app_nil_r.
+Qed.
+
 Lemma fold_elements:
   forall (A B : Type) (f : B -> string -> A -> B) (m : t A) acc,
     fold f m acc =
     List.fold_left (fun state kv => f state (fst kv) (snd kv)) (elements m) acc.
 Proof.
   intros A B f m. induction m as [|key value|sample split ltree IHl rtree IHr];
-    intros acc; cbn.
+    intros acc.
   - reflexivity.
   - reflexivity.
-  - rewrite List.fold_left_app. now rewrite <- IHl, <- IHr.
+  - cbn [fold]. rewrite elements_branch, List.fold_left_app.
+    now rewrite <- IHl, <- IHr.
 Qed.
 
 (** A well-formed branch separates all keys in its left and right subtrees at
@@ -121,12 +159,14 @@ Lemma all_keys_elements:
   forall (A : Type) (P : string -> Prop) (m : t A),
     all_keys P m <-> forall key value, In (key, value) (elements m) -> P key.
 Proof.
-  intros A P m. induction m as [|key value|sample split ltree IHl rtree IHr]; cbn.
-  - split; intros; [contradiction|exact I].
+  intros A P m. induction m as [|key value|sample split ltree IHl rtree IHr].
+  - cbn [all_keys elements elements_aux].
+    split; intros; [contradiction|exact I].
   - split.
-    + intros H k v [E|Hnone]; [inversion E; subst; assumption|contradiction].
+    + cbn [all_keys elements elements_aux].
+      intros H k v [E|Hnone]; [inversion E; subst; assumption|contradiction].
     + intros H. apply (H key value). now left.
-  - split.
+  - cbn [all_keys]. rewrite elements_branch. split.
     + intros [Hl Hr] key value Hin. apply in_app_iff in Hin.
       destruct Hin as [Hin|Hin].
       * apply (proj1 IHl Hl key value Hin).
@@ -143,10 +183,12 @@ Lemma representative_elements:
     representative m = Some key -> exists value, In (key, value) (elements m).
 Proof.
   intros A m. induction m as [|stored value|sample split ltree IHl rtree IHr];
-    intros key H; cbn in *.
+    intros key H.
   - discriminate.
-  - inversion H; subst. eauto.
-  - destruct (representative ltree) eqn:El.
+  - cbn [representative] in H. inversion H; subst.
+    exists value. cbn [elements elements_aux]. now left.
+  - cbn [representative] in H. rewrite elements_branch.
+    destruct (representative ltree) eqn:El.
     + inversion H; subst. destruct (IHl _ eq_refl) as [value Hin].
       exists value. apply in_or_app. now left.
     + destruct (IHr _ H) as [value Hin].
@@ -157,10 +199,11 @@ Lemma representative_none_elements:
   forall (A : Type) (m : t A),
     representative m = None <-> elements m = [].
 Proof.
-  intros A m. induction m as [|key value|sample split ltree IHl rtree IHr]; cbn.
-  - split; intros; reflexivity.
-  - split; discriminate.
-  - destruct (representative ltree) eqn:El.
+  intros A m. induction m as [|key value|sample split ltree IHl rtree IHr].
+  - cbn [representative elements elements_aux]. split; intros; reflexivity.
+  - cbn [representative elements elements_aux]. split; discriminate.
+  - cbn [representative]. rewrite elements_branch.
+    destruct (representative ltree) eqn:El.
     + split; [discriminate|]. intros H.
       apply app_eq_nil in H. destruct H as [Hl _].
       apply representative_elements in El. destruct El as [value Hin].
@@ -175,11 +218,13 @@ Lemma get_elements_sound:
     get key m = Some value -> In (key, value) (elements m).
 Proof.
   intros A m. induction m as [|stored stored_value|sample split ltree IHl rtree IHr];
-    intros key value H; cbn in *.
+    intros key value H.
   - discriminate.
-  - destruct (String.eqb key stored) eqn:E; [|discriminate].
+  - cbn [get elements elements_aux] in *.
+    destruct (String.eqb key stored) eqn:E; [|discriminate].
     apply String.eqb_eq in E. inversion H. subst. now left.
-  - destruct (bit_at key split) eqn:E.
+  - cbn [get] in H. rewrite elements_branch.
+    destruct (bit_at key split) eqn:E.
     + apply in_or_app. right. eapply IHr. exact H.
     + apply in_or_app. left. eapply IHl. exact H.
 Qed.
@@ -191,11 +236,13 @@ Lemma wf_elements_complete:
 Proof.
   intros A m Hwf. induction Hwf as
       [|stored stored_value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr]; intros key value Hin; cbn in *.
-  - contradiction.
-  - destruct Hin as [E|Hnone]; [|contradiction]. inversion E; subst.
-    now rewrite String.eqb_refl.
-  - apply in_app_iff in Hin. destruct Hin as [Hin|Hin].
+       Hnel Hner Hl Hr]; intros key value Hin.
+  - cbn [elements elements_aux] in Hin. contradiction.
+  - cbn [elements elements_aux] in Hin.
+    destruct Hin as [E|Hnone]; [|contradiction]. inversion E; subst.
+    cbn [get]. now rewrite String.eqb_refl.
+  - rewrite elements_branch in Hin. cbn [get].
+    apply in_app_iff in Hin. destruct Hin as [Hin|Hin].
     + pose proof (proj1 (all_keys_elements _ _ _) Hl key value Hin) as [_ Hbit].
       rewrite Hbit. now apply IHl.
     + pose proof (proj1 (all_keys_elements _ _ _) Hr key value Hin) as [_ Hbit].
@@ -218,10 +265,12 @@ Lemma routed_key_elements:
     exists value, In (stored, value) (elements m).
 Proof.
   intros A m. induction m as [|key value|sample split ltree IHl rtree IHr];
-    intros probe stored H; cbn in *.
+    intros probe stored H.
   - discriminate.
-  - inversion H; subst. eauto.
-  - destruct (bit_at probe split).
+  - cbn [routed_key] in H. inversion H; subst.
+    exists value. cbn [elements elements_aux]. now left.
+  - cbn [routed_key] in H. rewrite elements_branch.
+    destruct (bit_at probe split).
     + destruct (IHr _ _ H) as [value Hin]. exists value.
       apply in_or_app. now right.
     + destruct (IHl _ _ H) as [value Hin]. exists value.
@@ -244,10 +293,11 @@ Lemma wf_elements_keys_nodup:
 Proof.
   intros A m Hwf. induction Hwf as
       [|key value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr]; cbn.
-  - constructor.
-  - constructor; [intro H; inversion H|constructor].
-  - rewrite List.map_app. apply NoDup_app.
+       Hnel Hner Hl Hr].
+  - cbn [elements elements_aux]. constructor.
+  - cbn [elements elements_aux].
+    constructor; [intro H; inversion H|constructor].
+  - rewrite elements_branch, List.map_app. apply NoDup_app.
     + exact IHl.
     + exact IHr.
     + intros key Hleft Hright.
@@ -489,17 +539,86 @@ Proof.
     + exfalso. apply Hnel. reflexivity.
 Qed.
 
-Lemma all_keys_remove:
+Lemma remove_changed_some_reference:
+  forall (A : Type) key (m changed : t A),
+    remove_changed key m = Some changed ->
+    remove_reference key m = changed.
+Proof.
+  intros A key m.
+  induction m as [|stored value|sample split ltree IHl rtree IHr];
+    intros changed Hchanged.
+  - discriminate.
+  - cbn [remove_changed remove_reference] in *.
+    destruct (String.eqb key stored); inversion Hchanged. reflexivity.
+  - cbn [remove_changed remove_reference] in *.
+    destruct (bit_at key split).
+    + destruct (remove_changed key rtree) as [rtree'|] eqn:E;
+        inversion Hchanged; subst.
+      now rewrite (IHr rtree' eq_refl).
+    + destruct (remove_changed key ltree) as [ltree'|] eqn:E;
+        inversion Hchanged; subst.
+      now rewrite (IHl ltree' eq_refl).
+Qed.
+
+Lemma remove_changed_none_get:
+  forall (A : Type) key (m : t A),
+    remove_changed key m = None -> get key m = None.
+Proof.
+  intros A key m.
+  induction m as [|stored value|sample split ltree IHl rtree IHr]; intro Hchanged.
+  - reflexivity.
+  - cbn [remove_changed get] in *.
+    now destruct (String.eqb key stored).
+  - cbn [remove_changed get] in *.
+    destruct (bit_at key split).
+    + destruct (remove_changed key rtree) eqn:E; [discriminate|].
+      now apply IHr.
+    + destruct (remove_changed key ltree) eqn:E; [discriminate|].
+      now apply IHl.
+Qed.
+
+Lemma remove_changed_none_of_get_none:
+  forall (A : Type) key (m : t A),
+    get key m = None -> remove_changed key m = None.
+Proof.
+  intros A key m.
+  induction m as [|stored value|sample split ltree IHl rtree IHr]; intro Hget.
+  - reflexivity.
+  - cbn [get remove_changed] in *.
+    now destruct (String.eqb key stored).
+  - cbn [get remove_changed] in *.
+    destruct (bit_at key split); [now rewrite IHr|now rewrite IHl].
+Qed.
+
+Theorem remove_absent_identity:
+  forall (A : Type) key (m : t A),
+    get key m = None -> remove key m = m.
+Proof.
+  intros A key m Hget. unfold remove.
+  now rewrite (@remove_changed_none_of_get_none A key m Hget).
+Qed.
+
+Lemma all_keys_remove_reference:
   forall (A : Type) (P : string -> Prop) (m : t A) key,
-    all_keys P m -> all_keys P (remove key m).
+    all_keys P m -> all_keys P (remove_reference key m).
 Proof.
   intros A P m. induction m as [|stored value|sample split ltree IHl rtree IHr];
-    intros key Hall; cbn [remove] in *.
+    intros key Hall; cbn [remove_reference] in *.
   - exact I.
   - destruct (String.eqb key stored); cbn; [exact I|exact Hall].
   - destruct Hall as [Hl Hr]. destruct (bit_at key split).
     + apply all_keys_branch; [exact Hl|now apply IHr].
     + apply all_keys_branch; [now apply IHl|exact Hr].
+Qed.
+
+Lemma all_keys_remove:
+  forall (A : Type) (P : string -> Prop) (m : t A) key,
+    all_keys P m -> all_keys P (remove key m).
+Proof.
+  intros A P m key Hall. unfold remove.
+  destruct (remove_changed key m) as [changed|] eqn:E; [|exact Hall].
+  rewrite <- (@remove_changed_some_reference A key m changed E).
+  now apply all_keys_remove_reference.
 Qed.
 
 Lemma wf_representative_none:
@@ -535,12 +654,12 @@ Proof.
     unfold branch. exact Hwr.
 Qed.
 
-Theorem remove_wf:
-  forall (A : Type) key (m : t A), wf m -> wf (remove key m).
+Theorem remove_reference_wf:
+  forall (A : Type) key (m : t A), wf m -> wf (remove_reference key m).
 Proof.
   intros A key m Hwf. induction Hwf as
       [|stored value|sample split ltree rtree Hwl IHl Hwr IHr
-       Hnel Hner Hl Hr]; cbn [remove].
+       Hnel Hner Hl Hr]; cbn [remove_reference].
   - constructor.
   - destruct (String.eqb key stored); constructor.
   - destruct (bit_at key split).
@@ -548,25 +667,34 @@ Proof.
       * exact Hwl.
       * exact IHr.
       * exact Hl.
-      * now apply all_keys_remove.
+      * now apply all_keys_remove_reference.
     + apply branch_wf_general.
       * exact IHl.
       * exact Hwr.
-      * now apply all_keys_remove.
+      * now apply all_keys_remove_reference.
       * exact Hr.
 Qed.
 
-Theorem get_remove:
+Theorem remove_wf:
+  forall (A : Type) key (m : t A), wf m -> wf (remove key m).
+Proof.
+  intros A key m Hwf. unfold remove.
+  destruct (remove_changed key m) as [changed|] eqn:E; [|exact Hwf].
+  rewrite <- (@remove_changed_some_reference A key m changed E).
+  now apply remove_reference_wf.
+Qed.
+
+Theorem get_remove_reference:
   forall (A : Type) key query (m : t A),
     wf m ->
-    get query (remove key m) =
+    get query (remove_reference key m) =
       if String.eqb query key then None else get query m.
 Proof.
   intros A key query m Hwf. induction Hwf as
       [|stored value|sample split ltree rtree Hwl IHl Hwr IHr
        Hnel Hner Hl Hr].
   - cbn. destruct (String.eqb query key); reflexivity.
-  - cbn [remove get]. destruct (String.string_dec query key) as [->|Hqk].
+  - cbn [remove_reference get]. destruct (String.string_dec query key) as [->|Hqk].
     + rewrite String.eqb_refl. destruct (String.eqb key stored) eqn:Eks;
         cbn [get]; rewrite ?Eks; reflexivity.
     + assert (Eqk : String.eqb query key = false) by
@@ -577,13 +705,13 @@ Proof.
           (apply String.eqb_neq; exact Hqk).
         now rewrite Eqs.
       * reflexivity.
-  - cbn [remove].
+  - cbn [remove_reference].
     assert (Hlbit : all_keys (fun stored => bit_at stored split = false) ltree).
     { eapply all_keys_impl; [exact Hl|]. intros stored H. exact (proj2 H). }
     assert (Hrbit : all_keys (fun stored => bit_at stored split = true) rtree).
     { eapply all_keys_impl; [exact Hr|]. intros stored H. exact (proj2 H). }
     destruct (bit_at key split) eqn:Ekey.
-    + rewrite (get_branch A sample split ltree (remove key rtree) query).
+    + rewrite (get_branch A sample split ltree (remove_reference key rtree) query).
       * destruct (bit_at query split) eqn:Equery.
         -- rewrite IHr. cbn [get]. now rewrite Equery.
         -- assert (Hneq : query <> key).
@@ -592,8 +720,8 @@ Proof.
              (apply String.eqb_neq; exact Hneq).
            cbn [get]. now rewrite Equery, Eneq.
       * exact Hlbit.
-      * now apply all_keys_remove.
-    + rewrite (get_branch A sample split (remove key ltree) rtree query).
+      * now apply all_keys_remove_reference.
+    + rewrite (get_branch A sample split (remove_reference key ltree) rtree query).
       * destruct (bit_at query split) eqn:Equery.
         -- assert (Hneq : query <> key).
            { intros ->. rewrite Ekey in Equery. discriminate. }
@@ -601,8 +729,23 @@ Proof.
              (apply String.eqb_neq; exact Hneq).
            cbn [get]. now rewrite Equery, Eneq.
         -- rewrite IHl. cbn [get]. now rewrite Equery.
-      * now apply all_keys_remove.
+      * now apply all_keys_remove_reference.
       * exact Hrbit.
+Qed.
+
+Theorem get_remove:
+  forall (A : Type) key query (m : t A),
+    wf m ->
+    get query (remove key m) =
+      if String.eqb query key then None else get query m.
+Proof.
+  intros A key query m Hwf. unfold remove.
+  destruct (remove_changed key m) as [changed|] eqn:E.
+  - rewrite <- (@remove_changed_some_reference A key m changed E).
+    now apply get_remove_reference.
+  - pose proof (@remove_changed_none_get A key m E) as Hnone.
+    destruct (String.eqb query key) eqn:Equery; [|reflexivity].
+    apply String.eqb_eq in Equery. now subst query.
 Qed.
 
 Corollary get_remove_same:

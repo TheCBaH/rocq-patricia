@@ -41,8 +41,13 @@ Fixpoint get {A : Type} (key : string) (m : t A) : option A :=
       if bit_at key split then get key rtree else get key ltree
   end.
 
-Definition mem {A : Type} (key : string) (m : t A) : bool :=
-  match get key m with Some _ => true | None => false end.
+Fixpoint mem {A : Type} (key : string) (m : t A) : bool :=
+  match m with
+  | Empty => false
+  | Leaf stored _ => String.eqb key stored
+  | Branch _ split ltree rtree =>
+      if bit_at key split then mem key rtree else mem key ltree
+  end.
 
 Definition branch {A : Type}
     (sample : string) (split : nat) (ltree rtree : t A) : t A :=
@@ -114,14 +119,41 @@ Definition set {A : Type} (key : string) (value : A) (m : t A) : t A :=
       end
   end.
 
-Fixpoint remove {A : Type} (key : string) (m : t A) : t A :=
+(* This structural version is kept as a simple proof reference.  The public
+   deletion below uses [None] to propagate an unchanged result without
+   rebuilding the routed path. *)
+Fixpoint remove_reference {A : Type} (key : string) (m : t A) : t A :=
   match m with
   | Empty => Empty
   | Leaf stored _ => if String.eqb key stored then Empty else m
   | Branch sample split ltree rtree =>
       if bit_at key split
-      then branch sample split ltree (remove key rtree)
-      else branch sample split (remove key ltree) rtree
+      then branch sample split ltree (remove_reference key rtree)
+      else branch sample split (remove_reference key ltree) rtree
+  end.
+
+Fixpoint remove_changed {A : Type} (key : string) (m : t A)
+    : option (t A) :=
+  match m with
+  | Empty => None
+  | Leaf stored _ => if String.eqb key stored then Some Empty else None
+  | Branch sample split ltree rtree =>
+      if bit_at key split then
+        match remove_changed key rtree with
+        | None => None
+        | Some rtree' => Some (branch sample split ltree rtree')
+        end
+      else
+        match remove_changed key ltree with
+        | None => None
+        | Some ltree' => Some (branch sample split ltree' rtree)
+        end
+  end.
+
+Definition remove {A : Type} (key : string) (m : t A) : t A :=
+  match remove_changed key m with
+  | None => m
+  | Some changed => changed
   end.
 
 Fixpoint map {A B : Type} (f : string -> A -> B) (m : t A) : t B :=
@@ -211,12 +243,16 @@ Definition union_left {A : Type} (a b : t A) : t A :=
 Definition union_right {A : Type} (a b : t A) : t A :=
   combine (fun x y => match y with Some _ => y | None => x end) a b.
 
-Fixpoint elements {A : Type} (m : t A) : list (string * A) :=
+Fixpoint elements_aux {A : Type}
+    (m : t A) (tail : list (string * A)) : list (string * A) :=
   match m with
-  | Empty => []
-  | Leaf key value => [(key, value)]
-  | Branch _ _ ltree rtree => elements ltree ++ elements rtree
+  | Empty => tail
+  | Leaf key value => (key, value) :: tail
+  | Branch _ _ ltree rtree => elements_aux ltree (elements_aux rtree tail)
   end.
+
+Definition elements {A : Type} (m : t A) : list (string * A) :=
+  elements_aux m [].
 
 Fixpoint fold {A B : Type}
     (f : B -> string -> A -> B) (m : t A) (acc : B) : B :=

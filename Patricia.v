@@ -37,8 +37,15 @@ Fixpoint get {A : Type} (k : positive) (m : t A) : option A :=
       else None
   end.
 
-Definition mem {A : Type} (k : positive) (m : t A) : bool :=
-  match get k m with Some _ => true | None => false end.
+Fixpoint mem {A : Type} (k : positive) (m : t A) : bool :=
+  match m with
+  | Empty => false
+  | Leaf j _ => Pos.eqb k j
+  | Branch p mask l r =>
+      if matches_prefix k p mask then
+        if zero_bit k mask then mem k l else mem k r
+      else false
+  end.
 
 Fixpoint representative {A : Type} (m : t A) : option positive :=
   match m with
@@ -89,16 +96,45 @@ Fixpoint set {A : Type} (k : positive) (v : A) (m : t A) : t A :=
       else join (Leaf k v) old
   end.
 
-Fixpoint remove {A : Type} (k : positive) (m : t A) : t A :=
+(* This structural version is kept as a simple proof reference.  The public
+   deletion below uses [None] to propagate an unchanged result without
+   rebuilding the routed path. *)
+Fixpoint remove_reference {A : Type} (k : positive) (m : t A) : t A :=
   match m with
   | Empty => Empty
   | Leaf j _ => if Pos.eqb k j then Empty else m
   | Branch p mask l r =>
       if matches_prefix k p mask then
         if zero_bit k mask
-        then branch p mask (remove k l) r
-        else branch p mask l (remove k r)
+        then branch p mask (remove_reference k l) r
+        else branch p mask l (remove_reference k r)
       else m
+  end.
+
+Fixpoint remove_changed {A : Type} (k : positive) (m : t A)
+    : option (t A) :=
+  match m with
+  | Empty => None
+  | Leaf j _ => if Pos.eqb k j then Some Empty else None
+  | Branch p mask l r =>
+      if matches_prefix k p mask then
+        if zero_bit k mask then
+          match remove_changed k l with
+          | None => None
+          | Some l' => Some (branch p mask l' r)
+          end
+        else
+          match remove_changed k r with
+          | None => None
+          | Some r' => Some (branch p mask l r')
+          end
+      else None
+  end.
+
+Definition remove {A : Type} (k : positive) (m : t A) : t A :=
+  match remove_changed k m with
+  | None => m
+  | Some changed => changed
   end.
 
 Fixpoint map {A B : Type} (f : positive -> A -> B) (m : t A) : t B :=
@@ -200,12 +236,16 @@ Definition union_left {A : Type} (a b : t A) : t A :=
 Definition union_right {A : Type} (a b : t A) : t A :=
   combine (fun x y => match y with Some _ => y | None => x end) a b.
 
-Fixpoint elements {A : Type} (m : t A) : list (positive * A) :=
+Fixpoint elements_aux {A : Type}
+    (m : t A) (tail : list (positive * A)) : list (positive * A) :=
   match m with
-  | Empty => []
-  | Leaf k v => [(k, v)]
-  | Branch _ _ l r => elements l ++ elements r
+  | Empty => tail
+  | Leaf k v => (k, v) :: tail
+  | Branch _ _ l r => elements_aux l (elements_aux r tail)
   end.
+
+Definition elements {A : Type} (m : t A) : list (positive * A) :=
+  elements_aux m [].
 
 Fixpoint fold {A B : Type}
     (f : B -> positive -> A -> B) (m : t A) (acc : B) : B :=
@@ -228,4 +268,3 @@ Definition beq {A : Type} (eqA : A -> A -> bool) (a b : t A) : bool :=
     (fun k v => match get k b with Some w => eqA v w | None => false end) a
   && forallb
     (fun k v => match get k a with Some w => eqA w v | None => false end) b.
-

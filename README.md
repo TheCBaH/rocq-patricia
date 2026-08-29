@@ -22,8 +22,10 @@ make -C patricia benchmark
 ```
 
 The comparison verifies each measured Patricia result against `Stdlib.Map` and
-reports build, lookup, add, update, and remove time, retained heap words per
-binding, and allocated words.  It also reports allocation and time for
+reports build, lookup, membership, traversal (`elements`), add, update, and
+present/absent remove time, retained heap words per binding, and allocated
+words. Failed Patricia deletions additionally check physical root identity. It also
+reports allocation and time for
 left-biased unions with disjoint and half-overlapping inputs.  Integer keys and
 independent 3-, 4-, and 5-character ASCII-alphanumeric string key sets are
 measured separately.
@@ -53,7 +55,8 @@ The positive-key proof file currently establishes, without axioms:
 - representative soundness and lookup/`wf` correctness for compatible and
   disjoint `join` operations;
 - simultaneous lookup correctness and `wf` preservation by `set`;
-- general `remove` lookup correctness and `wf` preservation;
+- general `remove` lookup correctness, `wf` preservation, and structural
+  identity when the removed key is absent;
 - lookup correctness and `wf` preservation by `map_filter`, `map_left`, and
   `map_right`;
 - `fold` agreement with `elements`;
@@ -81,8 +84,8 @@ The direct-string proof files currently establish, without axioms:
 - representative and routed-leaf soundness;
 - two-way agreement between `get` and `elements` on well-formed trees,
   completeness of lookup, unique element keys, and unique bindings;
-- the general lookup specification for `remove`, plus the corresponding
-  `elements` filtering specification;
+- the general lookup specification for `remove`, structural identity for an
+  absent key, plus the corresponding `elements` filtering specification;
 - the unconditional `set` lookup law and well-formedness preservation,
   including fresh and existing keys;
 - `fold` agreement with `elements`, the key-aware `map` lookup law, and

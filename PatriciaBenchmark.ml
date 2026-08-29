@@ -216,6 +216,82 @@ let time_string_lookups keys patricia avl =
   report_operation "lookup" patricia_measurement avl_measurement
     (benchmark_size * lookup_repetitions)
 
+let time_int_membership present absent patricia avl =
+  let run mem map =
+    let present_count = ref 0 in
+    for _ = 1 to lookup_repetitions do
+      Array.iter
+        (fun key ->
+           if mem key map then incr present_count
+           else failwith "integer membership missed a present key")
+        present;
+      Array.iter
+        (fun key ->
+           if mem key map then failwith "integer membership found an absent key")
+        absent
+    done;
+    !present_count
+  in
+  let patricia_result, patricia_measurement =
+    measure_operation (fun () -> run Patricia.mem patricia)
+  in
+  let avl_result, avl_measurement =
+    measure_operation (fun () -> run Int_avl.mem avl)
+  in
+  if patricia_result <> avl_result then
+    failwith "integer membership counts differ";
+  report_operation "membership" patricia_measurement avl_measurement
+    (2 * benchmark_size * lookup_repetitions)
+
+let time_string_membership present absent patricia avl =
+  let run mem map =
+    let present_count = ref 0 in
+    for _ = 1 to lookup_repetitions do
+      Array.iter
+        (fun key ->
+           if mem key map then incr present_count
+           else failwith "string membership missed a present key")
+        present;
+      Array.iter
+        (fun key ->
+           if mem key map then failwith "string membership found an absent key")
+        absent
+    done;
+    !present_count
+  in
+  let patricia_result, patricia_measurement =
+    measure_operation (fun () -> run StringPatricia.mem patricia)
+  in
+  let avl_result, avl_measurement =
+    measure_operation (fun () -> run String_avl.mem avl)
+  in
+  if patricia_result <> avl_result then
+    failwith "string membership counts differ";
+  report_operation "membership" patricia_measurement avl_measurement
+    (2 * benchmark_size * lookup_repetitions)
+
+let time_int_elements patricia avl =
+  let patricia_bindings, patricia_measurement =
+    measure_operation (fun () -> Patricia.elements patricia)
+  in
+  let avl_bindings, avl_measurement =
+    measure_operation (fun () -> Int_avl.bindings avl)
+  in
+  if patricia_bindings <> avl_bindings then
+    failwith "integer elements differ from Stdlib.Map bindings";
+  report_operation "elements" patricia_measurement avl_measurement benchmark_size
+
+let time_string_elements patricia avl =
+  let patricia_bindings, patricia_measurement =
+    measure_operation (fun () -> StringPatricia.elements patricia)
+  in
+  let avl_bindings, avl_measurement =
+    measure_operation (fun () -> String_avl.bindings avl)
+  in
+  if List.sort Stdlib.compare patricia_bindings <> avl_bindings then
+    failwith "string elements differ from Stdlib.Map bindings";
+  report_operation "elements" patricia_measurement avl_measurement benchmark_size
+
 let time_int_mutations keys fresh_keys patricia avl =
   let all_keys = Array.append keys fresh_keys in
   let patricia_added, patricia_add =
@@ -255,6 +331,24 @@ let time_int_mutations keys fresh_keys patricia avl =
          failwith "integer update did not replace the binding")
     keys;
   report_operation "update keys" patricia_update avl_update benchmark_size;
+  let absent_keys = Array.make benchmark_size fresh_keys.(0) in
+  let patricia_unchanged, patricia_remove_absent =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key -> Patricia.remove key map)
+          patricia absent_keys)
+  in
+  let avl_unchanged, avl_remove_absent =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key -> Int_avl.remove key map)
+          avl absent_keys)
+  in
+  if patricia_unchanged != patricia then
+    failwith "absent integer removal did not preserve Patricia root identity";
+  check_int_equivalent keys patricia_unchanged avl_unchanged;
+  report_operation "remove absent" patricia_remove_absent avl_remove_absent
+    benchmark_size;
   let patricia_removed, patricia_remove =
     measure_operation (fun () ->
         Array.fold_left (fun map key -> Patricia.remove key map) patricia keys)
@@ -313,6 +407,24 @@ let time_string_mutations keys fresh_keys patricia avl =
          failwith "string update did not replace the binding")
     keys;
   report_operation "update keys" patricia_update avl_update benchmark_size;
+  let absent_keys = Array.make benchmark_size fresh_keys.(0) in
+  let patricia_unchanged, patricia_remove_absent =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key -> StringPatricia.remove key map)
+          patricia absent_keys)
+  in
+  let avl_unchanged, avl_remove_absent =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key -> String_avl.remove key map)
+          avl absent_keys)
+  in
+  if patricia_unchanged != patricia then
+    failwith "absent string removal did not preserve Patricia root identity";
+  check_string_equivalent keys patricia_unchanged avl_unchanged;
+  report_operation "remove absent" patricia_remove_absent avl_remove_absent
+    benchmark_size;
   let patricia_removed, patricia_remove =
     measure_operation (fun () ->
         Array.fold_left (fun map key -> StringPatricia.remove key map) patricia keys)
@@ -347,6 +459,8 @@ let benchmark_int () =
   check_int_equivalent left_keys patricia_left avl_left;
   report_build "Integer keys" patricia_build avl_build;
   time_int_lookups left_keys patricia_left avl_left;
+  time_int_membership left_keys disjoint_keys patricia_left avl_left;
+  time_int_elements patricia_left avl_left;
   time_int_mutations left_keys disjoint_keys patricia_left avl_left;
   let patricia_disjoint = build_patricia_int disjoint_keys in
   let avl_disjoint = build_avl_int disjoint_keys in
@@ -409,6 +523,8 @@ let benchmark_strings length =
   check_string_equivalent left_keys patricia_left avl_left;
   report_build (Printf.sprintf "String keys (%d characters)" length) patricia_build avl_build;
   time_string_lookups left_keys patricia_left avl_left;
+  time_string_membership left_keys disjoint_keys patricia_left avl_left;
+  time_string_elements patricia_left avl_left;
   time_string_mutations left_keys disjoint_keys patricia_left avl_left;
   let patricia_disjoint = build_patricia_string disjoint_keys in
   let avl_disjoint = build_avl_string disjoint_keys in
