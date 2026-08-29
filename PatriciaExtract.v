@@ -25,6 +25,104 @@ Extract Constant PatriciaBits.highest_differing_bit =>
      in log2 (left lxor right) 0)".
 Extract Constant PatriciaBits.mask_above => "(fun high low -> low < high)".
 
+(** The proof-side fuel establishes totality of [combine_fuel], but a native
+    merge can recurse directly: every recursive call consumes a branch from at
+    least one input.  Keeping the fuel calculation out of the extracted hot
+    path is important for disjoint maps, where walking both whole trees just
+    to derive a bound would otherwise dominate the actual join. *)
+Extract Constant Patricia.combine =>
+  "(fun combine_values first second ->
+     let rec merge left right =
+       match left, right with
+       | Empty, tree -> map_right combine_values tree
+       | tree, Empty -> map_left combine_values tree
+       | Leaf (key, value), tree ->
+           replace_binding key
+             (combine_values (Some value) (get key tree))
+             (map_right combine_values tree)
+       | tree, Leaf (key, value) ->
+           replace_binding key
+             (combine_values (get key tree) (Some value))
+             (map_left combine_values tree)
+       | Branch (prefix_left, mask_left, left_left, right_left),
+         Branch (prefix_right, mask_right, left_right, right_right) ->
+           if mask_left = mask_right && prefix_left = prefix_right then
+             branch prefix_left mask_left
+               (merge left_left left_right) (merge right_left right_right)
+           else if mask_above mask_left mask_right then
+             match representative right with
+             | Some key when matches_prefix key prefix_left mask_left ->
+                 if zero_bit key mask_left then
+                   branch prefix_left mask_left
+                     (merge left_left right) (map_left combine_values right_left)
+                 else
+                   branch prefix_left mask_left
+                     (map_left combine_values left_left) (merge right_left right)
+             | _ -> join (map_left combine_values left) (map_right combine_values right)
+           else if mask_above mask_right mask_left then
+             match representative left with
+             | Some key when matches_prefix key prefix_right mask_right ->
+                 if zero_bit key mask_right then
+                   branch prefix_right mask_right
+                     (merge left left_right) (map_right combine_values right_right)
+                 else
+                   branch prefix_right mask_right
+                     (map_right combine_values left_right) (merge left right_right)
+             | _ -> join (map_left combine_values left) (map_right combine_values right)
+           else join (map_left combine_values left) (map_right combine_values right)
+     in merge first second)".
+
+(** A biased union maps one-sided bindings identically.  Reuse those subtrees
+    directly, and join disjoint prefixes immediately.  Physical-identity
+    checks preserve the left tree (or the containing right tree) when a
+    recursive merge makes no observable change. *)
+Extract Constant Patricia.union_left =>
+  "(fun first second ->
+     let rec union left right =
+       match left, right with
+       | Empty, tree | tree, Empty -> tree
+       | (Leaf (left_key, _) as leaf), Leaf (right_key, _)
+         when left_key = right_key -> leaf
+       | Leaf (key, value), tree -> set key value tree
+       | tree, Leaf (key, value) ->
+           (match get key tree with Some _ -> tree | None -> set key value tree)
+       | (Branch (prefix_left, mask_left, left_left, right_left) as left_tree),
+         (Branch (prefix_right, mask_right, left_right, right_right) as right_tree) ->
+           if mask_left = mask_right && prefix_left = prefix_right then
+             let merged_left = union left_left left_right in
+             let merged_right = union right_left right_right in
+             if merged_left == left_left && merged_right == right_left then left_tree
+             else Branch (prefix_left, mask_left, merged_left, merged_right)
+           else if mask_above mask_left mask_right then
+             match representative right with
+             | Some key when matches_prefix key prefix_left mask_left ->
+                 if zero_bit key mask_left then
+                   let merged = union left_left right_tree in
+                   if merged == left_left then left_tree
+                   else Branch (prefix_left, mask_left, merged, right_left)
+                 else
+                   let merged = union right_left right_tree in
+                   if merged == right_left then left_tree
+                   else Branch (prefix_left, mask_left, left_left, merged)
+             | _ -> join left_tree right_tree
+           else if mask_above mask_right mask_left then
+             match representative left with
+             | Some key when matches_prefix key prefix_right mask_right ->
+                 if zero_bit key mask_right then
+                   let merged = union left_tree left_right in
+                   if merged == left_right then right_tree
+                   else Branch (prefix_right, mask_right, merged, right_right)
+                 else
+                   let merged = union left_tree right_right in
+                   if merged == right_right then right_tree
+                   else Branch (prefix_right, mask_right, left_right, merged)
+             | _ -> join left_tree right_tree
+           else join left_tree right_tree
+     in union first second)".
+
+Extract Constant Patricia.union_right =>
+  "(fun first second -> union_left second first)".
+
 (** Proof-side definitions remain pure Rocq.  Extracted string branches use a
     packed critical-bit token [(byte_index << 4) | tag], where tag zero is the
     continuation marker and tags 1--8 are the byte's bits from most to least
@@ -200,8 +298,10 @@ Extract Constant StringPatricia.union_right =>
   "(fun first second -> union_left second first)".
 
 Separate Extraction
+  PatriciaBits.mask_above
   Patricia.empty Patricia.is_empty Patricia.singleton Patricia.get Patricia.mem
-  Patricia.set Patricia.remove Patricia.combine
+  Patricia.set Patricia.remove Patricia.map_filter Patricia.map_left
+  Patricia.map_right Patricia.replace_binding Patricia.combine
   Patricia.union_left Patricia.union_right
   Patricia.map Patricia.fold Patricia.elements Patricia.beq
   StringBits.bit_at StringBits.first_diff StringBits.agrees_before

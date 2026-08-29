@@ -15,7 +15,8 @@ and both extracted implementations behaved correctly in the supplied tests
 and in additional fuzzing. It is not yet a complete formally verified
 mergeable-map library, however. The direct-string implementation is missing
 merge proofs, the extracted API does not enforce the proved preconditions, and
-the runtime fuel calculation defeats the intended fast-disjoint-merge behavior.
+the optimized native merge and union extraction remains a trusted refinement
+rather than a proved correspondence with the fuelled Rocq model.
 
 ## Validation results
 
@@ -41,35 +42,27 @@ evidence only; it does not close the proof gaps described below.
 
 ## Review findings
 
-### 1. Runtime fuel defeats fast merge
+### 1. Native merge now avoids fuel and biased union shares structure
 
-Both public `combine` definitions calculate fuel with
-`S (size left + size right)`. Computing `size` traverses every node before the
-merge begins. Consequently, even a merge of immediately disjoint trees has
-linear work in the combined tree size.
+The Rocq definitions still calculate `S (size left + size right)` as fuel;
+this makes their termination argument and existing proofs straightforward.
+The native extraction now replaces `combine` with direct structural recursion,
+so it does not compute that bound at runtime.  It also replaces `union_left`
+with a specialized structural algorithm in both the integer and string
+backends (`union_right` reverses its arguments).  Disjoint prefixes are joined
+immediately, one-sided subtrees are reused, and only a changed recursive path
+is rebuilt.
 
-The disjoint cases additionally call `map_left` and `map_right`. These
-functions rebuild every retained node. In particular, `union_left` and
-`union_right` are defined through generic `combine`, so they do not reuse
-unchanged disjoint subtrees even though their one-sided mapping functions are
-identities.
+The 10,000- and 100,000-binding benchmark checks in `patricia-bench.md`
+confirm constant-sized allocation for disjoint native unions and substantially
+less allocation for the overlapping workload.  This restores the intended
+operational behavior, but it is benchmark evidence rather than a complexity
+proof.
 
-This does not invalidate the lookup theorems, but it defeats the main
-performance property expected from an Okasaki--Gill-style mergeable Patricia
-tree.
-
-Recommended correction:
-
-1. Define merge using well-founded recursion whose termination evidence lives
-   in `Prop` and is erased during extraction. Avoid computing whole-tree fuel
-   at runtime.
-2. Separate generic combining, which may genuinely need to transform every
-   one-sided binding, from specialized biased union.
-3. Give biased union an implementation that returns unchanged disjoint
-   subtrees directly.
-4. Add a cost semantics if asymptotic behavior is to be a formally verified
-   claim. At minimum, benchmark disjoint and overlapping inputs and inspect
-   allocation behavior in extracted OCaml.
+The remaining verification task is to prove a well-founded version of this
+algorithm or a refinement theorem connecting the direct extracted recursion
+to the existing fuelled specification.  A cost semantics is additionally
+needed before making a formal asymptotic claim.
 
 ### 2. The direct-string core is only partially verified
 
@@ -121,9 +114,10 @@ Recommended correction:
 
 The Rocq model uses unbounded `positive`, `N`, and `nat`, while the optimized
 OCaml implementation uses bounded `int`, native shifts, and native strings.
-`bit_at`, `first_diff`, prefix matching, routing bits, and highest-differing-bit
-selection are replaced with handwritten OCaml realizers. Rocq proves the pure
-definitions, not the equivalence of these replacements.
+`bit_at`, `first_diff`, prefix matching, routing bits, highest-differing-bit
+selection, direct `combine`, and specialized biased union are replaced with
+handwritten OCaml realizers. Rocq proves the pure definitions, not the
+equivalence of these replacements.
 
 The current documentation states this honestly, and the extra fuzzing found no
 mismatch. Nevertheless, an implementation using unproved `Extract Constant`
@@ -297,12 +291,15 @@ finite-map extensional equality is sufficient for most clients.
 
 ### Phase 6: remove runtime fuel from the optimized implementation
 
-Status: no items in this phase are complete. Both current public `combine`
-definitions still evaluate a whole-tree `size` fuel bound before merging.
+Status: the optimized extracted implementation is complete: its direct
+`combine` does not evaluate a whole-tree size bound, and its specialized
+biased union preserves disjoint and unchanged subtrees.  The proof-side
+definition still uses fuel, so the formal refinement remains open.
 
 Use well-founded recursion over a lexicographic or combined structural measure
-and keep the accessibility proof in `Prop`, so extraction removes it. Verify
-the extracted code to ensure it does not compute `size` before merging.
+and keep the accessibility proof in `Prop`, so extraction removes it. Prove it
+extensionally equivalent to the fuelled definition, or verify the direct
+native realization against that definition.
 
 For generic `combine`, be precise about unavoidable work: an arbitrary
 one-sided function may need to visit every retained binding. For biased union,

@@ -1,5 +1,41 @@
 # Patricia benchmark results
 
+## Current implementation: specialized native merge and biased union
+
+The measurements below record the baseline that motivated the change.  The
+current extracted OCaml backends no longer use that slow path for normal
+native execution:
+
+- `Patricia.combine` and `StringPatricia.combine` recurse directly, so they
+  do not first traverse both maps to calculate proof-side fuel.
+- `union_left` is specialized in both backends.  It reuses one-sided
+  subtrees, joins disjoint prefixes immediately, and only rebuilds a path
+  whose bindings actually change.  `union_right` is its argument-reversed
+  counterpart.
+
+The Rocq definitions and their fuel proofs remain the executable
+specification.  The direct recursive extraction is an optimized native
+refinement, in the same trusted boundary as the existing native bit and
+string primitives.
+
+Post-change validation on the same platform passed both
+`make -C patricia test` and the benchmark's `Stdlib.Map` equivalence checks.
+The short operations are timer-resolution limited, but allocation makes the
+structural behavior clear:
+
+| Input size / keys | Integer disjoint P / AVL (ms) | Integer disjoint allocation P / AVL | Integer 50% overlap P / AVL (ms) | Integer overlap allocation P / AVL |
+| --- | ---: | ---: | ---: | ---: |
+| 10,000 | 0.001 / 0.004 | 288 / 2,404 | 0.017 / 0.070 | 243 / 81,324 |
+| 100,000 | 0.003 / 0.008 | 379 / 3,620 | 0.236 / 2.021 | 365 / 965,872 |
+
+At 100,000 bindings, the direct string implementation likewise used
+406 words for a disjoint union and 400,347 words for a 50%-overlapping
+union, versus 3,620 and 965,872 words respectively for AVL (across the
+three tested key lengths).  Thus the former whole-tree rebuild diagnosis is
+now a historical baseline rather than a property of `union_left`.
+
+## Baseline measurements (before specialized biased union)
+
 Run date: 2026-08-29  
 Command: `PATRICIA_BENCH_SIZE=10000 make -C patricia benchmark`  
 Platform: aarch64 Linux 7.0.0-28-generic; OCaml 4.14.3 native code.
@@ -9,7 +45,7 @@ The benchmark compares the extracted Patricia implementations with
 bindings.  It validates every measured result against `Stdlib.Map`; the run
 ended with `Patricia comparison benchmark: ok`.
 
-## Summary
+## Baseline summary
 
 | Workload | Integer Patricia vs. AVL | String Patricia vs. AVL |
 | --- | --- | --- |
@@ -172,12 +208,13 @@ for integers and 84,000x slower for strings, and allocates over 54,000x and
 that the generic fuel-and-rebuild implementation must not underlie biased
 union.
 
-## Interpretation and next step
+## Baseline interpretation and completed follow-up
 
-These numbers make specialized biased union the highest-priority performance
-change.  It should bypass generic `combine`, avoid runtime whole-tree fuel,
-and return unchanged disjoint subtrees where its left-bias semantics permits.
-After that change, rerun this command at several sizes and compare scaling and
-allocation, particularly for disjoint unions.  Do not use the absolute times
-as regression thresholds: they are affected by machine, compiler, runtime,
-and GC state.
+These numbers made specialized biased union the highest-priority performance
+change.  That change is now implemented in both native extracted backends:
+the generic native merge bypasses proof-side whole-tree fuel, and biased union
+returns unchanged one-sided and disjoint subtrees wherever its left-bias
+semantics permits.  The post-change 10,000- and 100,000-binding checks at the
+top of this document confirm the expected allocation behavior.  Do not use
+the absolute times as regression thresholds: they are affected by machine,
+compiler, runtime, and GC state.

@@ -109,6 +109,8 @@ remain visible. The integer proofs use unbounded positive keys, while extraction
 uses bounded OCaml `int`; callers must therefore supply keys in
 `1 .. max_int`. The string tree uses native OCaml strings and proof-side
 logical bit positions; native extraction represents positions as packed
-byte/tag integer tokens. These custom extraction refinements form an explicit
+byte/tag integer tokens. Native extraction also replaces proof-side fuelled
+`combine` with direct structural recursion and gives both Patricia variants a
+sharing biased union. These custom extraction refinements form an explicit
 performance/correctness boundary: their equivalence to the pure Rocq functions
 is trusted, rather than proved inside Rocq.
