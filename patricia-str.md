@@ -742,9 +742,11 @@ direct-string biased-union and extensional-`beq` laws are now proved, as is
 strong sorting of `elements` by the prefix-free bit-stream lexicographic
 order. Lookup-based finite-map extensionality is also packaged for both key
 variants. The extracted backends are now internal modules behind abstract
-`PatriciaMap` and `StringPatriciaMap` interfaces; checked native positive keys
-and stronger enforcement of the public generic-`combine` contract are the next
-API-hardening priorities.
+`PatriciaMap` and `StringPatriciaMap` interfaces. The integer wrapper now admits
+only validated positive native keys. Their public generic-`combine` APIs split
+the represented-key cases into `left_only`, `right_only`, and `both` callbacks;
+absence from both maps is handled internally as absence, enforcing the proof
+contract by construction.
 
 The completed scale runs confirm the key architectural result: specialized
 biased union fixes the former whole-tree traversal and rebuilding path, while

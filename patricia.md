@@ -138,12 +138,20 @@ change workers, low-level bit operations, packed split tokens, and combine
 workers. The structural oracle retains deliberate access to the internal
 modules; the benchmark exercises the wrappers.
 
-Remaining correction:
+`PatriciaMap.Key.t` is also abstract. Its only public constructors validate a
+native integer and reject every value below one, while `to_int` permits explicit
+conversion back to the representation. Thus supported clients cannot supply a
+zero or negative key. This enforces the input side of the current
+`1 .. max_int` extraction domain; proving the finite-width refinement remains a
+separate task.
 
-- use an abstract validated positive key type, or explicitly choose and verify
-  a different native integer key domain;
-- document `combine`'s finite-map condition in the public API, and provide
-  common combinators whose condition is proved once.
+The supported `combine` no longer accepts the raw two-option callback. Instead,
+its `combiner` record separates the only three cases in which a binding can
+exist: `left_only`, `right_only`, and `both`. The wrapper maps the fourth raw
+case, absence from both inputs, directly to `None`. Consequently a supported
+client cannot violate the theorem's `f None None = None` premise. The raw
+callback remains available only in the explicitly internal modules used for
+differential and structural validation.
 
 ### 4. Custom extraction constants are a trusted correctness boundary
 
@@ -169,7 +177,7 @@ does not inspect either kind of extraction directive.
 
 | Native deviation | What present validation establishes | Formal status and proof route |
 | --- | --- | --- |
-| `positive`, `N`, and `nat` represented by OCaml `int`; Rocq strings represented by OCaml strings | Tests cover positive keys through `max_int`, byte strings, and valid split positions used by the map | Source theorems use unbounded values. State a fixed-width key/string representation relation and prove every operation within it, or change the source model to `Uint63` and primitive strings. Inputs outside the relation must be rejected by the wrapper. |
+| `positive`, `N`, and `nat` represented by OCaml `int`; Rocq strings represented by OCaml strings | Wrapper tests reject `min_int`, negative values, and zero; accept and round-trip one and `max_int`; and the oracle covers positive keys through `max_int`, byte strings, and valid split positions used by the map | Source theorems use unbounded values. The abstract checked key wrapper enforces the positive native input domain, but a fixed-width key/string representation relation and operation refinements remain to be proved, or the source model must change to `Uint63` and primitive strings. |
 | Integer `word`, prefix, prefix match, routing bit, highest differing bit, and mask ordering | Boundary-key fuzzing and structural checks found no mismatch | These are small, formally provable word lemmas. Prove them against a 63-bit model; equality with the unbounded model then holds for keys in `1 .. max_int`. |
 | Packed string split token `(byte << 4) | tag`, native `bit_at`, and bytewise `first_diff` | `first_diff` is checked for all 65,536 one-byte pairs plus prefix and long-prefix cases; structural tests check `bit_at` routing over NUL, non-ASCII, and randomized strings | This requires a relational theorem, not equality at the same extracted integer: logical position 9 is encoded as token 16, and exported native `bit_at s 9` therefore does not denote pure `bit_at s 9`. Prove `native_bit_at s (encode n) = bit_at s n`, `native_first_diff = option_map encode first_diff`, validity and order preservation of tokens, then hide raw tokens from clients. |
 | A branch sample returned as its constant-time `representative` | Structural tests check that samples in public-operation results are resident keys | Existing `wf` only constrains the sample's prefix; it does not say the sample is resident. Strengthen the invariant with sample residency and prove every constructor preserves it, or keep the source representative descent. Without that stronger invariant, this realizer is not equivalent even on every currently `wf` tree. |
@@ -420,10 +428,12 @@ and establish bounds for:
 
 - [x] Generate internal modules and place abstract handwritten wrappers around
   them.
-- [ ] Add checked conversions for native integer keys.
+- [x] Add checked conversions and an abstract public type for native integer keys.
 - [x] Prevent supported clients from constructing malformed values or supplying fuel.
 - [x] Hide packed split tokens and low-level bit functions, or expose wrapper
   functions that encode and decode logical positions.
+- [x] Enforce the generic-combine finite-map condition through three explicit
+  one-sided/overlap callbacks.
 - [ ] Add a CompCert `TREE` adapter only after its required laws are enumerated and
   proved.
 - [x] Make extraction reproducible through the normal build and ensure generated

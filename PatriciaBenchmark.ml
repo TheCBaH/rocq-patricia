@@ -20,6 +20,8 @@ end)
 module Patricia = PatriciaMap
 module StringPatricia = StringPatriciaMap
 
+let patricia_key = Patricia.Key.of_int_exn
+
 let benchmark_size =
   match Sys.getenv_opt "PATRICIA_BENCH_SIZE" with
   | None -> 10_000
@@ -117,7 +119,9 @@ let report_operation name patricia avl operations =
   report "Stdlib.Map" avl
 
 let build_patricia_int keys =
-  Array.fold_left (fun map key -> Patricia.set key key map) Patricia.empty keys
+  Array.fold_left
+    (fun map key -> Patricia.set (patricia_key key) key map)
+    Patricia.empty keys
 
 let build_avl_int keys =
   Array.fold_left (fun map key -> Int_avl.add key key map) Int_avl.empty keys
@@ -141,7 +145,7 @@ let string_patricia_cardinal map =
 let check_int_equivalent keys patricia avl =
   Array.iter
     (fun key ->
-       if Patricia.get key patricia <> Int_avl.find_opt key avl then
+       if Patricia.get (patricia_key key) patricia <> Int_avl.find_opt key avl then
          failwith "integer Patricia result differs from Stdlib.Map")
     keys
 
@@ -159,8 +163,25 @@ let generic_combine_values left right =
   | None, Some value -> Some (-value)
   | None, None -> None
 
+let patricia_combiner : (int, int, int) Patricia.combiner = {
+  Patricia.left_only = (fun value -> Some (value + 1));
+  right_only = (fun value -> Some (-value));
+  both = (fun _ _ -> None);
+}
+
+let string_patricia_combiner : (int, int, int) StringPatricia.combiner = {
+  StringPatricia.left_only = (fun value -> Some (value + 1));
+  right_only = (fun value -> Some (-value));
+  both = (fun _ _ -> None);
+}
+
 let check_int_bindings context patricia avl =
-  if Patricia.elements patricia <> Int_avl.bindings avl then
+  let bindings =
+    List.map
+      (fun (key, value) -> Patricia.Key.to_int key, value)
+      (Patricia.elements patricia)
+  in
+  if bindings <> Int_avl.bindings avl then
     failwith (context ^ " differs from Stdlib.Map.merge")
 
 let check_string_bindings context patricia avl =
@@ -174,7 +195,7 @@ let time_int_lookups keys patricia avl =
     for _ = 1 to lookup_repetitions do
       Array.iter
         (fun key ->
-           match Patricia.get key patricia with
+           match Patricia.get (patricia_key key) patricia with
            | Some value when value = key -> checksum := !checksum lxor value
            | _ -> failwith "integer Patricia lookup failed")
         keys
@@ -247,7 +268,11 @@ let time_int_membership present absent patricia avl =
     !present_count
   in
   let patricia_result, patricia_measurement =
-    measure_operation (fun () -> run Patricia.mem patricia)
+    measure_operation
+      (fun () ->
+         run
+           (fun key map -> Patricia.mem (patricia_key key) map)
+           patricia)
   in
   let avl_result, avl_measurement =
     measure_operation (fun () -> run Int_avl.mem avl)
@@ -291,6 +316,11 @@ let time_int_elements patricia avl =
   let avl_bindings, avl_measurement =
     measure_operation (fun () -> Int_avl.bindings avl)
   in
+  let patricia_bindings =
+    List.map
+      (fun (key, value) -> Patricia.Key.to_int key, value)
+      patricia_bindings
+  in
   if patricia_bindings <> avl_bindings then
     failwith "integer elements differ from Stdlib.Map bindings";
   report_operation "elements" patricia_measurement avl_measurement benchmark_size
@@ -308,12 +338,12 @@ let time_string_elements patricia avl =
 
 let time_int_generic_combine keys patricia avl =
   let key = keys.(benchmark_size / 2) in
-  let patricia_leaf = Patricia.singleton key (-key) in
+  let patricia_leaf = Patricia.singleton (patricia_key key) (-key) in
   let avl_leaf = Int_avl.singleton key (-key) in
   let avl_combine = Int_avl.merge (fun _ -> generic_combine_values) in
   let patricia_left, patricia_left_measurement =
     measure_operation (fun () ->
-        Patricia.combine generic_combine_values patricia_leaf patricia)
+        Patricia.combine patricia_combiner patricia_leaf patricia)
   in
   let avl_left, avl_left_measurement =
     measure_operation (fun () -> avl_combine avl_leaf avl)
@@ -323,7 +353,7 @@ let time_int_generic_combine keys patricia avl =
     avl_left_measurement 1;
   let patricia_right, patricia_right_measurement =
     measure_operation (fun () ->
-        Patricia.combine generic_combine_values patricia patricia_leaf)
+        Patricia.combine patricia_combiner patricia patricia_leaf)
   in
   let avl_right, avl_right_measurement =
     measure_operation (fun () -> avl_combine avl avl_leaf)
@@ -340,7 +370,7 @@ let time_string_generic_combine keys patricia avl =
   let avl_combine = String_avl.merge (fun _ -> generic_combine_values) in
   let patricia_left, patricia_left_measurement =
     measure_operation (fun () ->
-        StringPatricia.combine generic_combine_values patricia_leaf patricia)
+        StringPatricia.combine string_patricia_combiner patricia_leaf patricia)
   in
   let avl_left, avl_left_measurement =
     measure_operation (fun () -> avl_combine avl_leaf avl)
@@ -350,7 +380,7 @@ let time_string_generic_combine keys patricia avl =
     avl_left_measurement 1;
   let patricia_right, patricia_right_measurement =
     measure_operation (fun () ->
-        StringPatricia.combine generic_combine_values patricia patricia_leaf)
+        StringPatricia.combine string_patricia_combiner patricia patricia_leaf)
   in
   let avl_right, avl_right_measurement =
     measure_operation (fun () -> avl_combine avl avl_leaf)
@@ -364,7 +394,7 @@ let time_int_mutations keys fresh_keys patricia avl =
   let patricia_added, patricia_add =
     measure_operation (fun () ->
         Array.fold_left
-          (fun map key -> Patricia.set key key map)
+          (fun map key -> Patricia.set (patricia_key key) key map)
           patricia fresh_keys)
   in
   let avl_added, avl_add =
@@ -381,7 +411,7 @@ let time_int_mutations keys fresh_keys patricia avl =
   let patricia_updated, patricia_update =
     measure_operation (fun () ->
         Array.fold_left
-          (fun map key -> Patricia.set key (-key) map)
+          (fun map key -> Patricia.set (patricia_key key) (-key) map)
           patricia keys)
   in
   let avl_updated, avl_update =
@@ -393,7 +423,7 @@ let time_int_mutations keys fresh_keys patricia avl =
   check_int_equivalent keys patricia_updated avl_updated;
   Array.iter
     (fun key ->
-       if Patricia.get key patricia_updated <> Some (-key)
+       if Patricia.get (patricia_key key) patricia_updated <> Some (-key)
           || Int_avl.find_opt key avl_updated <> Some (-key) then
          failwith "integer update did not replace the binding")
     keys;
@@ -402,7 +432,7 @@ let time_int_mutations keys fresh_keys patricia avl =
   let patricia_unchanged, patricia_remove_absent =
     measure_operation (fun () ->
         Array.fold_left
-          (fun map key -> Patricia.remove key map)
+          (fun map key -> Patricia.remove (patricia_key key) map)
           patricia absent_keys)
   in
   let avl_unchanged, avl_remove_absent =
@@ -418,7 +448,9 @@ let time_int_mutations keys fresh_keys patricia avl =
     benchmark_size;
   let patricia_removed, patricia_remove =
     measure_operation (fun () ->
-        Array.fold_left (fun map key -> Patricia.remove key map) patricia keys)
+        Array.fold_left
+          (fun map key -> Patricia.remove (patricia_key key) map)
+          patricia keys)
   in
   let avl_removed, avl_remove =
     measure_operation (fun () ->
@@ -428,7 +460,7 @@ let time_int_mutations keys fresh_keys patricia avl =
     failwith "integer removals produced a non-empty map";
   Array.iter
     (fun key ->
-       if Patricia.get key patricia_removed <> None
+       if Patricia.get (patricia_key key) patricia_removed <> None
           || Int_avl.find_opt key avl_removed <> None then
          failwith "integer removal did not delete the binding")
     keys;

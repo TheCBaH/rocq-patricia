@@ -49,6 +49,13 @@ abstract and expose only smart map operations; generated constructors, routing
 metadata, packed string positions, fuel/change workers, and merge helpers stay
 behind that boundary. The structural oracle intentionally uses the internal
 modules, while the comparison benchmark uses only the abstract interfaces.
+Integer-map keys have the abstract type `PatriciaMap.Key.t`; `Key.of_int` and
+`Key.of_int_exn` are the only public constructors and reject zero and negative
+integers. `Key.to_int` provides explicit conversion back to a native integer.
+Public generic combination uses a `combiner` record with separate `left_only`,
+`right_only`, and `both` callbacks. The wrappers supply `None` themselves for
+keys absent from both inputs, making the proof condition
+`f None None = None` unrepresentable through the supported interface.
 
 Native extraction maps integer keys, prefixes, masks,
 and routing operations to OCaml `int`. String branch discriminators are packed
@@ -136,9 +143,10 @@ not Rocq proofs or complete validation of the custom extraction constants.
 This is a design sketch, not a drop-in `Maps.TREE` implementation. Constructors
 remain visible only in the explicitly internal generated modules used by the
 structural tests; supported clients use abstract map types. The integer proofs
-use unbounded positive keys, while extraction uses bounded OCaml `int`; callers
-must therefore supply keys in
-`1 .. max_int`. The string tree uses native OCaml strings and proof-side
+use unbounded positive keys, while extraction uses bounded OCaml `int`.
+`PatriciaMap.Key` restricts supported clients to the representable positive
+domain `1 .. max_int`; the finite-width refinement itself remains trusted rather
+than proved. The string tree uses native OCaml strings and proof-side
 logical bit positions; native extraction represents positions as packed
 byte/tag integer tokens. Native extraction also replaces proof-side fuelled
 `combine` with direct structural recursion and gives both Patricia variants a

@@ -351,26 +351,63 @@ let check_string_keys () =
 
 let check_abstract_interfaces () =
   let module I = PatriciaMap in
+  if I.Key.of_int min_int <> None || I.Key.of_int (-1) <> None
+     || I.Key.of_int 0 <> None then
+    failwith "abstract integer interface accepted a non-positive key";
+  let key = I.Key.of_int_exn in
+  let one = key 1 and largest = key max_int in
+  if I.Key.to_int one <> 1 || I.Key.to_int largest <> max_int
+     || not (I.Key.equal one (key 1))
+     || I.Key.compare one largest >= 0 then
+    failwith "abstract integer key conversion failed";
+  let raised =
+    try
+      ignore (key 0);
+      false
+    with Invalid_argument _ -> true
+  in
+  if not raised then
+    failwith "abstract integer exception conversion accepted zero";
   let integers : int I.t =
     I.empty
-    |> I.set 7 70
-    |> I.set 3 30
-    |> I.set 7 71
+    |> I.set (key 7) 70
+    |> I.set (key 3) 30
+    |> I.set (key 7) 71
   in
-  if I.is_empty integers || not (I.mem 7 integers)
-     || I.get 7 integers <> Some 71 then
+  if I.is_empty integers || not (I.mem (key 7) integers)
+     || I.get (key 7) integers <> Some 71
+     || I.get largest (I.singleton largest 99) <> Some 99 then
     failwith "abstract integer interface update failed";
-  let mapped = I.map (fun key value -> key + value) integers in
+  let mapped = I.map (fun key value -> I.Key.to_int key + value) integers in
   let filtered = I.map_filter
-      (fun key value -> if key = 3 then None else Some value) mapped in
-  if I.elements filtered <> [7, 78]
+      (fun current value -> if I.Key.equal current (key 3) then None else Some value)
+      mapped in
+  let elements =
+    List.map (fun (current, value) -> I.Key.to_int current, value)
+      (I.elements filtered)
+  in
+  if elements <> [7, 78]
      || I.fold (fun count _ _ -> count + 1) filtered 0 <> 1 then
     failwith "abstract integer interface traversal failed";
-  let combined = I.combine merge_options filtered (I.singleton 9 90) in
-  if I.elements combined <> [7, 78; 9, 90]
-     || not (I.beq ( = ) combined (I.union_left filtered (I.singleton 9 90)))
-     || not (I.is_empty (I.remove 7 (I.remove 9 combined))) then
-    failwith "abstract integer interface combine failed";
+  let combiner : (int, int, int) I.combiner = {
+    left_only = (fun value -> Some (value + 1));
+    right_only = (fun value -> Some (-value));
+    both = (fun _ _ -> None);
+  } in
+  let right =
+    I.empty
+    |> I.set (key 7) 700
+    |> I.set (key 9) 90
+  in
+  let combined = I.combine combiner filtered right in
+  let elements =
+    List.map (fun (current, value) -> I.Key.to_int current, value)
+      (I.elements combined)
+  in
+  if elements <> [9, -90]
+     || not (I.beq ( = ) combined (I.singleton (key 9) (-90)))
+     || not (I.is_empty (I.remove (key 9) combined)) then
+    failwith "abstract integer interface combiner contract failed";
   let module S = StringPatriciaMap in
   let strings : int S.t =
     S.empty
@@ -387,12 +424,19 @@ let check_abstract_interfaces () =
       (fun key value -> if key = "" then None else Some value) mapped in
   if S.fold (fun count _ _ -> count + 1) filtered 0 <> 2 then
     failwith "abstract string interface traversal failed";
-  let singleton = S.singleton "z" 9 in
-  let combined = S.combine merge_options filtered singleton in
-  if S.get "z" combined <> Some 9
-     || not (S.beq ( = ) combined (S.union_right filtered singleton))
-     || S.get "a\000b" (S.remove "a\000b" combined) <> None then
-    failwith "abstract string interface combine failed"
+  let combiner : (int, int, int) S.combiner = {
+    left_only = (fun value -> Some (value + 1));
+    right_only = (fun value -> Some (-value));
+    both = (fun _ _ -> None);
+  } in
+  let right = S.empty |> S.set "a\000b" 10 |> S.set "z" 9 in
+  let combined = S.combine combiner filtered right in
+  if S.get "z" combined <> Some (-9)
+     || S.get "a\000b" combined <> None
+     || S.get "\255" combined <> Some 4
+     || S.fold (fun count _ _ -> count + 1) combined 0 <> 2
+     || S.get "z" (S.remove "z" combined) <> None then
+    failwith "abstract string interface combiner contract failed"
 
 let () =
   Random.init 0x504154;

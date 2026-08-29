@@ -58,9 +58,13 @@ thresholds.
   types through handwritten `PatriciaMap` and `StringPatriciaMap` interfaces;
   constructors, fuel/change workers, packed split tokens, and proof-internal
   helpers are absent from the supported API.
-- **next**: validate native integer keys at the public wrapper boundary.
-- **later**: strengthen and enforce the documented public `combine` contract.
-- **later**: retain a proof-aligned extraction backend for differential tests.
+- **done**: expose an abstract `PatriciaMap.Key.t`, reject non-positive native
+  integers in its only public constructors, and test both invalid inputs and
+  the accepted `1` / `max_int` boundaries.
+- **done**: replace the raw two-option public `combine` callback with explicit
+  `left_only`, `right_only`, and `both` cases, making absence from both inputs
+  unrepresentable and enforcing the finite-map contract at the wrapper boundary.
+- **next**: retain a proof-aligned extraction backend for differential tests.
 
 ## M5: Reduce the trusted native-refinement boundary
 
@@ -155,3 +159,15 @@ thresholds.
   metadata, packed positions, and proof-internal workers remain internal. The
   oracle adds wrapper-level functional checks, and the native benchmark now
   uses only the abstract interfaces. `make` and `make benchmark` passed.
+- **2026-08-29 — checked native integer keys**: `PatriciaMap.Key.t` is abstract
+  and can be created publicly only by `of_int` or `of_int_exn`, both of which
+  reject zero and negative integers. Tests cover `min_int`, `-1`, zero, one,
+  and `max_int`; wrapper operations and the native benchmark now consume the
+  validated type. The representation remains an allocation-free native `int`.
+  `make`, the randomized oracle, and `make benchmark` passed.
+- **2026-08-29 — enforced public combine contract**: both abstract wrappers now
+  accept a `combiner` record with `left_only`, `right_only`, and `both`
+  callbacks. The wrappers map the raw absent/absent case directly to absence,
+  so supported callers cannot violate `f None None = None`. Wrapper tests cover
+  all three callbacks, including overlap deletion; `make`, the randomized
+  oracle, and `make benchmark` passed.
