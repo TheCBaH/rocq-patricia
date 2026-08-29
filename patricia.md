@@ -175,7 +175,7 @@ does not inspect either kind of extraction directive.
 | --- | --- | --- |
 | `positive`, `N`, and `nat` represented by OCaml `int`; Rocq strings represented by OCaml strings | Wrapper tests reject `min_int`, negative values, and zero; accept and round-trip one and `max_int`; and the oracle covers positive keys through `max_int`, byte strings, and valid split positions used by the map | `NativeRefinement.v` fixes the supported 64-bit non-negative `int` payload domain at 62 bits and names the positive-key relation. It does not yet prove that native arithmetic, shifts, or the bounded string representation refine the unbounded source operations. |
 | Integer `word`, prefix, prefix match, routing bit, highest differing bit, and mask ordering | Boundary-key fuzzing and structural checks found no mismatch | These are small, formally provable word lemmas. Prove them against the supported 62-bit non-negative OCaml-`int` payload model; equality with the unbounded model then holds for keys in `1 .. max_int`. |
-| Packed string split token `(byte << 4) | tag`, native `bit_at`, and bytewise `first_diff` | `first_diff` is checked for all 65,536 one-byte pairs plus prefix and long-prefix cases; structural tests check `bit_at` routing over NUL, non-ASCII, and randomized strings | `NativeRefinement.v` proves the logical `9*b+t` to packed `16*b+t` codec, valid-tag property, injectivity, byte/tag order, and semantic transports for `bit_at` and `first_diff`. The native bytewise realizers have not yet been proved to implement those transports; logical position 9 remains token 16, so direct equality at the same extracted integer is intentionally false. |
+| Packed string split token `(byte << 4) | tag`, native `bit_at`, and bytewise `first_diff` | `first_diff` is checked for all 65,536 one-byte pairs plus prefix and long-prefix cases; structural tests check `bit_at` routing over NUL, non-ASCII, and randomized strings | `NativeRefinement.v` proves the logical `9*b+t` to packed `16*b+t` codec, valid-tag property, injectivity, and byte/tag order. Its safe source-level packed `bit_at` worker follows the native byte/tag dispatch and is proved correct at every encoded position; `first_diff` is currently specified by its encoded result. The native unsafe byte access and bytewise first-difference realizer have not yet been proved to implement these specifications; logical position 9 remains token 16, so direct equality at the same extracted integer is intentionally false. |
 | A branch sample returned as its constant-time `representative` | `wf_branch` now requires `resident sample (Branch ...)`, and every smart constructor and public-operation preservation theorem discharges that premise; structural tests independently check the property | Cached-sample residency is now kernel-checked (`wf_cached_sample_resident`). This justifies the native result as an actual binding, but it does not make it definitionally equal to the source representative, which may select a different resident key; consumers still require a refinement argument based on representative independence. |
 | Exception-based one-descent string `set` | Existing/fresh-key oracle tests and structural checks pass | Define a source worker returning either a rebuilt tree or a discriminator to bubble upward, prove it equivalent to `set`, and extract it. Proving the exact local-exception OCaml code instead requires a target-language logic supporting exceptions. |
 | Fuel-free integer and string `combine` | Randomized merges agree with reference maps; both source `combine` definitions are proved | Define well-founded recursion over `size left + size right`, prove its equations and equivalence to sufficiently fuelled `combine_fuel`, and extract that definition. |
@@ -443,7 +443,8 @@ and establish bounds for:
 - [x] Enforce the generic-combine finite-map condition through three explicit
   one-sided/overlap callbacks.
 - [x] Specify the 62-bit native positive-key domain and the logical/packed
-  string-position codec in Rocq.  The target arithmetic and bytewise-realizer
+  string-position codec in Rocq, including a source-level packed `bit_at`
+  worker.  The target arithmetic and bytewise-first-difference realizer
   refinement proofs remain open.
 - [ ] Add a CompCert `TREE` adapter only after its required laws are enumerated and
   proved.
@@ -463,8 +464,9 @@ Current validation status:
   non-ASCII bytes, and long common prefixes;
 - [x] Fresh and existing insertion, absent and present removal, and repeated
   collapse of branches;
-- [ ] All merge shapes: equal roots, left containment, right containment, and
-  disjoint prefixes;
+- [x] All merge shapes: equal roots, left containment, right containment, and
+  disjoint prefixes, with deterministic dispatch classification in addition to
+  randomized coverage;
 - [x] Combining functions that preserve, transform, or delete left-only,
   right-only, and overlapping bindings;
 - [x] Both specialized unions;

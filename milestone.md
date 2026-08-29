@@ -71,9 +71,10 @@ thresholds.
 
 - **in progress**: `NativeRefinement.v` formalizes the 62-bit positive-key
   domain and the logical-string-position/packed-token codec. Its kernel proofs
-  cover decode-after-encode, valid tags, injectivity, ordering, and semantic
-  transports for `bit_at` and `first_diff`; proving the handwritten OCaml
-  arithmetic and bytewise realizers against those transports is next.
+  cover decode-after-encode, valid tags, injectivity, ordering, and a safe
+  source-level packed `bit_at` worker correct at encoded positions. Proving
+  the handwritten OCaml primitive/string correspondence and bytewise
+  `first_diff` realizer against these specifications is next.
 - **done**: require every well-formed string branch's cached sample to be a
   resident binding and preserve that requirement through all smart operations.
 - **later**: replace handwritten direct `set`, `combine`, and biased-union
@@ -200,9 +201,17 @@ thresholds.
 - **2026-08-29 — representation-relation foundation**: added
   `NativeRefinement.v`, which specifies the 62-bit native positive-key domain
   and the logical-position to packed-token codec used by string extraction.
-  Its 13 new closed lemmas prove codec validity, decoding, injectivity, order,
-  and semantic transports for packed `bit_at`/`first_diff`. The normal proof
-  target and source-driven assumption audit include this module; `make` passed
-  with 222 declarations closed under the global context, and both deterministic
-  test suites passed. The OCaml realizer refinements are deliberately still
-  pending.
+  Its initial 13 closed lemmas proved codec validity, decoding, injectivity,
+  order, and semantic transport. The next two lemmas add a safe source-level
+  packed `bit_at` worker and prove it agrees with the logical bit view at every
+  encoded position. The normal proof target and source-driven assumption audit
+  include this module; the current `make` passed with 224 declarations closed
+  under the global context and both deterministic test suites passing. The
+  OCaml realizer refinements are deliberately still pending.
+- **2026-08-29 — deterministic direct-string merge shapes**: added fixtures
+  that inspect the packed-root dispatch relation and require each of equal
+  roots, left containment, right containment, and disjoint prefixes. Every
+  fixture checks normal and filtering `combine`, `union_left`, and
+  `union_right` against the reference map. This closes the previously missing
+  merge-shape validation item; it is test coverage, not a refinement proof of
+  the handwritten native merge.

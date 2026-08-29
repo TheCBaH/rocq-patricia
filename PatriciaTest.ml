@@ -349,6 +349,80 @@ let check_string_keys () =
     check_string_table round "union_right" keys expected_right (S.union_right !left !right)
   done
 
+(** Exercise every root relationship selected by the direct-string merge:
+    equal roots, either tree containing the other root, and disjoint prefixes.
+    Random workloads reach these cases, but these small examples make their
+    coverage deterministic and guard the dispatch conditions themselves. *)
+let check_string_merge_shapes () =
+  let tree bindings =
+    List.fold_left (fun result (key, value) -> S.set key value result) S.empty bindings
+  in
+  let table bindings =
+    let result = Hashtbl.create 8 in
+    List.iter (fun (key, value) -> Hashtbl.replace result key value) bindings;
+    result
+  in
+  let root_shape left right =
+    match left, right with
+    | S.Branch (sample_left, split_left, _, _),
+      S.Branch (sample_right, split_right, _, _) ->
+        if split_left = split_right
+           && StringBits.agrees_before_bounded sample_left sample_right split_left then
+          "equal"
+        else if split_left < split_right
+                && StringBits.agrees_before_bounded sample_left sample_right split_left then
+          "left contains right"
+        else if split_right < split_left
+                && StringBits.agrees_before_bounded sample_left sample_right split_right then
+          "right contains left"
+        else "disjoint"
+    | _ -> failwith "string merge-shape fixture did not build two branches"
+  in
+  let cases =
+    [ "equal", ["a0", 10; "b0", 20], ["a1", 30; "b1", 40];
+      "left contains right", ["a0", 10; "b0", 20], ["a1", 30; "a2", 40];
+      "right contains left", ["a1", 10; "a2", 20], ["a0", 30; "b0", 40];
+      "disjoint", ["a0", 10; "a1", 20], ["b0", 30; "b1", 40] ]
+  in
+  List.iteri
+    (fun round (expected_shape, left_bindings, right_bindings) ->
+       let left = tree left_bindings and right = tree right_bindings in
+       let actual_shape = root_shape left right in
+       if actual_shape <> expected_shape then
+         failwith
+           (Printf.sprintf "string merge shape: expected %s, got %s"
+              expected_shape actual_shape);
+       let left_ref = table left_bindings and right_ref = table right_bindings in
+       let keys = List.sort_uniq compare
+           (List.map fst left_bindings @ List.map fst right_bindings) in
+       let expected = table [] in
+       List.iter
+         (fun key ->
+            match merge_options (lookup left_ref key) (lookup right_ref key) with
+            | None -> ()
+            | Some value -> Hashtbl.replace expected key value)
+         keys;
+       check_string_table (-100 - round) (expected_shape ^ " combine") keys expected
+         (S.combine merge_options left right);
+       let expected_filtered = table [] in
+       List.iter
+         (fun key ->
+            match merge_filtering (lookup left_ref key) (lookup right_ref key) with
+            | None -> ()
+            | Some value -> Hashtbl.replace expected_filtered key value)
+         keys;
+       check_string_table (-100 - round) (expected_shape ^ " filtering combine") keys
+         expected_filtered (S.combine merge_filtering left right);
+       let expected_left = Hashtbl.copy right_ref in
+       Hashtbl.iter (Hashtbl.replace expected_left) left_ref;
+       check_string_table (-100 - round) (expected_shape ^ " union_left") keys
+         expected_left (S.union_left left right);
+       let expected_right = Hashtbl.copy left_ref in
+       Hashtbl.iter (Hashtbl.replace expected_right) right_ref;
+       check_string_table (-100 - round) (expected_shape ^ " union_right") keys
+         expected_right (S.union_right left right))
+    cases
+
 let check_abstract_interfaces () =
   let module I = PatriciaMap in
   if I.Key.of_int min_int <> None || I.Key.of_int (-1) <> None
@@ -488,5 +562,6 @@ let () =
       (union_right !left !right)
   done;
   check_int_wide_keys ();
+  check_string_merge_shapes ();
   check_string_keys ();
   print_endline "Patricia randomized oracle test: ok"
