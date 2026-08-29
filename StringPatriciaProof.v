@@ -1,0 +1,1491 @@
+From Stdlib Require Import Arith.Wf_nat Bool Lia List PeanoNat Strings.String.
+Import ListNotations.
+
+Require Import StringBits StringPatricia.
+
+Lemma get_empty:
+  forall (A : Type) key, @get A key empty = None.
+Proof. reflexivity. Qed.
+
+Lemma get_singleton_same:
+  forall (A : Type) key (value : A), get key (singleton key value) = Some value.
+Proof.
+  intros. cbn [get singleton]. now rewrite String.eqb_refl.
+Qed.
+
+Lemma get_singleton_other:
+  forall (A : Type) lkey rkey (value : A),
+    lkey <> rkey -> get lkey (singleton rkey value) = None.
+Proof.
+  intros. cbn [get singleton]. apply String.eqb_neq in H. now rewrite H.
+Qed.
+
+Lemma mem_spec:
+  forall (A : Type) key (m : t A),
+    mem key m = true <-> exists value, get key m = Some value.
+Proof.
+  intros A key m. unfold mem. destruct (get key m) eqn:E; split; intros H.
+  - now exists a.
+  - split; intros; reflexivity.
+  - discriminate.
+  - destruct H as [value H]. congruence.
+Qed.
+
+Lemma is_empty_spec:
+  forall (A : Type) (m : t A), is_empty m = true <-> m = Empty.
+Proof.
+  intros A m. destruct m as [|key value|sample split ltree rtree]; cbn.
+  - split; intros H; reflexivity.
+  - split; [discriminate|intros H; discriminate].
+  - split; [discriminate|intros H; discriminate].
+Qed.
+
+Lemma get_map:
+  forall (A B : Type) (f : string -> A -> B) key (m : t A),
+    get key (map f m) = option_map (f key) (get key m).
+Proof.
+  intros A B f key m. induction m as [|stored value|sample split ltree IHl rtree IHr]; cbn.
+  - reflexivity.
+  - destruct (String.eqb key stored) eqn:E; cbn.
+    + apply String.eqb_eq in E. now subst.
+    + reflexivity.
+  - destruct (bit_at key split); assumption.
+Qed.
+
+Lemma fold_elements:
+  forall (A B : Type) (f : B -> string -> A -> B) (m : t A) acc,
+    fold f m acc =
+    List.fold_left (fun state kv => f state (fst kv) (snd kv)) (elements m) acc.
+Proof.
+  intros A B f m. induction m as [|key value|sample split ltree IHl rtree IHr];
+    intros acc; cbn.
+  - reflexivity.
+  - reflexivity.
+  - rewrite List.fold_left_app. now rewrite <- IHl, <- IHr.
+Qed.
+
+(** A well-formed branch separates all keys in its left and right subtrees at
+    [split], and every key below it shares the sample's preceding bits. *)
+
+Fixpoint all_keys {A : Type} (P : string -> Prop) (m : t A) : Prop :=
+  match m with
+  | Empty => True
+  | Leaf key _ => P key
+  | Branch _ _ ltree rtree => all_keys P ltree /\ all_keys P rtree
+  end.
+
+Definition same_prefix (sample key : string) (split : nat) : Prop :=
+  forall n, n < split -> bit_at sample n = bit_at key n.
+
+Inductive wf {A : Type} : t A -> Prop :=
+| wf_empty : wf Empty
+| wf_leaf : forall key value, wf (Leaf key value)
+| wf_branch : forall sample split ltree rtree,
+    wf ltree ->
+    wf rtree ->
+    representative ltree <> None ->
+    representative rtree <> None ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) ltree ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) rtree ->
+    wf (Branch sample split ltree rtree).
+
+Fixpoint splits_after {A : Type} (bound : nat) (m : t A) : Prop :=
+  match m with
+  | Empty | Leaf _ _ => True
+  | Branch _ split ltree rtree =>
+      bound < split /\ splits_after bound ltree /\ splits_after bound rtree
+  end.
+
+Fixpoint splits_ordered {A : Type} (m : t A) : Prop :=
+  match m with
+  | Empty | Leaf _ _ => True
+  | Branch _ split ltree rtree =>
+      splits_after split ltree /\ splits_after split rtree /\
+      splits_ordered ltree /\ splits_ordered rtree
+  end.
+
+Lemma all_keys_impl:
+  forall (A : Type) (P Q : string -> Prop) (m : t A),
+    all_keys P m -> (forall key, P key -> Q key) -> all_keys Q m.
+Proof.
+  intros A P Q m. induction m as [|key value|sample split ltree IHl rtree IHr];
+    cbn; intros H HPQ.
+  - exact I.
+  - now apply HPQ.
+  - destruct H. split; [eapply IHl|eapply IHr]; eauto.
+Qed.
+
+Lemma all_keys_elements:
+  forall (A : Type) (P : string -> Prop) (m : t A),
+    all_keys P m <-> forall key value, In (key, value) (elements m) -> P key.
+Proof.
+  intros A P m. induction m as [|key value|sample split ltree IHl rtree IHr]; cbn.
+  - split; intros; [contradiction|exact I].
+  - split.
+    + intros H k v [E|Hnone]; [inversion E; subst; assumption|contradiction].
+    + intros H. apply (H key value). now left.
+  - split.
+    + intros [Hl Hr] key value Hin. apply in_app_iff in Hin.
+      destruct Hin as [Hin|Hin].
+      * apply (proj1 IHl Hl key value Hin).
+      * apply (proj1 IHr Hr key value Hin).
+    + intros H. split.
+      * apply (proj2 IHl). intros key value Hin. apply (H key value).
+        apply in_or_app. now left.
+      * apply (proj2 IHr). intros key value Hin. apply (H key value).
+        apply in_or_app. now right.
+Qed.
+
+Lemma representative_elements:
+  forall (A : Type) (m : t A) key,
+    representative m = Some key -> exists value, In (key, value) (elements m).
+Proof.
+  intros A m. induction m as [|stored value|sample split ltree IHl rtree IHr];
+    intros key H; cbn in *.
+  - discriminate.
+  - inversion H; subst. eauto.
+  - destruct (representative ltree) eqn:El.
+    + inversion H; subst. destruct (IHl _ eq_refl) as [value Hin].
+      exists value. apply in_or_app. now left.
+    + destruct (IHr _ H) as [value Hin].
+      exists value. apply in_or_app. now right.
+Qed.
+
+Lemma representative_none_elements:
+  forall (A : Type) (m : t A),
+    representative m = None <-> elements m = [].
+Proof.
+  intros A m. induction m as [|key value|sample split ltree IHl rtree IHr]; cbn.
+  - split; intros; reflexivity.
+  - split; discriminate.
+  - destruct (representative ltree) eqn:El.
+    + split; [discriminate|]. intros H.
+      apply app_eq_nil in H. destruct H as [Hl _].
+      apply representative_elements in El. destruct El as [value Hin].
+      rewrite Hl in Hin. contradiction.
+    + rewrite IHr. split.
+      * intros Hr. rewrite (proj1 IHl eq_refl), Hr. reflexivity.
+      * intros H. apply app_eq_nil in H. tauto.
+Qed.
+
+Lemma get_elements_sound:
+  forall (A : Type) (m : t A) key value,
+    get key m = Some value -> In (key, value) (elements m).
+Proof.
+  intros A m. induction m as [|stored stored_value|sample split ltree IHl rtree IHr];
+    intros key value H; cbn in *.
+  - discriminate.
+  - destruct (String.eqb key stored) eqn:E; [|discriminate].
+    apply String.eqb_eq in E. inversion H. subst. now left.
+  - destruct (bit_at key split) eqn:E.
+    + apply in_or_app. right. eapply IHr. exact H.
+    + apply in_or_app. left. eapply IHl. exact H.
+Qed.
+
+Lemma wf_elements_complete:
+  forall (A : Type) (m : t A),
+    wf m -> forall key value,
+      In (key, value) (elements m) -> get key m = Some value.
+Proof.
+  intros A m Hwf. induction Hwf as
+      [|stored stored_value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr]; intros key value Hin; cbn in *.
+  - contradiction.
+  - destruct Hin as [E|Hnone]; [|contradiction]. inversion E; subst.
+    now rewrite String.eqb_refl.
+  - apply in_app_iff in Hin. destruct Hin as [Hin|Hin].
+    + pose proof (proj1 (all_keys_elements _ _ _) Hl key value Hin) as [_ Hbit].
+      rewrite Hbit. now apply IHl.
+    + pose proof (proj1 (all_keys_elements _ _ _) Hr key value Hin) as [_ Hbit].
+      rewrite Hbit. now apply IHr.
+Qed.
+
+Theorem wf_elements_spec:
+  forall (A : Type) (m : t A),
+    wf m -> forall key value,
+      get key m = Some value <-> In (key, value) (elements m).
+Proof.
+  intros A m Hwf key value. split.
+  - apply get_elements_sound.
+  - apply (wf_elements_complete A m Hwf).
+Qed.
+
+Lemma routed_key_elements:
+  forall (A : Type) (m : t A) probe stored,
+    routed_key probe m = Some stored ->
+    exists value, In (stored, value) (elements m).
+Proof.
+  intros A m. induction m as [|key value|sample split ltree IHl rtree IHr];
+    intros probe stored H; cbn in *.
+  - discriminate.
+  - inversion H; subst. eauto.
+  - destruct (bit_at probe split).
+    + destruct (IHr _ _ H) as [value Hin]. exists value.
+      apply in_or_app. now right.
+    + destruct (IHl _ _ H) as [value Hin]. exists value.
+      apply in_or_app. now left.
+Qed.
+
+Corollary wf_routed_key_get:
+  forall (A : Type) (m : t A) probe stored,
+    wf m -> routed_key probe m = Some stored ->
+    exists value, get stored m = Some value.
+Proof.
+  intros A m probe stored Hwf Hrouted.
+  destruct (routed_key_elements A m probe stored Hrouted) as [value Hin].
+  exists value. now apply (wf_elements_complete A m Hwf).
+Qed.
+
+Lemma wf_elements_keys_nodup:
+  forall (A : Type) (m : t A),
+    wf m -> NoDup (List.map fst (elements m)).
+Proof.
+  intros A m Hwf. induction Hwf as
+      [|key value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr]; cbn.
+  - constructor.
+  - constructor; [intro H; inversion H|constructor].
+  - rewrite List.map_app. apply NoDup_app.
+    + exact IHl.
+    + exact IHr.
+    + intros key Hleft Hright.
+    apply in_map_iff in Hleft. destruct Hleft as [[lk lv] [Eleft Hinleft]].
+    apply in_map_iff in Hright. destruct Hright as [[rk rv] [Eright Hinright]].
+    cbn in Eleft, Eright. subst lk rk.
+    pose proof (proj1 (all_keys_elements _ _ _) Hl key lv Hinleft) as [_ Hfalse].
+    pose proof (proj1 (all_keys_elements _ _ _) Hr key rv Hinright) as [_ Htrue].
+    congruence.
+Qed.
+
+Corollary wf_elements_binding_unique:
+  forall (A : Type) (m : t A) key (left right : A),
+    wf m -> In (key, left) (elements m) -> In (key, right) (elements m) ->
+    left = right.
+Proof.
+  intros A m key left right Hwf Hl Hr.
+  pose proof (wf_elements_complete A m Hwf key left Hl) as Hgetl.
+  pose proof (wf_elements_complete A m Hwf key right Hr) as Hgetr.
+  congruence.
+Qed.
+
+Lemma representative_all_keys:
+  forall (A : Type) (P : string -> Prop) (m : t A) key,
+    all_keys P m -> representative m = Some key -> P key.
+Proof.
+  intros A P m key Hall Hrep.
+  destruct (representative_elements A m key Hrep) as [value Hin].
+  exact (proj1 (all_keys_elements A P m) Hall key value Hin).
+Qed.
+
+Lemma all_splits_after_of_all_keys:
+  forall (A : Type) outer_sample bound side (m : t A),
+    wf m ->
+    all_keys (fun key =>
+      same_prefix outer_sample key bound /\ bit_at key bound = side) m ->
+    splits_after bound m.
+Proof.
+  intros A outer_sample bound side m Hwf.
+  revert outer_sample bound side.
+  induction Hwf as
+      [|key value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr]; intros outer_sample bound side Hall; cbn in *.
+  - exact I.
+  - exact I.
+  - destruct Hall as [Houter_left Houter_right].
+    destruct (representative ltree) as [left_key|] eqn:Eleft;
+      [|exfalso; apply Hnel; reflexivity].
+    destruct (representative rtree) as [right_key|] eqn:Eright;
+      [|exfalso; apply Hner; reflexivity].
+    assert (Houter_left_key :
+      same_prefix outer_sample left_key bound /\
+      bit_at left_key bound = side).
+    { exact (representative_all_keys A _ ltree left_key Houter_left Eleft). }
+    assert (Houter_right_key :
+      same_prefix outer_sample right_key bound /\
+      bit_at right_key bound = side).
+    { exact (representative_all_keys A _ rtree right_key Houter_right Eright). }
+    assert (Hinner_left_key :
+      same_prefix sample left_key split /\ bit_at left_key split = false).
+    { exact (representative_all_keys A _ ltree left_key Hl Eleft). }
+    assert (Hinner_right_key :
+      same_prefix sample right_key split /\ bit_at right_key split = true).
+    { exact (representative_all_keys A _ rtree right_key Hr Eright). }
+    assert (Hbound : bound < split).
+    { destruct (Nat.lt_ge_cases bound split) as [Hlt|Hge]; [exact Hlt|].
+      apply (proj1 (Nat.lt_eq_cases split bound)) in Hge.
+      destruct Hge as [Hlt'|Heq].
+      - assert (Hsame : bit_at left_key split = bit_at right_key split).
+        { rewrite <- (proj1 Houter_left_key split Hlt').
+          rewrite <- (proj1 Houter_right_key split Hlt'). reflexivity. }
+        rewrite (proj2 Hinner_left_key), (proj2 Hinner_right_key) in Hsame.
+        discriminate.
+      - subst bound.
+        assert (Hsame : bit_at left_key split = bit_at right_key split).
+        { rewrite (proj2 Houter_left_key), (proj2 Houter_right_key).
+          reflexivity. }
+        rewrite (proj2 Hinner_left_key), (proj2 Hinner_right_key) in Hsame.
+        discriminate. }
+    repeat split; try assumption.
+    + now apply (IHl outer_sample bound side).
+    + now apply (IHr outer_sample bound side).
+Qed.
+
+Theorem wf_splits_ordered:
+  forall (A : Type) (m : t A), wf m -> splits_ordered m.
+Proof.
+  intros A m Hwf. induction Hwf as
+      [|key value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr]; cbn.
+  - exact I.
+  - exact I.
+  - repeat split; try assumption.
+    + now apply (all_splits_after_of_all_keys A sample split false ltree).
+    + now apply (all_splits_after_of_all_keys A sample split true rtree).
+Qed.
+
+Lemma same_prefix_rebase:
+  forall old new key split,
+    same_prefix old new split -> same_prefix old key split ->
+    same_prefix new key split.
+Proof.
+  unfold same_prefix. intros old new key split Hnew Hkey n Hn.
+  rewrite <- (Hnew n Hn). apply Hkey. exact Hn.
+Qed.
+
+Lemma all_keys_branch:
+  forall (A : Type) (P : string -> Prop) sample split (ltree rtree : t A),
+    all_keys P ltree -> all_keys P rtree ->
+    all_keys P (branch sample split ltree rtree).
+Proof.
+  intros A P sample split ltree rtree Hl Hr.
+  unfold branch. destruct ltree; destruct rtree; cbn in *; try tauto.
+  all: repeat match goal with
+       | |- context [match representative ?m with _ => _ end] =>
+           destruct (representative m)
+       end; cbn; tauto.
+Qed.
+
+Lemma all_keys_get:
+  forall (A : Type) (P : string -> Prop) (m : t A) key value,
+    all_keys P m -> get key m = Some value -> P key.
+Proof.
+  intros A P m key value Hall Hget.
+  apply (proj1 (all_keys_elements A P m) Hall key value).
+  now apply get_elements_sound.
+Qed.
+
+Lemma get_none_if_all_keys:
+  forall (A : Type) (P : string -> Prop) (m : t A) key,
+    all_keys P m -> (P key -> False) -> get key m = None.
+Proof.
+  intros A P m key Hall Hcontra. destruct (get key m) eqn:E; [|reflexivity].
+  exfalso. apply Hcontra. eapply all_keys_get; eauto.
+Qed.
+
+Lemma get_branch:
+  forall (A : Type) sample split (ltree rtree : t A) key,
+    all_keys (fun stored => bit_at stored split = false) ltree ->
+    all_keys (fun stored => bit_at stored split = true) rtree ->
+    get key (branch sample split ltree rtree) =
+      if bit_at key split then get key rtree else get key ltree.
+Proof.
+  intros A sample split ltree rtree key Hl Hr.
+  assert (Hleft_wrong : bit_at key split = true -> get key ltree = None).
+  { intros Hbit. eapply get_none_if_all_keys; [exact Hl|].
+    intros Hfalse. congruence. }
+  assert (Hright_wrong : bit_at key split = false -> get key rtree = None).
+  { intros Hbit. eapply get_none_if_all_keys; [exact Hr|].
+    intros Htrue. congruence. }
+  destruct (bit_at key split) eqn:E.
+  - pose proof (Hleft_wrong eq_refl) as Hleftnone. unfold branch.
+    destruct ltree; destruct rtree; cbn [get representative] in *;
+      try rewrite E; try reflexivity; try congruence.
+    all: repeat match goal with
+         | |- context [match representative ?m with _ => _ end] =>
+             destruct (representative m)
+         end; cbn [get]; rewrite E; reflexivity.
+  - pose proof (Hright_wrong eq_refl) as Hrightnone. unfold branch.
+    destruct ltree; destruct rtree; cbn [get representative] in *;
+      try rewrite E; try reflexivity; try congruence.
+    all: repeat match goal with
+         | |- context [match representative ?m with _ => _ end] =>
+             destruct (representative m)
+         end; cbn [get]; rewrite E; reflexivity.
+Qed.
+
+Lemma branch_wf:
+  forall (A : Type) sample split (ltree rtree : t A),
+    wf ltree -> wf rtree ->
+    representative ltree <> None -> representative rtree <> None ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) ltree ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) rtree ->
+    wf (branch sample split ltree rtree).
+Proof.
+  intros A sample split ltree rtree Hwl Hwr Hnel Hner Hl Hr.
+  assert (Hleft_rebase : forall new_sample,
+    representative ltree = Some new_sample ->
+    all_keys (fun key =>
+      same_prefix new_sample key split /\ bit_at key split = false) ltree).
+  { intros new_sample Hrep. eapply all_keys_impl; [exact Hl|].
+    intros key [Hprefix Hbit]. split; [|exact Hbit].
+    eapply same_prefix_rebase; [|exact Hprefix].
+    exact (proj1 (representative_all_keys A
+      (fun stored => same_prefix sample stored split /\
+                     bit_at stored split = false)
+      ltree new_sample Hl Hrep)). }
+  assert (Hright_rebase : forall new_sample,
+    representative ltree = Some new_sample ->
+    all_keys (fun key =>
+      same_prefix new_sample key split /\ bit_at key split = true) rtree).
+  { intros new_sample Hrep. eapply all_keys_impl; [exact Hr|].
+    intros key [Hprefix Hbit]. split; [|exact Hbit].
+    eapply same_prefix_rebase; [|exact Hprefix].
+    exact (proj1 (representative_all_keys A
+      (fun stored => same_prefix sample stored split /\
+                     bit_at stored split = false)
+      ltree new_sample Hl Hrep)). }
+  unfold branch.
+  destruct ltree as [|left_key left_value|left_sample left_split left_left left_right];
+    [exfalso; apply Hnel; reflexivity| |];
+  destruct rtree as [|right_key right_value|right_sample right_split right_left right_right];
+    try (exfalso; apply Hner; reflexivity).
+  - cbn. apply wf_branch.
+    + exact Hwl.
+    + exact Hwr.
+    + exact Hnel.
+    + exact Hner.
+    + apply Hleft_rebase. reflexivity.
+    + apply Hright_rebase. reflexivity.
+  - cbn. apply wf_branch.
+    + exact Hwl.
+    + exact Hwr.
+    + exact Hnel.
+    + exact Hner.
+    + apply Hleft_rebase. reflexivity.
+    + apply Hright_rebase. reflexivity.
+  - destruct (representative (Branch left_sample left_split left_left left_right))
+      eqn:Erep.
+    + apply wf_branch.
+      * exact Hwl.
+      * exact Hwr.
+      * rewrite Erep. discriminate.
+      * exact Hner.
+      * apply Hleft_rebase. reflexivity.
+      * apply Hright_rebase. reflexivity.
+    + exfalso. apply Hnel. reflexivity.
+  - destruct (representative (Branch left_sample left_split left_left left_right))
+      eqn:Erep.
+    + apply wf_branch.
+      * exact Hwl.
+      * exact Hwr.
+      * rewrite Erep. discriminate.
+      * exact Hner.
+      * apply Hleft_rebase. reflexivity.
+      * apply Hright_rebase. reflexivity.
+    + exfalso. apply Hnel. reflexivity.
+Qed.
+
+Lemma all_keys_remove:
+  forall (A : Type) (P : string -> Prop) (m : t A) key,
+    all_keys P m -> all_keys P (remove key m).
+Proof.
+  intros A P m. induction m as [|stored value|sample split ltree IHl rtree IHr];
+    intros key Hall; cbn [remove] in *.
+  - exact I.
+  - destruct (String.eqb key stored); cbn; [exact I|exact Hall].
+  - destruct Hall as [Hl Hr]. destruct (bit_at key split).
+    + apply all_keys_branch; [exact Hl|now apply IHr].
+    + apply all_keys_branch; [now apply IHl|exact Hr].
+Qed.
+
+Lemma wf_representative_none:
+  forall (A : Type) (m : t A),
+    wf m -> representative m = None -> m = Empty.
+Proof.
+  intros A m Hwf. induction Hwf as
+      [|key value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr]; intros Hrep; cbn in Hrep.
+  - reflexivity.
+  - discriminate.
+  - destruct (representative ltree) eqn:Eleft.
+    + discriminate.
+    + exfalso. now apply Hnel.
+Qed.
+
+Lemma branch_wf_general:
+  forall (A : Type) sample split (ltree rtree : t A),
+    wf ltree -> wf rtree ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) ltree ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) rtree ->
+    wf (branch sample split ltree rtree).
+Proof.
+  intros A sample split ltree rtree Hwl Hwr Hl Hr.
+  destruct (representative ltree) eqn:Eleft.
+  - destruct (representative rtree) eqn:Eright.
+    + apply branch_wf; try assumption; congruence.
+    + pose proof (wf_representative_none A rtree Hwr Eright) as ->.
+      unfold branch. destruct ltree; exact Hwl.
+  - pose proof (wf_representative_none A ltree Hwl Eleft) as ->.
+    unfold branch. exact Hwr.
+Qed.
+
+Theorem remove_wf:
+  forall (A : Type) key (m : t A), wf m -> wf (remove key m).
+Proof.
+  intros A key m Hwf. induction Hwf as
+      [|stored value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr]; cbn [remove].
+  - constructor.
+  - destruct (String.eqb key stored); constructor.
+  - destruct (bit_at key split).
+    + apply branch_wf_general.
+      * exact Hwl.
+      * exact IHr.
+      * exact Hl.
+      * now apply all_keys_remove.
+    + apply branch_wf_general.
+      * exact IHl.
+      * exact Hwr.
+      * now apply all_keys_remove.
+      * exact Hr.
+Qed.
+
+Theorem get_remove:
+  forall (A : Type) key query (m : t A),
+    wf m ->
+    get query (remove key m) =
+      if String.eqb query key then None else get query m.
+Proof.
+  intros A key query m Hwf. induction Hwf as
+      [|stored value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr].
+  - cbn. destruct (String.eqb query key); reflexivity.
+  - cbn [remove get]. destruct (String.string_dec query key) as [->|Hqk].
+    + rewrite String.eqb_refl. destruct (String.eqb key stored) eqn:Eks;
+        cbn [get]; rewrite ?Eks; reflexivity.
+    + assert (Eqk : String.eqb query key = false) by
+        (apply String.eqb_neq; exact Hqk).
+      rewrite Eqk. destruct (String.eqb key stored) eqn:Eks.
+      * apply String.eqb_eq in Eks. subst stored.
+        assert (Eqs : String.eqb query key = false) by
+          (apply String.eqb_neq; exact Hqk).
+        now rewrite Eqs.
+      * reflexivity.
+  - cbn [remove].
+    assert (Hlbit : all_keys (fun stored => bit_at stored split = false) ltree).
+    { eapply all_keys_impl; [exact Hl|]. intros stored H. exact (proj2 H). }
+    assert (Hrbit : all_keys (fun stored => bit_at stored split = true) rtree).
+    { eapply all_keys_impl; [exact Hr|]. intros stored H. exact (proj2 H). }
+    destruct (bit_at key split) eqn:Ekey.
+    + rewrite (get_branch A sample split ltree (remove key rtree) query).
+      * destruct (bit_at query split) eqn:Equery.
+        -- rewrite IHr. cbn [get]. now rewrite Equery.
+        -- assert (Hneq : query <> key).
+           { intros ->. rewrite Ekey in Equery. discriminate. }
+           assert (Eneq : String.eqb query key = false) by
+             (apply String.eqb_neq; exact Hneq).
+           cbn [get]. now rewrite Equery, Eneq.
+      * exact Hlbit.
+      * now apply all_keys_remove.
+    + rewrite (get_branch A sample split (remove key ltree) rtree query).
+      * destruct (bit_at query split) eqn:Equery.
+        -- assert (Hneq : query <> key).
+           { intros ->. rewrite Ekey in Equery. discriminate. }
+           assert (Eneq : String.eqb query key = false) by
+             (apply String.eqb_neq; exact Hneq).
+           cbn [get]. now rewrite Equery, Eneq.
+        -- rewrite IHl. cbn [get]. now rewrite Equery.
+      * now apply all_keys_remove.
+      * exact Hrbit.
+Qed.
+
+Corollary get_remove_same:
+  forall (A : Type) key (m : t A),
+    wf m -> get key (remove key m) = None.
+Proof.
+  intros. rewrite get_remove by exact H. now rewrite String.eqb_refl.
+Qed.
+
+Corollary get_remove_other:
+  forall (A : Type) key query (m : t A),
+    wf m -> query <> key ->
+    get query (remove key m) = get query m.
+Proof.
+  intros. rewrite get_remove by exact H.
+  apply String.eqb_neq in H0. now rewrite H0.
+Qed.
+
+Theorem elements_remove_spec:
+  forall (A : Type) key (m : t A),
+    wf m -> forall stored value,
+    In (stored, value) (elements (remove key m)) <->
+      stored <> key /\ In (stored, value) (elements m).
+Proof.
+  intros A key m Hwf stored value. split.
+  - intros Hin.
+    assert (Hneq : stored <> key).
+    { intros ->.
+      pose proof (wf_elements_complete A (remove key m)
+        (remove_wf A key m Hwf) key value Hin) as Hget.
+      rewrite get_remove_same in Hget by exact Hwf. discriminate. }
+    split; [exact Hneq|]. apply get_elements_sound.
+    pose proof (wf_elements_complete A (remove key m)
+      (remove_wf A key m Hwf) stored value Hin) as Hget.
+    rewrite (get_remove_other A key stored m Hwf Hneq) in Hget. exact Hget.
+  - intros [Hneq Hin].
+    apply get_elements_sound. rewrite (get_remove_other A key stored m Hwf Hneq).
+    now apply (wf_elements_complete A m Hwf).
+Qed.
+
+Lemma representative_map:
+  forall (A B : Type) (f : string -> A -> B) (m : t A),
+    representative (map f m) = representative m.
+Proof.
+  intros A B f m. induction m as [|key value|sample split ltree IHl rtree IHr];
+    cbn; [reflexivity|reflexivity|].
+  now rewrite IHl, IHr.
+Qed.
+
+Lemma all_keys_map:
+  forall (A B : Type) (P : string -> Prop) (f : string -> A -> B) (m : t A),
+    all_keys P (map f m) <-> all_keys P m.
+Proof.
+  intros A B P f m. induction m as [|key value|sample split ltree IHl rtree IHr];
+    cbn; [tauto|tauto|]. now rewrite IHl, IHr.
+Qed.
+
+Theorem map_wf:
+  forall (A B : Type) (f : string -> A -> B) (m : t A),
+    wf m -> wf (map f m).
+Proof.
+  intros A B f m Hwf. induction Hwf as
+      [|key value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr]; cbn [map].
+  - constructor.
+  - constructor.
+  - apply wf_branch.
+    + exact IHl.
+    + exact IHr.
+    + rewrite representative_map. exact Hnel.
+    + rewrite representative_map. exact Hner.
+    + apply (proj2 (all_keys_map A B _ f ltree)). exact Hl.
+    + apply (proj2 (all_keys_map A B _ f rtree)). exact Hr.
+Qed.
+
+(** Filtering is the first missing merge dependency.  Unlike [map], it may
+    remove every binding below a branch, so its invariant proof deliberately
+    goes through the collapsing smart [branch] constructor. *)
+Lemma all_keys_map_filter:
+  forall (A B : Type) (P : string -> Prop)
+      (f : string -> A -> option B) (m : t A),
+    all_keys P m -> all_keys P (map_filter f m).
+Proof.
+  intros A B P f m. induction m as
+      [|key value|sample split ltree IHl rtree IHr]; intros Hall;
+    cbn [map_filter] in *.
+  - exact I.
+  - destruct (f key value); cbn; [exact Hall|exact I].
+  - destruct Hall as [Hl Hr]. apply all_keys_branch.
+    + now apply IHl.
+    + now apply IHr.
+Qed.
+
+Theorem map_filter_wf:
+  forall (A B : Type) (f : string -> A -> option B) (m : t A),
+    wf m -> wf (map_filter f m).
+Proof.
+  intros A B f m Hwf. induction Hwf as
+      [|key value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr]; cbn [map_filter].
+  - constructor.
+  - destruct (f key value); constructor.
+  - apply branch_wf_general.
+    + exact IHl.
+    + exact IHr.
+    + now apply all_keys_map_filter.
+    + now apply all_keys_map_filter.
+Qed.
+
+Theorem get_map_filter_wf:
+  forall (A B : Type) (f : string -> A -> option B) (m : t A),
+    wf m -> forall query,
+    get query (map_filter f m) =
+      match get query m with None => None | Some value => f query value end.
+Proof.
+  intros A B f m Hwf. induction Hwf as
+      [|key value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr]; intros query.
+  - reflexivity.
+  - cbn [map_filter get]. destruct (f key value) as [result|] eqn:Eresult;
+      destruct (String.eqb query key) eqn:Equery; cbn.
+    + apply String.eqb_eq in Equery. subst query.
+      now rewrite String.eqb_refl, Eresult.
+    + now rewrite Equery.
+    + apply String.eqb_eq in Equery. subst query.
+      now rewrite Eresult.
+    + reflexivity.
+  - assert (Hlbit : all_keys (fun stored => bit_at stored split = false) ltree).
+    { eapply all_keys_impl; [exact Hl|]. intros stored H. exact (proj2 H). }
+    assert (Hrbit : all_keys (fun stored => bit_at stored split = true) rtree).
+    { eapply all_keys_impl; [exact Hr|]. intros stored H. exact (proj2 H). }
+    assert (Hlfiltered : all_keys
+      (fun stored => bit_at stored split = false) (map_filter f ltree)).
+    { now apply all_keys_map_filter. }
+    assert (Hrfiltered : all_keys
+      (fun stored => bit_at stored split = true) (map_filter f rtree)).
+    { now apply all_keys_map_filter. }
+    cbn [map_filter]. rewrite (get_branch B sample split
+      (map_filter f ltree) (map_filter f rtree) query Hlfiltered Hrfiltered).
+    cbn [get]. destruct (bit_at query split); [apply IHr|apply IHl].
+Qed.
+
+Theorem map_left_correct_wf:
+  forall (A B C : Type) (f : option A -> option B -> option C) (m : t A),
+    f None None = None -> wf m -> wf (map_left f m) /\
+    forall key, get key (map_left f m) = f (get key m) None.
+Proof.
+  intros A B C f m Hnone Hwf. unfold map_left. split.
+  - now apply map_filter_wf.
+  - intro key. rewrite get_map_filter_wf by exact Hwf.
+    destruct (get key m); [reflexivity|symmetry; exact Hnone].
+Qed.
+
+Theorem map_right_correct_wf:
+  forall (A B C : Type) (f : option A -> option B -> option C) (m : t B),
+    f None None = None -> wf m -> wf (map_right f m) /\
+    forall key, get key (map_right f m) = f None (get key m).
+Proof.
+  intros A B C f m Hnone Hwf. unfold map_right. split.
+  - now apply map_filter_wf.
+  - intro key. rewrite get_map_filter_wf by exact Hwf.
+    destruct (get key m); [reflexivity|symmetry; exact Hnone].
+Qed.
+
+Lemma get_routed_key_self:
+  forall (A : Type) key value (m : t A),
+    get key m = Some value -> routed_key key m = Some key.
+Proof.
+  intros A key value m. induction m as
+      [|stored stored_value|sample split ltree IHl rtree IHr];
+    intros Hget; cbn in *.
+  - discriminate.
+  - destruct (String.eqb key stored) eqn:E; [|discriminate].
+    apply String.eqb_eq in E. now subst.
+  - destruct (bit_at key split); eauto.
+Qed.
+
+Lemma representative_replace_same:
+  forall (A : Type) key value (m : t A),
+    routed_key key m = Some key ->
+    representative (replace key value m) = representative m.
+Proof.
+  intros A key value m. induction m as
+      [|stored stored_value|sample split ltree IHl rtree IHr];
+    intros Hrouted.
+  - discriminate.
+  - cbn in Hrouted. inversion Hrouted. reflexivity.
+  - destruct (bit_at key split) eqn:E.
+    + cbn [routed_key] in Hrouted. rewrite E in Hrouted.
+      cbn [replace representative]. rewrite E.
+      destruct (representative ltree) eqn:Eleft.
+      * cbn [representative]. now rewrite Eleft.
+      * cbn [representative]. rewrite Eleft. now rewrite (IHr Hrouted).
+    + cbn [routed_key] in Hrouted. rewrite E in Hrouted.
+      cbn [replace representative]. rewrite E.
+      cbn [representative]. now rewrite (IHl Hrouted).
+Qed.
+
+Lemma all_keys_replace_same:
+  forall (A : Type) (P : string -> Prop) key value (m : t A),
+    routed_key key m = Some key -> all_keys P m ->
+    all_keys P (replace key value m).
+Proof.
+  intros A P key value m. induction m as
+      [|stored stored_value|sample split ltree IHl rtree IHr];
+    intros Hrouted Hall; cbn in *.
+  - discriminate.
+  - inversion Hrouted; subst. exact Hall.
+  - destruct Hall as [Hl Hr]. destruct (bit_at key split).
+    + split; [exact Hl|now apply IHr].
+    + split; [now apply IHl|exact Hr].
+Qed.
+
+Theorem replace_same_correct_wf:
+  forall (A : Type) key value (m : t A),
+    wf m -> routed_key key m = Some key ->
+    wf (replace key value m) /\
+    forall query,
+      get query (replace key value m) =
+        if String.eqb query key then Some value else get query m.
+Proof.
+  intros A key value m Hwf. induction Hwf as
+      [|stored stored_value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr]; intros Hrouted.
+  - discriminate.
+  - cbn in Hrouted. inversion Hrouted; subst stored. split; [constructor|].
+    intros query. cbn [replace get]. destruct (String.eqb query key); reflexivity.
+  - cbn [routed_key] in Hrouted. destruct (bit_at key split) eqn:Ekey.
+    + specialize (IHr Hrouted). destruct IHr as [Hwreplace Hgetreplace]. split.
+      * cbn [replace]. rewrite Ekey. apply wf_branch; try assumption.
+        -- rewrite representative_replace_same by exact Hrouted. exact Hner.
+        -- apply all_keys_replace_same with (key := key); assumption.
+      * intros query. cbn [replace]. rewrite Ekey.
+        destruct (bit_at query split) eqn:Equery.
+        -- cbn [get]. rewrite Equery. apply Hgetreplace.
+        -- assert (Hneq : query <> key).
+           { intros ->. rewrite Ekey in Equery. discriminate. }
+           apply String.eqb_neq in Hneq. cbn [get]. now rewrite Equery, Hneq.
+    + specialize (IHl Hrouted). destruct IHl as [Hwreplace Hgetreplace]. split.
+      * cbn [replace]. rewrite Ekey. apply wf_branch; try assumption.
+        -- rewrite representative_replace_same by exact Hrouted. exact Hnel.
+        -- apply all_keys_replace_same with (key := key); assumption.
+      * intros query. cbn [replace]. rewrite Ekey.
+        destruct (bit_at query split) eqn:Equery.
+        -- assert (Hneq : query <> key).
+           { intros ->. rewrite Ekey in Equery. discriminate. }
+           apply String.eqb_neq in Hneq. cbn [get]. now rewrite Equery, Hneq.
+        -- cbn [get]. rewrite Equery. apply Hgetreplace.
+Qed.
+
+Theorem set_existing_correct_wf:
+  forall (A : Type) key old_value value (m : t A),
+    wf m -> get key m = Some old_value ->
+    wf (set key value m) /\
+    forall query,
+      get query (set key value m) =
+        if String.eqb query key then Some value else get query m.
+Proof.
+  intros A key old_value value m Hwf Hget.
+  pose proof (get_routed_key_self A key old_value m Hget) as Hrouted.
+  unfold set. rewrite Hrouted, first_diff_same.
+  now apply replace_same_correct_wf.
+Qed.
+
+Corollary get_set_existing_same:
+  forall (A : Type) key old_value value (m : t A),
+    wf m -> get key m = Some old_value ->
+    get key (set key value m) = Some value.
+Proof.
+  intros. destruct (set_existing_correct_wf A key old_value value m H H0) as [_ Hget].
+  rewrite Hget. now rewrite String.eqb_refl.
+Qed.
+
+Corollary get_set_existing_other:
+  forall (A : Type) key query old_value value (m : t A),
+    wf m -> get key m = Some old_value -> query <> key ->
+    get query (set key value m) = get query m.
+Proof.
+  intros. destruct (set_existing_correct_wf A key old_value value m H H0) as [_ Hget].
+  rewrite Hget. apply String.eqb_neq in H1. now rewrite H1.
+Qed.
+
+(** Fresh insertion puts a singleton on the opposite side of every existing
+    binding at the first differing bit.  These small lemmas package the
+    routing and invariant consequences of that construction. *)
+Lemma bool_neq_negb:
+  forall left right : bool, left <> right -> right = negb left.
+Proof.
+  intros [] []; cbn; intros H; try reflexivity; congruence.
+Qed.
+
+Lemma branch_at_leaf_wf:
+  forall (A : Type) key value split (old : t A),
+    wf old -> representative old <> None ->
+    all_keys (fun stored =>
+      same_prefix key stored split /\
+      bit_at stored split = negb (bit_at key split)) old ->
+    wf (branch_at key split (Leaf key value) old).
+Proof.
+  intros A key value split old Hwf Hnonempty Hall.
+  unfold branch_at. destruct (bit_at key split) eqn:Ekey.
+  - apply wf_branch.
+    + exact Hwf.
+    + constructor.
+    + exact Hnonempty.
+    + discriminate.
+    + eapply all_keys_impl; [exact Hall|].
+      intros stored [Hprefix Hbit]. split; [exact Hprefix|].
+      exact Hbit.
+    + cbn. split.
+      * unfold same_prefix. intros n Hn. reflexivity.
+      * exact Ekey.
+  - apply wf_branch.
+    + constructor.
+    + exact Hwf.
+    + discriminate.
+    + exact Hnonempty.
+    + cbn. split.
+      * unfold same_prefix. intros n Hn. reflexivity.
+      * exact Ekey.
+    + eapply all_keys_impl; [exact Hall|].
+      intros stored [Hprefix Hbit]. split; [exact Hprefix|].
+      exact Hbit.
+Qed.
+
+Lemma get_branch_at_leaf:
+  forall (A : Type) key value split (old : t A) query,
+    all_keys (fun stored =>
+      bit_at stored split = negb (bit_at key split)) old ->
+    get query (branch_at key split (Leaf key value) old) =
+      if String.eqb query key then Some value else get query old.
+Proof.
+  intros A key value split old query Hall.
+  unfold branch_at. destruct (bit_at key split) eqn:Ekey;
+    destruct (bit_at query split) eqn:Equery; cbn [get]; rewrite Equery.
+  - destruct (String.eqb query key) eqn:Eequal.
+    + reflexivity.
+    + assert (Hnone : get query old = None).
+      { apply (get_none_if_all_keys A
+          (fun stored => bit_at stored split = false) old query).
+        - exact Hall.
+        - intros Hbit. rewrite Equery in Hbit. discriminate. }
+      now rewrite Hnone.
+  - assert (Hneq : query <> key).
+    { intros ->. rewrite Ekey in Equery. discriminate. }
+    apply String.eqb_neq in Hneq. now rewrite Hneq.
+  - assert (Hneq : query <> key).
+    { intros ->. rewrite Ekey in Equery. discriminate. }
+    apply String.eqb_neq in Hneq. now rewrite Hneq.
+  - destruct (String.eqb query key) eqn:Eequal.
+    + reflexivity.
+    + assert (Hnone : get query old = None).
+      { apply (get_none_if_all_keys A
+          (fun stored => bit_at stored split = true) old query).
+        - exact Hall.
+        - intros Hbit. rewrite Equery in Hbit. discriminate. }
+      now rewrite Hnone.
+Qed.
+
+Lemma all_keys_insert_at:
+  forall (A : Type) (P : string -> Prop) key value differing (m : t A),
+    P key -> all_keys P m -> all_keys P (insert_at key value differing m).
+Proof.
+  intros A P key value differing m Hkey Hall.
+  induction m as [|stored stored_value|sample split ltree IHl rtree IHr];
+    cbn [insert_at] in *.
+  - exact Hkey.
+  - unfold branch_at. destruct (bit_at key differing); cbn; tauto.
+  - destruct (Nat.ltb differing split) eqn:Ebefore.
+    + destruct Hall as [Hl Hr]. unfold branch_at.
+      destruct (bit_at key differing); cbn; tauto.
+    + destruct Hall as [Hl Hr]. destruct (bit_at key split).
+      * split; [exact Hl|now apply IHr].
+      * split; [now apply IHl|exact Hr].
+Qed.
+
+Lemma wf_representative_nonempty_routed:
+  forall (A : Type) (m : t A) probe routed,
+    wf m -> routed_key probe m = Some routed -> representative m <> None.
+Proof.
+  intros A m probe routed Hwf Hrouted Hnone.
+  apply wf_representative_none in Hnone; [|exact Hwf]. subst m.
+  discriminate.
+Qed.
+
+Lemma wf_representative_nonempty_get:
+  forall (A : Type) (m : t A) key value,
+    wf m -> get key m = Some value -> representative m <> None.
+Proof.
+  intros A m key value Hwf Hget Hnone.
+  apply wf_representative_none in Hnone; [|exact Hwf]. subst m.
+  discriminate.
+Qed.
+
+Theorem insert_at_correct_wf:
+  forall (A : Type) key value differing (m : t A) routed,
+    wf m -> routed_key key m = Some routed ->
+    first_diff key routed = Some differing ->
+    wf (insert_at key value differing m) /\
+    forall query,
+      get query (insert_at key value differing m) =
+        if String.eqb query key then Some value else get query m.
+Proof.
+  intros A key value differing m routed Hwf.
+  induction Hwf as
+      [|stored stored_value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr]; intros Hrouted Hdiff.
+  - discriminate.
+  - cbn in Hrouted. inversion Hrouted; subst routed.
+    destruct (first_diff_spec _ _ _ Hdiff) as [Hbits Hbefore].
+    assert (Hall : all_keys (fun current =>
+      same_prefix key current differing /\
+      bit_at current differing = negb (bit_at key differing))
+      (Leaf stored stored_value)).
+    { cbn. split.
+      - unfold same_prefix. intros n Hn. now apply Hbefore.
+      - now apply bool_neq_negb. }
+    split.
+    + apply branch_at_leaf_wf; [constructor|discriminate|exact Hall].
+    + intro query. apply get_branch_at_leaf.
+      eapply all_keys_impl; [exact Hall|]. intros current H. exact (proj2 H).
+  - cbn [routed_key] in Hrouted.
+    assert (Hallprefix : all_keys (fun current => same_prefix sample current split)
+      (Branch sample split ltree rtree)).
+    { cbn. split.
+      - eapply all_keys_impl; [exact Hl|].
+        intros current H. exact (proj1 H).
+      - eapply all_keys_impl; [exact Hr|].
+        intros current H. exact (proj1 H). }
+    assert (Hrouted_full : routed_key key (Branch sample split ltree rtree) =
+      Some routed).
+    { cbn. destruct (bit_at key split) eqn:E; [exact Hrouted|exact Hrouted]. }
+    destruct (routed_key_elements A (Branch sample split ltree rtree)
+      key routed Hrouted_full) as [routed_value Hrouted_in].
+    assert (Hrouted_prefix : same_prefix sample routed split).
+    { apply (proj1 (all_keys_elements A (fun current => same_prefix sample current split)
+      (Branch sample split ltree rtree)) Hallprefix routed routed_value
+      Hrouted_in). }
+    destruct (first_diff_spec _ _ _ Hdiff) as [Hbits Hbefore].
+    destruct (bit_at key split) eqn:Ekey.
+    + cbn [routed_key] in Hrouted.
+      destruct (Nat.ltb differing split) eqn:Ebefore.
+      * assert (Hbefore_split : differing < split) by
+          (apply Nat.ltb_lt; exact Ebefore).
+        assert (Hall : all_keys (fun current =>
+          same_prefix key current differing /\
+          bit_at current differing = negb (bit_at key differing))
+          (Branch sample split ltree rtree)).
+        { eapply all_keys_impl; [exact Hallprefix|]. intros current Hcurrent.
+          split.
+          - unfold same_prefix. intros n Hn.
+            rewrite (Hbefore n Hn).
+            rewrite <- (Hrouted_prefix n ltac:(lia)).
+            exact (Hcurrent n ltac:(lia)).
+          - rewrite <- (Hcurrent differing ltac:(lia)).
+            rewrite (Hrouted_prefix differing ltac:(lia)).
+            now apply bool_neq_negb. }
+        split.
+        -- cbn [insert_at]. rewrite Ebefore.
+           apply branch_at_leaf_wf; [apply wf_branch; assumption| |exact Hall].
+           apply (wf_representative_nonempty_routed A
+             (Branch sample split ltree rtree) key routed).
+           ++ apply wf_branch; assumption.
+           ++ exact Hrouted_full.
+        -- intro query. cbn [insert_at]. rewrite Ebefore. apply get_branch_at_leaf.
+           eapply all_keys_impl; [exact Hall|]. intros current H. exact (proj2 H).
+      * assert (Hrouted_bit : bit_at routed split = true).
+        { destruct (routed_key_elements A rtree key routed Hrouted)
+            as [right_value Hrouted_in_right].
+          exact (proj2 (proj1 (all_keys_elements A _ rtree) Hr
+            routed right_value Hrouted_in_right)). }
+        assert (Hsplit : split < differing).
+        { apply Nat.ltb_ge in Ebefore. assert (split <> differing).
+          { intro E. subst differing. rewrite Ekey, Hrouted_bit in Hbits.
+            congruence. }
+          lia. }
+        assert (Hkey_prefix : same_prefix sample key split).
+        { unfold same_prefix. intros n Hn.
+          rewrite (Hbefore n ltac:(lia)). exact (Hrouted_prefix n Hn). }
+        assert (Hkey_right :
+          same_prefix sample key split /\ bit_at key split = true).
+        { split; assumption. }
+        specialize (IHr Hrouted Hdiff).
+        destruct IHr as [Hwinsert Hgetinsert].
+        split.
+        -- cbn [insert_at]. rewrite Ebefore, Ekey. apply wf_branch.
+           ++ exact Hwl.
+           ++ exact Hwinsert.
+           ++ exact Hnel.
+           ++ apply (wf_representative_nonempty_get A
+                (insert_at key value differing rtree) key value Hwinsert).
+              rewrite Hgetinsert. now rewrite String.eqb_refl.
+           ++ exact Hl.
+           ++ apply all_keys_insert_at; assumption.
+        -- intro query. cbn [insert_at]. rewrite Ebefore, Ekey.
+           destruct (bit_at query split) eqn:Equery.
+           ++ cbn [get]. rewrite Equery. exact (Hgetinsert query).
+           ++ assert (Hneq : query <> key).
+              { intros ->. rewrite Ekey in Equery. discriminate. }
+              apply String.eqb_neq in Hneq. cbn [get]. now rewrite Equery, Hneq.
+    + cbn [routed_key] in Hrouted.
+      destruct (Nat.ltb differing split) eqn:Ebefore.
+      * assert (Hbefore_split : differing < split) by
+          (apply Nat.ltb_lt; exact Ebefore).
+        assert (Hall : all_keys (fun current =>
+          same_prefix key current differing /\
+          bit_at current differing = negb (bit_at key differing))
+          (Branch sample split ltree rtree)).
+        { eapply all_keys_impl; [exact Hallprefix|]. intros current Hcurrent.
+          split.
+          - unfold same_prefix. intros n Hn.
+            rewrite (Hbefore n Hn).
+            rewrite <- (Hrouted_prefix n ltac:(lia)).
+            exact (Hcurrent n ltac:(lia)).
+          - rewrite <- (Hcurrent differing ltac:(lia)).
+            rewrite (Hrouted_prefix differing ltac:(lia)).
+            now apply bool_neq_negb. }
+        split.
+        -- cbn [insert_at]. rewrite Ebefore.
+           apply branch_at_leaf_wf; [apply wf_branch; assumption| |exact Hall].
+           apply (wf_representative_nonempty_routed A
+             (Branch sample split ltree rtree) key routed).
+           ++ apply wf_branch; assumption.
+           ++ exact Hrouted_full.
+        -- intro query. cbn [insert_at]. rewrite Ebefore. apply get_branch_at_leaf.
+           eapply all_keys_impl; [exact Hall|]. intros current H. exact (proj2 H).
+      * assert (Hrouted_bit : bit_at routed split = false).
+        { destruct (routed_key_elements A ltree key routed Hrouted)
+            as [left_value Hrouted_in_left].
+          exact (proj2 (proj1 (all_keys_elements A _ ltree) Hl
+            routed left_value Hrouted_in_left)). }
+        assert (Hsplit : split < differing).
+        { apply Nat.ltb_ge in Ebefore. assert (split <> differing).
+          { intro E. subst differing. rewrite Ekey, Hrouted_bit in Hbits.
+            congruence. }
+          lia. }
+        assert (Hkey_prefix : same_prefix sample key split).
+        { unfold same_prefix. intros n Hn.
+          rewrite (Hbefore n ltac:(lia)). exact (Hrouted_prefix n Hn). }
+        assert (Hkey_left :
+          same_prefix sample key split /\ bit_at key split = false).
+        { split; assumption. }
+        specialize (IHl Hrouted Hdiff).
+        destruct IHl as [Hwinsert Hgetinsert].
+        split.
+        -- cbn [insert_at]. rewrite Ebefore, Ekey. apply wf_branch.
+           ++ exact Hwinsert.
+           ++ exact Hwr.
+           ++ apply (wf_representative_nonempty_get A
+                (insert_at key value differing ltree) key value Hwinsert).
+              rewrite Hgetinsert. now rewrite String.eqb_refl.
+           ++ exact Hner.
+           ++ apply all_keys_insert_at; assumption.
+           ++ exact Hr.
+        -- intro query. cbn [insert_at]. rewrite Ebefore, Ekey.
+           destruct (bit_at query split) eqn:Equery.
+           ++ assert (Hneq : query <> key).
+              { intros ->. rewrite Ekey in Equery. discriminate. }
+              apply String.eqb_neq in Hneq. cbn [get]. now rewrite Equery, Hneq.
+           ++ cbn [get]. rewrite Equery. exact (Hgetinsert query).
+Qed.
+
+Lemma wf_routed_key_none:
+  forall (A : Type) (m : t A) probe,
+    wf m -> routed_key probe m = None -> m = Empty.
+Proof.
+  intros A m probe Hwf. induction Hwf as
+      [|stored stored_value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr]; intros Hrouted.
+  - reflexivity.
+  - discriminate.
+  - cbn [routed_key] in Hrouted. destruct (bit_at probe split).
+    + pose proof (IHr Hrouted) as Er. subst rtree.
+      exfalso. apply Hner. reflexivity.
+    + pose proof (IHl Hrouted) as El. subst ltree.
+      exfalso. apply Hnel. reflexivity.
+Qed.
+
+Theorem set_correct_wf:
+  forall (A : Type) key value (m : t A),
+    wf m -> wf (set key value m) /\
+    forall query,
+      get query (set key value m) =
+        if String.eqb query key then Some value else get query m.
+Proof.
+  intros A key value m Hwf. unfold set.
+  destruct (routed_key key m) as [routed|] eqn:Hrouted.
+  - destruct (first_diff key routed) as [differing|] eqn:Hdiff.
+    + now apply (insert_at_correct_wf A key value differing m routed).
+    + apply first_diff_none_iff in Hdiff. subst routed.
+      now apply (replace_same_correct_wf A key value m).
+  - pose proof (wf_routed_key_none A m key Hwf Hrouted) as ->.
+    split; [constructor|]. intros query.
+    cbn [get]. destruct (String.eqb query key); reflexivity.
+Qed.
+
+Corollary get_set_same:
+  forall (A : Type) key value (m : t A),
+    wf m -> get key (set key value m) = Some value.
+Proof.
+  intros A key value m Hwf.
+  destruct (set_correct_wf A key value m Hwf) as [_ Hget].
+  rewrite Hget. now rewrite String.eqb_refl.
+Qed.
+
+Corollary get_set_other:
+  forall (A : Type) key query value (m : t A),
+    wf m -> query <> key -> get query (set key value m) = get query m.
+Proof.
+  intros A key query value m Hwf Hneq.
+  destruct (set_correct_wf A key value m Hwf) as [_ Hget].
+  rewrite Hget. apply String.eqb_neq in Hneq. now rewrite Hneq.
+Qed.
+
+Theorem replace_binding_correct_wf:
+  forall (A : Type) key (value : option A) (m : t A),
+    wf m -> wf (replace_binding key value m) /\
+    forall query,
+      get query (replace_binding key value m) =
+        match value with
+        | Some result =>
+            if String.eqb query key then Some result else get query m
+        | None =>
+            if String.eqb query key then None else get query m
+        end.
+Proof.
+  intros A key [result|] m Hwf; cbn [replace_binding].
+  - now apply (set_correct_wf A key result m).
+  - split; [now apply remove_wf|].
+    intro query. now apply (get_remove A key query m).
+Qed.
+
+(** The generic merge explores at most one of six smaller branch-pair shapes
+    at each branch/branch step.  This conservative predicate is independent
+    of the string-prefix tests, which makes the public size bound reusable by
+    the semantic merge proof. *)
+Fixpoint combine_fuel_sufficient {A B : Type}
+    (fuel : nat) (left : t A) (right : t B) : Prop :=
+  match fuel with
+  | O => False
+  | S fuel' =>
+      match left, right with
+      | Branch _ _ left_left left_right, Branch _ _ right_left right_right =>
+          combine_fuel_sufficient fuel' left_left right_left /\
+          combine_fuel_sufficient fuel' left_right right_right /\
+          combine_fuel_sufficient fuel' left_left right /\
+          combine_fuel_sufficient fuel' left_right right /\
+          combine_fuel_sufficient fuel' left right_left /\
+          combine_fuel_sufficient fuel' left right_right
+      | _, _ => True
+      end
+  end.
+
+Lemma combine_fuel_sufficient_succ:
+  forall (A B : Type) fuel (left : t A) (right : t B),
+    combine_fuel_sufficient fuel left right ->
+    combine_fuel_sufficient (S fuel) left right.
+Proof.
+  intros A B fuel. induction fuel as [|fuel IH]; intros left right H;
+    [contradiction|].
+  destruct left as [|left_key left_value|left_sample left_split left_left left_right];
+    destruct right as [|right_key right_value|right_sample right_split right_left right_right];
+    cbn in *; auto.
+  destruct H as [H1 [H2 [H3 [H4 [H5 H6]]]]]. repeat split.
+  - exact (IH left_left right_left H1).
+  - exact (IH left_right right_right H2).
+  - exact (IH left_left (Branch right_sample right_split right_left right_right) H3).
+  - exact (IH left_right (Branch right_sample right_split right_left right_right) H4).
+  - exact (IH (Branch left_sample left_split left_left left_right) right_left H5).
+  - exact (IH (Branch left_sample left_split left_left left_right) right_right H6).
+Qed.
+
+Lemma combine_fuel_sufficient_monotone:
+  forall (A B : Type) fuel extra (left : t A) (right : t B),
+    combine_fuel_sufficient fuel left right ->
+    combine_fuel_sufficient (fuel + extra) left right.
+Proof.
+  intros A B fuel extra. induction extra as [|extra IH]; intros left right H.
+  - now rewrite Nat.add_0_r.
+  - rewrite Nat.add_succ_r. apply combine_fuel_sufficient_succ. now apply IH.
+Qed.
+
+Theorem public_combine_fuel_sufficient:
+  forall (A B : Type) (left : t A) (right : t B),
+    combine_fuel_sufficient (S (size left + size right)) left right.
+Proof.
+  intros A B.
+  assert (Hstrong : forall total,
+      forall (left : t A) (right : t B),
+      size left + size right = total ->
+      combine_fuel_sufficient (S total) left right).
+  { intro total. induction total using lt_wf_ind.
+    intros left right E. destruct left as
+        [|left_key left_value|left_sample left_split left_left left_right];
+      destruct right as
+        [|right_key right_value|right_sample right_split right_left right_right];
+      cbn; auto.
+    repeat split.
+    - pose proof (H (size left_left + size right_left)) as IH.
+      assert (Hs := IH ltac:(cbn in E; lia) left_left right_left eq_refl).
+      pose proof (@combine_fuel_sufficient_monotone A B _
+        (size left_right + S (size right_right)) _ _ Hs) as Hm.
+      replace total with
+        (S (size left_left + size right_left) +
+         (size left_right + S (size right_right))) by
+        (cbn [size] in E |- *; lia). exact Hm.
+    - pose proof (H (size left_right + size right_right)) as IH.
+      assert (Hs := IH ltac:(cbn in E; lia) left_right right_right eq_refl).
+      pose proof (@combine_fuel_sufficient_monotone A B _
+        (size left_left + S (size right_left)) _ _ Hs) as Hm.
+      replace total with
+        (S (size left_right + size right_right) +
+         (size left_left + S (size right_left))) by
+        (cbn [size] in E |- *; lia). exact Hm.
+    - pose proof (H (size left_left + size
+        (Branch right_sample right_split right_left right_right))) as IH.
+      assert (Hlt : size left_left +
+        size (Branch right_sample right_split right_left right_right) < total) by
+        (cbn [size] in E |- *; lia).
+      assert (Hs := IH Hlt left_left
+        (Branch right_sample right_split right_left right_right) eq_refl).
+      pose proof (@combine_fuel_sufficient_monotone A B _
+        (size left_right) _ _ Hs) as Hm.
+      replace total with
+        (S (size left_left + size
+          (Branch right_sample right_split right_left right_right)) +
+         size left_right) by (cbn [size] in E |- *; lia). exact Hm.
+    - pose proof (H (size left_right + size
+        (Branch right_sample right_split right_left right_right))) as IH.
+      assert (Hlt : size left_right +
+        size (Branch right_sample right_split right_left right_right) < total) by
+        (cbn [size] in E |- *; lia).
+      assert (Hs := IH Hlt left_right
+        (Branch right_sample right_split right_left right_right) eq_refl).
+      pose proof (@combine_fuel_sufficient_monotone A B _
+        (size left_left) _ _ Hs) as Hm.
+      replace total with
+        (S (size left_right + size
+          (Branch right_sample right_split right_left right_right)) +
+         size left_left) by (cbn [size] in E |- *; lia). exact Hm.
+    - pose proof (H (size (Branch left_sample left_split left_left left_right) +
+        size right_left)) as IH.
+      assert (Hlt : size (Branch left_sample left_split left_left left_right) +
+        size right_left < total) by (cbn [size] in E |- *; lia).
+      assert (Hs := IH Hlt
+        (Branch left_sample left_split left_left left_right) right_left eq_refl).
+      pose proof (@combine_fuel_sufficient_monotone A B _
+        (size right_right) _ _ Hs) as Hm.
+      replace total with
+        (S (size (Branch left_sample left_split left_left left_right) +
+          size right_left) + size right_right) by
+        (cbn [size] in E |- *; lia). exact Hm.
+    - pose proof (H (size (Branch left_sample left_split left_left left_right) +
+        size right_right)) as IH.
+      assert (Hlt : size (Branch left_sample left_split left_left left_right) +
+        size right_right < total) by (cbn [size] in E |- *; lia).
+      assert (Hs := IH Hlt
+        (Branch left_sample left_split left_left left_right) right_right eq_refl).
+      pose proof (@combine_fuel_sufficient_monotone A B _
+        (size right_left) _ _ Hs) as Hm.
+      replace total with
+        (S (size (Branch left_sample left_split left_left left_right) +
+          size right_right) + size right_left) by
+        (cbn [size] in E |- *; lia). exact Hm. }
+  intros. apply Hstrong with (total := size left + size right). reflexivity.
+Qed.
+
+Lemma branch_at_wf:
+  forall (A : Type) sample split (fresh old : t A),
+    wf fresh -> wf old ->
+    representative fresh <> None -> representative old <> None ->
+    all_keys (fun stored =>
+      same_prefix sample stored split /\
+      bit_at stored split = bit_at sample split) fresh ->
+    all_keys (fun stored =>
+      same_prefix sample stored split /\
+      bit_at stored split = negb (bit_at sample split)) old ->
+    wf (branch_at sample split fresh old).
+Proof.
+  intros A sample split fresh old Hfresh Hold Hfresh_nonempty Hold_nonempty
+    Hfresh_keys Hold_keys.
+  unfold branch_at. destruct (bit_at sample split) eqn:Esample.
+  - apply wf_branch.
+    + exact Hold.
+    + exact Hfresh.
+    + exact Hold_nonempty.
+    + exact Hfresh_nonempty.
+    + eapply all_keys_impl; [exact Hold_keys|].
+      intros stored [Hprefix Hbit]. split; [exact Hprefix|exact Hbit].
+    + eapply all_keys_impl; [exact Hfresh_keys|].
+      intros stored [Hprefix Hbit]. split; [exact Hprefix|exact Hbit].
+  - apply wf_branch.
+    + exact Hfresh.
+    + exact Hold.
+    + exact Hfresh_nonempty.
+    + exact Hold_nonempty.
+    + eapply all_keys_impl; [exact Hfresh_keys|].
+      intros stored [Hprefix Hbit]. split; [exact Hprefix|exact Hbit].
+    + eapply all_keys_impl; [exact Hold_keys|].
+      intros stored [Hprefix Hbit]. split; [exact Hprefix|exact Hbit].
+Qed.
+
+Lemma get_branch_at:
+  forall (A : Type) sample split (fresh old : t A) query,
+    all_keys (fun stored =>
+      bit_at stored split = bit_at sample split) fresh ->
+    all_keys (fun stored =>
+      bit_at stored split = negb (bit_at sample split)) old ->
+    get query (branch_at sample split fresh old) =
+      match get query fresh with Some value => Some value | None => get query old end.
+Proof.
+  intros A sample split fresh old query Hfresh Hold.
+  unfold branch_at. destruct (bit_at sample split) eqn:Esample;
+    destruct (bit_at query split) eqn:Equery; cbn [get]; rewrite Equery.
+  - destruct (get query fresh) eqn:Efresh; [reflexivity|].
+    assert (Eold : get query old = None).
+    { apply (get_none_if_all_keys A
+        (fun stored => bit_at stored split = false) old query).
+      - exact Hold.
+      - intros Hbit. rewrite Equery in Hbit. discriminate. }
+    now rewrite Eold.
+  - assert (Efresh : get query fresh = None).
+    { apply (get_none_if_all_keys A
+        (fun stored => bit_at stored split = true) fresh query).
+      - exact Hfresh.
+      - intros Hbit. rewrite Equery in Hbit. discriminate. }
+    now rewrite Efresh.
+  - assert (Efresh : get query fresh = None).
+    { apply (get_none_if_all_keys A
+        (fun stored => bit_at stored split = false) fresh query).
+      - exact Hfresh.
+      - intros Hbit. rewrite Equery in Hbit. discriminate. }
+    now rewrite Efresh.
+  - destruct (get query fresh) eqn:Efresh; [reflexivity|].
+    assert (Eold : get query old = None).
+    { apply (get_none_if_all_keys A
+        (fun stored => bit_at stored split = true) old query).
+      - exact Hold.
+      - intros Hbit. rewrite Equery in Hbit. discriminate. }
+    now rewrite Eold.
+Qed.
+
+Theorem join_disjoint_correct_wf:
+  forall (A : Type) (fresh old : t A) fresh_key old_key split,
+    wf fresh -> wf old ->
+    representative fresh = Some fresh_key ->
+    representative old = Some old_key ->
+    first_diff fresh_key old_key = Some split ->
+    all_keys (fun stored =>
+      same_prefix fresh_key stored split /\
+      bit_at stored split = bit_at fresh_key split) fresh ->
+    all_keys (fun stored =>
+      same_prefix fresh_key stored split /\
+      bit_at stored split = negb (bit_at fresh_key split)) old ->
+    wf (join fresh old) /\
+    forall query,
+      get query (join fresh old) =
+        match get query fresh with Some value => Some value | None => get query old end.
+Proof.
+  intros A fresh old fresh_key old_key split Hfresh Hold Hfresh_rep Hold_rep
+    Hdiff Hfresh_keys Hold_keys.
+  unfold join. rewrite Hfresh_rep, Hold_rep, Hdiff.
+  split.
+  - apply branch_at_wf; try assumption; congruence.
+  - intro query. apply get_branch_at.
+    + eapply all_keys_impl; [exact Hfresh_keys|].
+      intros stored H. exact (proj2 H).
+    + eapply all_keys_impl; [exact Hold_keys|].
+      intros stored H. exact (proj2 H).
+Qed.
+
+Definition sample : t nat :=
+  set "alpha" 1 (set "alphabet" 2 (set "" 3 (set "beta" 4 empty)))%string.
+
+Example lookup_empty_string: get "" sample = Some 3%nat.
+Proof. vm_compute. reflexivity. Qed.
+
+Example lookup_prefix_key: get "alpha" sample = Some 1%nat.
+Proof. vm_compute. reflexivity. Qed.
+
+Example lookup_extension_key: get "alphabet" sample = Some 2%nat.
+Proof. vm_compute. reflexivity. Qed.
+
+Example remove_prefix_preserves_extension:
+  get "alphabet" (remove "alpha" sample) = Some 2%nat.
+Proof. vm_compute. reflexivity. Qed.
