@@ -44,8 +44,10 @@ thresholds.
 - **done**: lift the result to public `combine` under
   `f None None = None`.
 - **done**: derive left- and right-biased union laws.
-- **next**: add string extensional equality/`beq`, documented `elements`
-  ordering, and finite-map extensionality theorems.
+- **done**: add string `beq` with pointwise and lookup-extensional correctness
+  theorems.
+- **next**: specify and prove the direct-string `elements` ordering.
+- **later**: package standalone finite-map extensionality theorems.
 
 ## M4: Harden the public extracted API
 
@@ -124,3 +126,9 @@ thresholds.
   lookup and well-formedness laws from the generic `combine` theorem. Rocq
   reports both exported theorems closed under the global context; `make proof`,
   `make`, the randomized oracle, and `make benchmark` passed.
+- **2026-08-29 — direct-string extensional equality**: added and exported
+  `beq`, proved its pointwise Boolean law and equivalence to equality of every
+  lookup under an equality-reflecting value comparator, and added randomized
+  checks over differently rebuilt trees. Rocq reports both theorems closed
+  under the global context; `make proof`, `make`, the randomized oracle, and
+  `make benchmark` passed.

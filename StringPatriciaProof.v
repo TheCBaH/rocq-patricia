@@ -320,6 +320,92 @@ Proof.
   congruence.
 Qed.
 
+Lemma forallb_elements:
+  forall (A : Type) (test : string -> A -> bool) (m : t A),
+    forallb test m = true <->
+    forall key value, In (key, value) (elements m) -> test key value = true.
+Proof.
+  intros A test m.
+  induction m as [|key value|sample split ltree IHl rtree IHr].
+  - cbn [forallb elements elements_aux].
+    split; intros; [contradiction|reflexivity].
+  - split.
+    + cbn [forallb elements elements_aux].
+      intros H k v [E|Hnone]; [now inversion E; subst|contradiction].
+    + intros H. exact (H key value (or_introl eq_refl)).
+  - cbn [forallb]. rewrite elements_branch, Bool.andb_true_iff, IHl, IHr.
+    split.
+    + intros [Hl Hr] key value Hin. apply in_app_iff in Hin.
+      destruct Hin; auto.
+    + intros H. split; intros key value Hin; apply H;
+        apply in_or_app; auto.
+Qed.
+
+Theorem beq_correct_wf:
+  forall (A : Type) (eqA : A -> A -> bool) (left right : t A),
+    wf left -> wf right ->
+    beq eqA left right = true <->
+    forall key,
+      match get key left, get key right with
+      | None, None => True
+      | Some left_value, Some right_value =>
+          eqA left_value right_value = true
+      | _, _ => False
+      end.
+Proof.
+  intros A eqA left right Hleft Hright. unfold beq.
+  rewrite Bool.andb_true_iff, !forallb_elements. split.
+  - intros [Hlr Hrl] key.
+    destruct (get key left) as [left_value|] eqn:Eleft;
+      destruct (get key right) as [right_value|] eqn:Eright; cbn.
+    + pose proof (Hlr key left_value
+        (@get_elements_sound A left key left_value Eleft)) as Hvalue.
+      now rewrite Eright in Hvalue.
+    + specialize (Hlr key left_value
+        (@get_elements_sound A left key left_value Eleft)).
+      now rewrite Eright in Hlr.
+    + specialize (Hrl key right_value
+        (@get_elements_sound A right key right_value Eright)).
+      now rewrite Eleft in Hrl.
+    + exact I.
+  - intros Hpoint. split.
+    + intros key value Hin.
+      pose proof (@wf_elements_complete A left Hleft key value Hin) as Eleft.
+      specialize (Hpoint key). rewrite Eleft in Hpoint.
+      destruct (get key right); cbn in Hpoint |- *;
+        [exact Hpoint|contradiction].
+    + intros key value Hin.
+      pose proof (@wf_elements_complete A right Hright key value Hin) as Eright.
+      specialize (Hpoint key). rewrite Eright in Hpoint.
+      destruct (get key left); cbn in Hpoint |- *;
+        [exact Hpoint|contradiction].
+Qed.
+
+Corollary beq_extensional_wf:
+  forall (A : Type) (eqA : A -> A -> bool) (left right : t A),
+    (forall x y, eqA x y = true <-> x = y) ->
+    wf left -> wf right ->
+    beq eqA left right = true <->
+    forall key, get key left = get key right.
+Proof.
+  intros A eqA left right Heq Hleft Hright.
+  rewrite (beq_correct_wf A eqA left right Hleft Hright).
+  split.
+  - intros Hpoint key. specialize (Hpoint key).
+    destruct (get key left) as [left_value|] eqn:Eleft;
+      destruct (get key right) as [right_value|] eqn:Eright; cbn in Hpoint.
+    + apply (proj1 (Heq left_value right_value)) in Hpoint.
+      now subst.
+    + contradiction.
+    + contradiction.
+    + reflexivity.
+  - intros Hlookup key. specialize (Hlookup key).
+    destruct (get key left) as [left_value|] eqn:Eleft;
+      destruct (get key right) as [right_value|] eqn:Eright;
+      cbn in Hlookup |- *; try congruence; try exact I.
+    apply (proj2 (Heq left_value right_value)). congruence.
+Qed.
+
 Lemma representative_all_keys:
   forall (A : Type) (P : string -> Prop) (m : t A) key,
     all_keys P m -> representative m = Some key -> P key.

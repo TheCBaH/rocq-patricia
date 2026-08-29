@@ -100,6 +100,7 @@ The direct-string proof files currently establish, without axioms:
 - sufficiency of the public combine fuel bound for every recursive-call shape.
 - simultaneous lookup correctness and well-formedness for `combine_fuel` and
   public `combine` under `f None None = None`.
+- pointwise and lookup-extensional correctness of string `beq` on `wf` trees.
 
 `join_separated_correct_wf` proves the string-tree join law under explicit
 prefix/bit-separation preconditions, including filtered empty sides. The

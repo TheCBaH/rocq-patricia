@@ -288,3 +288,25 @@ Fixpoint fold {A B : Type}
   | Leaf key value => f acc key value
   | Branch _ _ ltree rtree => fold f rtree (fold f ltree acc)
   end.
+
+Fixpoint forallb {A : Type}
+    (f : string -> A -> bool) (m : t A) : bool :=
+  match m with
+  | Empty => true
+  | Leaf key value => f key value
+  | Branch _ _ ltree rtree => forallb f ltree && forallb f rtree
+  end.
+
+Definition beq {A : Type} (eqA : A -> A -> bool) (left right : t A) : bool :=
+  forallb
+    (fun key value =>
+      match get key right with
+      | Some other => eqA value other
+      | None => false
+      end) left
+  && forallb
+    (fun key value =>
+      match get key left with
+      | Some other => eqA other value
+      | None => false
+      end) right.

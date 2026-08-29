@@ -738,8 +738,8 @@ and retains a measured lookup advantage. The native implementation now uses a
 packed critical-byte token, bytewise-XOR first-difference discovery, a
 one-descent `set`, cached constant-time representatives, fuel-free generic
 combine, a bounded prefix scanner, and structurally sharing biased union. The
-direct-string biased-union laws are now proved; extensional equality and its
-Boolean reflection are the next proof priority.
+direct-string biased-union and extensional-`beq` laws are now proved; a precise
+`elements` ordering theorem is the next proof priority.
 
 The completed scale runs confirm the key architectural result: specialized
 biased union fixes the former whole-tree traversal and rebuilding path, while

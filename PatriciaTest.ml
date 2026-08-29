@@ -310,6 +310,23 @@ let check_string_keys () =
     done;
     check_string_table round "left updates" keys left_ref !left;
     check_string_table round "right updates" keys right_ref !right;
+    let rebuilt_left =
+      List.fold_left
+        (fun tree (key, value) -> S.set key value tree)
+        S.empty (List.rev (S.elements !left))
+    in
+    if not (S.beq ( = ) !left rebuilt_left) then
+      failwith
+        (Printf.sprintf
+           "string round %d: beq rejected extensionally equal trees" round);
+    let expected_equal =
+      List.for_all
+        (fun key -> lookup left_ref key = lookup right_ref key)
+        keys
+    in
+    if S.beq ( = ) !left !right <> expected_equal then
+      failwith
+        (Printf.sprintf "string round %d: beq disagrees with lookup" round);
     let check_merge operation f =
       let expected = Hashtbl.create 128 in
       List.iter

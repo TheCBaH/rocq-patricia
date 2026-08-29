@@ -341,4 +341,5 @@ Separate Extraction
   StringPatricia.combine_leaf_left StringPatricia.combine_leaf_right
   StringPatricia.get StringPatricia.mem StringPatricia.set StringPatricia.remove
   StringPatricia.combine StringPatricia.union_left StringPatricia.union_right
-  StringPatricia.map StringPatricia.fold StringPatricia.elements.
+  StringPatricia.map StringPatricia.fold StringPatricia.elements
+  StringPatricia.beq.

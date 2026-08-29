@@ -13,17 +13,17 @@ The implementation is a strong executable and proof-development sketch. The
 positive-key source model has substantial functional-correctness coverage, and
 both extracted implementations behaved correctly in the supplied tests and in
 additional fuzzing. It is not yet a complete formally verified mergeable-map
-library, however. The direct-string source model is missing extensional
-equality, the extracted API does not enforce the proved preconditions, and the
-optimized native extraction is a second implementation rather than a proved
-compilation of the Rocq definitions.
+library, however. The direct-string source model is missing a documented and
+proved `elements` order, the extracted API does not enforce the proved
+preconditions, and the optimized native extraction is a second implementation
+rather than a proved compilation of the Rocq definitions.
 
 The verification claim must therefore be split into three layers:
 
 | Layer | Current status |
 | --- | --- |
 | Pure positive-key Rocq model | Kernel-checked functional map laws, including general `combine`, with no project axioms found in the inspected theorem closure |
-| Pure direct-string Rocq model | Lookup, update, removal, traversal, filtering, structural invariants, general `combine`, and biased unions are proved; extensional equality remains open |
+| Pure direct-string Rocq model | Lookup, update, removal, traversal, filtering, structural invariants, general `combine`, biased unions, and extensional `beq` are proved; traversal ordering remains open |
 | Extracted native OCaml | Extensive oracle and invariant testing passes, but the standard numeric/string mappings and 19 explicit handwritten realizers are trusted; neither their refinement nor the Rocq-to-OCaml compilation pipeline is proved here |
 
 Consequently, “formally verified” is accurate for the stated theorems about the
@@ -41,8 +41,9 @@ The following checks passed:
 - `Print Assumptions` reported the inspected integer `combine_correct_wf` and
   string `set_correct_wf`, `replace_binding_correct_wf`,
   `join_separated_correct_wf`, `public_combine_fuel_sufficient`,
-  `union_left_correct_wf`, `union_right_correct_wf`, and `wf_splits_ordered`
-  theorems as closed under the global context;
+  `union_left_correct_wf`, `union_right_correct_wf`, `beq_correct_wf`,
+  `beq_extensional_wf`, and `wf_splits_ordered` theorems as closed under the
+  global context;
 - additional integer fuzzing used keys across the positive OCaml `int` range,
   including high-bit boundary values, and checked lookup, elements, merge, and
   routing invariants;
@@ -105,8 +106,10 @@ implementation.
 
 `union_left_correct_wf` and `union_right_correct_wf` specialize the generic
 combine law, preserving well-formedness and selecting the preferred binding at
-every key. Extensional equality and its Boolean reflection are now the next
-pure-model functional gap.
+every key. `beq_correct_wf` gives the pointwise Boolean equality law, while
+`beq_extensional_wf` proves equivalence to identical lookup results when the
+value comparison reflects equality. The documented `elements` ordering is now
+the next pure-model functional gap.
 
 ### 3. The extracted interface exposes values outside the proof contract
 
@@ -368,10 +371,9 @@ Current API-law status across both key variants:
 - [x] `empty`, `is_empty`, `singleton`, `get`, and `mem` laws;
 - [x] Unconditional `set` and `remove` laws;
 - [x] `map`, `map_filter`, `fold`, and `elements` laws;
-- [ ] `combine` and specialized union laws: complete for positive keys, open
-  for direct strings;
-- [ ] Extensional equality and a `beq` correctness theorem: complete for
-  positive keys, open for direct strings;
+- [x] `combine` and specialized union laws for both key variants;
+- [x] Extensional equality and a `beq` correctness theorem for both key
+  variants;
 - [ ] The documented `elements` ordering, not only uniqueness: tested for
   positive keys but not established for direct strings;
 - [x] Fold equivalence to the traversal order produced by `elements`;
