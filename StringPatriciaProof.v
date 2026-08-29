@@ -1378,6 +1378,68 @@ Proof.
     intro query. now apply (get_remove A key query m).
 Qed.
 
+Theorem combine_leaf_left_correct_wf:
+  forall (A B C : Type) (f : option A -> option B -> option C)
+      key value (m : t B),
+    f None None = None -> wf m ->
+    wf (combine_leaf_left f key value m) /\
+    forall query,
+      get query (combine_leaf_left f key value m) =
+        f (if String.eqb query key then Some value else None) (get query m).
+Proof.
+  intros A B C f key value m Hnone Hwf.
+  unfold combine_leaf_left. destruct (get key m) as [old|] eqn:Ekey.
+  - split.
+    + now apply map_filter_wf.
+    + intro query. rewrite get_map_filter_wf by exact Hwf.
+      destruct (get query m) as [found|] eqn:Equery; cbn.
+      * now destruct (String.eqb query key).
+      * destruct (String.eqb query key) eqn:Eequal.
+        -- apply String.eqb_eq in Eequal. subst query. congruence.
+        -- symmetry. exact Hnone.
+  - destruct (@map_right_correct_wf A B C f m Hnone Hwf)
+      as [Hwmap Hgetmap].
+    destruct (replace_binding_correct_wf C key (f (Some value) None)
+      (map_right f m) Hwmap) as [Hwreplace Hgetreplace].
+    split; [exact Hwreplace|]. intro query.
+    rewrite Hgetreplace, Hgetmap.
+    destruct (String.eqb query key) eqn:Eequal.
+    + apply String.eqb_eq in Eequal. subst query. rewrite Ekey.
+      now destruct (f (Some value) None).
+    + now destruct (f (Some value) None).
+Qed.
+
+Theorem combine_leaf_right_correct_wf:
+  forall (A B C : Type) (f : option A -> option B -> option C)
+      (m : t A) key value,
+    f None None = None -> wf m ->
+    wf (combine_leaf_right f m key value) /\
+    forall query,
+      get query (combine_leaf_right f m key value) =
+        f (get query m) (if String.eqb query key then Some value else None).
+Proof.
+  intros A B C f m key value Hnone Hwf.
+  unfold combine_leaf_right. destruct (get key m) as [old|] eqn:Ekey.
+  - split.
+    + now apply map_filter_wf.
+    + intro query. rewrite get_map_filter_wf by exact Hwf.
+      destruct (get query m) as [found|] eqn:Equery; cbn.
+      * now destruct (String.eqb query key).
+      * destruct (String.eqb query key) eqn:Eequal.
+        -- apply String.eqb_eq in Eequal. subst query. congruence.
+        -- symmetry. exact Hnone.
+  - destruct (@map_left_correct_wf A B C f m Hnone Hwf)
+      as [Hwmap Hgetmap].
+    destruct (replace_binding_correct_wf C key (f None (Some value))
+      (map_left f m) Hwmap) as [Hwreplace Hgetreplace].
+    split; [exact Hwreplace|]. intro query.
+    rewrite Hgetreplace, Hgetmap.
+    destruct (String.eqb query key) eqn:Eequal.
+    + apply String.eqb_eq in Eequal. subst query. rewrite Ekey.
+      now destruct (f None (Some value)).
+    + now destruct (f None (Some value)).
+Qed.
+
 (** The generic merge explores at most one of six smaller branch-pair shapes
     at each branch/branch step.  This conservative predicate is independent
     of the string-prefix tests, which makes the public size bound reusable by

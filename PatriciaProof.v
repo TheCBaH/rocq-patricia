@@ -1037,6 +1037,70 @@ Proof.
   - exact (remove_correct_wf key Hwf).
 Qed.
 
+Theorem combine_leaf_left_correct_wf:
+  forall (A B C : Type) (f : option A -> option B -> option C)
+      key value (m : t B),
+    f None None = None -> wf m ->
+    wf (combine_leaf_left f key value m) /\
+    forall query,
+      get query (combine_leaf_left f key value m) =
+        f (if Pos.eqb query key then Some value else None) (get query m).
+Proof.
+  intros A B C f key value m Hnone Hwf.
+  unfold combine_leaf_left. destruct (get key m) as [old|] eqn:Ekey.
+  - destruct (map_filter_correct_wf
+      (fun stored right =>
+        if Pos.eqb stored key
+        then f (Some value) (Some right)
+        else f None (Some right)) Hwf) as [Hwmap Hgetmap].
+    split; [exact Hwmap|]. intro query. rewrite Hgetmap.
+    destruct (get query m) as [found|] eqn:Equery; cbn.
+    + destruct (Pos.eqb query key) eqn:Eequal; reflexivity.
+    + destruct (Pos.eqb query key) eqn:Eequal.
+      * apply Pos.eqb_eq in Eequal. subst query. congruence.
+      * symmetry. exact Hnone.
+  - destruct (map_right_correct_wf f Hwf) as [Hwmap Hgetmap].
+    destruct (replace_binding_correct_wf key (f (Some value) None) Hwmap)
+      as [Hwreplace Hgetreplace].
+    split; [exact Hwreplace|]. intro query.
+    rewrite Hgetreplace, Hgetmap.
+    destruct (Pos.eqb query key) eqn:Eequal.
+    + apply Pos.eqb_eq in Eequal. subst query. now rewrite Ekey.
+    + destruct (get query m); [reflexivity|]. symmetry. exact Hnone.
+Qed.
+
+Theorem combine_leaf_right_correct_wf:
+  forall (A B C : Type) (f : option A -> option B -> option C)
+      (m : t A) key value,
+    f None None = None -> wf m ->
+    wf (combine_leaf_right f m key value) /\
+    forall query,
+      get query (combine_leaf_right f m key value) =
+        f (get query m) (if Pos.eqb query key then Some value else None).
+Proof.
+  intros A B C f m key value Hnone Hwf.
+  unfold combine_leaf_right. destruct (get key m) as [old|] eqn:Ekey.
+  - destruct (map_filter_correct_wf
+      (fun stored left =>
+        if Pos.eqb stored key
+        then f (Some left) (Some value)
+        else f (Some left) None) Hwf) as [Hwmap Hgetmap].
+    split; [exact Hwmap|]. intro query. rewrite Hgetmap.
+    destruct (get query m) as [found|] eqn:Equery; cbn.
+    + destruct (Pos.eqb query key) eqn:Eequal; reflexivity.
+    + destruct (Pos.eqb query key) eqn:Eequal.
+      * apply Pos.eqb_eq in Eequal. subst query. congruence.
+      * symmetry. exact Hnone.
+  - destruct (map_left_correct_wf f Hwf) as [Hwmap Hgetmap].
+    destruct (replace_binding_correct_wf key (f None (Some value)) Hwmap)
+      as [Hwreplace Hgetreplace].
+    split; [exact Hwreplace|]. intro query.
+    rewrite Hgetreplace, Hgetmap.
+    destruct (Pos.eqb query key) eqn:Eequal.
+    + apply Pos.eqb_eq in Eequal. subst query. now rewrite Ekey.
+    + destruct (get query m); [reflexivity|]. symmetry. exact Hnone.
+Qed.
+
 (** A conservative fuel predicate: at a branch/branch node it requires enough
     fuel for every recursive shape used by [combine_fuel], independently of
     which prefix/mask comparison is selected at runtime. *)

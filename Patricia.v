@@ -166,6 +166,35 @@ Definition replace_binding {A : Type}
     (k : positive) (v : option A) (m : t A) : t A :=
   match v with Some x => set k x m | None => remove k m end.
 
+(** Fuse the replacement of an overlapping leaf into the whole-tree
+    transformation.  An absent leaf still uses the ordinary mapped-tree
+    insertion path; the preceding lookup determines which case applies. *)
+Definition combine_leaf_left {A B C : Type}
+    (f : option A -> option B -> option C)
+    (key : positive) (value : A) (m : t B) : t C :=
+  match get key m with
+  | Some _ =>
+      map_filter (fun stored right =>
+        if Pos.eqb stored key
+        then f (Some value) (Some right)
+        else f None (Some right)) m
+  | None =>
+      replace_binding key (f (Some value) None) (map_right f m)
+  end.
+
+Definition combine_leaf_right {A B C : Type}
+    (f : option A -> option B -> option C)
+    (m : t A) (key : positive) (value : B) : t C :=
+  match get key m with
+  | Some _ =>
+      map_filter (fun stored left =>
+        if Pos.eqb stored key
+        then f (Some left) (Some value)
+        else f (Some left) None) m
+  | None =>
+      replace_binding key (f None (Some value)) (map_left f m)
+  end.
+
 Fixpoint size {A : Type} (m : t A) : nat :=
   match m with
   | Empty => 0

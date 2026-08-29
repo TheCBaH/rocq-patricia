@@ -37,13 +37,9 @@ Extract Constant Patricia.combine =>
        | Empty, tree -> map_right combine_values tree
        | tree, Empty -> map_left combine_values tree
        | Leaf (key, value), tree ->
-           replace_binding key
-             (combine_values (Some value) (get key tree))
-             (map_right combine_values tree)
+           combine_leaf_left combine_values key value tree
        | tree, Leaf (key, value) ->
-           replace_binding key
-             (combine_values (get key tree) (Some value))
-             (map_left combine_values tree)
+           combine_leaf_right combine_values tree key value
        | Branch (prefix_left, mask_left, left_left, right_left),
          Branch (prefix_right, mask_right, left_right, right_right) ->
            if mask_left = mask_right && prefix_left = prefix_right then
@@ -213,13 +209,9 @@ Extract Constant StringPatricia.combine =>
        | Empty, tree -> map_right combine_values tree
        | tree, Empty -> map_left combine_values tree
        | Leaf (key, value), tree ->
-           replace_binding key
-             (combine_values (Some value) (get key tree))
-             (map_right combine_values tree)
+           combine_leaf_left combine_values key value tree
        | tree, Leaf (key, value) ->
-           replace_binding key
-             (combine_values (get key tree) (Some value))
-             (map_left combine_values tree)
+           combine_leaf_right combine_values tree key value
        | Branch (sample_left, split_left, left_left, right_left),
          Branch (sample_right, split_right, left_right, right_right) ->
            if split_left = split_right then
@@ -301,7 +293,8 @@ Separate Extraction
   PatriciaBits.mask_above
   Patricia.empty Patricia.is_empty Patricia.singleton Patricia.get Patricia.mem
   Patricia.set Patricia.remove Patricia.map_filter Patricia.map_left
-  Patricia.map_right Patricia.replace_binding Patricia.combine
+  Patricia.map_right Patricia.replace_binding Patricia.combine_leaf_left
+  Patricia.combine_leaf_right Patricia.combine
   Patricia.union_left Patricia.union_right
   Patricia.map Patricia.fold Patricia.elements Patricia.beq
   StringBits.bit_at StringBits.first_diff StringBits.agrees_before
@@ -309,6 +302,7 @@ Separate Extraction
   StringPatricia.representative StringPatricia.branch StringPatricia.branch_at
   StringPatricia.join StringPatricia.map_filter StringPatricia.map_left
   StringPatricia.map_right StringPatricia.replace_binding
+  StringPatricia.combine_leaf_left StringPatricia.combine_leaf_right
   StringPatricia.get StringPatricia.mem StringPatricia.set StringPatricia.remove
   StringPatricia.combine StringPatricia.union_left StringPatricia.union_right
   StringPatricia.map StringPatricia.fold StringPatricia.elements.

@@ -154,6 +154,22 @@ let check_string_equivalent keys patricia avl =
          failwith "string Patricia result differs from Stdlib.Map")
     keys
 
+let generic_combine_values left right =
+  match left, right with
+  | Some _, Some _ -> None
+  | Some value, None -> Some (value + 1)
+  | None, Some value -> Some (-value)
+  | None, None -> None
+
+let check_int_bindings context patricia avl =
+  if Patricia.elements patricia <> Int_avl.bindings avl then
+    failwith (context ^ " differs from Stdlib.Map.merge")
+
+let check_string_bindings context patricia avl =
+  if List.sort Stdlib.compare (StringPatricia.elements patricia)
+     <> String_avl.bindings avl then
+    failwith (context ^ " differs from Stdlib.Map.merge")
+
 let time_int_lookups keys patricia avl =
   let patricia_lookup () =
     let checksum = ref 0 in
@@ -291,6 +307,59 @@ let time_string_elements patricia avl =
   if List.sort Stdlib.compare patricia_bindings <> avl_bindings then
     failwith "string elements differ from Stdlib.Map bindings";
   report_operation "elements" patricia_measurement avl_measurement benchmark_size
+
+let time_int_generic_combine keys patricia avl =
+  let key = keys.(benchmark_size / 2) in
+  let patricia_leaf = Patricia.singleton key (-key) in
+  let avl_leaf = Int_avl.singleton key (-key) in
+  let avl_combine = Int_avl.merge (fun _ -> generic_combine_values) in
+  let patricia_left, patricia_left_measurement =
+    measure_operation (fun () ->
+        Patricia.combine generic_combine_values patricia_leaf patricia)
+  in
+  let avl_left, avl_left_measurement =
+    measure_operation (fun () -> avl_combine avl_leaf avl)
+  in
+  check_int_bindings "integer leaf/tree combine" patricia_left avl_left;
+  report_operation "combine leaf/tree" patricia_left_measurement
+    avl_left_measurement 1;
+  let patricia_right, patricia_right_measurement =
+    measure_operation (fun () ->
+        Patricia.combine generic_combine_values patricia patricia_leaf)
+  in
+  let avl_right, avl_right_measurement =
+    measure_operation (fun () -> avl_combine avl avl_leaf)
+  in
+  check_int_bindings "integer tree/leaf combine" patricia_right avl_right;
+  report_operation "combine tree/leaf" patricia_right_measurement
+    avl_right_measurement 1
+
+let time_string_generic_combine keys patricia avl =
+  let key = keys.(benchmark_size / 2) in
+  let value = -(Stdlib.String.length key) in
+  let patricia_leaf = StringPatricia.singleton key value in
+  let avl_leaf = String_avl.singleton key value in
+  let avl_combine = String_avl.merge (fun _ -> generic_combine_values) in
+  let patricia_left, patricia_left_measurement =
+    measure_operation (fun () ->
+        StringPatricia.combine generic_combine_values patricia_leaf patricia)
+  in
+  let avl_left, avl_left_measurement =
+    measure_operation (fun () -> avl_combine avl_leaf avl)
+  in
+  check_string_bindings "string leaf/tree combine" patricia_left avl_left;
+  report_operation "combine leaf/tree" patricia_left_measurement
+    avl_left_measurement 1;
+  let patricia_right, patricia_right_measurement =
+    measure_operation (fun () ->
+        StringPatricia.combine generic_combine_values patricia patricia_leaf)
+  in
+  let avl_right, avl_right_measurement =
+    measure_operation (fun () -> avl_combine avl avl_leaf)
+  in
+  check_string_bindings "string tree/leaf combine" patricia_right avl_right;
+  report_operation "combine tree/leaf" patricia_right_measurement
+    avl_right_measurement 1
 
 let time_int_mutations keys fresh_keys patricia avl =
   let all_keys = Array.append keys fresh_keys in
@@ -461,6 +530,7 @@ let benchmark_int () =
   time_int_lookups left_keys patricia_left avl_left;
   time_int_membership left_keys disjoint_keys patricia_left avl_left;
   time_int_elements patricia_left avl_left;
+  time_int_generic_combine left_keys patricia_left avl_left;
   time_int_mutations left_keys disjoint_keys patricia_left avl_left;
   let patricia_disjoint = build_patricia_int disjoint_keys in
   let avl_disjoint = build_avl_int disjoint_keys in
@@ -525,6 +595,7 @@ let benchmark_strings length =
   time_string_lookups left_keys patricia_left avl_left;
   time_string_membership left_keys disjoint_keys patricia_left avl_left;
   time_string_elements patricia_left avl_left;
+  time_string_generic_combine left_keys patricia_left avl_left;
   time_string_mutations left_keys disjoint_keys patricia_left avl_left;
   let patricia_disjoint = build_patricia_string disjoint_keys in
   let avl_disjoint = build_avl_string disjoint_keys in
