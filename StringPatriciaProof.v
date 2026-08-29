@@ -1474,6 +1474,103 @@ Proof.
       intros stored H. exact (proj2 H).
 Qed.
 
+(** The scanner specification gives the forward direction (a reported split
+    is first).  This converse packages the form used by merge: agreement
+    below a split and disagreement at it force that exact split. *)
+Lemma first_diff_at:
+  forall left right split,
+    same_prefix left right split ->
+    bit_at left split <> bit_at right split ->
+    first_diff left right = Some split.
+Proof.
+  intros left right split Hprefix Hbit.
+  assert (Hneq : left <> right).
+  { intro E. subst right. apply Hbit. reflexivity. }
+  destruct (first_diff_unequal_exists left right Hneq) as [differing Hdiff].
+  destruct (first_diff_spec _ _ _ Hdiff) as [Hdifferent Hbefore].
+  assert (Hle : differing <= split).
+  { apply Nat.nlt_ge. intro Hgt. apply Hbit. apply Hbefore. exact Hgt. }
+  assert (Hge : split <= differing).
+  { apply Nat.nlt_ge. intro Hlt. apply Hdifferent. apply Hprefix. exact Hlt. }
+  assert (differing = split) by lia. subst differing. exact Hdiff.
+Qed.
+
+(** [join] also handles an empty filtered side.  This version of the disjoint
+    join law therefore supplies the form required by generic merge, while
+    delegating the non-empty case to [join_disjoint_correct_wf]. *)
+Theorem join_separated_correct_wf:
+  forall (A : Type) sample split (fresh old : t A),
+    wf fresh -> wf old ->
+    all_keys (fun stored =>
+      same_prefix sample stored split /\
+      bit_at stored split = bit_at sample split) fresh ->
+    all_keys (fun stored =>
+      same_prefix sample stored split /\
+      bit_at stored split = negb (bit_at sample split)) old ->
+    wf (join fresh old) /\
+    forall query,
+      get query (join fresh old) =
+        match get query fresh with Some value => Some value | None => get query old end.
+Proof.
+  intros A sample split fresh old Hfresh Hold Hfresh_keys Hold_keys.
+  destruct (representative fresh) as [fresh_key|] eqn:Efresh;
+    destruct (representative old) as [old_key|] eqn:Eold.
+  - pose proof (representative_all_keys A _ fresh fresh_key Hfresh_keys Efresh)
+      as [Hfresh_prefix Hfresh_bit].
+    pose proof (representative_all_keys A _ old old_key Hold_keys Eold)
+      as [Hold_prefix Hold_bit].
+    assert (Hfirst : first_diff fresh_key old_key = Some split).
+    { apply first_diff_at.
+      - eapply same_prefix_rebase; eauto.
+      - rewrite Hfresh_bit, Hold_bit. destruct (bit_at sample split);
+          discriminate. }
+    assert (Hfresh_separated : all_keys (fun stored =>
+      same_prefix fresh_key stored split /\
+      bit_at stored split = bit_at fresh_key split) fresh).
+    { eapply all_keys_impl; [exact Hfresh_keys|]. intros stored [Hprefix Hbit].
+      split.
+      - eapply same_prefix_rebase; eauto.
+      - now rewrite Hbit, Hfresh_bit. }
+    assert (Hold_separated : all_keys (fun stored =>
+      same_prefix fresh_key stored split /\
+      bit_at stored split = negb (bit_at fresh_key split)) old).
+    { eapply all_keys_impl; [exact Hold_keys|]. intros stored [Hprefix Hbit].
+      split.
+      - eapply same_prefix_rebase; eauto.
+      - now rewrite Hbit, Hfresh_bit. }
+    eapply join_disjoint_correct_wf; eauto.
+  - pose proof (wf_representative_none A old Hold Eold) as Eempty. subst old.
+    unfold join. rewrite Efresh. cbn. split; [exact Hfresh|].
+    intro query. now destruct (get query fresh).
+  - pose proof (wf_representative_none A fresh Hfresh Efresh) as Eempty. subst fresh.
+    cbn [join]. split; [exact Hold|reflexivity].
+  - pose proof (wf_representative_none A fresh Hfresh Efresh) as Eempty. subst fresh.
+    cbn [join]. split; [exact Hold|reflexivity].
+Qed.
+
+(** Functional merge laws preserve any key predicate already satisfied by
+    both inputs.  The target tree's [wf] proof bridges routed lookup back to
+    its structural [all_keys] invariant. *)
+Lemma all_keys_of_combine_lookup:
+  forall (A B C : Type) (f : option A -> option B -> option C)
+      (left : t A) (right : t B) (out : t C) (P : string -> Prop),
+    f None None = None -> wf out ->
+    (forall key, get key out = f (get key left) (get key right)) ->
+    all_keys P left -> all_keys P right -> all_keys P out.
+Proof.
+  intros A B C f left right out P Hnone Hwout Hget Hleft Hright.
+  apply (proj2 (all_keys_elements C P out)).
+  intros key value Hin.
+  pose proof (wf_elements_complete C out Hwout key value Hin) as Hout.
+  specialize (Hget key).
+  destruct (get key left) as [left_value|] eqn:Eleft;
+    destruct (get key right) as [right_value|] eqn:Eright.
+  - eapply (all_keys_get A P left key left_value); eauto.
+  - eapply (all_keys_get A P left key left_value); eauto.
+  - eapply (all_keys_get B P right key right_value); eauto.
+  - rewrite Hnone in Hget. congruence.
+Qed.
+
 Definition sample : t nat :=
   set "alpha" 1 (set "alphabet" 2 (set "" 3 (set "beta" 4 empty)))%string.
 

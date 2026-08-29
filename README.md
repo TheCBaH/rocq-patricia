@@ -82,11 +82,12 @@ The direct-string proof files currently establish, without axioms:
 - `fold` agreement with `elements`, the key-aware `map` lookup law, and
   well-formedness/lookup laws for `map_filter`, `map_left`, and `map_right`
   (the latter two under `f None None = None`).
+- sufficiency of the public combine fuel bound for every recursive-call shape.
 
-`join_disjoint_correct_wf` proves the string-tree join law under its explicit
-prefix/bit-separation preconditions. Generic `combine` remains a proof
-obligation; the randomized string tests exercise it, but are not substitutes
-for its general Rocq specification.
+`join_separated_correct_wf` proves the string-tree join law under explicit
+prefix/bit-separation preconditions, including filtered empty sides. Generic
+`combine` remains a proof obligation; the randomized string tests exercise it,
+but are not substitutes for its general Rocq specification.
 
 It then runs deterministic randomized OCaml tests against reference maps. The
 positive suite exercises point updates, removal, generic and deletion-capable
