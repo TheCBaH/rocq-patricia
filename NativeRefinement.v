@@ -38,6 +38,124 @@ Proof.
   exact (fun mask H => H).
 Qed.
 
+(** ** Bounded integer routing model
+
+    The integer extraction represents a source [positive] by the identical
+    non-negative OCaml payload and implements the following operations with
+    [lsr], [land], [lxor], and a small [log2] loop.  We state their meaning
+    over bounded unsigned payloads here.  This is intentionally separate from
+    the foreign-function obligation that the OCaml operators implement these
+    mathematical operations; the theorems below make that remaining
+    obligation pointwise and finite-domain. *)
+Definition native_prefix_word (key mask : N) : N :=
+  N.shiftr key (N.succ mask).
+
+Definition native_matches_prefix (key prefix mask : N) : bool :=
+  N.eqb (native_prefix_word key mask) prefix.
+
+Definition native_zero_bit (key mask : N) : bool :=
+  negb (N.testbit key mask).
+
+Definition native_highest_differing_bit (left right : N) : N :=
+  N.log2 (N.lxor left right).
+
+Definition native_mask_above (left right : N) : bool := N.ltb right left.
+
+Lemma native_prefix_word_refines:
+  forall key mask,
+    native_prefix_word (PatriciaBits.word key) mask =
+      PatriciaBits.prefix key mask.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma native_matches_prefix_refines:
+  forall key prefix mask,
+    native_matches_prefix (PatriciaBits.word key) prefix mask =
+      PatriciaBits.matches_prefix key prefix mask.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma native_zero_bit_refines:
+  forall key mask,
+    native_zero_bit (PatriciaBits.word key) mask =
+      PatriciaBits.zero_bit key mask.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma native_highest_differing_bit_refines:
+  forall left right,
+    native_highest_differing_bit (PatriciaBits.word left)
+      (PatriciaBits.word right) =
+      PatriciaBits.highest_differing_bit left right.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma native_mask_above_refines:
+  forall left right,
+    native_mask_above left right = PatriciaBits.mask_above left right.
+Proof.
+  reflexivity.
+Qed.
+
+(** Every result which the routing code retains as a word remains in the
+    payload domain.  The split-bit result is instead a mask, and is bounded by
+    the word width even for the unused equal-key case ([log2 0 = 0]). *)
+Lemma native_prefix_word_fits:
+  forall key mask,
+    fits_native_word key -> fits_native_word (native_prefix_word key mask).
+Proof.
+  intros key mask Hkey. unfold fits_native_word, native_prefix_word in *.
+  eapply N.le_lt_trans; [apply N.shiftr_upper_bound|exact Hkey].
+Qed.
+
+Lemma native_log2_fits_mask:
+  forall key,
+    fits_native_word key -> key <> 0%N ->
+      (N.log2 key < native_word_bits)%N.
+Proof.
+  intros key Hfits Hnonzero. unfold fits_native_word in Hfits.
+  apply (proj1 (N.log2_lt_pow2 key native_word_bits
+    (proj1 (N.neq_0_lt_0 key) Hnonzero))).
+  exact Hfits.
+Qed.
+
+Lemma native_highest_differing_bit_fits_mask:
+  forall left right,
+    fits_native_word left -> fits_native_word right ->
+    native_mask (native_highest_differing_bit left right).
+Proof.
+  intros left right Hleft Hright.
+  unfold native_mask, native_highest_differing_bit.
+  apply N.nle_gt. intro Hwidth.
+  assert (Hleft_bit : N.testbit left (N.log2 (N.lxor left right)) = false).
+  { destruct left as [|left].
+    - reflexivity.
+    - apply N.bits_above_log2.
+      eapply N.lt_le_trans.
+      + apply native_log2_fits_mask.
+        * exact Hleft.
+        * discriminate.
+      + exact Hwidth. }
+  assert (Hright_bit : N.testbit right (N.log2 (N.lxor left right)) = false).
+  { destruct right as [|right].
+    - reflexivity.
+    - apply N.bits_above_log2.
+      eapply N.lt_le_trans.
+      + apply native_log2_fits_mask.
+        * exact Hright.
+        * discriminate.
+      + exact Hwidth. }
+  destruct (N.eq_dec (N.lxor left right) 0%N) as [Hzero|Hnonzero].
+  - rewrite Hzero in Hwidth. change (62 <= 0)%N in Hwidth. lia.
+  - pose proof (N.bit_log2 (N.lxor left right) Hnonzero) as Hbit.
+    rewrite N.lxor_spec, Hleft_bit, Hright_bit in Hbit.
+    discriminate.
+Qed.
+
 (** The source-level bit view has nine logical positions per byte: a
     continuation marker followed by eight character bits.  The native backend
     reserves four low token bits for that tag, so a logical position [9*b+t]
