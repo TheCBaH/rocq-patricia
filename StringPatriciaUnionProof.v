@@ -406,6 +406,66 @@ Proof.
     + apply Hgetout.
 Qed.
 
+(** Changed-result variant of the left-outer, left-child containment case. *)
+Lemma union_left_specialized_changed_left_outer_left_branch_correct_wf:
+  forall (A : Type) sample split (left right : t A)
+      inner_sample inner_split (inner_left inner_right : t A),
+    wf (Branch sample split left right) ->
+    wf (Branch inner_sample inner_split inner_left inner_right) ->
+    split < inner_split ->
+    agrees_before_bounded sample inner_sample split = true ->
+    bit_at inner_sample split = false ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false)
+      (Branch inner_sample inner_split inner_left inner_right) ->
+    (wf (union_left_specialized_changed_result left
+           (Branch inner_sample inner_split inner_left inner_right)) /\
+      forall key,
+        get key (union_left_specialized_changed_result left
+          (Branch inner_sample inner_split inner_left inner_right)) =
+        match get key left with
+        | Some value => Some value
+        | None => get key (Branch inner_sample inner_split inner_left inner_right)
+        end) ->
+    wf (union_left_specialized_changed_result
+      (Branch sample split left right)
+      (Branch inner_sample inner_split inner_left inner_right)) /\
+    forall key,
+      get key (union_left_specialized_changed_result
+        (Branch sample split left right)
+        (Branch inner_sample inner_split inner_left inner_right)) =
+      match get key (Branch sample split left right) with
+      | Some value => Some value
+      | None => get key (Branch inner_sample inner_split inner_left inner_right)
+      end.
+Proof.
+  intros A sample split left right inner_sample inner_split inner_left inner_right
+    Houter Hinner Hlt Hagree Hside Hoperand Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr Hnl Hnr Hleft Hright Hresident]; subst.
+  assert (Eequal : (split =? inner_split) = false) by
+    (apply Nat.eqb_neq; lia).
+  assert (Eless : (split <? inner_split) = true) by
+    (apply Nat.ltb_lt; exact Hlt).
+  unfold union_left_specialized_changed_result.
+  rewrite union_left_specialized_changed_equation.
+  rewrite Eequal, Eless, Hagree, Hside.
+  destruct (union_left_specialized_changed left
+    (Branch inner_sample inner_split inner_left inner_right)) eqn:Echild.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild.
+    eapply union_left_specialized_left_outer_left_branch_correct_wf;
+      eauto.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild.
+    destruct (union_left_specialized_left_outer_left_branch_correct_wf A
+      sample split left right
+      (Branch inner_sample inner_split inner_left inner_right) left
+      Hwl Hwr Hinner Hleft Hright Hoperand Hchild) as [_ Hget].
+    split; [exact Houter|]. intro key.
+    rewrite <- (get_branch_cached_sample_irrelevant A sample split left right key Hnl Hnr) at 1.
+    apply Hget.
+Qed.
+
 Lemma union_left_specialized_left_outer_right_branch_correct_wf:
   forall (A : Type) sample split (left right operand out_right : t A),
     wf left -> wf right -> wf operand ->
@@ -455,6 +515,66 @@ Proof.
       { eapply get_none_if_all_keys; [exact Hoperand|].
         intros [_ Hbit]. rewrite E in Hbit. discriminate. }
       rewrite Eoperand. now destruct (get key left).
+Qed.
+
+(** Changed-result variant of the left-outer, right-child containment case. *)
+Lemma union_left_specialized_changed_left_outer_right_branch_correct_wf:
+  forall (A : Type) sample split (left right : t A)
+      inner_sample inner_split (inner_left inner_right : t A),
+    wf (Branch sample split left right) ->
+    wf (Branch inner_sample inner_split inner_left inner_right) ->
+    split < inner_split ->
+    agrees_before_bounded sample inner_sample split = true ->
+    bit_at inner_sample split = true ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true)
+      (Branch inner_sample inner_split inner_left inner_right) ->
+    (wf (union_left_specialized_changed_result right
+           (Branch inner_sample inner_split inner_left inner_right)) /\
+      forall key,
+        get key (union_left_specialized_changed_result right
+          (Branch inner_sample inner_split inner_left inner_right)) =
+        match get key right with
+        | Some value => Some value
+        | None => get key (Branch inner_sample inner_split inner_left inner_right)
+        end) ->
+    wf (union_left_specialized_changed_result
+      (Branch sample split left right)
+      (Branch inner_sample inner_split inner_left inner_right)) /\
+    forall key,
+      get key (union_left_specialized_changed_result
+        (Branch sample split left right)
+        (Branch inner_sample inner_split inner_left inner_right)) =
+      match get key (Branch sample split left right) with
+      | Some value => Some value
+      | None => get key (Branch inner_sample inner_split inner_left inner_right)
+      end.
+Proof.
+  intros A sample split left right inner_sample inner_split inner_left inner_right
+    Houter Hinner Hlt Hagree Hside Hoperand Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr Hnl Hnr Hleft Hright Hresident]; subst.
+  assert (Eequal : (split =? inner_split) = false) by
+    (apply Nat.eqb_neq; lia).
+  assert (Eless : (split <? inner_split) = true) by
+    (apply Nat.ltb_lt; exact Hlt).
+  unfold union_left_specialized_changed_result.
+  rewrite union_left_specialized_changed_equation.
+  rewrite Eequal, Eless, Hagree, Hside.
+  destruct (union_left_specialized_changed right
+    (Branch inner_sample inner_split inner_left inner_right)) eqn:Echild.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild.
+    eapply union_left_specialized_left_outer_right_branch_correct_wf;
+      eauto.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild.
+    destruct (union_left_specialized_left_outer_right_branch_correct_wf A
+      sample split left right
+      (Branch inner_sample inner_split inner_left inner_right) right
+      Hwl Hwr Hinner Hleft Hright Hoperand Hchild) as [_ Hget].
+    split; [exact Houter|]. intro key.
+    rewrite <- (get_branch_cached_sample_irrelevant A sample split left right key Hnl Hnr) at 1.
+    apply Hget.
 Qed.
 
 (** The worker's successful bounded-prefix test identifies the side occupied
@@ -587,6 +707,109 @@ Proof.
       { eapply get_none_if_all_keys; [exact Hoperand|].
         intros [_ Hbit]. rewrite E in Hbit. discriminate. }
       now rewrite Eoperand.
+Qed.
+
+(** In the right-outer case, even an unchanged routed child must be placed
+    under the other outer sibling, so the changed worker always rebuilds. *)
+Lemma union_left_specialized_changed_right_outer_left_branch_correct_wf:
+  forall (A : Type) inner_sample inner_split (inner_left inner_right : t A)
+      outer_sample outer_split (outer_left outer_right : t A),
+    wf (Branch inner_sample inner_split inner_left inner_right) ->
+    wf (Branch outer_sample outer_split outer_left outer_right) ->
+    outer_split < inner_split ->
+    agrees_before_bounded inner_sample outer_sample outer_split = true ->
+    bit_at inner_sample outer_split = false ->
+    all_keys (fun key =>
+      same_prefix outer_sample key outer_split /\ bit_at key outer_split = false)
+      (Branch inner_sample inner_split inner_left inner_right) ->
+    (wf (union_left_specialized_changed_result
+           (Branch inner_sample inner_split inner_left inner_right) outer_left) /\
+      forall key,
+        get key (union_left_specialized_changed_result
+          (Branch inner_sample inner_split inner_left inner_right) outer_left) =
+        match get key (Branch inner_sample inner_split inner_left inner_right) with
+        | Some value => Some value
+        | None => get key outer_left
+        end) ->
+    wf (union_left_specialized_changed_result
+      (Branch inner_sample inner_split inner_left inner_right)
+      (Branch outer_sample outer_split outer_left outer_right)) /\
+    forall key,
+      get key (union_left_specialized_changed_result
+        (Branch inner_sample inner_split inner_left inner_right)
+        (Branch outer_sample outer_split outer_left outer_right)) =
+      match get key (Branch inner_sample inner_split inner_left inner_right) with
+      | Some value => Some value
+      | None => get key (Branch outer_sample outer_split outer_left outer_right)
+      end.
+Proof.
+  intros A inner_sample inner_split inner_left inner_right
+    outer_sample outer_split outer_left outer_right
+    Hinner Houter Hlt Hagree Hside Hoperand Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr _ _ Hleft Hright _]; subst.
+  assert (Eequal : (inner_split =? outer_split) = false) by
+    (apply Nat.eqb_neq; lia).
+  assert (Enotless : (inner_split <? outer_split) = false) by
+    (apply Nat.ltb_ge; lia).
+  unfold union_left_specialized_changed_result.
+  rewrite union_left_specialized_changed_equation.
+  rewrite Eequal, Enotless, Hagree, Hside.
+  destruct (union_left_specialized_changed
+    (Branch inner_sample inner_split inner_left inner_right) outer_left) eqn:Echild;
+    unfold union_left_specialized_changed_result in Hchild;
+    rewrite Echild in Hchild;
+    eapply union_left_specialized_right_outer_left_branch_correct_wf; eauto.
+Qed.
+
+(** Changed-result composition for the right child of an enclosing branch. *)
+Lemma union_left_specialized_changed_right_outer_right_branch_correct_wf:
+  forall (A : Type) inner_sample inner_split (inner_left inner_right : t A)
+      outer_sample outer_split (outer_left outer_right : t A),
+    wf (Branch inner_sample inner_split inner_left inner_right) ->
+    wf (Branch outer_sample outer_split outer_left outer_right) ->
+    outer_split < inner_split ->
+    agrees_before_bounded inner_sample outer_sample outer_split = true ->
+    bit_at inner_sample outer_split = true ->
+    all_keys (fun key =>
+      same_prefix outer_sample key outer_split /\ bit_at key outer_split = true)
+      (Branch inner_sample inner_split inner_left inner_right) ->
+    (wf (union_left_specialized_changed_result
+           (Branch inner_sample inner_split inner_left inner_right) outer_right) /\
+      forall key,
+        get key (union_left_specialized_changed_result
+          (Branch inner_sample inner_split inner_left inner_right) outer_right) =
+        match get key (Branch inner_sample inner_split inner_left inner_right) with
+        | Some value => Some value
+        | None => get key outer_right
+        end) ->
+    wf (union_left_specialized_changed_result
+      (Branch inner_sample inner_split inner_left inner_right)
+      (Branch outer_sample outer_split outer_left outer_right)) /\
+    forall key,
+      get key (union_left_specialized_changed_result
+        (Branch inner_sample inner_split inner_left inner_right)
+        (Branch outer_sample outer_split outer_left outer_right)) =
+      match get key (Branch inner_sample inner_split inner_left inner_right) with
+      | Some value => Some value
+      | None => get key (Branch outer_sample outer_split outer_left outer_right)
+      end.
+Proof.
+  intros A inner_sample inner_split inner_left inner_right
+    outer_sample outer_split outer_left outer_right
+    Hinner Houter Hlt Hagree Hside Hoperand Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr _ _ Hleft Hright _]; subst.
+  assert (Eequal : (inner_split =? outer_split) = false) by
+    (apply Nat.eqb_neq; lia).
+  assert (Enotless : (inner_split <? outer_split) = false) by
+    (apply Nat.ltb_ge; lia).
+  unfold union_left_specialized_changed_result.
+  rewrite union_left_specialized_changed_equation.
+  rewrite Eequal, Enotless, Hagree, Hside.
+  destruct (union_left_specialized_changed
+    (Branch inner_sample inner_split inner_left inner_right) outer_right) eqn:Echild;
+    unfold union_left_specialized_changed_result in Hchild;
+    rewrite Echild in Hchild;
+    eapply union_left_specialized_right_outer_right_branch_correct_wf; eauto.
 Qed.
 
 Lemma union_left_specialized_branch_calls_smaller:

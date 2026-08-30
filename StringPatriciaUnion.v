@@ -92,12 +92,12 @@ Fixpoint union_left_specialized_changed {A : Type} (a : t A) {struct a}
               if agrees_before_bounded sample_a sample_b split_b then
                 if bit_at sample_a split_b then
                   match union_right_tree right_b with
-                  | None => None
+                  | None => Some (branch sample_b split_b left_b a)
                   | Some right' => Some (branch sample_b split_b left_b right')
                   end
                 else
                   match union_right_tree left_b with
-                  | None => None
+                  | None => Some (branch sample_b split_b a right_b)
                   | Some left' => Some (branch sample_b split_b left' right_b)
                   end
               else Some (join a b)
@@ -154,12 +154,12 @@ Lemma union_left_specialized_changed_equation:
           if agrees_before_bounded sample_a sample_b split_b then
             if bit_at sample_a split_b then
               match union_left_specialized_changed a right_b with
-              | None => None
+              | None => Some (branch sample_b split_b left_b a)
               | Some right' => Some (branch sample_b split_b left_b right')
               end
             else
               match union_left_specialized_changed a left_b with
-              | None => None
+              | None => Some (branch sample_b split_b a right_b)
               | Some left' => Some (branch sample_b split_b left' right_b)
               end
           else Some (join a b)

@@ -104,12 +104,12 @@ Fixpoint union_left_specialized_changed {A : Type} (a : t A) {struct a}
                   if matches_prefix ka pb mb then
                     if zero_bit ka mb then
                       match union_right_tree lb with
-                      | None => None
+                      | None => Some (branch pb mb a rb)
                       | Some left' => Some (branch pb mb left' rb)
                       end
                     else
                       match union_right_tree rb with
-                      | None => None
+                      | None => Some (branch pb mb lb a)
                       | Some right' => Some (branch pb mb lb right')
                       end
                   else Some (join a b)
@@ -170,12 +170,12 @@ Lemma union_left_specialized_changed_equation:
               if matches_prefix ka pb mb then
                 if zero_bit ka mb then
                   match union_left_specialized_changed a lb with
-                  | None => None
+                  | None => Some (branch pb mb a rb)
                   | Some left' => Some (branch pb mb left' rb)
                   end
                 else
                   match union_left_specialized_changed a rb with
-                  | None => None
+                  | None => Some (branch pb mb lb a)
                   | Some right' => Some (branch pb mb lb right')
                   end
               else Some (join a b)

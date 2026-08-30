@@ -33,6 +33,14 @@ let check_integer () =
     failwith "integer changed worker missed unchanged certificate";
   if changed_left = None then
     failwith "integer changed worker missed fresh right bindings";
+  let nested = I.set 3 30 (I.set 1 10 I.empty) in
+  let enclosing = I.set 8 80 nested in
+  let nested_changed = IU.union_left_specialized_changed nested enclosing in
+  let nested_result =
+    match nested_changed with None -> nested | Some changed -> changed
+  in
+  if nested_changed = None || I.get 8 nested_result <> Some 80 then
+    failwith "integer changed worker dropped an outer sibling";
   if IU.union_left_specialized left I.empty != left then
     failwith "integer empty-right certificate lost sharing"
 
@@ -73,6 +81,14 @@ let check_string () =
     failwith "string changed worker missed unchanged certificate";
   if changed_left = None then
     failwith "string changed worker missed fresh right bindings";
+  let nested = S.set "ab" 2 (S.set "aa" 1 S.empty) in
+  let enclosing = S.set "z" 3 nested in
+  let nested_changed = SU.union_left_specialized_changed nested enclosing in
+  let nested_result =
+    match nested_changed with None -> nested | Some changed -> changed
+  in
+  if nested_changed = None || S.get "z" nested_result <> Some 3 then
+    failwith "string changed worker dropped an outer sibling";
   if SU.union_left_specialized left S.empty != left then
     failwith "string empty-right certificate lost sharing"
 
