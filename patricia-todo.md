@@ -165,10 +165,9 @@ Required only for an end-to-end native-refinement claim.
   left-biased pointwise lookup law for every empty/leaf case. The integer and
   direct-string common-split branch cases are likewise complete. Both integer
   and direct-string left-outer child-routing reconstruction cases are also
-  complete, including the direct-string routing-premise derivation. Both
-  direct-string right-outer reconstruction cases are also complete; final
-  recursive assembly and the corresponding integer right-outer cases remain
-  open.
+  complete, including the direct-string routing-premise derivation. All
+  integer and direct-string branch-shape reconstruction cases are complete;
+  the final structural-recursion assembly remains open.
 - [x] Isolate experimental specialized-union workers in companion Rocq modules
   and give them a targeted extraction/oracle target, so iteration on N2 does
   not invalidate the expensive established `PatriciaProof.v` and
@@ -293,6 +292,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Completed the integer right-outer unequal-split reconstruction | `PatriciaUnionProof.v` adds left- and right-child reconstruction rules for the inner structural recursion, completing the four integer unequal-split branch shapes. `make union-proof` passed. |
 | 2026-08-30 | Proved direct-string right-outer unequal-split reconstruction | `StringPatriciaUnionProof.v` adds left- and right-child reconstruction rules for the branch held by the worker’s inner structural recursion. `make union-proof` passed. |
 | 2026-08-30 | Derived direct-string left-outer routing from the worker test | `StringPatriciaUnionProof.v`'s `union_left_specialized_left_outer_routing` turns the successful `agrees_before_bounded` check and split ordering into the exact all-keys side invariant consumed by the unequal-split reconstruction rules. `make union-proof` passed. |
 | 2026-08-30 | Proved direct-string left-outer unequal-split reconstruction | `StringPatriciaUnionProof.v` adds the left- and right-child reconstruction rules, each proving well-formedness and the biased lookup law once the branch-side routing invariant is supplied. `make union-proof` passed. |
