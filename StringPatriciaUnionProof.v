@@ -58,6 +58,32 @@ Proof.
       [destruct (get key r)|destruct (get key l)]; reflexivity.
 Qed.
 
+(** Smart branches may refresh their cached sample, but lookup ignores that
+    field.  With nonempty children, refreshing it cannot collapse the branch. *)
+Lemma get_branch_cached_sample_irrelevant:
+  forall (A : Type) sample split (left right : t A) key,
+    representative left <> None -> representative right <> None ->
+    get key (branch sample split left right) =
+    get key (Branch sample split left right).
+Proof.
+  intros A sample split left right key Hleft Hright.
+  unfold branch.
+  destruct left as [|left_key left_value|left_sample left_split left_left left_right].
+  - exfalso. apply Hleft. reflexivity.
+  - destruct right as [|right_key right_value|right_sample right_split right_left right_right].
+    + exfalso. apply Hright. reflexivity.
+    + reflexivity.
+    + reflexivity.
+  - destruct right as [|right_key right_value|right_sample right_split right_left right_right].
+    + exfalso. apply Hright. reflexivity.
+    + cbn [representative]. destruct (representative left_left);
+        [cbn [get]; reflexivity|].
+      destruct (representative left_right); cbn [get]; reflexivity.
+    + cbn [representative]. destruct (representative left_left);
+        [cbn [get]; reflexivity|].
+      destruct (representative left_right); cbn [get]; reflexivity.
+Qed.
+
 Theorem union_left_specialized_disjoint_samples:
   forall (A : Type) sample_a split (left_a right_a : t A)
       sample_b (left_b right_b : t A),
