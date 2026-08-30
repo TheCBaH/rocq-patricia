@@ -175,3 +175,50 @@ Proof.
     + exact Hra.
     + exact Hrb'.
 Qed.
+
+(** Complete reconstruction for equal split positions.  The worker retains
+    the left cached sample, while [branch_wf_general] is free to rebase it to
+    a resident output representative if either recursive result is empty. *)
+Lemma union_left_specialized_same_branch_correct_wf:
+  forall (A : Type) sample_a sample_b split
+      (left_a right_a left_b right_b out_left out_right : t A),
+    wf (Branch sample_a split left_a right_a) ->
+    wf (Branch sample_b split left_b right_b) ->
+    agrees_before_bounded sample_a sample_b split = true ->
+    (wf out_left /\
+      forall key,
+        get key out_left =
+        match get key left_a with Some value => Some value | None => get key left_b end) ->
+    (wf out_right /\
+      forall key,
+        get key out_right =
+        match get key right_a with Some value => Some value | None => get key right_b end) ->
+    wf (branch sample_a split out_left out_right) /\
+    forall key,
+      get key (branch sample_a split out_left out_right) =
+      match get key (Branch sample_a split left_a right_a) with
+      | Some value => Some value
+      | None => get key (Branch sample_b split left_b right_b)
+      end.
+Proof.
+  intros A sample_a sample_b split left_a right_a left_b right_b out_left out_right
+    Hwa Hwb Hagree [Hwol Hgetol] [Hwor Hgetor].
+  inversion Hwa as [| |? ? ? ? Hwla Hwra _ _ Hla Hra _]; subst.
+  inversion Hwb as [| |? ? ? ? Hwlb Hwrb _ _ Hlb Hrb _]; subst.
+  destruct (union_left_specialized_same_split_output_keys A sample_a sample_b split
+    left_a right_a left_b right_b out_left out_right Hagree
+    Hla Hra Hlb Hrb Hwol Hgetol Hwor Hgetor) as [Houtl Houtr].
+  split.
+  - apply branch_wf_general; assumption.
+  - intro key.
+    assert (Houtlbit : all_keys (fun stored => bit_at stored split = false)
+      out_left).
+    { eapply all_keys_impl; [exact Houtl|]. intros stored H. exact (proj2 H). }
+    assert (Houtrbit : all_keys (fun stored => bit_at stored split = true)
+      out_right).
+    { eapply all_keys_impl; [exact Houtr|]. intros stored H. exact (proj2 H). }
+    rewrite (get_branch A sample_a split out_left out_right key Houtlbit Houtrbit).
+    destruct (bit_at key split) eqn:E; cbn [get]; rewrite E.
+    + apply Hgetor.
+    + apply Hgetol.
+Qed.
