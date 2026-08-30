@@ -41,6 +41,30 @@ let check_integer () =
   in
   if nested_changed = None || I.get 8 nested_result <> Some 80 then
     failwith "integer changed worker dropped an outer sibling";
+  for seed = 1 to 32 do
+    let state = ref seed in
+    let next () =
+      state := ((!state * 1103515245) + 12345) land 0x3fffffff;
+      !state
+    in
+    let rec add count tree =
+      if count = 0 then tree
+      else
+        let key = 1 + (next () mod 127) in
+        add (count - 1) (I.set key (next ()) tree)
+    in
+    let random_left = add 48 I.empty in
+    let random_right = add 48 I.empty in
+    let random_changed = IU.union_left_specialized_changed random_left random_right in
+    let random_result =
+      match random_changed with None -> random_left | Some changed -> changed
+    in
+    let random_expected = I.union_left random_left random_right in
+    for key = 1 to 127 do
+      if I.get key random_result <> I.get key random_expected then
+        failwith "integer randomized changed-worker union mismatch"
+    done
+  done;
   if IU.union_left_specialized left I.empty != left then
     failwith "integer empty-right certificate lost sharing"
 
@@ -89,6 +113,31 @@ let check_string () =
   in
   if nested_changed = None || S.get "z" nested_result <> Some 3 then
     failwith "string changed worker dropped an outer sibling";
+  for seed = 1 to 32 do
+    let state = ref seed in
+    let next () =
+      state := ((!state * 1103515245) + 12345) land 0x3fffffff;
+      !state
+    in
+    let rec add count tree =
+      if count = 0 then tree
+      else
+        let key = Printf.sprintf "%03d" (next () mod 127) in
+        add (count - 1) (S.set key (next ()) tree)
+    in
+    let random_left = add 48 S.empty in
+    let random_right = add 48 S.empty in
+    let random_changed = SU.union_left_specialized_changed random_left random_right in
+    let random_result =
+      match random_changed with None -> random_left | Some changed -> changed
+    in
+    let random_expected = S.union_left random_left random_right in
+    for key = 0 to 126 do
+      let key = Printf.sprintf "%03d" key in
+      if S.get key random_result <> S.get key random_expected then
+        failwith "string randomized changed-worker union mismatch"
+    done
+  done;
   if SU.union_left_specialized left S.empty != left then
     failwith "string empty-right certificate lost sharing"
 

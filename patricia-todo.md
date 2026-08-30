@@ -302,6 +302,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Expanded changed-worker extraction coverage | `PatriciaUnionTest.ml` now runs 32 deterministic mixed-shape workloads per backend, comparing every result against the established left-biased union across 127 keys. `make union-oracle` and `git diff --check` passed. |
 | 2026-08-30 | Completed integer changed-worker terminal cases | `PatriciaUnionProof.v` maps all three disjoint branch outcomes to a `Some` separated join: both outer-prefix mismatches and equal masks with distinct prefixes. `make PatriciaUnionProof.vo`, `make union-oracle`, and `git diff --check` passed. |
 | 2026-08-30 | Completed integer changed-worker branch reconstruction | `PatriciaUnionProof.v` now has changed-result certificates for equal headers and all four unequal-mask routing sides. The right-outer rules account for the mandatory enclosing-branch rebuild. `make PatriciaUnionProof.vo` and `make union-oracle` passed. |
 | 2026-08-30 | Proved integer changed-worker equal-header reconstruction | `PatriciaUnionProof.v`'s `union_left_specialized_changed_same_branch_correct_wf` handles all four optional child-result shapes, using `branch_unchanged` for the all-unchanged certificate. `make PatriciaUnionProof.vo` passed. |
