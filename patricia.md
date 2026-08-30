@@ -71,9 +71,11 @@ below.
 
 ### 1. Native merge now avoids fuel and biased union shares structure
 
-The Rocq definitions still calculate `S (size left + size right)` as fuel;
-this makes their termination argument and existing proofs straightforward.
-The native extraction now replaces `combine` with direct structural recursion,
+The public Rocq definitions now use direct well-founded structural recursion,
+with `size left + size right` as their strict termination measure.
+`combine_structural_eq_combine_fuel` proves that each worker exactly agrees
+with the retained fuelled reference at every sufficient fuel bound. The native
+extraction also replaces `combine` with its own direct structural recursion,
 so it does not compute that bound at runtime. Its leaf/tree cases delegate to
 source-level workers with proved lookup and well-formedness laws, fusing an
 overlapping replacement into the mapping pass. It also replaces `union_left`
@@ -88,10 +90,9 @@ less allocation for the overlapping workload.  This restores the intended
 operational behavior, but it is benchmark evidence rather than a complexity
 proof.
 
-The remaining verification task is to prove a well-founded version of this
-algorithm or a refinement theorem connecting the direct extracted recursion
-to the existing fuelled specification.  A cost semantics is additionally
-needed before making a formal asymptotic claim.
+The remaining native-refinement task is to connect the direct extracted
+recursion to this proved structural source worker. A cost semantics is
+additionally needed before making a formal asymptotic claim.
 
 ### 2. The direct-string biased unions are verified
 
@@ -188,7 +189,7 @@ does not inspect either kind of extraction directive.
 | Packed string split token `(byte << 4) | tag`, native `bit_at`, and bytewise `first_diff` | `first_diff` is checked for all 65,536 one-byte pairs plus prefix and long-prefix cases; direct checks cover all 16 tags at in-range and out-of-range byte indices, and structural tests check `bit_at` routing over NUL, non-ASCII, and randomized strings | `NativeRefinement.v` proves the logical `9*b+t` to packed `16*b+t` codec, valid-tag property, injectivity, ordering, and valid-token decode/encode round trips. Its native byte-code-array model proves byte length/access/bounds, the guard conditions for every `unsafe_get` site, and `native_packed_bit_at_refines_representation`; its safe structural bytewise scanner is proved equal to packed `first_diff`, and its mismatching-byte choice is equivalent to the Boolean-XOR leading-zeroes model. The remaining FFI contract is only that OCaml byte strings implement this array model, `String.length`/`Char.code` return the stated length/code, and short-circuit guards precede each unsafe access; OCaml execution itself is not kernel-verified. Logical position 9 remains token 16, so direct equality at the same extracted integer is intentionally false. |
 | A branch sample returned as its constant-time `representative` | `wf_branch` requires `resident sample (Branch ...)`, and every smart constructor and public-operation preservation theorem discharges that premise; structural tests independently check the property | Cached-sample residency is kernel-checked (`wf_cached_sample_resident`). The cached and pure representatives can differ, but `wf_cached_sample_same_prefix_representative` proves agreement below the branch split. `wf_cached_sample_agrees_before_representative` and `wf_cached_sample_bit_at_before_representative` therefore justify every bounded-prefix comparison and strictly-outer routing-bit use in native merge/union without requiring representative equality. |
 | Exception-based one-descent string `set` | Existing/fresh-key oracle tests and structural checks pass | Define a source worker returning either a rebuilt tree or a discriminator to bubble upward, prove it equivalent to `set`, and extract it. Proving the exact local-exception OCaml code instead requires a target-language logic supporting exceptions. |
-| Fuel-free integer and string `combine` | Randomized merges agree with reference maps; both source `combine` definitions are proved | Define well-founded recursion over `size left + size right`, prove its equations and equivalence to sufficiently fuelled `combine_fuel`, and extract that definition. |
+| Fuel-free integer and string `combine` | The public source workers recurse well-foundedly over `size left + size right` and are proved equal to every sufficient `combine_fuel` run; randomized native merges agree with reference maps | Connect the handwritten native direct recursion to the proved structural source workers, or extract those workers once they meet performance requirements. |
 | Specialized biased unions and physical-identity (`==`) sharing | Disjoint and overlap results agree with `Stdlib.Map`; allocation demonstrates sharing | Prove the semantic union law for a source-level specialized algorithm. Functional correctness does not prove physical sharing; a sharing/allocation claim needs a cost or heap semantics. A source worker can return a `changed` certificate to justify returning the original tree without relying on target physical equality. |
 
 The packed-token and cached-representative rows are the most important subtle

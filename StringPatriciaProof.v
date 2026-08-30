@@ -2325,6 +2325,44 @@ Proof.
   intros. apply Hstrong with (total := size left + size right). reflexivity.
 Qed.
 
+(** Direct structural recursion follows exactly the same branch selected by
+    the fuelled reference whenever the latter is given sufficient fuel. *)
+Theorem combine_structural_eq_combine_fuel:
+  forall (A B C : Type) fuel
+      (f : option A -> option B -> option C) (left : t A) (right : t B),
+    combine_fuel_sufficient fuel left right ->
+    combine_structural f left right = combine_fuel fuel f left right.
+Proof.
+  intros A B C fuel. induction fuel as [|fuel IH]; intros f left right Hfuel.
+  - cbn in Hfuel. contradiction.
+  - destruct left as [|lk lv|ls lsplit ll lr];
+      destruct right as [|rk rv|rs rsplit rl rr]; cbn in Hfuel |- *; auto.
+    destruct Hfuel as [Hll [Hrr [Hlr [Hrright [Hlleft Hlright]]]]].
+    cbn [combine_structural, combine_fuel].
+    destruct (lsplit =? rsplit) eqn:Esplit; cbn.
+    + destruct (agrees_before_bounded ls rs lsplit) eqn:Eagree; cbn; auto.
+      rewrite (IH f ll rl Hll), (IH f lr rr Hrr). reflexivity.
+    + destruct (lsplit <? rsplit) eqn:Eorder; cbn.
+      * destruct (agrees_before_bounded ls rs lsplit) eqn:Eagree; cbn; auto.
+        destruct (bit_at rs lsplit) eqn:Ebit; cbn.
+        -- rewrite (IH f lr (Branch rs rsplit rl rr) Hrright). reflexivity.
+        -- rewrite (IH f ll (Branch rs rsplit rl rr) Hlr). reflexivity.
+      * destruct (agrees_before_bounded ls rs rsplit) eqn:Eagree; cbn; auto.
+        destruct (bit_at ls rsplit) eqn:Ebit; cbn.
+        -- rewrite (IH f (Branch ls lsplit ll lr) rr Hlright). reflexivity.
+        -- rewrite (IH f (Branch ls lsplit ll lr) rl Hlleft). reflexivity.
+Qed.
+
+Corollary combine_structural_eq_public_combine_fuel:
+  forall (A B C : Type)
+      (f : option A -> option B -> option C) (left : t A) (right : t B),
+    combine_structural f left right =
+    combine_fuel (S (size left + size right)) f left right.
+Proof.
+  intros. apply combine_structural_eq_combine_fuel.
+  apply public_combine_fuel_sufficient.
+Qed.
+
 Lemma branch_at_wf:
   forall (A : Type) sample split (fresh old : t A),
     wf fresh -> wf old ->
@@ -2896,7 +2934,9 @@ Theorem combine_correct_wf:
     forall key,
       get key (combine f left right) = f (get key left) (get key right).
 Proof.
-  intros. unfold combine. eapply combine_fuel_correct_wf; eauto.
+  intros. unfold combine.
+  rewrite combine_structural_eq_public_combine_fuel.
+  eapply combine_fuel_correct_wf; eauto.
   apply public_combine_fuel_sufficient.
 Qed.
 

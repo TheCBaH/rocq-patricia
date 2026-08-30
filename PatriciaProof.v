@@ -1317,6 +1317,48 @@ Proof.
   intros. apply Hstrong with (total := size left + size right). reflexivity.
 Qed.
 
+(** Direct structural recursion follows exactly the same branch chosen by the
+    fuelled reference whenever the latter is given sufficient fuel. *)
+Theorem combine_structural_eq_combine_fuel:
+  forall (A B C : Type) fuel
+      (f : option A -> option B -> option C) (left : t A) (right : t B),
+    combine_fuel_sufficient fuel left right ->
+    combine_structural f left right = combine_fuel fuel f left right.
+Proof.
+  intros A B C fuel. induction fuel as [|fuel IH]; intros f left right Hfuel.
+  - cbn in Hfuel. contradiction.
+  - destruct left as [|lk lv|lp lm ll lr];
+      destruct right as [|rk rv|rp rm rl rr]; cbn in Hfuel |- *; auto.
+    destruct Hfuel as [Hll [Hrr [Hlr [Hrright [Hlleft Hlright]]]]].
+    cbn [combine_structural, combine_fuel].
+    destruct (N.eqb lm rm && N.eqb lp rp)%bool eqn:Eequal; cbn.
+    + rewrite (IH f ll rl Hll), (IH f lr rr Hrr). reflexivity.
+    + destruct (mask_above lm rm) eqn:Eleft; cbn.
+      * destruct (representative (Branch rp rm rl rr)) as [key|] eqn:Erep; cbn.
+        -- destruct (matches_prefix key lp lm) eqn:Eprefix; cbn; auto.
+           destruct (zero_bit key lm) eqn:Ebit; cbn.
+           ++ rewrite (IH f ll (Branch rp rm rl rr) Hlr). reflexivity.
+           ++ rewrite (IH f lr (Branch rp rm rl rr) Hrright). reflexivity.
+        -- reflexivity.
+      * destruct (mask_above rm lm) eqn:Eright; cbn; auto.
+        destruct (representative (Branch lp lm ll lr)) as [key|] eqn:Erep; cbn.
+        -- destruct (matches_prefix key rp rm) eqn:Eprefix; cbn; auto.
+           destruct (zero_bit key rm) eqn:Ebit; cbn.
+           ++ rewrite (IH f (Branch lp lm ll lr) rl Hlleft). reflexivity.
+           ++ rewrite (IH f (Branch lp lm ll lr) rr Hlright). reflexivity.
+        -- reflexivity.
+Qed.
+
+Corollary combine_structural_eq_public_combine_fuel:
+  forall (A B C : Type)
+      (f : option A -> option B -> option C) (left : t A) (right : t B),
+    combine_structural f left right =
+    combine_fuel (S (size left + size right)) f left right.
+Proof.
+  intros. apply combine_structural_eq_combine_fuel.
+  apply public_combine_fuel_sufficient.
+Qed.
+
 Theorem combine_fuel_correct_wf:
   forall (A B C : Type) fuel
       (f : option A -> option B -> option C) (left : t A) (right : t B),
@@ -1776,7 +1818,9 @@ Theorem combine_correct_wf:
     wf (combine f left right) /\
     forall key, get key (combine f left right) = f (get key left) (get key right).
 Proof.
-  intros. unfold combine. eapply combine_fuel_correct_wf; eauto.
+  intros. unfold combine.
+  rewrite combine_structural_eq_public_combine_fuel.
+  eapply combine_fuel_correct_wf; eauto.
   apply public_combine_fuel_sufficient.
 Qed.
 

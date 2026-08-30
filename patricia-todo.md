@@ -150,8 +150,11 @@ Required only for an end-to-end native-refinement claim.
   directions; `set_one_descent_eq_set` concludes `set_one_descent` and `set`
   are the same function, and `set_one_descent_correct_wf` restates wf
   preservation and the `get` law for free by rewriting through it.
-- [ ] Replace proof-side fuelled `combine` with well-founded structural
+- [x] Replace proof-side fuelled `combine` with well-founded structural
   recursion and prove equivalence to sufficiently fuelled `combine_fuel`.
+  `combine_structural` uses the strict measure `size left + size right`, and
+  `combine_structural_eq_combine_fuel` proves exact agreement with every
+  sufficient fuel bound in both backends.
 - [ ] Define and prove source-level specialized left- and right-biased unions,
   including their unchanged/disjoint subtree result certificates.
 - [ ] Remove the corresponding handwritten `set`, `combine`, and union
@@ -269,6 +272,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Replaced the public fuelled combine with a well-founded structural worker in both backends | `Patricia.v` and `StringPatricia.v` define `combine_structural` over `size left + size right`; their proof files establish exact equality with `combine_fuel` under `combine_fuel_sufficient` and derive the public fuel-bound corollary |
 | 2026-08-30 | Completed the N1 byte-string primitive model and guarded-access contract | `NativeRefinement.v` proves `native_bytes_length`, `native_bytes_get`, guarded `unsafe_get` access, `native_code_bit_ascii`, and `native_packed_bit_at_refines_representation`; `make` and `git diff --check` passed |
 | 2026-08-30 | Completed the N2 one-descent string `set` worker, fixing a dropped-sibling bug the proof caught in the pre-existing stub | `StringPatriciaProof.v`'s `set_descend_matches_insert_at`/`set_one_descent_eq_set`/`set_one_descent_correct_wf`; full `make`: 281 declarations closed, oracle and differential tests passed; `git diff --check` passed |
 | 2026-08-30 | Completed the N1 native XOR/leading-zeroes first-difference refinement | `NativeRefinement.v`'s `native_byte_first_diff_correct`/`native_string_first_diff_refines` connect the realizer's `lxor`/mask-shift loop to the existing safe source model; full `make` and `git diff --check` passed |

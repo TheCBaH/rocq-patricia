@@ -1,4 +1,5 @@
-From Stdlib Require Import Bool List PeanoNat Strings.String.
+From Stdlib Require Import Arith.Wf_nat Bool Lia List PeanoNat Program.Wf
+  Strings.String.
 Import ListNotations.
 
 Require Import StringBits.
@@ -315,9 +316,53 @@ Fixpoint combine_fuel {A B C : Type}
       end
   end.
 
+(** The fuelled worker above is the simple termination reference.  The public
+    worker recurses directly on the strictly smaller combined size of its
+    Patricia arguments. *)
+Program Fixpoint combine_structural {A B C : Type}
+    (f : option A -> option B -> option C)
+    (a : t A) (b : t B) {measure (size a + size b)%nat} : t C :=
+  match a, b with
+  | Empty, _ => map_right f b
+  | _, Empty => map_left f a
+  | Leaf ka va, _ => combine_leaf_left f ka va b
+  | _, Leaf kb vb => combine_leaf_right f a kb vb
+  | Branch sample_a split_a left_a right_a,
+    Branch sample_b split_b left_b right_b =>
+      if split_a =? split_b then
+        if agrees_before_bounded sample_a sample_b split_a then
+          branch sample_a split_a
+            (combine_structural f left_a left_b)
+            (combine_structural f right_a right_b)
+        else join (map_left f a) (map_right f b)
+      else if split_a <? split_b then
+        if agrees_before_bounded sample_a sample_b split_a then
+          if bit_at sample_b split_a
+          then branch sample_a split_a (map_left f left_a)
+                 (combine_structural f right_a b)
+          else branch sample_a split_a
+                 (combine_structural f left_a b) (map_left f right_a)
+        else join (map_left f a) (map_right f b)
+      else
+        if agrees_before_bounded sample_a sample_b split_b then
+          if bit_at sample_a split_b
+          then branch sample_b split_b (map_right f left_b)
+                 (combine_structural f a right_b)
+          else branch sample_b split_b
+                 (combine_structural f a left_b) (map_right f right_b)
+        else join (map_left f a) (map_right f b)
+  end.
+Next Obligation. intros; cbn [size]; lia. Qed.
+Next Obligation. intros; cbn [size]; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. split; intros; intuition discriminate. Qed.
+
 Definition combine {A B C : Type}
     (f : option A -> option B -> option C) (a : t A) (b : t B) : t C :=
-  combine_fuel (S (size a + size b)) f a b.
+  combine_structural f a b.
 
 Definition union_left {A : Type} (a b : t A) : t A :=
   combine (fun x y => match x with Some _ => x | None => y end) a b.

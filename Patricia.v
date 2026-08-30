@@ -4,7 +4,7 @@
     clients should hide them behind a module signature and only expose values
     produced by the smart constructors below. *)
 
-From Stdlib Require Import Bool List NArith PArith.
+From Stdlib Require Import Arith.Wf_nat Bool Lia List NArith PArith Program.Wf.
 Import ListNotations.
 
 Require Import PatriciaBits.
@@ -255,9 +255,63 @@ Fixpoint combine_fuel {A B C : Type}
       end
   end.
 
+(** The fuelled worker above is the simple termination reference.  The public
+    worker uses the same Patricia cases, but recurses directly on the strictly
+    smaller combined size of its arguments. *)
+Program Fixpoint combine_structural {A B C : Type}
+    (f : option A -> option B -> option C)
+    (a : t A) (b : t B) {measure (size a + size b)%nat} : t C :=
+  match a, b with
+  | Empty, _ => map_right f b
+  | _, Empty => map_left f a
+  | Leaf ka va, _ =>
+      replace_binding ka (f (Some va) (get ka b)) (map_right f b)
+  | _, Leaf kb vb =>
+      replace_binding kb (f (get kb a) (Some vb)) (map_left f a)
+  | Branch pa ma la ra, Branch pb mb lb rb =>
+      if (N.eqb ma mb && N.eqb pa pb)%bool then
+        branch pa ma
+          (combine_structural f la lb)
+          (combine_structural f ra rb)
+      else if mask_above ma mb then
+        match representative b with
+        | None => map_left f a
+        | Some kb =>
+            if matches_prefix kb pa ma then
+              if zero_bit kb ma then
+                branch pa ma
+                  (combine_structural f la b) (map_left f ra)
+              else
+                branch pa ma
+                  (map_left f la) (combine_structural f ra b)
+            else join (map_left f a) (map_right f b)
+        end
+      else if mask_above mb ma then
+        match representative a with
+        | None => map_right f b
+        | Some ka =>
+            if matches_prefix ka pb mb then
+              if zero_bit ka mb then
+                branch pb mb
+                  (combine_structural f a lb) (map_right f rb)
+              else
+                branch pb mb
+                  (map_right f lb) (combine_structural f a rb)
+            else join (map_left f a) (map_right f b)
+        end
+      else join (map_left f a) (map_right f b)
+  end.
+Next Obligation. intros; cbn [size]; lia. Qed.
+Next Obligation. intros; cbn [size]; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. split; intros; intuition discriminate. Qed.
+
 Definition combine {A B C : Type}
     (f : option A -> option B -> option C) (a : t A) (b : t B) : t C :=
-  combine_fuel (S (size a + size b)) f a b.
+  combine_structural f a b.
 
 Definition union_left {A : Type} (a b : t A) : t A :=
   combine (fun x y => match x with Some _ => x | None => y end) a b.
