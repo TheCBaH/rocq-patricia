@@ -161,8 +161,9 @@ Required only for an end-to-end native-refinement claim.
   including their unchanged/disjoint subtree result certificates. The source
   workers, compact proof-facing equation lemmas, and exact
   empty/immediate-join certificates are now defined in the isolated companion
-  modules; the general well-formedness and pointwise union theorems remain
-  open.
+  modules. Both companion closures also prove invariant preservation and the
+  left-biased pointwise lookup law for every empty/leaf case; the general
+  branch/branch well-formedness and pointwise union theorems remain open.
 - [x] Isolate experimental specialized-union workers in companion Rocq modules
   and give them a targeted extraction/oracle target, so iteration on N2 does
   not invalidate the expensive established `PatriciaProof.v` and
@@ -287,6 +288,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Proved the specialized-union empty/leaf boundary contracts | `PatriciaUnionProof.v` and `StringPatriciaUnionProof.v` now establish well-formedness and the left-biased pointwise lookup law for every worker case with an empty or leaf operand. `make union-proof`, `make union-oracle`, full `make`, and `git diff --check` passed; the assumption audit reported 311 closed declarations. |
 | 2026-08-30 | Isolated specialized biased-union iteration and removed the pathological structural-combine proof reduction | `PatriciaUnion.v`/`StringPatriciaUnion.v` contain nested structural workers; their companion proof files contain the initial exact-result certificates. `combine_structural` was reformulated as nested structural recursion with compact equation lemmas, reducing fresh `PatriciaProof.v` and `StringPatriciaProof.v` compilation from more than 199 seconds at the interrupted unfolding point to under one second each. `make proof`, `make union-oracle`, full `make`, and `git diff --check` passed; the assumption audit reported 307 closed declarations. |
 | 2026-08-30 | Replaced the public fuelled combine with a direct structural worker in both backends | `Patricia.v` and `StringPatricia.v` define nested structurally recursive `combine_structural`; their proof files establish exact equality with `combine_fuel` under `combine_fuel_sufficient` and derive the public fuel-bound corollary |
 | 2026-08-30 | Completed the N1 byte-string primitive model and guarded-access contract | `NativeRefinement.v` proves `native_bytes_length`, `native_bytes_get`, guarded `unsafe_get` access, `native_code_bit_ascii`, and `native_packed_bit_at_refines_representation`; `make` and `git diff --check` passed |
