@@ -184,9 +184,10 @@ Required only for an end-to-end native-refinement claim.
   rebuilt result. The extraction oracle checks both certificate outcomes. A
   10K wrapper trial reduced overlapping allocation to about 70K words for
   each backend (below `Stdlib.Map`'s 81K), but still above the handwritten
-  physical-equality implementation. The changed-result correctness proof and
-  source-level allocation refinement remain open, so public wrappers continue
-  to use the handwritten unions for now.
+  physical-equality implementation. The direct-string changed-result worker
+  now has a full structural correctness proof; the corresponding integer proof
+  and source-level allocation refinement remain open, so public wrappers
+  continue to use the handwritten unions for now.
 
 Exit gate: optimized public operations are linked by refinement theorems to the
 proved finite-map semantics. Physical sharing remains outside the claim unless
@@ -301,6 +302,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Completed direct-string changed-worker refinement | `StringPatriciaUnionProof.v` now proves `union_left_specialized_changed_correct_wf` and its right-biased dual by the same combined-size induction as the specialized worker, reusing the changed-result branch certificates. Full `make` passed with 352 closed declarations. |
 | 2026-08-30 | Fixed changed-worker right-outer rebuilding | Both source-level changed workers now rebuild an enclosing right branch even when the recursively routed child is unchanged; otherwise the outer sibling was lost. `PatriciaUnionTest.ml` includes integer and string regressions for that shape. `make union-oracle` passed. |
 | 2026-08-30 | Proved direct-string changed-worker left-outer reconstruction | `StringPatriciaUnionProof.v` now covers both left- and right-child containment routes. In an unchanged-child path it preserves the raw cached branch while using representative-independent lookup equivalence. `make StringPatriciaUnionProof.vo` and `make union-oracle` passed. |
 | 2026-08-30 | Proved direct-string changed-worker equal-split reconstruction | `StringPatriciaUnionProof.v`'s `union_left_specialized_changed_same_branch_correct_wf` normalizes all four optional child-result shapes through the established branch reconstruction theorem. Its `None`/`None` path proves lookup preservation despite cached-sample reuse. `make union-oracle` passed. |

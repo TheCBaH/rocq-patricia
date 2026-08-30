@@ -1009,6 +1009,166 @@ Proof.
   eapply Hstrong with (total := size left + size right); eauto.
 Qed.
 
+(** The source-visible signal refines the specialized worker: interpreting
+    [None] as the original first input has the usual left-biased union law. *)
+Theorem union_left_specialized_changed_correct_wf:
+  forall (A : Type) (left right : t A),
+    wf left -> wf right ->
+    wf (union_left_specialized_changed_result left right) /\
+    forall key,
+      get key (union_left_specialized_changed_result left right) =
+      match get key left with
+      | Some value => Some value
+      | None => get key right
+      end.
+Proof.
+  intros A.
+  assert (Hstrong : forall total, forall (left right : t A),
+      size left + size right = total -> wf left -> wf right ->
+      wf (union_left_specialized_changed_result left right) /\
+      forall key,
+        get key (union_left_specialized_changed_result left right) =
+        match get key left with
+        | Some value => Some value
+        | None => get key right
+        end).
+  { intro total. induction total using lt_wf_ind.
+    intros left right E Hwl Hwr.
+    destruct left as [|left_key left_value
+        |left_sample left_split left_left left_right];
+      destruct right as [|right_key right_value
+        |right_sample right_split right_left right_right].
+    - rewrite union_left_specialized_changed_empty_left.
+      now apply union_left_specialized_correct_wf.
+    - rewrite union_left_specialized_changed_empty_left.
+      now apply union_left_specialized_correct_wf.
+    - rewrite union_left_specialized_changed_empty_left.
+      now apply union_left_specialized_correct_wf.
+    - rewrite union_left_specialized_changed_leaf_left.
+      now apply union_left_specialized_correct_wf.
+    - rewrite union_left_specialized_changed_leaf_left.
+      now apply union_left_specialized_correct_wf.
+    - rewrite union_left_specialized_changed_leaf_left.
+      now apply union_left_specialized_correct_wf.
+    - rewrite union_left_specialized_changed_empty_right.
+      now apply union_left_specialized_correct_wf.
+    - rewrite union_left_specialized_changed_leaf_right.
+      now apply union_left_specialized_correct_wf.
+    - inversion Hwl as
+        [| |? ? ? ? Hwll Hwlr _ _ Hall Halr _]; subst.
+      inversion Hwr as
+        [| |? ? ? ? Hwrl Hwrr _ _ Harl Harr _]; subst.
+      destruct (left_split =? right_split) eqn:Esplits.
+      + apply Nat.eqb_eq in Esplits. subst right_split.
+        destruct (agrees_before_bounded left_sample right_sample left_split)
+          eqn:Eagrees.
+        * destruct (H (size left_left + size right_left)
+            ltac:(cbn [size]; lia) left_left right_left eq_refl Hwll Hwrl)
+            as [Hwoutl Hgetoutl].
+          destruct (H (size left_right + size right_right)
+            ltac:(cbn [size]; lia) left_right right_right eq_refl Hwlr Hwrr)
+            as [Hwoutr Hgetoutr].
+          eapply union_left_specialized_changed_same_branch_correct_wf; eauto.
+        * destruct (union_left_specialized_disjoint_branches_correct_wf A
+            left_sample left_split left_left left_right right_sample
+            left_split right_left right_right Hwl Hwr
+            ltac:(now rewrite Nat.min_id)) as [Hwj Hgetj].
+          unfold union_left_specialized_changed_result.
+          rewrite union_left_specialized_changed_equation.
+          rewrite Nat.eqb_refl, Eagrees. exact (conj Hwj Hgetj).
+      + destruct (left_split <? right_split) eqn:Eorder.
+        * apply Nat.ltb_lt in Eorder.
+          destruct (agrees_before_bounded left_sample right_sample left_split)
+            eqn:Eagrees.
+          -- assert (Hoperand : all_keys (fun key =>
+                 same_prefix left_sample key left_split /\
+                 bit_at key left_split = bit_at right_sample left_split)
+                 (Branch right_sample right_split right_left right_right)).
+             { eapply union_left_specialized_left_outer_routing; eauto. }
+             destruct (bit_at right_sample left_split) eqn:Eside.
+             ++ destruct (H (size left_right +
+                   size (Branch right_sample right_split right_left right_right))
+                 ltac:(cbn [size]; lia) left_right
+                 (Branch right_sample right_split right_left right_right)
+                 eq_refl Hwlr Hwr) as [Hwout Hgetout].
+                eapply union_left_specialized_changed_left_outer_right_branch_correct_wf;
+                  eauto.
+             ++ destruct (H (size left_left +
+                   size (Branch right_sample right_split right_left right_right))
+                 ltac:(cbn [size]; lia) left_left
+                 (Branch right_sample right_split right_left right_right)
+                 eq_refl Hwll Hwr) as [Hwout Hgetout].
+                eapply union_left_specialized_changed_left_outer_left_branch_correct_wf;
+                  eauto.
+          -- destruct (union_left_specialized_disjoint_branches_correct_wf A
+               left_sample left_split left_left left_right right_sample
+               right_split right_left right_right Hwl Hwr
+               ltac:(rewrite Nat.min_l by lia; exact Eagrees)) as [Hwj Hgetj].
+             unfold union_left_specialized_changed_result.
+             rewrite union_left_specialized_changed_equation.
+             assert (Eorderb : (left_split <? right_split) = true) by
+               (apply Nat.ltb_lt; exact Eorder).
+             rewrite Esplits, Eorderb, Eagrees. exact (conj Hwj Hgetj).
+        * apply Nat.ltb_ge in Eorder.
+          assert (Hreverse : right_split < left_split) by
+            (apply Nat.eqb_neq in Esplits; lia).
+          destruct (agrees_before_bounded left_sample right_sample right_split)
+            eqn:Eagrees.
+          -- assert (Hoperand : all_keys (fun key =>
+                 same_prefix right_sample key right_split /\
+                 bit_at key right_split = bit_at left_sample right_split)
+                 (Branch left_sample left_split left_left left_right)).
+             { eapply all_keys_contained_prefix with
+                 (inner_sample := left_sample) (inner_split := left_split).
+               - unfold same_prefix. intros n Hn. symmetry.
+                 apply (proj1 (agrees_before_bounded_spec
+                   left_sample right_sample right_split) Eagrees).
+                 exact Hn.
+               - exact Hreverse.
+               - now apply branch_all_prefix. }
+             destruct (bit_at left_sample right_split) eqn:Eside.
+             ++ destruct (H (size (Branch left_sample left_split left_left left_right) +
+                   size right_right) ltac:(cbn [size]; lia)
+                 (Branch left_sample left_split left_left left_right) right_right
+                 eq_refl Hwl Hwrr) as [Hwout Hgetout].
+                eapply union_left_specialized_changed_right_outer_right_branch_correct_wf;
+                  eauto.
+             ++ destruct (H (size (Branch left_sample left_split left_left left_right) +
+                   size right_left) ltac:(cbn [size]; lia)
+                 (Branch left_sample left_split left_left left_right) right_left
+                 eq_refl Hwl Hwrl) as [Hwout Hgetout].
+                eapply union_left_specialized_changed_right_outer_left_branch_correct_wf;
+                  eauto.
+          -- destruct (union_left_specialized_disjoint_branches_correct_wf A
+               left_sample left_split left_left left_right right_sample
+               right_split right_left right_right Hwl Hwr
+               ltac:(rewrite Nat.min_r by lia; exact Eagrees)) as [Hwj Hgetj].
+             unfold union_left_specialized_changed_result.
+             rewrite union_left_specialized_changed_equation.
+             assert (Eorderb : (left_split <? right_split) = false) by
+               (apply Nat.ltb_ge; exact Eorder).
+             rewrite Esplits, Eorderb, Eagrees. exact (conj Hwj Hgetj).
+  }
+  intros left right Hwl Hwr.
+  eapply Hstrong with (total := size left + size right); eauto.
+Qed.
+
+Theorem union_right_specialized_changed_correct_wf:
+  forall (A : Type) (left right : t A),
+    wf left -> wf right ->
+    wf (union_right_specialized_changed_result left right) /\
+    forall key,
+      get key (union_right_specialized_changed_result left right) =
+      match get key right with
+      | Some value => Some value
+      | None => get key left
+      end.
+Proof.
+  intros A left right Hleft Hright.
+  unfold union_right_specialized_changed_result.
+  now apply union_left_specialized_changed_correct_wf.
+Qed.
+
 Theorem union_right_specialized_correct_wf:
   forall (A : Type) (left right : t A),
     wf left -> wf right ->
