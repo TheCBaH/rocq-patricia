@@ -125,6 +125,66 @@ Definition union_left_specialized_changed_result {A : Type} (a b : t A) : t A :=
   | Some out => out
   end.
 
+(** One-step equation for changed-result refinement proofs. *)
+Lemma union_left_specialized_changed_equation:
+  forall (A : Type) (a b : t A),
+    union_left_specialized_changed a b =
+    match a, b with
+    | Empty, Empty => None
+    | Empty, tree => Some tree
+    | _, Empty => None
+    | Leaf ka va, Leaf kb _ =>
+        if Pos.eqb ka kb then None else Some (set ka va b)
+    | Leaf ka va, tree => Some (set ka va tree)
+    | tree, Leaf kb vb =>
+        match get kb tree with Some _ => None | None => Some (set kb vb tree) end
+    | Branch pa ma la ra, Branch pb mb lb rb =>
+        if (N.eqb ma mb && N.eqb pa pb)%bool then
+          match union_left_specialized_changed la lb,
+                union_left_specialized_changed ra rb with
+          | None, None => None
+          | Some left', None => Some (branch pa ma left' ra)
+          | None, Some right' => Some (branch pa ma la right')
+          | Some left', Some right' => Some (branch pa ma left' right')
+          end
+        else if mask_above ma mb then
+          match representative b with
+          | Some kb =>
+              if matches_prefix kb pa ma then
+                if zero_bit kb ma then
+                  match union_left_specialized_changed la b with
+                  | None => None
+                  | Some left' => Some (branch pa ma left' ra)
+                  end
+                else
+                  match union_left_specialized_changed ra b with
+                  | None => None
+                  | Some right' => Some (branch pa ma la right')
+                  end
+              else Some (join a b)
+          | None => None
+          end
+        else if mask_above mb ma then
+          match representative a with
+          | Some ka =>
+              if matches_prefix ka pb mb then
+                if zero_bit ka mb then
+                  match union_left_specialized_changed a lb with
+                  | None => None
+                  | Some left' => Some (branch pb mb left' rb)
+                  end
+                else
+                  match union_left_specialized_changed a rb with
+                  | None => None
+                  | Some right' => Some (branch pb mb lb right')
+                  end
+              else Some (join a b)
+          | None => Some b
+          end
+        else Some (join a b)
+    end.
+Proof. intros A a b. destruct a; destruct b; reflexivity. Qed.
+
 (** Two-argument unfolding rule for proofs.  It hides whether a recursive
     call is implemented by the outer or the local structural fixpoint. *)
 Lemma union_left_specialized_equation:
