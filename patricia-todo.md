@@ -178,12 +178,15 @@ Required only for an end-to-end native-refinement claim.
   checks both workers against the established biased unions.
 - [ ] Remove the corresponding handwritten `set`, `combine`, and union
   realizers when proved extracted workers meet the performance requirements;
-  otherwise prove the realizers against those workers. The completed extracted
-  union workers pass the oracle, but a 10K native trial allocates about
-  100K words for the overlapping integer workload and 110K for the
-  overlapping string workload, versus about 81K for `Stdlib.Map`; the current
-  handwritten unions retain their physical-identity reuse and therefore stay
-  public pending a source-level `changed` certificate or a target refinement.
+  otherwise prove the realizers against those workers. The companion modules
+  now define and extract source-level `union_left_specialized_changed` workers:
+  `None` means the original left tree can be reused and `Some out` carries a
+  rebuilt result. The extraction oracle checks both certificate outcomes. A
+  10K wrapper trial reduced overlapping allocation to about 70K words for
+  each backend (below `Stdlib.Map`'s 81K), but still above the handwritten
+  physical-equality implementation. The changed-result correctness proof and
+  source-level allocation refinement remain open, so public wrappers continue
+  to use the handwritten unions for now.
 
 Exit gate: optimized public operations are linked by refinement theorems to the
 proved finite-map semantics. Physical sharing remains outside the claim unless
@@ -298,6 +301,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Implemented source-level changed-result union workers | `PatriciaUnion.v` and `StringPatriciaUnion.v` now define `union_left_specialized_changed`, its result wrapper, and right-biased duals; `PatriciaUnionTest.ml` checks both unchanged and changed certificates after extraction. A temporary 10K wrapper benchmark measured 70,305 integer and about 70,240 fixed-length-string overlap words, versus 81,324 for AVL. Correctness proofs for the new workers remain the next N2 task, so the experiment did not replace the supported handwritten union. |
 | 2026-08-30 | Evaluated extracted specialized unions for the supported wrappers | The fully proved `PatriciaUnion` and `StringPatriciaUnion` workers pass `make union-oracle`, but a 10K native benchmark trial allocated roughly 100K/110K words for integer/string overlap, losing the handwritten unions' physical-identity reuse. The public wrappers therefore continue to use the tested handwritten optimization; the final N2 realizer-refinement obligation remains open. |
 | 2026-08-30 | Completed the integer specialized-union correctness assembly | `PatriciaUnionProof.v` now proves `union_left_specialized_correct_wf` and its right-biased dual by combined-size induction. Its three terminal-join certificates cover equal masks with distinct prefixes and each unequal-root mismatch. `make union-proof` passed. |
 | 2026-08-30 | Completed the direct-string specialized-union correctness assembly | `StringPatriciaUnionProof.v` now proves `union_left_specialized_correct_wf` and its right-biased dual by well-founded induction on combined tree size, consuming the existing equal-split, containment, and separated-join certificates. `make union-proof` passed. |

@@ -16,12 +16,23 @@ let check_integer () =
   let expected_right = I.union_right left right in
   let actual_left = IU.union_left_specialized left right in
   let actual_right = IU.union_right_specialized left right in
+  let changed_left = IU.union_left_specialized_changed left right in
+  let changed_result =
+    match changed_left with None -> left | Some changed -> changed
+  in
   for key = 1 to 64 do
     if I.get key actual_left <> I.get key expected_left then
       failwith "integer specialized left union mismatch";
     if I.get key actual_right <> I.get key expected_right then
-      failwith "integer specialized right union mismatch"
+      failwith "integer specialized right union mismatch";
+    if I.get key changed_result <> I.get key expected_left then
+      failwith "integer changed-worker union mismatch"
   done;
+  let subset = build (fun key -> key mod 2 = 0) (fun key -> -key) 64 I.empty in
+  if IU.union_left_specialized_changed left subset <> None then
+    failwith "integer changed worker missed unchanged certificate";
+  if changed_left = None then
+    failwith "integer changed worker missed fresh right bindings";
   if IU.union_left_specialized left I.empty != left then
     failwith "integer empty-right certificate lost sharing"
 
@@ -44,13 +55,24 @@ let check_string () =
   let expected_right = S.union_right left right in
   let actual_left = SU.union_left_specialized left right in
   let actual_right = SU.union_right_specialized left right in
+  let changed_left = SU.union_left_specialized_changed left right in
+  let changed_result =
+    match changed_left with None -> left | Some changed -> changed
+  in
   List.iter
     (fun key ->
       if S.get key actual_left <> S.get key expected_left then
         failwith "string specialized left union mismatch";
       if S.get key actual_right <> S.get key expected_right then
-        failwith "string specialized right union mismatch")
+        failwith "string specialized right union mismatch";
+      if S.get key changed_result <> S.get key expected_left then
+        failwith "string changed-worker union mismatch")
     keys;
+  let subset = add_selected 2 S.empty in
+  if SU.union_left_specialized_changed left subset <> None then
+    failwith "string changed worker missed unchanged certificate";
+  if changed_left = None then
+    failwith "string changed worker missed fresh right bindings";
   if SU.union_left_specialized left S.empty != left then
     failwith "string empty-right certificate lost sharing"
 
