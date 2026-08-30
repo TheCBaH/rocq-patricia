@@ -166,8 +166,10 @@ Required only for an end-to-end native-refinement claim.
   direct-string common-split branch cases are likewise complete. Both integer
   and direct-string left-outer child-routing reconstruction cases are also
   complete, including the direct-string routing-premise derivation. All
-  integer and direct-string branch-shape reconstruction cases are complete;
-  the final structural-recursion assembly remains open.
+  integer and direct-string branch-shape reconstruction cases are complete.
+  The direct-string worker now has its final well-founded structural-recursion
+  assembly and both biased lookup contracts; the corresponding integer
+  assembly remains open.
 - [x] Isolate experimental specialized-union workers in companion Rocq modules
   and give them a targeted extraction/oracle target, so iteration on N2 does
   not invalidate the expensive established `PatriciaProof.v` and
@@ -292,6 +294,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Completed the direct-string specialized-union correctness assembly | `StringPatriciaUnionProof.v` now proves `union_left_specialized_correct_wf` and its right-biased dual by well-founded induction on combined tree size, consuming the existing equal-split, containment, and separated-join certificates. `make union-proof` passed. |
 | 2026-08-30 | Proved the direct-string specialized-union disjoint terminal case | `StringPatriciaUnionProof.v`'s `union_left_specialized_disjoint_branches_correct_wf` converts the worker’s failed bounded-prefix comparison into the existing separated-join invariant and left-biased lookup contract. `make union-proof` passed. |
 | 2026-08-30 | Established the specialized-union assembly measure | Both companion proof files now prove that each of the six branch/branch recursive pair shapes strictly decreases combined tree size, providing the well-founded measure for the remaining global worker theorem. `make union-proof` passed. |
 | 2026-08-30 | Completed the integer right-outer unequal-split reconstruction | `PatriciaUnionProof.v` adds left- and right-child reconstruction rules for the inner structural recursion, completing the four integer unequal-split branch shapes. `make union-proof` passed. |
