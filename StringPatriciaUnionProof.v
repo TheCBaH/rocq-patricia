@@ -114,3 +114,64 @@ Proof.
           end).
         destruct (get query (Branch sample split left right)); reflexivity.
 Qed.
+
+(** In the equal-split branch case, the cached samples may differ while still
+    denoting the same prefix.  This lemma transfers the right tree onto the
+    left sample and lifts each recursive biased-union contract back to the
+    branch-side key invariant. *)
+Lemma union_left_specialized_same_split_output_keys:
+  forall (A : Type) sample_a sample_b split
+      (left_a right_a left_b right_b out_left out_right : t A),
+    agrees_before_bounded sample_a sample_b split = true ->
+    all_keys (fun key =>
+      same_prefix sample_a key split /\ bit_at key split = false) left_a ->
+    all_keys (fun key =>
+      same_prefix sample_a key split /\ bit_at key split = true) right_a ->
+    all_keys (fun key =>
+      same_prefix sample_b key split /\ bit_at key split = false) left_b ->
+    all_keys (fun key =>
+      same_prefix sample_b key split /\ bit_at key split = true) right_b ->
+    wf out_left ->
+    (forall key,
+      get key out_left =
+      match get key left_a with Some value => Some value | None => get key left_b end) ->
+    wf out_right ->
+    (forall key,
+      get key out_right =
+      match get key right_a with Some value => Some value | None => get key right_b end) ->
+    all_keys (fun key =>
+      same_prefix sample_a key split /\ bit_at key split = false) out_left /\
+    all_keys (fun key =>
+      same_prefix sample_a key split /\ bit_at key split = true) out_right.
+Proof.
+  intros A sample_a sample_b split left_a right_a left_b right_b out_left out_right
+    Hagree Hla Hra Hlb Hrb Hwol Hgetol Hwor Hgetor.
+  assert (Hprefix : same_prefix sample_a sample_b split).
+  { unfold same_prefix. now apply (proj1
+      (agrees_before_bounded_spec sample_a sample_b split)). }
+  assert (Hlb' : all_keys (fun key =>
+      same_prefix sample_a key split /\ bit_at key split = false) left_b).
+  { eapply all_keys_equal_split_rebase; eauto. }
+  assert (Hrb' : all_keys (fun key =>
+      same_prefix sample_a key split /\ bit_at key split = true) right_b).
+  { eapply all_keys_equal_split_rebase; eauto. }
+  split.
+  - eapply all_keys_of_combine_lookup with
+      (left := left_a) (right := left_b) (out := out_left)
+      (f := fun x y => match x with Some _ => x | None => y end).
+    + reflexivity.
+    + exact Hwol.
+    + intro key. specialize (Hgetol key).
+      destruct (get key left_a); cbn in Hgetol |- *; exact Hgetol.
+    + exact Hla.
+    + exact Hlb'.
+  - eapply all_keys_of_combine_lookup with
+      (left := right_a) (right := right_b) (out := out_right)
+      (f := fun x y => match x with Some _ => x | None => y end).
+    + reflexivity.
+    + exact Hwor.
+    + intro key. specialize (Hgetor key).
+      destruct (get key right_a); cbn in Hgetor |- *; exact Hgetor.
+    + exact Hra.
+    + exact Hrb'.
+Qed.
