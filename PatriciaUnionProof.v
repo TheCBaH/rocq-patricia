@@ -231,3 +231,56 @@ Proof.
         intros [Hprefix _]. rewrite P in Hprefix. discriminate. }
       now rewrite Eoperand.
 Qed.
+
+Lemma union_left_specialized_left_outer_right_branch_correct_wf:
+  forall (A : Type) prefix mask (left right operand out_right : t A),
+    wf left -> wf right -> wf operand ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = true)
+      left ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = false)
+      right ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = false)
+      operand ->
+    (wf out_right /\
+      forall key,
+        get key out_right =
+        match get key right with Some value => Some value | None => get key operand end) ->
+    wf (branch prefix mask left out_right) /\
+    forall key,
+      get key (branch prefix mask left out_right) =
+      match get key (Branch prefix mask left right) with
+      | Some value => Some value
+      | None => get key operand
+      end.
+Proof.
+  intros A prefix mask left right operand out_right
+    Hwl Hwr Hwo Hleft Hright Hoperand [Hwout Hgetout].
+  assert (Houtright : all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = false)
+      out_right).
+  { eapply all_keys_of_combine_lookup with
+      (left := right) (right := operand) (out := out_right)
+      (f := fun x y => match x with Some _ => x | None => y end).
+    - reflexivity.
+    - intro key. specialize (Hgetout key).
+      destruct (get key right); cbn in Hgetout |- *; exact Hgetout.
+    - exact Hright.
+    - exact Hoperand. }
+  split.
+  - now apply branch_wf.
+  - intro key. rewrite get_branch by assumption. cbn [get].
+    destruct (matches_prefix key prefix mask) eqn:P.
+    + destruct (zero_bit key mask) eqn:Z.
+      * assert (Eoperand : get key operand = None).
+        { eapply all_keys_none; [exact Hoperand|].
+          intros [_ Hbit]. rewrite Z in Hbit. discriminate. }
+        rewrite Eoperand. now destruct (get key left).
+      * apply Hgetout.
+    + assert (Eoperand : get key operand = None).
+      { eapply all_keys_none; [exact Hoperand|].
+        intros [Hprefix _]. rewrite P in Hprefix. discriminate. }
+      now rewrite Eoperand.
+Qed.
