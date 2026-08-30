@@ -210,12 +210,8 @@ There are three defensible completion choices:
 
 Keeping both backends is useful: the proof-aligned backend can serve as an
 executable reference oracle for differential tests of the optimized backend.
-For a stronger compilation story, CertiCoq targets CompCert Clight, and the
-2025 [verified Coq/C FFI work](https://doi.org/10.1145/3704860) shows how
-external primitives can receive formal specifications. This is a possible
-architecture, not a drop-in completion: the
-[CertiCoq project](https://certicoq.org/) still describes parts of its compiler
-verification as work in progress.
+For a stronger compilation story, external primitives need formal
+specifications and a verified or explicitly trusted compilation boundary.
 
 #### Can the current deviations be formally proved?
 
@@ -404,60 +400,9 @@ Current API-law status across both key variants:
 - [x] Fold equivalence to the traversal order produced by `elements`;
 - [x] Extensionality theorems packaging equal lookup at every key as finite-map
   equivalence and characterizing it by binding membership;
-- [x] Enumerate the 18 theorem families required by the intended CompCert
-  `TREE` adapter; see the contract below.
-- [ ] Prove the two remaining enumeration laws and export the opaque,
-  well-formed-tree `TREE` adapter.
 
 If structural equality of canonical trees is desired, prove that separately;
 finite-map extensional equality is sufficient for most clients.
-
-#### CompCert `TREE` adapter contract
-
-The intended target is the local `Maps.TREE` module type in
-`modules/CompCert/lib/Maps.v`, not an informal subset of its operations.  Its
-contract has 18 theorem families:
-
-| `TREE` requirement | Current positive Patricia evidence | Adapter work still required |
-| --- | --- | --- |
-| `gempty`; `gss`, `gso`, `gsspec` | `get_empty`, `get_set_same`, `set_correct_wf`, and `get_set_other_wf` | Repackage over the adapter type |
-| `grs`, `gro`, `grspec` | `remove_correct_wf` | Repackage over the adapter type |
-| `beq_correct` | `beq_correct_wf` | Repackage over the adapter type |
-| `gmap`, `gmap1` | `get_map`; `map1` can be `map (fun _ => f)` | Define `map1` and discharge the one-line specialization |
-| `gcombine` | `combine_correct_wf` under `f None None = None` | Repackage over the adapter type |
-| `elements_correct`, `elements_complete`, `elements_keys_norepet` | `elements_sound`, `elements_complete_wf`, `elements_keys_nodup_wf` | Repackage over the adapter type |
-| `elements_extensional` | lookup extensionality is proved, and `equiv_elements_wf` characterizes identical binding membership | Prove equality of the *enumeration lists*, not only equal membership; either prove canonical traversal order for well-formed positive trees or expose a deterministically sorted enumeration |
-| `elements_remove` | pointwise removal and element membership are covered | Prove that removing a present binding deletes exactly one occurrence while retaining the order of every other enumerated binding |
-| `fold_spec`, `fold1_spec` | `fold_elements` | Define `fold1` and specialize the existing fold theorem |
-
-The raw type `Patricia.t A` cannot implement `TREE` directly: CompCert's laws
-quantify over every value of `t A`, while this repository proves the
-nontrivial update, removal, merge, equality, and enumeration laws only under
-`wf`.  The adapter should therefore make its map type opaque and define it
-internally as a dependent pair:
-
-```coq
-Definition t (A : Type) := { m : Patricia.t A | PatriciaProof.wf m }.
-```
-
-`empty`, `set`, `remove`, `map`, and `combine` then construct a new pair using
-their existing preservation theorem, and `get` simply projects the tree.  This
-also prevents clients of the Rocq adapter from constructing malformed branches.
-It does not change the separately extracted OCaml boundary, whose abstract
-wrappers remain the supported native API.
-
-The enumeration items must be completed before declaring the adapter done.
-They are stronger than the current finite-map result: two lists can have the
-same unique binding membership yet differ in order, whereas `TREE` requires
-literal equality in `elements_extensional`.  A practical, low-risk route is
-to retain the existing traversal as an internal helper and expose its stable
-sort by `positive` key as `TREE.elements`; the proof then needs soundness,
-completeness, no-duplicate keys, sorted-list uniqueness, and that removal is
-the corresponding single-binding deletion.  Alternatively, prove that the
-existing compressed-tree traversal is canonical for extensionally equal
-well-formed trees.  The latter gives the cheaper enumeration but requires a
-canonical-shape theorem that the current development deliberately does not
-claim.
 
 ### Phase 6: remove runtime fuel from the optimized implementation
 
@@ -497,8 +442,6 @@ and establish bounds for:
   worker and the canonical first-difference property needed by a bytewise
   scan.  The target arithmetic and bytewise-first-difference realizer
   refinement proofs remain open.
-- [ ] Add the opaque CompCert `TREE` adapter after proving its two remaining
-  enumeration laws (`elements_extensional` and `elements_remove`).
 - [x] Make extraction reproducible through the normal build and ensure generated
   files are never hand-edited.
 - [x] Run `Print Assumptions` over every top-level proof declaration during the

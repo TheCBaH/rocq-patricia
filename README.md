@@ -1,7 +1,7 @@
 # Standalone Patricia-tree sketch
 
-This directory is intentionally independent of CompCert's `Maps.PTree` and
-build.  It contains two compressed Patricia-tree sketches:
+This directory is intentionally self-contained. It contains two compressed
+Patricia-tree sketches:
 
 - `Patricia.v`: big-endian Patricia trees proved over unbounded positive keys
   and extracted as a native OCaml `int`-key API.
@@ -164,10 +164,10 @@ folding, equality, and lookup. It directly compares string bit operations by
 encoding logical positions to native packed tokens and decoding first
 differences back to logical positions.
 
-This is a design sketch, not a drop-in `Maps.TREE` implementation. Constructors
-remain visible only in the explicitly internal generated modules used by the
-structural tests; supported clients use abstract map types. The integer proofs
-use unbounded positive keys, while extraction uses bounded OCaml `int`.
+This is intentionally a standalone design sketch. Constructors remain visible
+only in the explicitly internal generated modules used by the structural tests;
+supported clients use abstract map types. The integer proofs use unbounded
+positive keys, while extraction uses bounded OCaml `int`.
 `PatriciaMap.Key` restricts supported clients to the representable positive
 domain `1 .. max_int`; the finite-width refinement itself remains trusted rather
 than proved. The string tree uses native OCaml strings and proof-side

@@ -272,7 +272,7 @@ for example, omit the integer prefix and route to a final leaf comparison, pack
 the prefix/discriminator in a fixed-width backend, or remove the string sample
 and accept representative descent. Each choice trades memory against lookup,
 join, or merge work and requires new invariant proofs. Pursue it only if
-retained memory dominates the target CompCert workload.
+retained memory dominates the target workload.
 
 ## Benchmark changes needed to evaluate those updates
 
