@@ -262,6 +262,102 @@ refinement theorem or a verification of the extraction pipeline. Repository CI
 wiring also remains to be added. Merge timing and allocation benchmarks exist
 in `patricia-bench.md`.
 
+### 6. The public maps are not yet `Map.Make`-compatible; ordered API and sets are a separate completion track
+
+This repository uses OCaml 4.14.3 in its build configuration.  Its
+`Map.Make` result implements the 40-value `Map.S` signature (in addition to
+the `key` and covariant map-type declarations).  `PatriciaMap` and
+`StringPatriciaMap` deliberately expose a smaller, safer API instead: they
+have `empty`, `is_empty`, `singleton`, `get`, `mem`, `set`, `remove`, a
+key-aware `map`, `map_filter`, restricted `combine`, two biased unions,
+`elements`, a state-first `fold`, and `beq`.
+
+They therefore do **not** currently implement `Map.S`, and cannot simply be
+ascribed that signature.  The following is an API audit, not just a list of
+renamings:
+
+| `Map.S` group | Current status | Required compatibility work |
+| --- | --- | --- |
+| `empty`, `is_empty`, `mem`, `singleton`, `remove` | Present with the same observable meaning | Retain and prove/expose the usual `Map.S` laws.  The documented physical-identity clauses remain outside the current proof claim. |
+| `add`, `find_opt`, `find`, `update` | `set` is `add` semantically and `get` is `find_opt`; no `find` or `update` | Add aliases/wrappers.  `update k f` is `replace_binding k (f (get k m)) m`; prove its pointwise law and use an OCaml wrapper only for `Not_found` in `find`. |
+| `merge`, `union` | `combine` is a safe three-case, key-less combination; `union_left`/`union_right` are fixed biases | Add standard `merge` and conflict-only `union`.  `merge` can adapt its key-aware callback to the three represented cases, with absent/absent fixed to `None`; its usual lookup theorem still has the standard premise `f k None None = None`.  Keep the current restricted `combine` and biased unions as useful extra operations. |
+| `equal`, `compare` | `beq` has the semantic role of `equal`; no lexicographic `compare` | Export `equal = beq` under the compatibility name and define `compare` over sorted bindings using `Key.compare`/`String.compare` and the supplied value comparator. |
+| `iter`, `fold`, `for_all`, `exists` | Only a state-first, key-aware `fold` and internal `forallb` exist | Add the standard argument order and traversal functions.  The existing fold must be renamed or retained only as a non-`Map.S` extra: its type is incompatible with `Map.S.fold`. |
+| `filter`, `filter_map`, `partition` | `map_filter` is the semantic core of `filter_map` | Export `filter` and `filter_map`; derive/prove `partition`, preferably with one paired traversal rather than two passes. |
+| `cardinal`, `bindings`, extrema, `choose`, `split` | Absent; `elements` is close to `bindings` | Add them only after proving `elements` is ordered by the public key comparison.  `split` can first be specified/implemented through filtering; a Patricia-specific logarithmic split is a later optimization. |
+| `find_first[_opt]`, `find_last[_opt]` | Absent | Scan ordered bindings initially and prove the least/greatest result under the documented monotonicity premise. |
+| `map`, `mapi` | Current `map` is key-aware, hence has `mapi` semantics | This is a source-incompatible name collision.  A `Map.S` module must call the existing operation `mapi` and provide value-only `map`.  In addition, callback order must be made explicitly increasing; structural extraction alone does not provide that OCaml evaluation-order guarantee. |
+| `to_seq`, `to_rev_seq`, `to_seq_from`, `add_seq`, `of_seq` | Absent | Add wrappers over proved ordered bindings (and document whether the first implementation eagerly materializes the binding list). |
+
+The order requirement is the material blocker, rather than the missing
+wrappers.  The positive-key proofs establish uniqueness and
+lookup/elements agreement, but do not yet state that `elements` is increasing
+under `Pos.compare`.  The string proofs establish
+`wf_elements_bit_lex_sorted`, but do not yet connect `bit_lex_lt` to the
+public `String.compare` order.  The latter connection should show that the
+continuation-marker/most-significant-bit encoding orders bytes lexicographically
+and puts a proper prefix first.  Until these two bridge theorems exist, it is
+unsound to advertise `elements` as `bindings`, or to implement extrema,
+`split`, ordered iteration, comparison, or first/last search with the
+standard-library contracts.  The native comparison of arbitrary OCaml byte
+strings also belongs in the already documented extraction-refinement boundary.
+
+There are two viable API designs:
+
+1. Make a major-version change to the existing public wrappers: rename the
+   current key-aware `map` to `mapi`, `map_filter` to `filter_map`, and the
+   current fold to a clearly nonstandard name; then implement the `Map.S`
+   names and expose `type +'a t`.
+2. Preserve the present API and add separate `PatriciaMapStdlib` and
+   `StringPatriciaMapStdlib` modules which satisfy `Map.S` while retaining the
+   current wrappers as the proof-oriented API.
+
+The second route avoids breaking clients and is preferable unless source
+compatibility is explicitly unimportant.  Neither route makes these modules
+themselves `Map.Make`: they are fixed-key implementations.  A genuinely
+generic Patricia `Make` functor would require a Rocq key/bit-decomposition
+interface and proofs of its prefix, first-difference, routing, and ordering
+laws; that is a substantially different generalization.
+
+Sets should be added as two further abstract wrappers,
+`PatriciaSet` and `StringPatriciaSet`, not as a new tree representation.  An
+implementation may use `unit PatriciaMap.t` internally, but must keep that
+representation abstract.  This reuses compression, lookup, deletion, and
+merge while yielding the complete `Set.S` surface: membership/update,
+`union`, `inter`, `disjoint`, `diff`, subset/equality/comparison, ordered
+traversal and transformations, partition/cardinality/extrema/split/search,
+and the sequence/list constructors.  In particular, set `map` and
+`filter_map` must insert their output keys, because different input elements
+can map to the same output element.
+
+The proof cost for basic set operations is modest once the map API laws are
+available.  Define `member key s := get key s = Some tt` and a set
+extensionality relation, then derive:
+
+```coq
+member key (union left right) <-> member key left \/ member key right.
+member key (inter left right) <-> member key left /\ member key right.
+member key (diff left right)  <-> member key left /\ ~ member key right.
+member key (map f set)       <-> exists x, member x set /\ f x = key.
+```
+
+`wf` preservation follows from the corresponding map `set`, `map_filter`,
+and `combine` theorems.  The image theorem for set `map`/`filter_map`, and
+the ordered `elements`/comparison/extrema theorems, are new proof obligations;
+they are not consequences of pointwise map lookup alone.  The same ordered
+bridge theorems are therefore prerequisites for both full `Map.S` support and
+full `Set.S` support.
+
+An initial compatibility implementation may build `partition`, `split`,
+set intersection/difference, and sequence operations from `map_filter`,
+`fold`, and ordered bindings.  It will be functionally correct but can be
+linear or worse and may lose physical sharing.  Fast versions should be
+introduced as source-level Patricia workers and proved as refinements before
+adding native realizers.  In particular, the physical-equality guarantees in
+the standard interfaces must either be implemented with a `changed` result
+and separately justified, or explicitly excluded from the verified claim;
+semantic `Map.S`/`Set.S` compatibility alone does not establish them.
+
 ## Roadmap to complete functional verification
 
 ### Phase 1: freeze the specification and trusted computing base
@@ -385,7 +481,7 @@ forall key,
     f (get key left) (get key right).
 ```
 
-### Phase 5: close the complete API laws
+### Phase 5: close the current custom API laws
 
 Current API-law status across both key variants:
 
@@ -403,6 +499,13 @@ Current API-law status across both key variants:
 
 If structural equality of canonical trees is desired, prove that separately;
 finite-map extensional equality is sufficient for most clients.
+
+This phase describes the present proof-oriented API, not the complete OCaml
+`Map.S`/`Set.S` interfaces.  Before claiming standard-library compatibility,
+complete the ordered traversal bridge theorems and the compatibility/set work
+in finding 6: in particular, prove the public comparison order, callback
+order, image laws for set transformations, and the semantics of every added
+search, split, sequence, and exception-raising wrapper.
 
 ### Phase 6: remove runtime fuel from the optimized implementation
 
@@ -496,3 +599,7 @@ the following hold:
 8. Any complexity claim is backed by an explicit cost theorem; otherwise the
    documentation limits itself to functional correctness plus benchmark
    evidence.
+9. If `Map.S` or `Set.S` compatibility is claimed, every operation in the
+   selected OCaml-version signature is exported with its documented observable
+   semantics, including increasing-order traversal and binding/element order;
+   any physical-sharing guarantee is proved or explicitly excluded.
