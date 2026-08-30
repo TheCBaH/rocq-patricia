@@ -302,6 +302,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Proved integer changed-worker equal-header reconstruction | `PatriciaUnionProof.v`'s `union_left_specialized_changed_same_branch_correct_wf` handles all four optional child-result shapes, using `branch_unchanged` for the all-unchanged certificate. `make PatriciaUnionProof.vo` passed. |
 | 2026-08-30 | Completed direct-string changed-worker refinement | `StringPatriciaUnionProof.v` now proves `union_left_specialized_changed_correct_wf` and its right-biased dual by the same combined-size induction as the specialized worker, reusing the changed-result branch certificates. Full `make` passed with 352 closed declarations. |
 | 2026-08-30 | Fixed changed-worker right-outer rebuilding | Both source-level changed workers now rebuild an enclosing right branch even when the recursively routed child is unchanged; otherwise the outer sibling was lost. `PatriciaUnionTest.ml` includes integer and string regressions for that shape. `make union-oracle` passed. |
 | 2026-08-30 | Proved direct-string changed-worker left-outer reconstruction | `StringPatriciaUnionProof.v` now covers both left- and right-child containment routes. In an unchanged-child path it preserves the raw cached branch while using representative-independent lookup equivalence. `make StringPatriciaUnionProof.vo` and `make union-oracle` passed. |

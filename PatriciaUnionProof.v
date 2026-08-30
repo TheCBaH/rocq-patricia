@@ -222,6 +222,55 @@ Proof.
       rewrite ?Kprefix, ?Kbit; auto.
 Qed.
 
+(** Changed-result composition for equal integer branch headers. *)
+Lemma union_left_specialized_changed_same_branch_correct_wf:
+  forall (A : Type) prefix mask (left_a right_a left_b right_b : t A),
+    wf (Branch prefix mask left_a right_a) ->
+    wf (Branch prefix mask left_b right_b) ->
+    (wf (union_left_specialized_changed_result left_a left_b) /\
+      forall key,
+        get key (union_left_specialized_changed_result left_a left_b) =
+        match get key left_a with Some value => Some value | None => get key left_b end) ->
+    (wf (union_left_specialized_changed_result right_a right_b) /\
+      forall key,
+        get key (union_left_specialized_changed_result right_a right_b) =
+        match get key right_a with Some value => Some value | None => get key right_b end) ->
+    wf (union_left_specialized_changed_result
+      (Branch prefix mask left_a right_a) (Branch prefix mask left_b right_b)) /\
+    forall key,
+      get key (union_left_specialized_changed_result
+        (Branch prefix mask left_a right_a) (Branch prefix mask left_b right_b)) =
+      match get key (Branch prefix mask left_a right_a) with
+      | Some value => Some value
+      | None => get key (Branch prefix mask left_b right_b)
+      end.
+Proof.
+  intros A prefix mask left_a right_a left_b right_b Hwa Hwb Hleft Hright.
+  inversion Hwa as [| |? ? ? ? Hwla Hwra Hnla Hnra Hla Hra]; subst.
+  inversion Hwb as [| |? ? ? ? Hwlb Hwrb Hnlb Hnrb Hlb Hrb]; subst.
+  unfold union_left_specialized_changed_result.
+  rewrite union_left_specialized_changed_equation.
+  rewrite !N.eqb_refl. cbn.
+  destruct (union_left_specialized_changed left_a left_b) eqn:Eleft;
+    destruct (union_left_specialized_changed right_a right_b) eqn:Eright.
+  - unfold union_left_specialized_changed_result in Hleft, Hright.
+    rewrite Eleft in Hleft. rewrite Eright in Hright.
+    eapply union_left_specialized_same_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hleft, Hright.
+    rewrite Eleft in Hleft. rewrite Eright in Hright.
+    eapply union_left_specialized_same_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hleft, Hright.
+    rewrite Eleft in Hleft. rewrite Eright in Hright.
+    eapply union_left_specialized_same_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hleft, Hright.
+    rewrite Eleft in Hleft. rewrite Eright in Hright.
+    assert (Ebranch : branch prefix mask left_a right_a =
+      Branch prefix mask left_a right_a).
+    { now apply branch_unchanged. }
+    rewrite <- Ebranch.
+    eapply union_left_specialized_same_branch_correct_wf; eauto.
+Qed.
+
 (** When every binding of the right operand lies in the left side of the
     outer branch, only that child needs a recursive union. *)
 Lemma union_left_specialized_left_outer_branch_correct_wf:
