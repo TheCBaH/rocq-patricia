@@ -326,6 +326,64 @@ Proof.
       now rewrite Eoperand.
 Qed.
 
+(** Changed-result composition for a left-outer zero-bit route. *)
+Lemma union_left_specialized_changed_left_outer_left_branch_correct_wf:
+  forall (A : Type) prefix mask (left right : t A)
+      operand_prefix operand_mask (operand_left operand_right : t A) key,
+    wf (Branch prefix mask left right) ->
+    wf (Branch operand_prefix operand_mask operand_left operand_right) ->
+    (N.eqb mask operand_mask && N.eqb prefix operand_prefix)%bool = false ->
+    mask_above mask operand_mask = true ->
+    representative (Branch operand_prefix operand_mask operand_left operand_right) = Some key ->
+    matches_prefix key prefix mask = true ->
+    zero_bit key mask = true ->
+    all_keys (fun stored =>
+      matches_prefix stored prefix mask = true /\ zero_bit stored mask = true)
+      (Branch operand_prefix operand_mask operand_left operand_right) ->
+    (wf (union_left_specialized_changed_result left
+           (Branch operand_prefix operand_mask operand_left operand_right)) /\
+      forall stored,
+        get stored (union_left_specialized_changed_result left
+          (Branch operand_prefix operand_mask operand_left operand_right)) =
+        match get stored left with
+        | Some value => Some value
+        | None => get stored (Branch operand_prefix operand_mask operand_left operand_right)
+        end) ->
+    wf (union_left_specialized_changed_result
+      (Branch prefix mask left right)
+      (Branch operand_prefix operand_mask operand_left operand_right)) /\
+    forall stored,
+      get stored (union_left_specialized_changed_result
+        (Branch prefix mask left right)
+        (Branch operand_prefix operand_mask operand_left operand_right)) =
+      match get stored (Branch prefix mask left right) with
+      | Some value => Some value
+      | None => get stored (Branch operand_prefix operand_mask operand_left operand_right)
+      end.
+Proof.
+  intros A prefix mask left right operand_prefix operand_mask operand_left operand_right key
+    Houter Hoperand Hsame Habove Hrep Hprefix Hside Hall Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr Hnl Hnr Hleft Hright]; subst.
+  unfold union_left_specialized_changed_result.
+  rewrite union_left_specialized_changed_equation.
+  rewrite Hsame, Habove, Hrep, Hprefix, Hside.
+  destruct (union_left_specialized_changed left
+    (Branch operand_prefix operand_mask operand_left operand_right)) eqn:Echild.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild.
+    eapply union_left_specialized_left_outer_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild.
+    destruct (union_left_specialized_left_outer_branch_correct_wf A prefix mask
+      left right (Branch operand_prefix operand_mask operand_left operand_right) left
+      Hwl Hwr Hoperand Hleft Hright Hall Hchild) as [_ Hget].
+    split; [exact Houter|]. intro stored.
+    assert (Ebranch : branch prefix mask left right = Branch prefix mask left right).
+    { now apply branch_unchanged. }
+    rewrite <- Ebranch at 1.
+    apply Hget.
+Qed.
+
 Lemma union_left_specialized_left_outer_right_branch_correct_wf:
   forall (A : Type) prefix mask (left right operand out_right : t A),
     wf left -> wf right -> wf operand ->
@@ -377,6 +435,64 @@ Proof.
       { eapply all_keys_none; [exact Hoperand|].
         intros [Hprefix _]. rewrite P in Hprefix. discriminate. }
       now rewrite Eoperand.
+Qed.
+
+(** Changed-result composition for a left-outer one-bit route. *)
+Lemma union_left_specialized_changed_left_outer_right_branch_correct_wf:
+  forall (A : Type) prefix mask (left right : t A)
+      operand_prefix operand_mask (operand_left operand_right : t A) key,
+    wf (Branch prefix mask left right) ->
+    wf (Branch operand_prefix operand_mask operand_left operand_right) ->
+    (N.eqb mask operand_mask && N.eqb prefix operand_prefix)%bool = false ->
+    mask_above mask operand_mask = true ->
+    representative (Branch operand_prefix operand_mask operand_left operand_right) = Some key ->
+    matches_prefix key prefix mask = true ->
+    zero_bit key mask = false ->
+    all_keys (fun stored =>
+      matches_prefix stored prefix mask = true /\ zero_bit stored mask = false)
+      (Branch operand_prefix operand_mask operand_left operand_right) ->
+    (wf (union_left_specialized_changed_result right
+           (Branch operand_prefix operand_mask operand_left operand_right)) /\
+      forall stored,
+        get stored (union_left_specialized_changed_result right
+          (Branch operand_prefix operand_mask operand_left operand_right)) =
+        match get stored right with
+        | Some value => Some value
+        | None => get stored (Branch operand_prefix operand_mask operand_left operand_right)
+        end) ->
+    wf (union_left_specialized_changed_result
+      (Branch prefix mask left right)
+      (Branch operand_prefix operand_mask operand_left operand_right)) /\
+    forall stored,
+      get stored (union_left_specialized_changed_result
+        (Branch prefix mask left right)
+        (Branch operand_prefix operand_mask operand_left operand_right)) =
+      match get stored (Branch prefix mask left right) with
+      | Some value => Some value
+      | None => get stored (Branch operand_prefix operand_mask operand_left operand_right)
+      end.
+Proof.
+  intros A prefix mask left right operand_prefix operand_mask operand_left operand_right key
+    Houter Hoperand Hsame Habove Hrep Hprefix Hside Hall Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr Hnl Hnr Hleft Hright]; subst.
+  unfold union_left_specialized_changed_result.
+  rewrite union_left_specialized_changed_equation.
+  rewrite Hsame, Habove, Hrep, Hprefix, Hside.
+  destruct (union_left_specialized_changed right
+    (Branch operand_prefix operand_mask operand_left operand_right)) eqn:Echild.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild.
+    eapply union_left_specialized_left_outer_right_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild.
+    destruct (union_left_specialized_left_outer_right_branch_correct_wf A prefix mask
+      left right (Branch operand_prefix operand_mask operand_left operand_right) right
+      Hwl Hwr Hoperand Hleft Hright Hall Hchild) as [_ Hget].
+    split; [exact Houter|]. intro stored.
+    assert (Ebranch : branch prefix mask left right = Branch prefix mask left right).
+    { now apply branch_unchanged. }
+    rewrite <- Ebranch at 1.
+    apply Hget.
 Qed.
 
 (** Dual unequal-split reconstruction for the branch traversed by the
@@ -485,6 +601,107 @@ Proof.
       { eapply all_keys_none; [exact Hoperand|].
         intros [Hprefix _]. rewrite P in Hprefix. discriminate. }
       now rewrite Eoperand.
+Qed.
+
+(** Changed-result composition when the right operand has the outer mask and
+    its routed left child is revisited. *)
+Lemma union_left_specialized_changed_right_outer_left_branch_correct_wf:
+  forall (A : Type) operand_prefix operand_mask (operand_left operand_right : t A)
+      prefix mask (left right : t A) key,
+    wf (Branch operand_prefix operand_mask operand_left operand_right) ->
+    wf (Branch prefix mask left right) ->
+    (N.eqb operand_mask mask && N.eqb operand_prefix prefix)%bool = false ->
+    mask_above operand_mask mask = false ->
+    mask_above mask operand_mask = true ->
+    representative (Branch operand_prefix operand_mask operand_left operand_right) = Some key ->
+    matches_prefix key prefix mask = true ->
+    zero_bit key mask = true ->
+    all_keys (fun stored =>
+      matches_prefix stored prefix mask = true /\ zero_bit stored mask = true)
+      (Branch operand_prefix operand_mask operand_left operand_right) ->
+    (wf (union_left_specialized_changed_result
+           (Branch operand_prefix operand_mask operand_left operand_right) left) /\
+      forall stored,
+        get stored (union_left_specialized_changed_result
+          (Branch operand_prefix operand_mask operand_left operand_right) left) =
+        match get stored (Branch operand_prefix operand_mask operand_left operand_right) with
+        | Some value => Some value
+        | None => get stored left
+        end) ->
+    wf (union_left_specialized_changed_result
+      (Branch operand_prefix operand_mask operand_left operand_right)
+      (Branch prefix mask left right)) /\
+    forall stored,
+      get stored (union_left_specialized_changed_result
+        (Branch operand_prefix operand_mask operand_left operand_right)
+        (Branch prefix mask left right)) =
+      match get stored (Branch operand_prefix operand_mask operand_left operand_right) with
+      | Some value => Some value
+      | None => get stored (Branch prefix mask left right)
+      end.
+Proof.
+  intros A operand_prefix operand_mask operand_left operand_right
+    prefix mask left right key Hoperand Houter Hsame Hnotabove Habove
+    Hrep Hprefix Hside Hall Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr _ _ Hleft Hright]; subst.
+  unfold union_left_specialized_changed_result.
+  rewrite union_left_specialized_changed_equation.
+  rewrite Hsame, Hnotabove, Habove, Hrep, Hprefix, Hside.
+  destruct (union_left_specialized_changed
+    (Branch operand_prefix operand_mask operand_left operand_right) left) eqn:Echild;
+    unfold union_left_specialized_changed_result in Hchild;
+    rewrite Echild in Hchild;
+    eapply union_left_specialized_right_outer_left_branch_correct_wf; eauto.
+Qed.
+
+(** Changed-result composition for the one-bit child of an outer right branch. *)
+Lemma union_left_specialized_changed_right_outer_right_branch_correct_wf:
+  forall (A : Type) operand_prefix operand_mask (operand_left operand_right : t A)
+      prefix mask (left right : t A) key,
+    wf (Branch operand_prefix operand_mask operand_left operand_right) ->
+    wf (Branch prefix mask left right) ->
+    (N.eqb operand_mask mask && N.eqb operand_prefix prefix)%bool = false ->
+    mask_above operand_mask mask = false ->
+    mask_above mask operand_mask = true ->
+    representative (Branch operand_prefix operand_mask operand_left operand_right) = Some key ->
+    matches_prefix key prefix mask = true ->
+    zero_bit key mask = false ->
+    all_keys (fun stored =>
+      matches_prefix stored prefix mask = true /\ zero_bit stored mask = false)
+      (Branch operand_prefix operand_mask operand_left operand_right) ->
+    (wf (union_left_specialized_changed_result
+           (Branch operand_prefix operand_mask operand_left operand_right) right) /\
+      forall stored,
+        get stored (union_left_specialized_changed_result
+          (Branch operand_prefix operand_mask operand_left operand_right) right) =
+        match get stored (Branch operand_prefix operand_mask operand_left operand_right) with
+        | Some value => Some value
+        | None => get stored right
+        end) ->
+    wf (union_left_specialized_changed_result
+      (Branch operand_prefix operand_mask operand_left operand_right)
+      (Branch prefix mask left right)) /\
+    forall stored,
+      get stored (union_left_specialized_changed_result
+        (Branch operand_prefix operand_mask operand_left operand_right)
+        (Branch prefix mask left right)) =
+      match get stored (Branch operand_prefix operand_mask operand_left operand_right) with
+      | Some value => Some value
+      | None => get stored (Branch prefix mask left right)
+      end.
+Proof.
+  intros A operand_prefix operand_mask operand_left operand_right
+    prefix mask left right key Hoperand Houter Hsame Hnotabove Habove
+    Hrep Hprefix Hside Hall Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr _ _ Hleft Hright]; subst.
+  unfold union_left_specialized_changed_result.
+  rewrite union_left_specialized_changed_equation.
+  rewrite Hsame, Hnotabove, Habove, Hrep, Hprefix, Hside.
+  destruct (union_left_specialized_changed
+    (Branch operand_prefix operand_mask operand_left operand_right) right) eqn:Echild;
+    unfold union_left_specialized_changed_result in Hchild;
+    rewrite Echild in Hchild;
+    eapply union_left_specialized_right_outer_right_branch_correct_wf; eauto.
 Qed.
 
 (** Package the common precondition of [join_disjoint_correct] for the
