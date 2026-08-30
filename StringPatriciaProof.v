@@ -693,6 +693,83 @@ Proof.
   - eapply all_keys_impl; [exact Hright|]. intros key H. exact (proj1 H).
 Qed.
 
+(** The native extraction returns a branch's cached sample in constant time,
+    whereas the pure definition of [representative] selects a key by walking
+    its left spine.  They need not be the same resident key.  They are,
+    however, interchangeable for every native consumer: a prefix comparison
+    below the branch split observes precisely the same bits. *)
+Lemma wf_cached_sample_same_prefix_representative:
+  forall (A : Type) sample split (ltree rtree : t A) representative_key,
+    wf (Branch sample split ltree rtree) ->
+    representative (Branch sample split ltree rtree) = Some representative_key ->
+    same_prefix sample representative_key split.
+Proof.
+  intros A sample split ltree rtree representative_key Hwf Hrepresentative.
+  inversion Hwf as
+      [| |? ? ? ? Hleft Hright Hleft_nonempty Hright_nonempty
+       Hleft_keys Hright_keys Hresident]; subst.
+  eapply (representative_all_keys A
+    (fun key => same_prefix sample key split)
+    (Branch sample split ltree rtree) representative_key).
+  - now apply branch_all_prefix.
+  - exact Hrepresentative.
+Qed.
+
+Lemma wf_cached_sample_agrees_before_representative:
+  forall (A : Type) sample split (ltree rtree : t A)
+      representative_key other bound,
+    wf (Branch sample split ltree rtree) ->
+    representative (Branch sample split ltree rtree) = Some representative_key ->
+    bound <= split ->
+    agrees_before_bounded sample other bound =
+      agrees_before_bounded representative_key other bound.
+Proof.
+  intros A sample split ltree rtree representative_key other bound Hwf
+    Hrepresentative Hbound.
+  pose proof (wf_cached_sample_same_prefix_representative A sample split
+    ltree rtree representative_key Hwf Hrepresentative) as Hprefix.
+  pose proof (same_prefix_shrink sample representative_key split bound
+    Hprefix Hbound) as Hbounded_prefix.
+  destruct (agrees_before_bounded sample other bound) eqn:Hsample,
+           (agrees_before_bounded representative_key other bound) eqn:Hrepresentative';
+    try reflexivity.
+  - exfalso.
+    assert (Hsample_spec : forall n, n < bound ->
+      bit_at sample n = bit_at other n).
+    { apply (proj1 (agrees_before_bounded_spec sample other bound)).
+      exact Hsample. }
+    assert (Hrepresentative_true :
+      agrees_before_bounded representative_key other bound = true).
+    { apply (proj2 (agrees_before_bounded_spec representative_key other bound)).
+      intros n Hn. rewrite <- (Hbounded_prefix n Hn).
+      apply Hsample_spec. exact Hn. }
+    rewrite Hrepresentative_true in Hrepresentative'. discriminate.
+  - exfalso.
+    assert (Hrepresentative_spec : forall n, n < bound ->
+      bit_at representative_key n = bit_at other n).
+    { apply (proj1 (agrees_before_bounded_spec representative_key other bound)).
+      exact Hrepresentative'. }
+    assert (Hsample_true : agrees_before_bounded sample other bound = true).
+    { apply (proj2 (agrees_before_bounded_spec sample other bound)).
+      intros n Hn. rewrite (Hbounded_prefix n Hn).
+      apply Hrepresentative_spec. exact Hn. }
+    rewrite Hsample_true in Hsample. discriminate.
+Qed.
+
+Lemma wf_cached_sample_bit_at_before_representative:
+  forall (A : Type) sample split (ltree rtree : t A)
+      representative_key position,
+    wf (Branch sample split ltree rtree) ->
+    representative (Branch sample split ltree rtree) = Some representative_key ->
+    position < split ->
+    bit_at sample position = bit_at representative_key position.
+Proof.
+  intros A sample split ltree rtree representative_key position Hwf
+    Hrepresentative Hposition.
+  apply (wf_cached_sample_same_prefix_representative A sample split
+    ltree rtree representative_key Hwf Hrepresentative position Hposition).
+Qed.
+
 (** Below a branch's own split, all of its keys have the sample's bit.  This
     is the containment fact used when one merge root lies below the other. *)
 Lemma all_keys_contained_prefix:
