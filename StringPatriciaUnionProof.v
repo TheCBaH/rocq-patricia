@@ -481,3 +481,35 @@ Lemma union_left_specialized_branch_calls_smaller:
       size (Branch sample_a split_a left_a right_a) +
       size (Branch sample_b split_b left_b right_b).
 Proof. intros. cbn [size]. lia. Qed.
+
+(** A failed bounded-prefix comparison is the terminal join case of the
+    worker.  Repackage the existing separated-join proof in that exact form. *)
+Lemma union_left_specialized_disjoint_branches_correct_wf:
+  forall (A : Type) sample_a split_a (left_a right_a : t A)
+      sample_b split_b (left_b right_b : t A),
+    wf (Branch sample_a split_a left_a right_a) ->
+    wf (Branch sample_b split_b left_b right_b) ->
+    agrees_before_bounded sample_a sample_b (Nat.min split_a split_b) = false ->
+    wf (join (Branch sample_a split_a left_a right_a)
+             (Branch sample_b split_b left_b right_b)) /\
+    forall key,
+      get key (join (Branch sample_a split_a left_a right_a)
+                    (Branch sample_b split_b left_b right_b)) =
+      match get key (Branch sample_a split_a left_a right_a) with
+      | Some value => Some value
+      | None => get key (Branch sample_b split_b left_b right_b)
+      end.
+Proof.
+  intros A sample_a split_a left_a right_a sample_b split_b left_b right_b
+    Hwa Hwb Hdisagree.
+  inversion Hwa as [| |? ? ? ? _ _ _ _ Hla Hra _]; subst.
+  inversion Hwb as [| |? ? ? ? _ _ _ _ Hlb Hrb _]; subst.
+  destruct (branches_disjoint_prefix A A sample_a split_a
+    (Branch sample_a split_a left_a right_a) sample_b split_b
+    (Branch sample_b split_b left_b right_b)) as [differing
+      [Hdiff [Hleft Hright]]].
+  - now apply branch_all_prefix.
+  - now apply branch_all_prefix.
+  - exact Hdisagree.
+  - eapply join_separated_correct_wf; eauto.
+Qed.
