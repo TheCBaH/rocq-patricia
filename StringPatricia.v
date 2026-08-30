@@ -364,6 +364,58 @@ Definition combine {A B C : Type}
     (f : option A -> option B -> option C) (a : t A) (b : t B) : t C :=
   combine_structural f a b.
 
+(** Source counterpart of the optimized left-biased union.  One-sided
+    subtrees are retained directly and recursion follows only the potentially
+    overlapping branch.  The native realizer may additionally reuse a whole
+    node by physical identity; that is an optimization outside this pure
+    functional worker. *)
+Program Fixpoint union_left_specialized {A : Type}
+    (a b : t A) {measure (size a + size b)%nat} : t A :=
+  match a, b with
+  | Empty, tree => tree
+  | tree, Empty => tree
+  | Leaf ka va, Leaf kb _ =>
+      if String.eqb ka kb then a else set ka va b
+  | Leaf ka va, tree => set ka va tree
+  | tree, Leaf kb vb =>
+      match get kb tree with Some _ => tree | None => set kb vb tree end
+  | Branch sample_a split_a left_a right_a,
+    Branch sample_b split_b left_b right_b =>
+      if split_a =? split_b then
+        if agrees_before_bounded sample_a sample_b split_a then
+          branch sample_a split_a
+            (union_left_specialized left_a left_b)
+            (union_left_specialized right_a right_b)
+        else join a b
+      else if split_a <? split_b then
+        if agrees_before_bounded sample_a sample_b split_a then
+          if bit_at sample_b split_a then
+            branch sample_a split_a left_a
+              (union_left_specialized right_a b)
+          else branch sample_a split_a
+              (union_left_specialized left_a b) right_a
+        else join a b
+      else
+        if agrees_before_bounded sample_a sample_b split_b then
+          if bit_at sample_a split_b then
+            branch sample_b split_b left_b
+              (union_left_specialized a right_b)
+          else branch sample_b split_b
+              (union_left_specialized a left_b) right_b
+        else join a b
+  end.
+Next Obligation. intros; cbn [size]; lia. Qed.
+Next Obligation. intros; cbn [size]; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. split; intros; intuition discriminate. Qed.
+Next Obligation. repeat split; intros; intuition discriminate. Qed.
+
+Definition union_right_specialized {A : Type} (a b : t A) : t A :=
+  union_left_specialized b a.
+
 Definition union_left {A : Type} (a b : t A) : t A :=
   combine (fun x y => match x with Some _ => x | None => y end) a b.
 

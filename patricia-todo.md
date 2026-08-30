@@ -157,6 +157,11 @@ Required only for an end-to-end native-refinement claim.
   sufficient fuel bound in both backends.
 - [ ] Define and prove source-level specialized left- and right-biased unions,
   including their unchanged/disjoint subtree result certificates.
+- [ ] Isolate experimental specialized-union workers in companion Rocq modules
+  and give them a targeted extraction/oracle target, so iteration on N2 does
+  not invalidate the expensive established `PatriciaProof.v` and
+  `StringPatriciaProof.v` proof closures. Integrate a worker into the core
+  modules only with its completed refinement theorem.
 - [ ] Remove the corresponding handwritten `set`, `combine`, and union
   realizers when proved extracted workers meet the performance requirements;
   otherwise prove the realizers against those workers.

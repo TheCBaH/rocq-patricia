@@ -333,6 +333,7 @@ Separate Extraction
   Patricia.map_right Patricia.replace_binding Patricia.combine_leaf_left
   Patricia.combine_leaf_right Patricia.combine
   Patricia.union_left Patricia.union_right
+  Patricia.union_left_specialized Patricia.union_right_specialized
   Patricia.map Patricia.fold Patricia.elements Patricia.beq
   StringBits.bit_at StringBits.first_diff StringBits.agrees_before
   StringBits.agrees_before_bounded
@@ -343,5 +344,6 @@ Separate Extraction
   StringPatricia.combine_leaf_left StringPatricia.combine_leaf_right
   StringPatricia.get StringPatricia.mem StringPatricia.set StringPatricia.remove
   StringPatricia.combine StringPatricia.union_left StringPatricia.union_right
+  StringPatricia.union_left_specialized StringPatricia.union_right_specialized
   StringPatricia.map StringPatricia.fold StringPatricia.elements
   StringPatricia.beq.

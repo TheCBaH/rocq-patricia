@@ -1864,6 +1864,31 @@ Proof.
   intro key. rewrite Hget. now destruct (get key right).
 Qed.
 
+(** Small exact-result certificates for the specialized worker.  They are the
+    source counterparts of the native realizer's no-change and immediate-join
+    paths; the forthcoming general refinement theorem composes them through
+    recursive overlap cases. *)
+Theorem union_left_specialized_empty_right:
+  forall (A : Type) (left : t A),
+    union_left_specialized left Empty = left.
+Proof. intros. reflexivity. Qed.
+
+Theorem union_left_specialized_empty_left:
+  forall (A : Type) (right : t A),
+    union_left_specialized Empty right = right.
+Proof. intros. reflexivity. Qed.
+
+Theorem union_left_specialized_disjoint_masks:
+  forall (A : Type) pa ma (la ra : t A) pb mb (lb rb : t A),
+    mask_above ma mb = false ->
+    mask_above mb ma = false ->
+    union_left_specialized (Branch pa ma la ra) (Branch pb mb lb rb) =
+    join (Branch pa ma la ra) (Branch pb mb lb rb).
+Proof.
+  intros A pa ma la ra pb mb lb rb Hab Hba.
+  cbn [union_left_specialized]. rewrite Hab, Hba. reflexivity.
+Qed.
+
 Lemma wf_empty_ok:
   forall A, @wf A empty.
 Proof. constructor. Qed.

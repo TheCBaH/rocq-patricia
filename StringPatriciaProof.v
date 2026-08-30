@@ -2982,6 +2982,34 @@ Proof.
   now destruct (get key right).
 Qed.
 
+(** Exact no-change and immediate-disjoint-result certificates for the
+    specialized source worker.  They expose the cases in which the optimized
+    extraction may retain an existing subtree without consulting generic
+    [combine]. *)
+Theorem union_left_specialized_empty_right:
+  forall (A : Type) (left : t A),
+    union_left_specialized left Empty = left.
+Proof. intros. reflexivity. Qed.
+
+Theorem union_left_specialized_empty_left:
+  forall (A : Type) (right : t A),
+    union_left_specialized Empty right = right.
+Proof. intros. reflexivity. Qed.
+
+Theorem union_left_specialized_disjoint_samples:
+  forall (A : Type) sample_a split (left_a right_a : t A)
+      sample_b (left_b right_b : t A),
+    agrees_before_bounded sample_a sample_b split = false ->
+    union_left_specialized
+      (Branch sample_a split left_a right_a)
+      (Branch sample_b split left_b right_b) =
+    join (Branch sample_a split left_a right_a)
+      (Branch sample_b split left_b right_b).
+Proof.
+  intros A sample_a split left_a right_a sample_b left_b right_b Hagree.
+  cbn [union_left_specialized]. rewrite Nat.eqb_refl, Hagree. reflexivity.
+Qed.
+
 Definition sample : t nat :=
   set "alpha" 1 (set "alphabet" 2 (set "" 3 (set "beta" 4 empty)))%string.
 

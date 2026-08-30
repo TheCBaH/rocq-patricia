@@ -142,9 +142,13 @@ let check_int_wide_keys () =
     let expected_left = Hashtbl.copy right_ref in
     Hashtbl.iter (Hashtbl.replace expected_left) left_ref;
     check_int_table round "wide union_left" keys expected_left (union_left !left !right);
+    check_int_table round "wide specialized union_left" keys expected_left
+      (union_left_specialized !left !right);
     let expected_right = Hashtbl.copy left_ref in
     Hashtbl.iter (Hashtbl.replace expected_right) right_ref;
-    check_int_table round "wide union_right" keys expected_right (union_right !left !right)
+    check_int_table round "wide union_right" keys expected_right (union_right !left !right);
+    check_int_table round "wide specialized union_right" keys expected_right
+      (union_right_specialized !left !right)
   done
 
 module S = StringPatriciaInternal
@@ -365,9 +369,13 @@ let check_string_keys () =
     let expected_left = Hashtbl.copy right_ref in
     Hashtbl.iter (Hashtbl.replace expected_left) left_ref;
     check_string_table round "union_left" keys expected_left (S.union_left !left !right);
+    check_string_table round "specialized union_left" keys expected_left
+      (S.union_left_specialized !left !right);
     let expected_right = Hashtbl.copy left_ref in
     Hashtbl.iter (Hashtbl.replace expected_right) right_ref;
-    check_string_table round "union_right" keys expected_right (S.union_right !left !right)
+    check_string_table round "union_right" keys expected_right (S.union_right !left !right);
+    check_string_table round "specialized union_right" keys expected_right
+      (S.union_right_specialized !left !right)
   done
 
 (** Exercise every root relationship selected by the direct-string merge:
@@ -438,10 +446,14 @@ let check_string_merge_shapes () =
        Hashtbl.iter (Hashtbl.replace expected_left) left_ref;
        check_string_table (-100 - round) (expected_shape ^ " union_left") keys
          expected_left (S.union_left left right);
+       check_string_table (-100 - round) (expected_shape ^ " specialized union_left")
+         keys expected_left (S.union_left_specialized left right);
        let expected_right = Hashtbl.copy left_ref in
        Hashtbl.iter (Hashtbl.replace expected_right) right_ref;
        check_string_table (-100 - round) (expected_shape ^ " union_right") keys
-         expected_right (S.union_right left right))
+         expected_right (S.union_right left right);
+       check_string_table (-100 - round) (expected_shape ^ " specialized union_right")
+         keys expected_right (S.union_right_specialized left right))
     cases
 
 let check_abstract_interfaces () =
@@ -577,10 +589,18 @@ let () =
       (Array.init 256 (fun key ->
            match left_ref.(key) with Some _ as value -> value | None -> right_ref.(key)))
       (union_left !left !right);
+    check_array_get round "specialized union_left"
+      (Array.init 256 (fun key ->
+           match left_ref.(key) with Some _ as value -> value | None -> right_ref.(key)))
+      (union_left_specialized !left !right);
     check_array_get round "union_right"
       (Array.init 256 (fun key ->
            match right_ref.(key) with Some _ as value -> value | None -> left_ref.(key)))
-      (union_right !left !right)
+      (union_right !left !right);
+    check_array_get round "specialized union_right"
+      (Array.init 256 (fun key ->
+           match right_ref.(key) with Some _ as value -> value | None -> left_ref.(key)))
+      (union_right_specialized !left !right)
   done;
   check_int_wide_keys ();
   check_string_merge_shapes ();

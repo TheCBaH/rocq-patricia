@@ -313,6 +313,62 @@ Definition combine {A B C : Type}
     (f : option A -> option B -> option C) (a : t A) (b : t B) : t C :=
   combine_structural f a b.
 
+(** The biased worker keeps the one-sided trees themselves, rather than
+    mapping them through [combine].  It is deliberately separate from the
+    generic worker: in particular, its recursive calls occur only where the
+    two Patricia prefixes can overlap.  The extracted backend adds physical
+    identity checks to these same cases; the source worker records the
+    functional result independently of that optimization. *)
+Program Fixpoint union_left_specialized {A : Type}
+    (a b : t A) {measure (size a + size b)%nat} : t A :=
+  match a, b with
+  | Empty, tree => tree
+  | tree, Empty => tree
+  | Leaf ka va, Leaf kb _ =>
+      if Pos.eqb ka kb then a else set ka va b
+  | Leaf ka va, tree => set ka va tree
+  | tree, Leaf kb vb =>
+      match get kb tree with Some _ => tree | None => set kb vb tree end
+  | Branch pa ma la ra, Branch pb mb lb rb =>
+      if (N.eqb ma mb && N.eqb pa pb)%bool then
+        branch pa ma
+          (union_left_specialized la lb)
+          (union_left_specialized ra rb)
+      else if mask_above ma mb then
+        match representative b with
+        | Some kb =>
+            if matches_prefix kb pa ma then
+              if zero_bit kb ma then
+                branch pa ma (union_left_specialized la b) ra
+              else branch pa ma la (union_left_specialized ra b)
+            else join a b
+        | None => a
+        end
+      else if mask_above mb ma then
+        match representative a with
+        | Some ka =>
+            if matches_prefix ka pb mb then
+              if zero_bit ka mb then
+                branch pb mb (union_left_specialized a lb) rb
+              else branch pb mb lb (union_left_specialized a rb)
+            else join a b
+        | None => b
+        end
+      else join a b
+  end.
+Next Obligation. intros; cbn [size]; lia. Qed.
+Next Obligation. intros; cbn [size]; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. intros; cbn in *; lia. Qed.
+Next Obligation. split; intros; intuition discriminate. Qed.
+Next Obligation. repeat split; intros; intuition discriminate. Qed.
+
+(** [union_right_specialized] is the symmetric right-biased worker. *)
+Definition union_right_specialized {A : Type} (a b : t A) : t A :=
+  union_left_specialized b a.
+
 Definition union_left {A : Type} (a b : t A) : t A :=
   combine (fun x y => match x with Some _ => x | None => y end) a b.
 
