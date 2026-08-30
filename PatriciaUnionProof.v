@@ -14,6 +14,51 @@ Theorem union_left_specialized_empty_left:
     union_left_specialized Empty right = right.
 Proof. reflexivity. Qed.
 
+(** The changed worker agrees definitionally with the original worker in all
+    non-recursive shapes.  These bridge lemmas keep the eventual changed
+    worker proof focused solely on branch/branch reconstruction. *)
+Lemma union_left_specialized_changed_empty_left:
+  forall (A : Type) (right : t A),
+    union_left_specialized_changed_result Empty right =
+    union_left_specialized Empty right.
+Proof. intros A right. destruct right; reflexivity. Qed.
+
+Lemma union_left_specialized_changed_empty_right:
+  forall (A : Type) (left : t A),
+    union_left_specialized_changed_result left Empty =
+    union_left_specialized left Empty.
+Proof. intros A left. destruct left; reflexivity. Qed.
+
+Lemma union_left_specialized_changed_leaf_left:
+  forall (A : Type) key (value : A) (right : t A),
+    union_left_specialized_changed_result (Leaf key value) right =
+    union_left_specialized (Leaf key value) right.
+Proof.
+  intros A key value right. destruct right;
+    unfold union_left_specialized_changed_result,
+      union_left_specialized_changed, union_left_specialized; cbn;
+    try reflexivity.
+  destruct (Pos.eqb key key0); reflexivity.
+Qed.
+
+Lemma union_left_specialized_changed_leaf_right:
+  forall (A : Type) (left : t A) key (value : A),
+    union_left_specialized_changed_result left (Leaf key value) =
+    union_left_specialized left (Leaf key value).
+Proof.
+  intros A left key value. destruct left as [|stored stored_value|p m l r].
+  - reflexivity.
+  - unfold union_left_specialized_changed_result,
+      union_left_specialized_changed, union_left_specialized; cbn.
+    destruct (Pos.eqb stored key); reflexivity.
+  - unfold union_left_specialized_changed_result,
+      union_left_specialized_changed, union_left_specialized; cbn.
+    destruct (matches_prefix key p m) eqn:P; cbn [get].
+    + destruct (zero_bit key m) eqn:Z;
+        [destruct (get key l)|destruct (get key r)]; reflexivity.
+    + reflexivity.
+Qed.
+
 Theorem union_left_specialized_disjoint_masks:
   forall (A : Type) pa ma (la ra : t A) pb mb (lb rb : t A),
     (N.eqb ma mb && N.eqb pa pb)%bool = false ->

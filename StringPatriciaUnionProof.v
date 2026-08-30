@@ -14,6 +14,50 @@ Theorem union_left_specialized_empty_left:
     union_left_specialized Empty right = right.
 Proof. reflexivity. Qed.
 
+(** Definitionally identical boundary cases for the source-level changed
+    worker.  The remaining refinement proof is consequently branch/branch
+    only. *)
+Lemma union_left_specialized_changed_empty_left:
+  forall (A : Type) (right : t A),
+    union_left_specialized_changed_result Empty right =
+    union_left_specialized Empty right.
+Proof. intros A right. destruct right; reflexivity. Qed.
+
+Lemma union_left_specialized_changed_empty_right:
+  forall (A : Type) (left : t A),
+    union_left_specialized_changed_result left Empty =
+    union_left_specialized left Empty.
+Proof. intros A left. destruct left; reflexivity. Qed.
+
+Lemma union_left_specialized_changed_leaf_left:
+  forall (A : Type) key (value : A) (right : t A),
+    union_left_specialized_changed_result (Leaf key value) right =
+    union_left_specialized (Leaf key value) right.
+Proof.
+  intros A key value right. destruct right as [|stored stored_value|sample split l r].
+  - reflexivity.
+  - unfold union_left_specialized_changed_result,
+      union_left_specialized_changed, union_left_specialized; cbn.
+    destruct (String.eqb key stored); reflexivity.
+  - reflexivity.
+Qed.
+
+Lemma union_left_specialized_changed_leaf_right:
+  forall (A : Type) (left : t A) key (value : A),
+    union_left_specialized_changed_result left (Leaf key value) =
+    union_left_specialized left (Leaf key value).
+Proof.
+  intros A left key value. destruct left as [|stored stored_value|sample split l r].
+  - reflexivity.
+  - unfold union_left_specialized_changed_result,
+      union_left_specialized_changed, union_left_specialized; cbn.
+    destruct (String.eqb stored key); reflexivity.
+  - unfold union_left_specialized_changed_result,
+      union_left_specialized_changed, union_left_specialized; cbn.
+    destruct (bit_at key split) eqn:B; cbn [get];
+      [destruct (get key r)|destruct (get key l)]; reflexivity.
+Qed.
+
 Theorem union_left_specialized_disjoint_samples:
   forall (A : Type) sample_a split (left_a right_a : t A)
       sample_b (left_b right_b : t A),
