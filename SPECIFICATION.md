@@ -150,6 +150,25 @@ trusted boundary. The proof-aligned reference extraction shares the standard
 numeric/string mappings and extraction/compiler boundary, but omits the
 Patricia-specific algorithm realizers.
 
+### Standard extraction-mapping audit
+
+Both extraction units import the following Rocq standard mapping modules. They
+are runtime realizers, not kernel-checked refinement proofs; the reference
+backend shares them deliberately, so differential testing does not validate
+this row of the trust boundary.
+
+| Source representation | Mapping module and native representation | Remaining foreign obligation |
+| --- | --- | --- |
+| `positive`, `N`, `Z` | `ExtrOcamlZInt`: OCaml `int`, including constructor eliminators and native arithmetic/comparison realizers | Values and every intermediate arithmetic result must remain in the intended finite range. The supported wrapper only accepts positive keys through `max_int`; masks and temporary arithmetic remain subject to the 62-bit model and the OCaml-operator contract. |
+| `nat` | `ExtrOcamlNatInt`: OCaml non-negative `int`, with native successor, arithmetic, comparison, and division realizers | Bounds are required for string lengths, logical positions, fuel, and traversal counters; overflow is not represented by the source model. |
+| `Ascii.ascii`, `Byte.byte`, `string` | `ExtrOcamlNativeString`/`ExtrOcamlChar`: OCaml `char` and byte string, with constructor elimination through `String.length`, `String.get`, and `String.sub` | Establish byte-for-byte correspondence, finite-length bounds, and the behavior of access operations. The optimized backend additionally relies on guarded `String.unsafe_get` and `Char.code`. |
+| Reference-only `String.length` | Explicit inline mapping to `Stdlib.String.length` in `PatriciaReferenceExtract.v` | This removes a generated shadowing `String` unit but remains part of the shared native-string boundary. |
+
+The optimized extraction then adds the Patricia-specific realizers enumerated
+in `PatriciaExtract.v`; those are separately listed in the trusted computing
+base above. No `Axiom`, `Admitted`, or extraction directive turns any of these
+runtime mappings into a theorem about OCaml execution.
+
 ## Validation and exclusions
 
 `make` compiles the Rocq proofs, performs the source-driven assumption audit,

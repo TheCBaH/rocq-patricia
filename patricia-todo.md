@@ -101,8 +101,12 @@ Required only for an end-to-end native-refinement claim.
   including the guards around `String.unsafe_get`.
 - [ ] Prove the native XOR/leading-zeroes first-difference calculation refines
   the source model.
-- [ ] Audit the remaining standard `positive`, `N`, `nat`, and string extraction
-  mappings and record which pieces remain axiomatic or foreign.
+- [x] Audit the remaining standard `positive`, `N`, `nat`, and string extraction
+  mappings and record which pieces remain axiomatic or foreign.  The public
+  specification now names `ExtrOcamlZInt`, `ExtrOcamlNatInt`,
+  `ExtrOcamlNativeString`, and the reference-only `String.length` inline,
+  their native representations, and the finite-range or primitive contracts
+  still outside the kernel proof.
 
 Exit gate: every low-level native operation used by the optimized map has a
 proved refinement theorem or a narrowly specified, explicitly trusted foreign
@@ -242,6 +246,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Completed the N1 audit of standard extraction mappings | `SPECIFICATION.md` records the exact imported mapping modules, native representations, and remaining foreign obligations; `git diff --check` passed |
 | 2026-08-30 | Completed cached-string-sample representative independence for N2 | `StringPatriciaProof.v` proves prefix, bounded-agreement, and outer-routing-bit equivalence between the cached resident sample and pure representative; full `make` and `git diff --check` passed |
 | 2026-08-30 | Completed the bounded integer-routing source refinement for N1 | `NativeRefinement.v` proves prefix, prefix-match, routing-bit, highest-differing-bit, and mask-order correspondence, plus 62-bit payload/mask closure; full `make` and `git diff --check` passed |
 | 2026-08-30 | Completed P0: published the current custom-API contract and theorem checklist, enumerated the trusted computing base, added standalone repository CI, and added a bounded checked benchmark smoke target | Clean `make`: 252 declarations closed; randomized oracle and optimized/reference differential tests passed. `make benchmark-smoke`: 100-binding integer and string workloads passed. `git diff --check` passed |
