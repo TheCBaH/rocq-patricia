@@ -890,3 +890,209 @@ Proof.
         -- rewrite !StringBits.bit_at_cons_character by lia.
            apply Hbefore. lia.
 Qed.
+
+(** ** The native byte-difference calculation
+
+    [PatriciaExtract.v]'s realizer for [StringBits.first_diff] locates a
+    differing byte with a native XOR ([lxor]) and then finds the first
+    differing bit with a mask-shift loop (starting at mask [128] and
+    shifting right once per step) rather than the safe [ascii_xor]/
+    [ascii_leading_zeroes] source model above.  This section states that
+    native computation directly, over bounded [N] payloads mirroring OCaml's
+    [int], and proves it finds exactly the same split as [ascii_first_diff]
+    and, via [bytewise_first_diff_correct], as [StringBits.first_diff]
+    itself.  As elsewhere in this file, the residual obligation is only the
+    foreign correspondence between these [N] operations and OCaml's own
+    [land]/[lxor]/[lsr]/[Char.code] primitives. *)
+
+(** The finite ascii/[N] bit correspondence needed below: [ascii_bit]
+    counts from the most significant bit, while [N.testbit] counts from the
+    least significant, so position [offset] corresponds to [N] index
+    [7 - offset].  Both sides are closed terms once [a]'s eight booleans and
+    [offset] are fixed, so this is decided the same brute-force way as
+    [ascii_bit_ext] and [ascii_xor_bit] above. *)
+Lemma ascii_bit_testbit:
+  forall a offset, offset < 8 ->
+    StringBits.ascii_bit a offset =
+      N.testbit (Ascii.N_of_ascii a) (N.of_nat (7 - offset)).
+Proof.
+  intros [b0 b1 b2 b3 b4 b5 b6 b7] offset Hoffset.
+  destruct offset as [|[|[|[|[|[|[|[|offset]]]]]]]]; try lia;
+    destruct b0, b1, b2, b3, b4, b5, b6, b7; vm_compute; reflexivity.
+Qed.
+
+Lemma N_land_pow2_eqb:
+  forall value k, N.eqb (N.land value (N.pow 2 k)) 0 = negb (N.testbit value k).
+Proof.
+  intros value k. destruct (N.testbit value k) eqn:Htest.
+  - apply N.eqb_neq. intro Hzero.
+    assert (Hbit : N.testbit (N.land value (N.pow 2 k)) k = false)
+      by (rewrite Hzero; apply N.bits_0).
+    rewrite N.land_spec, N.pow2_bits_eqb, N.eqb_refl, Htest in Hbit.
+    discriminate.
+  - apply N.eqb_eq. apply N.bits_inj_0. intros n.
+    rewrite N.land_spec, N.pow2_bits_eqb.
+    destruct (N.eqb k n) eqn:Ekn.
+    + apply N.eqb_eq in Ekn. subst n. rewrite Htest. reflexivity.
+    + apply Bool.andb_false_r.
+Qed.
+
+(** The mask check at loop position [offset] (mask [2 ^ (7 - offset)],
+    matching the realizer's [128 lsr offset]) is nonzero exactly when the
+    two byte codes' bits differ at that source position. *)
+Definition native_byte_bit (left right : Ascii.ascii) (offset : nat) : bool :=
+  negb (N.eqb
+    (N.land (N.lxor (Ascii.N_of_ascii left) (Ascii.N_of_ascii right))
+       (N.pow 2 (N.of_nat (7 - offset)))) 0).
+
+Lemma native_byte_bit_correct:
+  forall left right offset, offset < 8 ->
+    native_byte_bit left right offset =
+      xorb (StringBits.ascii_bit left offset) (StringBits.ascii_bit right offset).
+Proof.
+  intros left right offset Hoffset. unfold native_byte_bit.
+  rewrite N_land_pow2_eqb, Bool.negb_involutive, N.lxor_spec.
+  now rewrite (ascii_bit_testbit left offset Hoffset),
+              (ascii_bit_testbit right offset Hoffset).
+Qed.
+
+Lemma native_byte_bit_is_ascii_xor_bit:
+  forall left right offset, offset < 8 ->
+    native_byte_bit left right offset =
+      StringBits.ascii_bit (ascii_xor left right) offset.
+Proof.
+  intros left right offset Hoffset.
+  rewrite native_byte_bit_correct by exact Hoffset.
+  symmetry. apply ascii_xor_bit. lia.
+Qed.
+
+(** The native loop itself: increment [offset] while the mask check misses,
+    stop and report [offset] once it hits.  Structurally identical to
+    [ascii_leading_zeroes_from], modulo the boolean test used at each step. *)
+Fixpoint native_byte_leading_zeroes_from
+    (fuel offset : nat) (left right : Ascii.ascii) : option nat :=
+  match fuel with
+  | 0 => None
+  | S fuel' =>
+      if native_byte_bit left right offset
+      then Some offset
+      else native_byte_leading_zeroes_from fuel' (S offset) left right
+  end.
+
+Definition native_byte_leading_zeroes (left right : Ascii.ascii) : option nat :=
+  native_byte_leading_zeroes_from 8 0 left right.
+
+Lemma native_byte_leading_zeroes_from_eq:
+  forall fuel offset, offset + fuel <= 8 ->
+    forall left right,
+      native_byte_leading_zeroes_from fuel offset left right =
+        ascii_leading_zeroes_from fuel offset (ascii_xor left right).
+Proof.
+  induction fuel as [|fuel IH]; intros offset Hbound left right; [reflexivity|].
+  cbn [native_byte_leading_zeroes_from ascii_leading_zeroes_from].
+  rewrite (native_byte_bit_is_ascii_xor_bit left right offset ltac:(lia)).
+  destruct (StringBits.ascii_bit (ascii_xor left right) offset).
+  - reflexivity.
+  - apply IH. lia.
+Qed.
+
+Corollary native_byte_leading_zeroes_correct:
+  forall left right,
+    native_byte_leading_zeroes left right = ascii_leading_zeroes (ascii_xor left right).
+Proof.
+  intros left right. apply native_byte_leading_zeroes_from_eq. lia.
+Qed.
+
+Lemma N_of_ascii_inj:
+  forall left right, Ascii.N_of_ascii left = Ascii.N_of_ascii right -> left = right.
+Proof.
+  intros left right H.
+  rewrite <- (Ascii.ascii_N_embedding left), <- (Ascii.ascii_N_embedding right), H.
+  reflexivity.
+Qed.
+
+Definition native_byte_difference (left right : Ascii.ascii) : N :=
+  N.lxor (Ascii.N_of_ascii left) (Ascii.N_of_ascii right).
+
+Lemma native_byte_difference_zero_iff:
+  forall left right, native_byte_difference left right = 0%N <-> left = right.
+Proof.
+  intros left right. unfold native_byte_difference. rewrite N.lxor_eq_0_iff.
+  split.
+  - apply N_of_ascii_inj.
+  - intros ->. reflexivity.
+Qed.
+
+(** The full per-byte realizer: an [lxor]-then-zero-check guard, exactly as
+    in [PatriciaExtract.v], ahead of the mask loop. *)
+Definition native_byte_first_diff (left right : Ascii.ascii) : option nat :=
+  if N.eqb (native_byte_difference left right) 0 then None
+  else native_byte_leading_zeroes left right.
+
+Theorem native_byte_first_diff_correct:
+  forall left right,
+    native_byte_first_diff left right = ascii_first_diff left right.
+Proof.
+  intros left right. unfold native_byte_first_diff.
+  destruct (N.eqb (native_byte_difference left right) 0) eqn:E.
+  - apply N.eqb_eq in E. apply native_byte_difference_zero_iff in E. subst right.
+    symmetry. apply ascii_first_diff_same.
+  - assert (Hneq : left <> right).
+    { intro Heq. subst right.
+      assert (H0 : native_byte_difference left left = 0%N)
+        by (apply native_byte_difference_zero_iff; reflexivity).
+      rewrite H0, N.eqb_refl in E. discriminate. }
+    assert (Heqb : Ascii.eqb left right = false) by (apply Ascii.eqb_neq; exact Hneq).
+    rewrite native_byte_leading_zeroes_correct.
+    assert (Hcorrect := xor_first_diff_correct left right).
+    unfold xor_first_diff in Hcorrect. rewrite Heqb in Hcorrect.
+    exact Hcorrect.
+Qed.
+
+(** The whole-string realizer, matching [bytewise_first_diff]'s shape with
+    the native per-byte guard and loop in place of [Ascii.eqb]/
+    [ascii_first_diff]; [native_string_first_diff_refines] closes the chain
+    to the packed source model, and so - through [packed_first_diff_spec] -
+    to [StringBits.first_diff] itself. *)
+Fixpoint native_string_first_diff (left right : string) : option nat :=
+  match left, right with
+  | EmptyString, EmptyString => None
+  | EmptyString, String _ _ => Some 0
+  | String _ _, EmptyString => Some 0
+  | String left_ch left_tail, String right_ch right_tail =>
+      if N.eqb (native_byte_difference left_ch right_ch) 0
+      then option_map (fun token => 16 + token)
+             (native_string_first_diff left_tail right_tail)
+      else option_map S (native_byte_leading_zeroes left_ch right_ch)
+  end.
+
+Theorem native_string_first_diff_correct:
+  forall left right,
+    native_string_first_diff left right = bytewise_first_diff left right.
+Proof.
+  induction left as [|left_ch left_tail IH]; intros right;
+    destruct right as [|right_ch right_tail]; try reflexivity.
+  cbn [native_string_first_diff bytewise_first_diff].
+  destruct (N.eqb (native_byte_difference left_ch right_ch) 0) eqn:Ediff.
+  - assert (Echar : left_ch = right_ch).
+    { apply native_byte_difference_zero_iff. now apply N.eqb_eq. }
+    subst right_ch. rewrite Ascii.eqb_refl. now rewrite IH.
+  - assert (Hneq : left_ch <> right_ch).
+    { intro Heq. subst right_ch.
+      assert (H0 : native_byte_difference left_ch left_ch = 0%N)
+        by (apply native_byte_difference_zero_iff; reflexivity).
+      rewrite H0, N.eqb_refl in Ediff. discriminate. }
+    assert (Heqb : Ascii.eqb left_ch right_ch = false) by (apply Ascii.eqb_neq; exact Hneq).
+    rewrite Heqb, native_byte_leading_zeroes_correct.
+    assert (Hcorrect := xor_first_diff_correct left_ch right_ch).
+    unfold xor_first_diff in Hcorrect. rewrite Heqb in Hcorrect.
+    now rewrite Hcorrect.
+Qed.
+
+Corollary native_string_first_diff_refines:
+  forall left right,
+    native_string_first_diff left right = packed_first_diff left right.
+Proof.
+  intros left right. rewrite native_string_first_diff_correct.
+  apply bytewise_first_diff_correct.
+Qed.

@@ -109,6 +109,57 @@ Fixpoint routed_key {A : Type} (key : string) (m : t A) : option string :=
       if bit_at key split then routed_key key rtree else routed_key key ltree
   end.
 
+(** The result carried by the proof-side counterpart of the native
+    exception-based update.  A [Set_bubble] result records the first split
+    discovered at a leaf and propagates it only until the first enclosing
+    branch below which the fresh binding belongs. *)
+Inductive set_descent_result (A : Type) : Type :=
+| Set_complete (updated : t A)
+| Set_bubble (differing : nat).
+
+Arguments Set_complete {A} _.
+Arguments Set_bubble {A} _.
+
+(** This follows the native [set] realizer's control flow without using an
+    exception.  It descends only once: an existing key is replaced at its
+    leaf, while a fresh key's first-difference position bubbles upward until
+    it can be installed.  [set] below remains the established specification;
+    [StringPatriciaProof.v] will establish the refinement theorem before this
+    worker is extracted. *)
+Fixpoint set_descend {A : Type}
+    (key : string) (value : A) (m : t A) : set_descent_result A :=
+  let fresh := Leaf key value in
+  match m with
+  | Empty => Set_complete fresh
+  | Leaf stored _ =>
+      match first_diff key stored with
+      | None => Set_complete fresh
+      | Some differing => Set_bubble differing
+      end
+  | Branch sample split ltree rtree =>
+      if bit_at key split then
+        match set_descend key value rtree with
+        | Set_complete updated => Set_complete (Branch sample split ltree updated)
+        | Set_bubble differing =>
+            if differing <? split then Set_bubble differing
+            else Set_complete (branch_at key differing fresh rtree)
+        end
+      else
+        match set_descend key value ltree with
+        | Set_complete updated => Set_complete (Branch sample split updated rtree)
+        | Set_bubble differing =>
+            if differing <? split then Set_bubble differing
+            else Set_complete (branch_at key differing fresh ltree)
+        end
+  end.
+
+Definition set_one_descent {A : Type}
+    (key : string) (value : A) (m : t A) : t A :=
+  match set_descend key value m with
+  | Set_complete updated => updated
+  | Set_bubble differing => branch_at key differing (Leaf key value) m
+  end.
+
 Definition set {A : Type} (key : string) (value : A) (m : t A) : t A :=
   match routed_key key m with
   | None => Leaf key value

@@ -127,6 +127,9 @@ Required only for an end-to-end native-refinement claim.
   prefix-comparison and strictly-outer routing-bit use in native merge/union.
 - [ ] Define and prove a source-level one-descent string `set` worker, or verify
   the exception-based native realization in a target-language logic.
+  `set_descend` and `set_one_descent` now state the exception-free source
+  worker and its bubble result; its refinement and well-formedness proof is
+  still required before extraction can use it.
 - [ ] Replace proof-side fuelled `combine` with well-founded structural
   recursion and prove equivalence to sufficiently fuelled `combine_fuel`.
 - [ ] Define and prove source-level specialized left- and right-biased unions,
