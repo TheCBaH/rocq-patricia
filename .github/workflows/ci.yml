@@ -1,0 +1,33 @@
+name: patricia
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "4.14.3"
+
+      - name: Install Rocq
+        run: opam install rocq-core.9.2.0 rocq-stdlib.9.2.0
+
+      - name: Proof, extraction, and functional tests
+        run: >-
+          opam exec -- make
+          ROCQ=rocq OCAMLC=ocamlc OCAMLOPT=ocamlopt OCAMLDEP=ocamldep
+
+      - name: Checked benchmark smoke test
+        run: >-
+          opam exec -- make benchmark-smoke
+          ROCQ=rocq OCAMLC=ocamlc OCAMLOPT=ocamlopt OCAMLDEP=ocamldep
