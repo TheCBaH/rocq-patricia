@@ -293,6 +293,66 @@ Proof.
     + apply Hgetol.
 Qed.
 
+Lemma union_left_specialized_changed_same_branch_correct_wf:
+  forall (A : Type) sample_a sample_b split
+      (left_a right_a left_b right_b : t A),
+    wf (Branch sample_a split left_a right_a) ->
+    wf (Branch sample_b split left_b right_b) ->
+    agrees_before_bounded sample_a sample_b split = true ->
+    (wf (union_left_specialized_changed_result left_a left_b) /\
+      forall key,
+        get key (union_left_specialized_changed_result left_a left_b) =
+        match get key left_a with Some value => Some value | None => get key left_b end) ->
+    (wf (union_left_specialized_changed_result right_a right_b) /\
+      forall key,
+        get key (union_left_specialized_changed_result right_a right_b) =
+        match get key right_a with Some value => Some value | None => get key right_b end) ->
+    wf (union_left_specialized_changed_result
+      (Branch sample_a split left_a right_a)
+      (Branch sample_b split left_b right_b)) /\
+    forall key,
+      get key (union_left_specialized_changed_result
+        (Branch sample_a split left_a right_a)
+        (Branch sample_b split left_b right_b)) =
+      match get key (Branch sample_a split left_a right_a) with
+      | Some value => Some value
+      | None => get key (Branch sample_b split left_b right_b)
+      end.
+Proof.
+  intros A sample_a sample_b split left_a right_a left_b right_b
+    Hwa Hwb Hagree Hleft Hright.
+  inversion Hwa as [| |? ? ? ? Hwla Hwra Hnla Hnra Hla Hra Hresidenta]; subst.
+  inversion Hwb as [| |? ? ? ? Hwlb Hwrb Hnlb Hnrb Hlb Hrb Hresidentb]; subst.
+  unfold union_left_specialized_changed_result.
+  rewrite union_left_specialized_changed_equation.
+  cbn. rewrite Nat.eqb_refl, Hagree.
+  destruct (union_left_specialized_changed left_a left_b) eqn:Eleft;
+    destruct (union_left_specialized_changed right_a right_b) eqn:Eright.
+  - unfold union_left_specialized_changed_result in Hleft, Hright.
+    rewrite Eleft in Hleft. rewrite Eright in Hright.
+    eapply union_left_specialized_same_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hleft, Hright.
+    rewrite Eleft in Hleft. rewrite Eright in Hright.
+    eapply union_left_specialized_same_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hleft, Hright.
+    rewrite Eleft in Hleft. rewrite Eright in Hright.
+    eapply union_left_specialized_same_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hleft, Hright.
+    rewrite Eleft in Hleft. rewrite Eright in Hright.
+    destruct (union_left_specialized_same_branch_correct_wf A sample_a sample_b split
+      left_a right_a left_b right_b left_a right_a Hwa Hwb Hagree Hleft Hright)
+      as [_ Hget].
+    split; [exact Hwa|]. intro key.
+    rewrite <- (get_branch_cached_sample_irrelevant A sample_a split left_a right_a key
+      Hnla Hnra).
+    change (get key (branch sample_a split left_a right_a) =
+      match get key (Branch sample_a split left_a right_a) with
+      | Some value => Some value
+      | None => get key (Branch sample_b split left_b right_b)
+      end).
+    apply Hget.
+Qed.
+
 (** Unequal-split reconstruction once routing has established that every key
     of the inner operand belongs to one child of the outer branch. *)
 Lemma union_left_specialized_left_outer_left_branch_correct_wf:
