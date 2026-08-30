@@ -163,8 +163,9 @@ Required only for an end-to-end native-refinement claim.
   empty/immediate-join certificates are now defined in the isolated companion
   modules. Both companion closures also prove invariant preservation and the
   left-biased pointwise lookup law for every empty/leaf case. The integer and
-  direct-string common-split branch cases are likewise complete; the unequal-
-  split routing cases remain open.
+  direct-string common-split branch cases are likewise complete. The integer
+  left-outer/left-child unequal-split case is also complete; the remaining
+  unequal-split routing cases remain open.
 - [x] Isolate experimental specialized-union workers in companion Rocq modules
   and give them a targeted extraction/oracle target, so iteration on N2 does
   not invalidate the expensive established `PatriciaProof.v` and
@@ -289,6 +290,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Proved the first integer unequal-split routing reconstruction | `PatriciaUnionProof.v`'s `union_left_specialized_left_outer_branch_correct_wf` proves the invariant and pointwise left-biased law when the complete right operand lies in the left child of an outer left branch. `make union-proof` passed. |
 | 2026-08-30 | Completed the direct-string specialized-union common-split branch case | `StringPatriciaUnionProof.v`'s `union_left_specialized_same_branch_correct_wf` proves invariant preservation and the full left-biased lookup law from the two recursive contracts, using output-key rebasing to retain the cached-sample invariant. `make union-proof` passed. |
 | 2026-08-30 | Proved direct-string common-split output-key invariants | `StringPatriciaUnionProof.v`'s `union_left_specialized_same_split_output_keys` rebases equal-split cached samples and lifts both recursive lookup contracts to the branch-side prefix/bit invariants. `make union-proof` passed. |
 | 2026-08-30 | Proved the integer specialized-union common-split composition rule | `PatriciaUnionProof.v`'s `union_left_specialized_same_branch_correct_wf` reconstructs the invariant and pointwise biased-union law from contracts for the two same-split recursive calls. `make union-proof`, `make union-oracle`, and `git diff --check` passed. |
