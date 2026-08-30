@@ -1,30 +1,30 @@
 # Direct-string Patricia map performance analysis
 
-Analysis date: 2026-08-29
+Last reviewed: 2026-08-30
 
 ## Scope and conclusion
 
-This note analyzes performance options for the direct byte-string map in
-`StringPatricia.v`, using the implementation, extraction directives, proof
-invariants, and measurements recorded in `patricia-bench.md`.
+This note records the performance analysis and design rationale for the direct
+byte-string map in `StringPatricia.v`, using the implementation, extraction
+directives, proof invariants, and measurements recorded in
+[`patricia-bench.md`](patricia-bench.md). Current and proposed work is tracked
+only in [`patricia-todo.md`](patricia-todo.md).
 
-The string map already routes at bit granularity. The main question is not
-whether to introduce bit routing, but how to implement its critical-bit
-operations without paying repeated division, remainder, bounds-check, and
-whole-prefix-scan costs.
+The string map already routed at bit granularity. The original question was
+how to implement its critical-bit operations without paying repeated division,
+remainder, bounds-check, and whole-prefix-scan costs.
 
 There were two distinct performance problems in the original extracted
 implementation:
 
-1. **Biased union has the wrong execution path.** `union_left` and
-   `union_right` go through generic fuelled `combine`. That computes the size
-   of both inputs and rebuilds one-sided subtrees. This is responsible for the
-   enormous disjoint-union gap and is the highest-priority change for the map
-   as a whole.
-2. **Ordinary string mutations do more string and tree work than necessary.**
-   Routing decodes a logical bit position with `/ 9` and `mod 9` at every
-   branch; `first_diff` scans one logical bit at a time; and `set` first routes
-   to a leaf and then traverses the tree again to update or insert.
+1. **Biased union had the wrong execution path.** `union_left` and
+   `union_right` went through generic fuelled `combine`. That computed the size
+   of both inputs and rebuilt one-sided subtrees, causing the dominant
+   disjoint-union gap.
+2. **Ordinary string mutations did more string and tree work than necessary.**
+   Routing decoded a logical bit position with `/ 9` and `mod 9` at every
+   branch; `first_diff` scanned one logical bit at a time; and `set` first
+   routed to a leaf and then traversed the tree again to update or insert.
 
 The following sequence was completed in the native extraction:
 
@@ -95,8 +95,9 @@ gave the following observations (not regression thresholds):
 | Half-overlap left union | 500.0 us, 425,586 words | 55.1 us, 40,330 words |
 
 The benchmark evidence establishes the original union diagnosis and validates
-the native implementation at scale. It also makes the residual string-overlap
-allocation visible; the next section isolates that cost.
+the native implementation at scale. The initial optimized run still exposed
+string-overlap allocation; the next section records how the bounded prefix
+scanner removed that cost in the checked 10K and 100K follow-ups.
 
 ## Completed follow-up: bounded `agrees_before`
 
@@ -241,12 +242,18 @@ versus 222.1 for fresh add, 170.4 versus 206.4 for existing update, and 60.7
 versus 105.7 for removal (Patricia versus AVL). The direct-string tree remains
 eight words per binding versus AVL's six.
 
-The most decisive result is union allocation. Across 10K, 100K, and 1M,
+The most decisive pre-bounded-scanner result is union allocation. Across 10K,
+100K, and 1M,
 disjoint string union allocated 351, 406, and 405 words, while AVL allocated
 2,404, 3,620, and 4,940 words. At 1M, half-overlapping string union allocated
 4,000,362 words versus AVL's 10,193,264. The low disjoint allocation confirms
 that the specialized operation shares input subtrees rather than traversing
 and rebuilding every binding.
+
+The later bounded-`agrees_before` follow-up reduced the half-overlap allocation
+to 128 words at 10K and 143 words at 100K. A post-follow-up 1M measurement is
+not recorded, so the earlier 1M value remains a historical baseline rather
+than a current result.
 
 These results support three conclusions:
 
@@ -372,9 +379,17 @@ biased union through generic `combine` erases this information and forces
 mapping and reconstruction. The nearly key-length-independent union allocation
 in the benchmark is consistent with node rebuilding dominating string work.
 
-## Ranked optimization options
+## Optimization rationale and current status
+
+The seven subsections below preserve the rationale that led to the current
+native implementation. Their prescriptive wording is historical; remaining
+proof and refinement work is tracked under N1 and N2 in
+[`patricia-todo.md`](patricia-todo.md).
 
 ### 1. Specialized structurally sharing biased union
+
+**Status:** implemented and benchmarked in native extraction; source-level
+algorithm refinement and formal sharing claims remain open under N2/N4.
 
 **Expected impact:** decisive for union; little or no effect on standalone
 lookup and mutation.
@@ -395,14 +410,17 @@ The algorithm should not compute `size`, call an identity-shaped `map_left` or
 unchanged. A well-founded measure can live in `Prop`, allowing extraction to
 erase termination evidence.
 
-This option addresses the measured 84,000x disjoint-union time gap at ten
-million bindings. No routing micro-optimization is in the same impact class.
+This option addressed the dominant disjoint-union time and allocation gap. No
+routing micro-optimization is in the same impact class.
 
 The general string `combine` law is now proved. The specialized union proof
 remains distinct because its native algorithm has identity one-sided behavior
 and fewer filter-collapse cases.
 
 ### 2. Scan `first_diff` byte by byte
+
+**Status:** implemented natively, with a proved safe source model. Native byte,
+`Char.code`, XOR, and unsafe-access refinement remains open under N1.
 
 **Expected impact:** high for build and fresh insertion, potentially material
 for merge; no direct effect on successful lookup.
@@ -443,6 +461,10 @@ algorithm, not the finite-map semantics. There are two verification choices:
   native byte and bit primitives remain trusted.
 
 ### 3. Pack byte index and discriminator into the branch integer
+
+**Status:** implemented natively. The codec and safe packed operations are
+proved in `NativeRefinement.v`; primitive finite-width refinement remains open
+under N1.
 
 **Expected impact:** material for lookup and every routed mutation; neutral on
 asymptotic behavior; no retained-size increase if packed.
@@ -502,6 +524,9 @@ fully token-native scanner can avoid even that multiplication.
 
 ### 4. Fuse routing and persistent reconstruction in `set`
 
+**Status:** implemented by the native realizer. A proved source-level
+one-descent worker or target-language refinement remains open under N2.
+
 **Expected impact:** high for update and useful for insertion; proof and
 implementation complexity are higher than the primitive optimizations.
 
@@ -531,6 +556,9 @@ A sensible development path is:
 4. benchmark before replacing the public definition.
 
 ### 5. Make representative access constant-time
+
+**Status:** implemented natively, and cached-sample residency is proved.
+Representative independence for native consumers remains open under N2.
 
 **Expected impact:** likely useful for removal, join, and union; magnitude is
 not yet measured.
@@ -564,6 +592,9 @@ important than merge and mutation latency.
 
 ### 6. Remove runtime fuel from generic `combine`
 
+**Status:** implemented by the native realizer. A well-founded source worker
+and equivalence with `combine_fuel` remain open under N2.
+
 **Expected impact:** high for all generic combines, but insufficient by itself
 for fast biased union.
 
@@ -583,6 +614,9 @@ per branch pair, rather than separately asking agreement and then routing a
 sample, but its value should be measured after the larger changes.
 
 ### 7. Use unchecked native byte access only as a final micro-optimization
+
+**Status:** implemented behind explicit length/index guards. Its correspondence
+to the safe source byte model remains open under N1.
 
 **Expected impact:** small to moderate after packed routing; increases the
 trusted native boundary.
@@ -626,17 +660,18 @@ integer conversion would inherit the same results.
 ### Removing samples to save one word per branch
 
 This can plausibly reduce retained nodes from approximately eight to seven
-words per binding, but it makes prefix/merge decisions depend on a representative
-descent or on separately stored prefix data. It trades away time in precisely
-the operations currently needing improvement. Treat it as a memory-profile
-variant, not the default performance plan.
+words per binding, but it makes prefix/merge decisions depend on a
+representative descent or on separately stored prefix data. It trades away
+time in precisely the operations for which the current design is optimized.
+Treat it as a memory-profile variant, not the default performance plan.
 
 ## Verification and trusted-boundary implications
 
 The current custom `Extract Constant` definitions for `bit_at` and
-`first_diff` are already trusted refinements: Rocq proves the pure functions,
-not that the handwritten OCaml implementations are equivalent. Performance
-work has two defensible tracks.
+`first_diff` are trusted refinements: Rocq proves the pure functions, not that
+the handwritten OCaml implementations are equivalent. The two tracks below
+explain the design choice; N1 and N2 in `patricia-todo.md` contain the active
+refinement tasks.
 
 ### Minimal-change optimized track
 
@@ -670,22 +705,28 @@ keeps malformed tag values out of the proved model. It is the stronger choice
 if the optimized native backend is intended to support a formal-verification
 claim rather than remain an audited foreign refinement.
 
-In both tracks, the extracted map type should eventually be abstract. Exposed
-constructors currently allow OCaml clients to create invalid split tokens or
-branches that violate routing invariants.
+`NativeRefinement.v` now provides the valid packed-token model, codec order,
+safe packed routing, and a source bytewise first-difference proof. The open part
+is the connection to bounded OCaml integers, byte access, `Char.code`, XOR, and
+the optimized map realizers; those obligations are N1 and N2 in
+`patricia-todo.md`.
 
-## Completed validation and gates
+The supported extracted map types are now abstract behind `PatriciaMap` and
+`StringPatriciaMap`. Raw constructors remain available only in explicitly
+internal generated modules used by structural validation.
 
-The implementation and validation sequence is complete for the native
-extraction boundary.
+## Validation record
+
+The following records completed empirical validation of the native extraction
+boundary. It does not close the formal refinement obligations in N1 and N2.
 
 ### Build, proof, and oracle validation
 
-`make -C patricia all` completed successfully on 2026-08-29. It recompiles the
-Rocq proof files and both extractions, audits every top-level proof declaration
-with `Print Assumptions`, rebuilds the bytecode clients, and runs both
-`PatriciaTest.ml` and the optimized/reference differential suite. The audit
-currently reports all 209 declarations closed under the global context.
+`make -C patricia all` completed successfully again on 2026-08-30. It
+recompiles the Rocq proof files and both extractions, audits every top-level
+proof declaration with `Print Assumptions`, rebuilds the bytecode clients, and
+runs both `PatriciaTest.ml` and the optimized/reference differential suite. The audit
+reports all 247 declarations closed under the global context.
 The test suite differentially checks the packed `first_diff` scanner against
 the logical nine-bit model for all 65,536 pairs of one-byte strings. It also
 covers empty strings, prefixes, embedded NULs, non-ASCII bytes, and long
@@ -703,14 +744,15 @@ PATRICIA_BENCH_SIZE=1000000 PATRICIA_BENCH_STRING_LENGTHS=4,5 \
   make -C patricia benchmark
 ```
 
-The scale gate is met. For disjoint union, integer Patricia allocation was
-288, 379, and 486 words at 10K, 100K, and 1M bindings respectively; the
-four-character string variant used 351, 406, and 405 words. This is a
+The historical scale checks passed. For disjoint union, integer Patricia
+allocation was 288, 379, and 486 words at 10K, 100K, and 1M bindings
+respectively; the four-character string variant used 351, 406, and 405 words.
+This is a
 join-spine-sized cost, rather than work proportional to all bindings. At 1M,
 string half-overlap used 4,000,362 words versus AVL's 10,193,264, and all
 result maps were checked against `Stdlib.Map`.
 
-The retained-size gate is also met: the direct-string tree stayed at eight
+The retained-size result was also stable: the direct-string tree stayed at eight
 words per binding at every completed scale. The current measurements, machine
 details, and full tables are maintained in `patricia-bench.md`; they are
 observations, not portable regression thresholds.
@@ -762,10 +804,12 @@ The completed scale runs confirm the key architectural result: specialized
 biased union fixes the former whole-tree traversal and rebuilding path, while
 the string-operation changes preserve the eight-word representation and pass
 the extraction, differential, structural, and map-oracle checks. The measured
-string-overlap allocation is now constant-sized. The principal remaining
-limitation is that packed-position and other OCaml extraction overrides are
-trusted refinements of the pure Rocq specification rather than proved
-refinements inside Rocq.
+string-overlap allocation is constant-sized in the checked 10K and 100K
+follow-ups. The principal remaining limitation is that packed-position and
+other OCaml extraction overrides are trusted refinements of the pure Rocq
+specification rather than proved refinements inside Rocq. Those obligations,
+and optional future benchmark or representation work, are tracked in
+`patricia-todo.md`, including benchmark hardening under N6.
 
 ## Source basis
 
@@ -785,5 +829,6 @@ refinements inside Rocq.
   allocation methodology.
 - `patricia-bench.md`: recorded 10K through 1M baseline results and the
   completed bounded-`agrees_before` follow-up.
-- `patricia.md`: verification review, trusted-boundary analysis, and the
-  existing recommendation to separate biased union from generic combine.
+- `patricia.md`: verification review and trusted-boundary analysis.
+- `patricia-todo.md`: active decisions, refinement work, optional performance
+  work, and completion gates.

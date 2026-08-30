@@ -1,6 +1,11 @@
-# Patricia-tree review and formal-verification roadmap
+# Patricia-tree verification review
 
-Review date: 2026-08-29
+Review date: 2026-08-30
+
+The active implementation plan and status tracker are maintained separately in
+[`patricia-todo.md`](patricia-todo.md). Performance analysis is in
+[`patricia-str.md`](patricia-str.md), and measured results are in
+[`patricia-bench.md`](patricia-bench.md).
 
 ## Scope and verdict
 
@@ -9,13 +14,14 @@ positive-integer Patricia tree, the direct byte-string Patricia tree, their
 Rocq proofs, OCaml extraction directives, and the randomized OCaml test
 harness.
 
-The implementation is a strong executable and proof-development sketch. The
-positive-key source model has substantial functional-correctness coverage, and
-both extracted implementations behaved correctly in the supplied tests and in
-additional fuzzing. It is not yet a complete formally verified mergeable-map
-library, however. The extracted API does not enforce the proved preconditions,
-and the optimized native extraction is a second implementation rather than a
-proved compilation of the Rocq definitions.
+The implementation is a strong executable and proof development. Both pure
+source models have functional-correctness coverage for the current custom map
+API, and both extracted implementations behaved correctly in the supplied
+tests and in additional fuzzing. The supported OCaml wrappers now enforce the
+representable structural, positive-key, and combine preconditions. It is not
+yet a complete end-to-end formally verified mergeable-map library, however:
+the optimized native extraction remains a second implementation rather than a
+proved compilation or refinement of the Rocq definitions.
 
 The verification claim must therefore be split into three layers:
 
@@ -31,15 +37,17 @@ optimized OCaml library.
 
 ## Validation results
 
-The following checks passed:
+The normal validation gate was rerun successfully on 2026-08-30. The following
+checks passed:
 
 - `make -C patricia`, including all Rocq proof files, extraction, OCaml
   compilation, and the deterministic randomized oracle test;
 - a source scan found no `Admitted`, `admit`, `Axiom`, aborted proof, or similar
   unresolved proof escape in the Patricia sources;
-- the source-driven `Print Assumptions` audit discovers every top-level lemma,
-  theorem, and corollary across the bit-specification, map-proof, and native
-  representation modules, and reports each closed under the global context;
+- the source-driven `Print Assumptions` audit discovered all 247 top-level
+  lemmas, theorems, and corollaries across the bit-specification, map-proof,
+  and native-representation modules, and reported each closed under the global
+  context;
 - additional integer fuzzing used keys across the positive OCaml `int` range,
   including high-bit boundary values, and checked lookup, elements, merge, and
   routing invariants;
@@ -358,248 +366,9 @@ the standard interfaces must either be implemented with a `changed` result
 and separately justified, or explicitly excluded from the verified claim;
 semantic `Map.S`/`Set.S` compatibility alone does not establish them.
 
-## Roadmap to complete functional verification
+## Plan and completion tracking
 
-### Phase 1: freeze the specification and trusted computing base
-
-Before extending proofs, decide and record:
-
-- whether the verified key domain is unbounded positive integers, all
-  non-negative integers, or fixed-width unsigned words;
-- whether native OCaml extraction is part of the verified claim or is an
-  explicitly unverified optimized refinement;
-- whether the string tree is a required public implementation or a separate
-  experimental extension;
-- the exact public operations, ordering of `elements`, semantics of `fold`,
-  and precondition on `combine`;
-- whether performance is tested, proved with a cost model, or intentionally
-  excluded from the formal claim.
-
-Write these decisions as a small module signature and a theorem checklist.
-This prevents a proof of one representation from being mistaken for a proof
-of a different extracted runtime representation.
-
-### Phase 2: strengthen and package the invariants
-
-For both tree variants, provide named results for all canonicality properties:
-
-- [x] both branch children are non-empty, encoded in `wf_branch`;
-- [x] every descendant key agrees with the branch prefix, encoded through
-  `all_keys`/`same_prefix` in `wf_branch`;
-- [x] the left and right subtrees have opposite routing bits;
-- [x] descendant split positions are strictly ordered relative to ancestors
-  (`wf_splits_ordered` for direct strings);
-- [x] pure representatives are actual bindings (`representative_elements`);
-- [x] the cached string branch sample is a resident binding
-  (`wf_cached_sample_resident`), preserved by all proved smart operations;
-- [x] keys and bindings in `elements` are unique on well-formed trees;
-- [x] direct-string `elements` is strongly sorted by prefix-free bit-stream
-  lexicographic order (`wf_elements_bit_lex_sorted`);
-- [x] lookup is extensionally equivalent to membership in `elements` on
-  well-formed trees;
-- [x] every value constructed through the public API is well formed, including
-  string `join`, generic combine, and both specialized unions.
-
-The direct-string split-order consequence is now exposed as a named theorem,
-so merge proofs can rely on it without reproving the contradiction between an
-ancestor's routing bit and a descendant's branch partition.
-
-If convenient, define a semantic finite-map relation such as:
-
-```coq
-represents m M := forall k, get k m = M k
-```
-
-and use it to separate functional-map laws from structural canonicality.
-
-### Phase 3: fresh string insertion and disjoint join completed
-
-Completed prerequisites and theorem:
-
-1. [x] `first_diff fresh representative = Some split` gives prefix
-   agreement below `split` and opposite bits at `split`.
-2. [x] The singleton-fresh-side `branch_at` lookup and well-formedness laws
-   needed by `insert_at` are proved.
-3. [x] General `branch_at` correctness and well-formedness when its two
-   input trees agree before `split` and occupy opposite sides.
-4. [x] `join_disjoint_correct_wf` proves `join` correctness for distinct,
-   compatible non-empty trees:
-
-   ```coq
-   wf (join fresh old) /\
-   get k (join fresh old) =
-     match get k fresh with Some v => Some v | None => get k old end
-   ```
-
-   under explicit prefix/bit separation hypotheses.
-
-Completed: the routed-leaf `insert_at` invariant, fresh-key branch separation,
-and the unconditional `set` law:
-
-   ```coq
-   wf m ->
-   wf (set key value m) /\
-   forall query,
-     get query (set key value m) =
-       if String.eqb query key then Some value else get query m.
-   ```
-
-### Phase 4: finish string filtering and merge
-
-Completed: `map_filter` and its one-sided derivatives are proved. The next
-merge dependency is to connect those laws to the structural prefix cases:
-
-```coq
-wf m ->
-wf (map_filter f m) /\
-forall k,
-  get k (map_filter f m) =
-    match get k m with None => None | Some v => f k v end.
-```
-
-The derived `map_left` and `map_right` laws carry the standard
-`f None None = None` precondition. Completed:
-`replace_binding_correct_wf` derives the update-or-remove law from the
-unconditional `set` and `remove` theorems, and
-`join_separated_correct_wf` covers the disjoint join case, including collapsed
-filtered sides. Remaining work:
-
-1. [x] Prove representative and prefix-agreement lemmas for equal-split,
-   containment, and disjoint-prefix cases;
-2. [x] Define and prove sufficiency of the recursive-call fuel measure;
-3. [x] Prove `combine_fuel` correctness and well-formedness simultaneously;
-4. [x] Lift the result to public `combine` under `f None None = None`;
-5. [x] Derive left- and right-biased union laws.
-
-The main final theorem should be:
-
-```coq
-f None None = None -> wf left -> wf right ->
-wf (combine f left right) /\
-forall key,
-  get key (combine f left right) =
-    f (get key left) (get key right).
-```
-
-### Phase 5: close the current custom API laws
-
-Current API-law status across both key variants:
-
-- [x] `empty`, `is_empty`, `singleton`, `get`, and `mem` laws;
-- [x] Unconditional `set` and `remove` laws;
-- [x] `map`, `map_filter`, `fold`, and `elements` laws;
-- [x] `combine` and specialized union laws for both key variants;
-- [x] Extensional equality and a `beq` correctness theorem for both key
-  variants;
-- [x] The documented `elements` ordering, including strong sorting for direct
-  strings;
-- [x] Fold equivalence to the traversal order produced by `elements`;
-- [x] Extensionality theorems packaging equal lookup at every key as finite-map
-  equivalence and characterizing it by binding membership;
-
-If structural equality of canonical trees is desired, prove that separately;
-finite-map extensional equality is sufficient for most clients.
-
-This phase describes the present proof-oriented API, not the complete OCaml
-`Map.S`/`Set.S` interfaces.  Before claiming standard-library compatibility,
-complete the ordered traversal bridge theorems and the compatibility/set work
-in finding 6: in particular, prove the public comparison order, callback
-order, image laws for set transformations, and the semantics of every added
-search, split, sequence, and exception-raising wrapper.
-
-### Phase 6: remove runtime fuel from the optimized implementation
-
-Status: the optimized extracted implementation is complete: its direct
-`combine` does not evaluate a whole-tree size bound, and its specialized
-biased union preserves disjoint and unchanged subtrees.  The proof-side
-definition still uses fuel, so the formal refinement remains open.
-
-Use well-founded recursion over a lexicographic or combined structural measure
-and keep the accessibility proof in `Prop`, so extraction removes it. Prove it
-extensionally equivalent to the fuelled definition, or verify the direct
-native realization against that definition.
-
-For generic `combine`, be precise about unavoidable work: an arbitrary
-one-sided function may need to visit every retained binding. For biased union,
-prove a specialized algorithm correct and verify that disjoint inputs reuse
-existing subtrees. A formal complexity track can then define operation costs
-and establish bounds for:
-
-- lookup and update in terms of word width or key-bit length;
-- disjoint biased union;
-- overlapping merge in terms of the traversed spines and affected subtrees;
-- allocation or constructor count if structural sharing is part of the claim.
-
-### Phase 7: harden extraction and integration
-
-- [x] Generate internal modules and place abstract handwritten wrappers around
-  them.
-- [x] Add checked conversions and an abstract public type for native integer keys.
-- [x] Prevent supported clients from constructing malformed values or supplying fuel.
-- [x] Hide packed split tokens and low-level bit functions, or expose wrapper
-  functions that encode and decode logical positions.
-- [x] Enforce the generic-combine finite-map condition through three explicit
-  one-sided/overlap callbacks.
-- [x] Specify the 62-bit native positive-key domain and the logical/packed
-  string-position codec in Rocq, including a source-level packed `bit_at`
-  worker and the canonical first-difference property needed by a bytewise
-  scan.  The target arithmetic and bytewise-first-difference realizer
-  refinement proofs remain open.
-- [x] Make extraction reproducible through the normal build and ensure generated
-  files are never hand-edited.
-- [x] Run `Print Assumptions` over every top-level proof declaration during the
-  normal build, with count checking so new declarations are included
-  automatically. The audit includes `NativeRefinement.v`; repository-level CI
-  wiring remains separate.
-
-### Phase 8: expand automated validation
-
-Current validation status:
-
-- [x] Integer keys around every bit boundary and near `max_int`;
-- [x] Arbitrary byte strings, empty strings, embedded NULs, prefix-related keys,
-  non-ASCII bytes, and long common prefixes;
-- [x] Fresh and existing insertion, absent and present removal, and repeated
-  collapse of branches;
-- [x] All merge shapes: equal roots, left containment, right containment, and
-  disjoint prefixes, with deterministic dispatch classification in addition to
-  randomized coverage;
-- [x] Combining functions that preserve, transform, or delete left-only,
-  right-only, and overlapping bindings;
-- [x] Both specialized unions;
-- [x] `elements` completeness, uniqueness, and documented order, including
-  byte-lexicographic randomized checks for direct strings;
-- [x] Structural well-formedness of every tested result;
-- [x] Differential equivalence testing between proof-aligned and optimized
-  extraction backends, including logical/packed string-position translation.
-
-- [x] Add benchmarks that separately report runtime and allocation for disjoint
-  and overlapping merges. `make -C patricia benchmark` compares extracted
-  Patricia trees with `Stdlib.Map` for integer and 3-, 4-, and 5-character
-  string keys, while validating each measured result. The recorded baseline
-  and analysis are in `patricia-bench.md`; these are machine-specific
-  measurements, not formal complexity proofs.
-
-## Completion criteria
-
-The project can reasonably claim complete functional verification when all of
-the following hold:
-
-1. Every public constructor and operation preserves the chosen invariant.
-2. Every public operation has its pointwise finite-map specification proved.
-3. String merge has the same proof coverage as the positive-key implementation.
-4. The public extracted types prevent construction of values outside the proof
-   contract.
-5. The relationship between the proved model and native OCaml primitives is
-   either itself verified or clearly excluded from the formal claim, with a
-   proof-aligned reference backend retained.
-6. No runtime whole-tree fuel calculation defeats the promised fast merge.
-7. All exported theorems pass assumption auditing, all extraction targets
-   build reproducibly, and the expanded oracle and invariant tests pass in CI.
-8. Any complexity claim is backed by an explicit cost theorem; otherwise the
-   documentation limits itself to functional correctness plus benchmark
-   evidence.
-9. If `Map.S` or `Set.S` compatibility is claimed, every operation in the
-   selected OCaml-version signature is exported with its documented observable
-   semantics, including increasing-order traversal and binding/element order;
-   any physical-sharing guarantee is proved or explicitly excluded.
+Open decisions, prioritized work, completed foundations, validation commands,
+and completion gates are tracked in
+[`patricia-todo.md`](patricia-todo.md). This review intentionally records the
+current evidence and verification boundary only; it is not a second task list.

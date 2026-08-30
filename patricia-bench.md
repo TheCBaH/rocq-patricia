@@ -1,8 +1,13 @@
 # Patricia benchmark results
 
-Run date: 2026-08-29  
-Command: `make -C patricia benchmark`  
-Platform: aarch64 Linux 7.0.0-28-generic; OCaml 4.14.3 native code.
+- Run date: 2026-08-29
+- Last reviewed: 2026-08-30
+- Command: `make -C patricia benchmark`
+- Platform: aarch64 Linux 7.0.0-28-generic; OCaml 4.14.3 native code
+
+This document is the measurement record and reproduction guide. Performance
+analysis is in [`patricia-str.md`](patricia-str.md), and all current or proposed
+work is tracked in [`patricia-todo.md`](patricia-todo.md).
 
 ## Result
 
@@ -163,7 +168,7 @@ to the number of compared string branches. Timings grow with size for the
 overlap cases. This is empirical behavior of these inputs, not a
 machine-independent complexity guarantee.
 
-## Implementation changes suggested by the benchmark
+## Benchmark-driven implementation results
 
 ### 1. Bounded, allocation-free `agrees_before` completed
 
@@ -215,7 +220,7 @@ by the existing fold, soundness, completeness, and uniqueness proofs, and the
 benchmark checks the resulting bindings. The follow-up table above records
 linear output-list allocation at 10,000 bindings.
 
-### 3. Absent-removal identity completed; no-op updates remain
+### 3. Absent-removal identity completed
 
 Both maps now use `remove_changed`, where `None` reports an absent key and
 `Some tree` carries a real deletion. `remove_absent_identity` proves that a
@@ -227,7 +232,8 @@ The benchmark already has a separate `update keys` case that replaces and
 checks every existing binding. An optional `set_if_changed`/`update` API
 supplied with value equality could additionally avoid rebuilding an existing
 binding whose value is unchanged. This remains relevant to persistent compiler
-data-flow maps, where converged updates are common.
+data-flow maps, where converged updates are common. It is tracked as optional
+runtime work under N5 in `patricia-todo.md`.
 
 ### 4. Generic-combine leaf cases completed
 
@@ -249,7 +255,7 @@ sub-millisecond timings are too noisy to support a speedup claim.
 | 4-character leaf/tree | 140,170 words | 140,023 words | 147 words |
 | 4-character tree/leaf | 140,170 words | 140,023 words | 147 words |
 
-### 5. Allocation-free membership completed; bulk construction remains
+### 5. Allocation-free membership completed
 
 The lookup measurements allocate about two words per operation for both
 implementations because the result is an option. Both `mem` implementations
@@ -259,7 +265,8 @@ present/absent benchmark passes allocate only fixed measurement overhead.
 Build uses repeated persistent `set` over already sorted ranges. A proved
 `of_sorted_array` or `of_sorted_list` builder could construct the Patricia
 shape directly with less allocation. It should be reported separately from
-incremental insertion because it answers a different API question.
+incremental insertion because it answers a different API question. This is an
+optional N5 item in `patricia-todo.md`.
 
 ### 6. Treat retained size as a representation tradeoff
 
@@ -274,10 +281,10 @@ and accept representative descent. Each choice trades memory against lookup,
 join, or merge work and requires new invariant proofs. Pursue it only if
 retained memory dominates the target workload.
 
-## Benchmark changes needed to evaluate those updates
+## Further benchmark coverage
 
-The present benchmark is a useful checked smoke benchmark, but a performance
-decision should add:
+The benchmark is a useful checked comparison and smoke benchmark. Future
+performance decisions would benefit from:
 
 - calibrated batches and multiple samples for union, reporting median and
   dispersion instead of timing one sub-millisecond operation with
@@ -285,14 +292,20 @@ decision should add:
 - random insertion order, successful and unsuccessful lookups/removals,
   subset/no-op union, equal maps, sparse overlap, and adversarial long-prefix
   strings in addition to consecutive ranges;
-- a bulk-build workload (the benchmark now includes generic leaf/tree
-  `combine`, `elements`, and mixed hit/miss `mem`);
+- a bulk-build workload if a bulk builder is added (the benchmark already
+  includes generic leaf/tree `combine`, `elements`, and mixed hit/miss `mem`);
 - physical-sharing counters or retained-node checks, so low allocation is
   attributed to reused nodes rather than inferred only from GC totals;
-- a proof-aligned extraction backend beside the optimized backend, making
-  performance cost and differential semantic validation visible together; and
 - pinned compiler configuration. These results used OCaml 4.14.3 without
   Flambda, so compiler changes must not be confused with data-structure changes.
+
+The normal build already links a proof-aligned extraction beside the optimized
+backend and differentially validates semantics. It is not timed by this
+benchmark, so a future performance comparison could report both backends if
+the extraction overhead itself becomes relevant.
+
+These possible extensions are tracked under N6 in `patricia-todo.md`; this
+measurement record is not a second task list.
 
 The local paper motivates Patricia maps specifically by lookup, insertion, and
 fast merge. The benchmark should keep those headline operations, while the
