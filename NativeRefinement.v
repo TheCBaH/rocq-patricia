@@ -1,5 +1,7 @@
-From Stdlib Require Import Lia NArith PArith PeanoNat Strings.Ascii Strings.String.
+From Stdlib Require Import Lia NArith PArith PeanoNat Lists.List Strings.Ascii Strings.String.
 Require Import PatriciaBits StringBits.
+
+Import ListNotations.
 
 (** * The representation boundary used by the native extraction
 
@@ -279,26 +281,8 @@ Proof.
   intros. unfold packed_position. lia.
 Qed.
 
-(** This is the source-level counterpart of the packed native [bit_at]
-    realizer.  It performs the same byte/tag decomposition, rejects invalid
-    tags, and reads exactly one byte.  [String.get] is deliberately used in
-    place of OCaml's unsafe access: proving that primitive correspondence is a
-    separate target-language obligation. *)
-Definition packed_bit_at (s : string) (token : nat) : bool :=
-  let byte := token / 16 in
-  let tag := token mod 16 in
-  match String.get byte s with
-  | None => false
-  | Some ch =>
-      match tag with
-      | 0 => true
-      | S offset => if offset <? 8 then StringBits.ascii_bit ch offset else false
-      end
-  end.
-
-(** These two lemmas isolate the guards in the native [bit_at] realizer.
-    They are stated with safe [String.get]; connecting that operation to the
-    target's bounded unsafe access remains a target-language obligation. *)
+(** Safe logical indexing is the source counterpart of the native string
+    runtime.  These facts will also discharge every [unsafe_get] guard. *)
 Lemma string_get_past_end:
   forall s byte, String.length s <= byte -> String.get byte s = None.
 Proof.
@@ -319,6 +303,153 @@ Proof.
     + exists ch. reflexivity.
     + cbn [String.get]. apply IH. cbn in Hbound. lia.
 Qed.
+
+(** ** Native byte strings and guarded access
+
+    The native-string extraction maps a Rocq string to an OCaml byte string.
+    The following finite model makes that mapping concrete: a native string is
+    a list of the unsigned byte codes returned by [Char.code].  The equality
+    [native_bytes s] is the foreign-interface contract for the representation
+    of [s]; the lemmas below prove everything that follows once an OCaml value
+    satisfies that contract. *)
+Fixpoint native_bytes (s : string) : list N :=
+  match s with
+  | EmptyString => []
+  | String ch tail => Ascii.N_of_ascii ch :: native_bytes tail
+  end.
+
+Definition native_byte_length (bytes : list N) : nat := List.length bytes.
+
+Definition native_byte_get (bytes : list N) (byte : nat) : option N :=
+  nth_error bytes byte.
+
+(** This models [String.unsafe_get] after [Char.code].  Its arbitrary
+    out-of-range default is intentionally unobservable: every consumer below
+    proves an in-range guard before using it. *)
+Definition native_unsafe_byte_code (bytes : list N) (byte : nat) : N :=
+  nth byte bytes 0%N.
+
+Definition native_string_refines (s : string) (bytes : list N) : Prop :=
+  bytes = native_bytes s.
+
+Lemma native_bytes_length:
+  forall s, native_byte_length (native_bytes s) = String.length s.
+Proof.
+  induction s as [|ch tail IH].
+  - reflexivity.
+  - change (S (List.length (native_bytes tail)) = S (String.length tail)).
+    unfold native_byte_length in IH. now rewrite IH.
+Qed.
+
+Lemma native_bytes_get:
+  forall s byte,
+    native_byte_get (native_bytes s) byte =
+      option_map Ascii.N_of_ascii (String.get byte s).
+Proof.
+  induction s as [|ch tail IH]; intros [|byte]; cbn; auto.
+Qed.
+
+Lemma native_bytes_unsafe_byte_code:
+  forall s byte ch,
+    String.get byte s = Some ch ->
+    native_unsafe_byte_code (native_bytes s) byte = Ascii.N_of_ascii ch.
+Proof.
+  intros s byte ch Hget. unfold native_unsafe_byte_code.
+  apply (nth_error_nth (native_bytes s) byte 0%N).
+  unfold native_byte_get. rewrite native_bytes_get, Hget. reflexivity.
+Qed.
+
+Lemma native_bytes_unsafe_byte_code_guarded:
+  forall s byte,
+    byte < native_byte_length (native_bytes s) ->
+    exists code,
+      native_byte_get (native_bytes s) byte = Some code /\
+      native_unsafe_byte_code (native_bytes s) byte = code.
+Proof.
+  intros s byte Hbound.
+  rewrite native_bytes_length in Hbound.
+  destruct (string_get_in_bounds s byte Hbound) as [ch Hget].
+  exists (Ascii.N_of_ascii ch). split.
+  - unfold native_byte_get. rewrite native_bytes_get, Hget. reflexivity.
+  - now apply native_bytes_unsafe_byte_code.
+Qed.
+
+(** The [Char.code] result is always an unsigned byte. *)
+Lemma native_bytes_code_bound:
+  forall s byte code,
+    native_byte_get (native_bytes s) byte = Some code -> (code < 256)%N.
+Proof.
+  intros s byte code Hget.
+  rewrite native_bytes_get in Hget.
+  destruct (String.get byte s) as [ch|] eqn:Hsource; cbn in Hget;
+    try discriminate.
+  injection Hget as Hcode. subst code.
+  apply Ascii.N_ascii_bounded.
+Qed.
+
+(** These are the three index facts needed by the handwritten string
+    realizers.  They correspond respectively to [bit_at], the body of the
+    [first_diff] scan, and the two reads in the final-byte case of the bounded
+    prefix scan. *)
+Definition common_byte_length (left right : string) : nat :=
+  Nat.min (String.length left) (String.length right).
+
+Lemma bit_at_unsafe_get_guard:
+  forall s byte,
+    byte < String.length s ->
+    byte < native_byte_length (native_bytes s).
+Proof.
+  intros s byte Hbound. now rewrite native_bytes_length.
+Qed.
+
+Lemma first_diff_unsafe_get_guard:
+  forall left right byte,
+    byte < common_byte_length left right ->
+    byte < String.length left /\ byte < String.length right.
+Proof.
+  intros left right byte Hbound. unfold common_byte_length in Hbound.
+  split.
+  - eapply Nat.lt_le_trans; [exact Hbound|apply Nat.le_min_l].
+  - eapply Nat.lt_le_trans; [exact Hbound|apply Nat.le_min_r].
+Qed.
+
+Lemma bounded_prefix_scan_unsafe_get_guard:
+  forall left right byte,
+    byte <= common_byte_length left right ->
+    byte <> common_byte_length left right ->
+    byte < String.length left /\ byte < String.length right.
+Proof.
+  intros left right byte Hle Hneq.
+  assert (Hlt : byte < common_byte_length left right) by lia.
+  now apply first_diff_unsafe_get_guard.
+Qed.
+
+Lemma bounded_prefix_final_unsafe_get_guard:
+  forall left right byte,
+    (byte <? String.length left) = true ->
+    (byte <? String.length right) = true ->
+    byte < String.length left /\ byte < String.length right.
+Proof.
+  intros left right byte Hleft Hright.
+  now apply Nat.ltb_lt in Hleft, Hright.
+Qed.
+
+(** This is the source-level counterpart of the packed native [bit_at]
+    realizer.  It performs the same byte/tag decomposition, rejects invalid
+    tags, and reads exactly one byte.  [String.get] is deliberately used in
+    place of OCaml's unsafe access: the guarded native model immediately above
+    is the precise foreign-interface contract for that replacement. *)
+Definition packed_bit_at (s : string) (token : nat) : bool :=
+  let byte := token / 16 in
+  let tag := token mod 16 in
+  match String.get byte s with
+  | None => false
+  | Some ch =>
+      match tag with
+      | 0 => true
+      | S offset => if offset <? 8 then StringBits.ascii_bit ch offset else false
+      end
+  end.
 
 Lemma packed_bit_at_past_end:
   forall s token, String.length s <= token / 16 ->
@@ -964,6 +1095,70 @@ Proof.
   intros left right offset Hoffset.
   rewrite native_byte_bit_correct by exact Hoffset.
   symmetry. apply ascii_xor_bit. lia.
+Qed.
+
+(** [Char.code] exposes the same unsigned byte code used by the native XOR
+    model.  This single-byte test is the mathematical meaning of the
+    [Char.code ... lsr ... land 1] expression in the [bit_at] realizer; the
+    established [N] primitive contract supplies the final link to OCaml's
+    shift and mask instructions. *)
+Definition native_code_bit (code : N) (offset : nat) : bool :=
+  negb (N.eqb
+    (N.land code (N.pow 2 (N.of_nat (7 - offset)))) 0).
+
+Lemma native_code_bit_ascii:
+  forall ch offset, offset < 8 ->
+    native_code_bit (Ascii.N_of_ascii ch) offset =
+      StringBits.ascii_bit ch offset.
+Proof.
+  intros ch offset Hoffset. unfold native_code_bit.
+  rewrite N_land_pow2_eqb, Bool.negb_involutive.
+  symmetry. apply ascii_bit_testbit. exact Hoffset.
+Qed.
+
+(** This follows the control flow of the extracted [bit_at] realizer exactly:
+    first test the byte index against native length, then dispatch on the
+    packed tag, and only then consume the guarded unsafe byte code. *)
+Definition native_packed_bit_at (bytes : list N) (token : nat) : bool :=
+  let byte := token / 16 in
+  let tag := token mod 16 in
+  if byte <? native_byte_length bytes then
+    match tag with
+    | 0 => true
+    | S offset => if offset <? 8 then native_code_bit
+        (native_unsafe_byte_code bytes byte) offset else false
+    end
+  else false.
+
+Theorem native_packed_bit_at_refines:
+  forall s token,
+    native_packed_bit_at (native_bytes s) token = packed_bit_at s token.
+Proof.
+  intros s token.
+  unfold native_packed_bit_at, packed_bit_at.
+  remember (token / 16) as byte.
+  remember (token mod 16) as tag.
+  rewrite native_bytes_length.
+  destruct (byte <? String.length s) eqn:Hbound.
+  - apply Nat.ltb_lt in Hbound.
+    destruct (string_get_in_bounds s byte Hbound) as [ch Hget].
+    rewrite Hget.
+    destruct tag as [|offset].
+    + reflexivity.
+    + destruct (offset <? 8) eqn:Hoffset; [|reflexivity].
+      rewrite native_bytes_unsafe_byte_code with (ch := ch) by exact Hget.
+      apply native_code_bit_ascii. now apply Nat.ltb_lt.
+  - apply Nat.ltb_ge in Hbound.
+    rewrite string_get_past_end by exact Hbound. reflexivity.
+Qed.
+
+Corollary native_packed_bit_at_refines_representation:
+  forall s bytes token,
+    native_string_refines s bytes ->
+    native_packed_bit_at bytes token = packed_bit_at s token.
+Proof.
+  intros s bytes token Hrefines. unfold native_string_refines in Hrefines.
+  subst bytes. apply native_packed_bit_at_refines.
 Qed.
 
 (** The native loop itself: increment [offset] while the mask check misses,

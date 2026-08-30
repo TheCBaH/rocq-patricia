@@ -52,9 +52,12 @@ defines the prefix-free string bit view (a continuation marker plus eight bits
 per byte and an end marker), so empty strings, embedded zero bytes, and prefix
 keys are distinct. `NativeRefinement.v` records the supported 62-bit native
 key domain and the codec between logical string-bit positions and the packed
-native tokens. It includes a safe source-level counterpart of the packed
-`bit_at` worker and proves it correct at encoded positions, but not the OCaml
-primitive/string realizer refinement.
+native tokens. It includes a native byte-code-array model for OCaml strings,
+proves byte length/access/bounds and every `unsafe_get` guard used by the
+string realizers, and proves the packed `bit_at` dispatcher correct. The final
+connection from that model to OCaml's string, `Char.code`, and integer
+primitives remains an explicit foreign-interface contract, not a kernel proof
+of OCaml execution.
 `PatriciaExtract.v` generates implementation backends under
 `patricia/extracted/`; the build names the map modules `PatriciaInternal` and
 `StringPatriciaInternal`. `PatriciaReferenceExtract.v` separately generates
