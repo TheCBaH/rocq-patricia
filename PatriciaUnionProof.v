@@ -763,6 +763,32 @@ Proof.
   split; exact Hhigh.
 Qed.
 
+(** Equal masks with distinct prefixes take the terminal join path as well. *)
+Lemma union_left_specialized_changed_same_mask_disjoint_correct_wf:
+  forall (A : Type) pa ma (la ra : t A) pb mb (lb rb : t A),
+    wf (Branch pa ma la ra) -> wf (Branch pb mb lb rb) ->
+    (N.eqb ma mb && N.eqb pa pb)%bool = false ->
+    mask_above ma mb = false -> mask_above mb ma = false ->
+    wf (union_left_specialized_changed_result
+      (Branch pa ma la ra) (Branch pb mb lb rb)) /\
+    forall key, get key (union_left_specialized_changed_result
+      (Branch pa ma la ra) (Branch pb mb lb rb)) =
+      match get key (Branch pa ma la ra) with
+      | Some value => Some value | None => get key (Branch pb mb lb rb) end.
+Proof.
+  intros A pa ma la ra pb mb lb rb Hwa Hwb Hsame Hab Hba.
+  assert (Emasks : ma = mb) by
+    (apply N.le_antisymm; apply N.ltb_ge; assumption).
+  subst mb.
+  assert (Eprefix : pa <> pb).
+  { intro Eprefix. subst pb. now rewrite !N.eqb_refl in Hsame. }
+  destruct (union_left_specialized_same_mask_disjoint_correct_wf A pa ma la ra
+    pb lb rb Hwa Hwb Eprefix) as [Hwf Hget].
+  unfold union_left_specialized_changed_result.
+  rewrite union_left_specialized_changed_equation.
+  rewrite Hsame, Hab. exact (conj Hwf Hget).
+Qed.
+
 (** If the right root is deeper and its representative misses the left
     root's prefix, every pair of bindings differs above both root masks. *)
 Lemma union_left_specialized_left_outer_disjoint_correct_wf:
@@ -847,6 +873,64 @@ Proof.
     intro E. apply Hmiss. now rewrite <- Hleft_prefix, E, Hright_prefix. }
   pose proof (prefix_mismatch_highest_above kl kb mb Hdifferent) as Hhigh.
   split; [lia|exact Hhigh].
+Qed.
+
+(** A failed outer-prefix test is a changed result carrying the established
+    separated join, rather than an unchanged certificate. *)
+Lemma union_left_specialized_changed_left_outer_disjoint_correct_wf:
+  forall (A : Type) pa ma (la ra : t A) pb mb (lb rb : t A) kb,
+    wf (Branch pa ma la ra) ->
+    wf (Branch pb mb lb rb) ->
+    (N.eqb ma mb && N.eqb pa pb)%bool = false ->
+    mask_above ma mb = true ->
+    representative (Branch pb mb lb rb) = Some kb ->
+    matches_prefix kb pa ma = false ->
+    wf (union_left_specialized_changed_result
+      (Branch pa ma la ra) (Branch pb mb lb rb)) /\
+    forall key,
+      get key (union_left_specialized_changed_result
+        (Branch pa ma la ra) (Branch pb mb lb rb)) =
+      match get key (Branch pa ma la ra) with
+      | Some value => Some value
+      | None => get key (Branch pb mb lb rb)
+      end.
+Proof.
+  intros A pa ma la ra pb mb lb rb kb Hwa Hwb Hsame Habove Hrep Hmiss.
+  assert (Hlt : (mb < ma)%N) by (apply mask_above_spec; exact Habove).
+  destruct (union_left_specialized_left_outer_disjoint_correct_wf A pa ma la ra
+    pb mb lb rb kb Hwa Hwb Hlt Hrep Hmiss) as [Hwf Hget].
+  unfold union_left_specialized_changed_result.
+  rewrite union_left_specialized_changed_equation.
+  rewrite Hsame, Habove, Hrep, Hmiss. exact (conj Hwf Hget).
+Qed.
+
+(** Symmetric terminal signal case when the left root is deeper. *)
+Lemma union_left_specialized_changed_right_outer_disjoint_correct_wf:
+  forall (A : Type) pa ma (la ra : t A) pb mb (lb rb : t A) ka,
+    wf (Branch pa ma la ra) ->
+    wf (Branch pb mb lb rb) ->
+    (N.eqb ma mb && N.eqb pa pb)%bool = false ->
+    mask_above ma mb = false ->
+    mask_above mb ma = true ->
+    representative (Branch pa ma la ra) = Some ka ->
+    matches_prefix ka pb mb = false ->
+    wf (union_left_specialized_changed_result
+      (Branch pa ma la ra) (Branch pb mb lb rb)) /\
+    forall key,
+      get key (union_left_specialized_changed_result
+        (Branch pa ma la ra) (Branch pb mb lb rb)) =
+      match get key (Branch pa ma la ra) with
+      | Some value => Some value
+      | None => get key (Branch pb mb lb rb)
+      end.
+Proof.
+  intros A pa ma la ra pb mb lb rb ka Hwa Hwb Hsame Hnotabove Habove Hrep Hmiss.
+  assert (Hlt : (ma < mb)%N) by (apply mask_above_spec; exact Habove).
+  destruct (union_left_specialized_right_outer_disjoint_correct_wf A pa ma la ra
+    pb mb lb rb ka Hwa Hwb Hlt Hrep Hmiss) as [Hwf Hget].
+  unfold union_left_specialized_changed_result.
+  rewrite union_left_specialized_changed_equation.
+  rewrite Hsame, Hnotabove, Habove, Hrep, Hmiss. exact (conj Hwf Hget).
 Qed.
 
 (** Every recursive pair selected by the nested worker is smaller in the
