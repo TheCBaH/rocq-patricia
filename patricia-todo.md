@@ -164,8 +164,9 @@ Required only for an end-to-end native-refinement claim.
   modules. Both companion closures also prove invariant preservation and the
   left-biased pointwise lookup law for every empty/leaf case. The integer and
   direct-string common-split branch cases are likewise complete. Both integer
-  left-outer child-routing cases are also complete; the right-outer integer
-  and all direct-string unequal-split routing cases remain open.
+  and direct-string left-outer child-routing reconstruction cases are also
+  complete; deriving the routing premises and the right-outer cases remain
+  open.
 - [x] Isolate experimental specialized-union workers in companion Rocq modules
   and give them a targeted extraction/oracle target, so iteration on N2 does
   not invalidate the expensive established `PatriciaProof.v` and
@@ -290,6 +291,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Proved direct-string left-outer unequal-split reconstruction | `StringPatriciaUnionProof.v` adds the left- and right-child reconstruction rules, each proving well-formedness and the biased lookup law once the branch-side routing invariant is supplied. `make union-proof` passed. |
 | 2026-08-30 | Completed both integer left-outer unequal-split child routes | `PatriciaUnionProof.v` adds `union_left_specialized_left_outer_right_branch_correct_wf`, complementing the left-child reconstruction rule. `make union-proof` passed. |
 | 2026-08-30 | Proved the first integer unequal-split routing reconstruction | `PatriciaUnionProof.v`'s `union_left_specialized_left_outer_branch_correct_wf` proves the invariant and pointwise left-biased law when the complete right operand lies in the left child of an outer left branch. `make union-proof` passed. |
 | 2026-08-30 | Completed the direct-string specialized-union common-split branch case | `StringPatriciaUnionProof.v`'s `union_left_specialized_same_branch_correct_wf` proves invariant preservation and the full left-biased lookup law from the two recursive contracts, using output-key rebasing to retain the cached-sample invariant. `make union-proof` passed. |

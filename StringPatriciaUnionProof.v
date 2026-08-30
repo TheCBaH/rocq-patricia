@@ -222,3 +222,107 @@ Proof.
     + apply Hgetor.
     + apply Hgetol.
 Qed.
+
+(** Unequal-split reconstruction once routing has established that every key
+    of the inner operand belongs to one child of the outer branch. *)
+Lemma union_left_specialized_left_outer_left_branch_correct_wf:
+  forall (A : Type) sample split (left right operand out_left : t A),
+    wf left -> wf right -> wf operand ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) left ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) right ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) operand ->
+    (wf out_left /\
+      forall key,
+        get key out_left =
+        match get key left with Some value => Some value | None => get key operand end) ->
+    wf (branch sample split out_left right) /\
+    forall key,
+      get key (branch sample split out_left right) =
+      match get key (Branch sample split left right) with
+      | Some value => Some value
+      | None => get key operand
+      end.
+Proof.
+  intros A sample split left right operand out_left
+    Hwl Hwr Hwo Hleft Hright Hoperand [Hwout Hgetout].
+  assert (Houtleft : all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) out_left).
+  { eapply all_keys_of_combine_lookup with
+      (left := left) (right := operand) (out := out_left)
+      (f := fun x y => match x with Some _ => x | None => y end).
+    - reflexivity.
+    - exact Hwout.
+    - intro key. specialize (Hgetout key).
+      destruct (get key left); cbn in Hgetout |- *; exact Hgetout.
+    - exact Hleft.
+    - exact Hoperand. }
+  split.
+  - now apply branch_wf_general.
+  - intro key.
+    assert (Houtleftbit : all_keys (fun stored => bit_at stored split = false)
+      out_left).
+    { eapply all_keys_impl; [exact Houtleft|]. intros stored H. exact (proj2 H). }
+    assert (Hrightbit : all_keys (fun stored => bit_at stored split = true) right).
+    { eapply all_keys_impl; [exact Hright|]. intros stored H. exact (proj2 H). }
+    rewrite (get_branch A sample split out_left right key Houtleftbit Hrightbit).
+    destruct (bit_at key split) eqn:E; cbn [get]; rewrite E.
+    + assert (Eoperand : get key operand = None).
+      { eapply get_none_if_all_keys; [exact Hoperand|].
+        intros [_ Hbit]. rewrite E in Hbit. discriminate. }
+      rewrite Eoperand. now destruct (get key right).
+    + apply Hgetout.
+Qed.
+
+Lemma union_left_specialized_left_outer_right_branch_correct_wf:
+  forall (A : Type) sample split (left right operand out_right : t A),
+    wf left -> wf right -> wf operand ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) left ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) right ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) operand ->
+    (wf out_right /\
+      forall key,
+        get key out_right =
+        match get key right with Some value => Some value | None => get key operand end) ->
+    wf (branch sample split left out_right) /\
+    forall key,
+      get key (branch sample split left out_right) =
+      match get key (Branch sample split left right) with
+      | Some value => Some value
+      | None => get key operand
+      end.
+Proof.
+  intros A sample split left right operand out_right
+    Hwl Hwr Hwo Hleft Hright Hoperand [Hwout Hgetout].
+  assert (Houtright : all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) out_right).
+  { eapply all_keys_of_combine_lookup with
+      (left := right) (right := operand) (out := out_right)
+      (f := fun x y => match x with Some _ => x | None => y end).
+    - reflexivity.
+    - exact Hwout.
+    - intro key. specialize (Hgetout key).
+      destruct (get key right); cbn in Hgetout |- *; exact Hgetout.
+    - exact Hright.
+    - exact Hoperand. }
+  split.
+  - now apply branch_wf_general.
+  - intro key.
+    assert (Hleftbit : all_keys (fun stored => bit_at stored split = false) left).
+    { eapply all_keys_impl; [exact Hleft|]. intros stored H. exact (proj2 H). }
+    assert (Houtrightbit : all_keys (fun stored => bit_at stored split = true)
+      out_right).
+    { eapply all_keys_impl; [exact Houtright|]. intros stored H. exact (proj2 H). }
+    rewrite (get_branch A sample split left out_right key Hleftbit Houtrightbit).
+    destruct (bit_at key split) eqn:E; cbn [get]; rewrite E.
+    + apply Hgetout.
+    + assert (Eoperand : get key operand = None).
+      { eapply get_none_if_all_keys; [exact Hoperand|].
+        intros [_ Hbit]. rewrite E in Hbit. discriminate. }
+      rewrite Eoperand. now destruct (get key left).
+Qed.
