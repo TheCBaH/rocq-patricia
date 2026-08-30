@@ -292,6 +292,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Established the specialized-union assembly measure | Both companion proof files now prove that each of the six branch/branch recursive pair shapes strictly decreases combined tree size, providing the well-founded measure for the remaining global worker theorem. `make union-proof` passed. |
 | 2026-08-30 | Completed the integer right-outer unequal-split reconstruction | `PatriciaUnionProof.v` adds left- and right-child reconstruction rules for the inner structural recursion, completing the four integer unequal-split branch shapes. `make union-proof` passed. |
 | 2026-08-30 | Proved direct-string right-outer unequal-split reconstruction | `StringPatriciaUnionProof.v` adds left- and right-child reconstruction rules for the branch held by the worker’s inner structural recursion. `make union-proof` passed. |
 | 2026-08-30 | Derived direct-string left-outer routing from the worker test | `StringPatriciaUnionProof.v`'s `union_left_specialized_left_outer_routing` turns the successful `agrees_before_bounded` check and split ordering into the exact all-keys side invariant consumed by the unequal-split reconstruction rules. `make union-proof` passed. |

@@ -1,7 +1,7 @@
 (** Focused certificates and refinement proof workspace for
     [PatriciaUnion].  Recompiling this file reuses the cached core proof. *)
 
-From Stdlib Require Import Bool NArith.
+From Stdlib Require Import Bool Lia NArith.
 Require Import PatriciaBits Patricia PatriciaProof PatriciaUnion.
 
 Theorem union_left_specialized_empty_right:
@@ -392,3 +392,20 @@ Proof.
         intros [Hprefix _]. rewrite P in Hprefix. discriminate. }
       now rewrite Eoperand.
 Qed.
+
+(** Every recursive pair selected by the nested worker is smaller in the
+    combined structural size.  The final correctness theorem uses this as its
+    well-founded induction measure, independently of routing outcomes. *)
+Lemma union_left_specialized_branch_calls_smaller:
+  forall (A : Type) pa ma (la ra : t A) pb mb (lb rb : t A),
+    size la + size lb < size (Branch pa ma la ra) + size (Branch pb mb lb rb) /\
+    size ra + size rb < size (Branch pa ma la ra) + size (Branch pb mb lb rb) /\
+    size la + size (Branch pb mb lb rb) <
+      size (Branch pa ma la ra) + size (Branch pb mb lb rb) /\
+    size ra + size (Branch pb mb lb rb) <
+      size (Branch pa ma la ra) + size (Branch pb mb lb rb) /\
+    size (Branch pa ma la ra) + size lb <
+      size (Branch pa ma la ra) + size (Branch pb mb lb rb) /\
+    size (Branch pa ma la ra) + size rb <
+      size (Branch pa ma la ra) + size (Branch pb mb lb rb).
+Proof. intros. cbn [size]. lia. Qed.

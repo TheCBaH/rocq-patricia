@@ -1,7 +1,7 @@
 (** Focused certificates and refinement proof workspace for the specialized
     direct-string union worker. *)
 
-From Stdlib Require Import PeanoNat Strings.String.
+From Stdlib Require Import Lia PeanoNat Strings.String.
 Require Import StringBits StringPatricia StringPatriciaProof StringPatriciaUnion.
 
 Theorem union_left_specialized_empty_right:
@@ -458,3 +458,26 @@ Proof.
         intros [_ Hbit]. rewrite E in Hbit. discriminate. }
       now rewrite Eoperand.
 Qed.
+
+Lemma union_left_specialized_branch_calls_smaller:
+  forall (A : Type) sample_a split_a (left_a right_a : t A)
+      sample_b split_b (left_b right_b : t A),
+    size left_a + size left_b <
+      size (Branch sample_a split_a left_a right_a) +
+      size (Branch sample_b split_b left_b right_b) /\
+    size right_a + size right_b <
+      size (Branch sample_a split_a left_a right_a) +
+      size (Branch sample_b split_b left_b right_b) /\
+    size left_a + size (Branch sample_b split_b left_b right_b) <
+      size (Branch sample_a split_a left_a right_a) +
+      size (Branch sample_b split_b left_b right_b) /\
+    size right_a + size (Branch sample_b split_b left_b right_b) <
+      size (Branch sample_a split_a left_a right_a) +
+      size (Branch sample_b split_b left_b right_b) /\
+    size (Branch sample_a split_a left_a right_a) + size left_b <
+      size (Branch sample_a split_a left_a right_a) +
+      size (Branch sample_b split_b left_b right_b) /\
+    size (Branch sample_a split_a left_a right_a) + size right_b <
+      size (Branch sample_a split_a left_a right_a) +
+      size (Branch sample_b split_b left_b right_b).
+Proof. intros. cbn [size]. lia. Qed.
