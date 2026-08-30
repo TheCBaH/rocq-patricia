@@ -157,7 +157,7 @@ Required only for an end-to-end native-refinement claim.
   `combine_structural_equation` avoids reducing termination proof terms, and
   `combine_structural_eq_combine_fuel` proves exact agreement with every
   sufficient fuel bound in both backends.
-- [ ] Define and prove source-level specialized left- and right-biased unions,
+- [x] Define and prove source-level specialized left- and right-biased unions,
   including their unchanged/disjoint subtree result certificates. The source
   workers, compact proof-facing equation lemmas, and exact
   empty/immediate-join certificates are now defined in the isolated companion
@@ -167,9 +167,8 @@ Required only for an end-to-end native-refinement claim.
   and direct-string left-outer child-routing reconstruction cases are also
   complete, including the direct-string routing-premise derivation. All
   integer and direct-string branch-shape reconstruction cases are complete.
-  The direct-string worker now has its final well-founded structural-recursion
-  assembly and both biased lookup contracts; the corresponding integer
-  assembly remains open.
+  Both workers now have their final well-founded structural-recursion
+  assemblies and left-/right-biased lookup contracts.
 - [x] Isolate experimental specialized-union workers in companion Rocq modules
   and give them a targeted extraction/oracle target, so iteration on N2 does
   not invalidate the expensive established `PatriciaProof.v` and
@@ -179,7 +178,12 @@ Required only for an end-to-end native-refinement claim.
   checks both workers against the established biased unions.
 - [ ] Remove the corresponding handwritten `set`, `combine`, and union
   realizers when proved extracted workers meet the performance requirements;
-  otherwise prove the realizers against those workers.
+  otherwise prove the realizers against those workers. The completed extracted
+  union workers pass the oracle, but a 10K native trial allocates about
+  100K words for the overlapping integer workload and 110K for the
+  overlapping string workload, versus about 81K for `Stdlib.Map`; the current
+  handwritten unions retain their physical-identity reuse and therefore stay
+  public pending a source-level `changed` certificate or a target refinement.
 
 Exit gate: optimized public operations are linked by refinement theorems to the
 proved finite-map semantics. Physical sharing remains outside the claim unless
@@ -294,6 +298,8 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Evaluated extracted specialized unions for the supported wrappers | The fully proved `PatriciaUnion` and `StringPatriciaUnion` workers pass `make union-oracle`, but a 10K native benchmark trial allocated roughly 100K/110K words for integer/string overlap, losing the handwritten unions' physical-identity reuse. The public wrappers therefore continue to use the tested handwritten optimization; the final N2 realizer-refinement obligation remains open. |
+| 2026-08-30 | Completed the integer specialized-union correctness assembly | `PatriciaUnionProof.v` now proves `union_left_specialized_correct_wf` and its right-biased dual by combined-size induction. Its three terminal-join certificates cover equal masks with distinct prefixes and each unequal-root mismatch. `make union-proof` passed. |
 | 2026-08-30 | Completed the direct-string specialized-union correctness assembly | `StringPatriciaUnionProof.v` now proves `union_left_specialized_correct_wf` and its right-biased dual by well-founded induction on combined tree size, consuming the existing equal-split, containment, and separated-join certificates. `make union-proof` passed. |
 | 2026-08-30 | Proved the direct-string specialized-union disjoint terminal case | `StringPatriciaUnionProof.v`'s `union_left_specialized_disjoint_branches_correct_wf` converts the worker’s failed bounded-prefix comparison into the existing separated-join invariant and left-biased lookup contract. `make union-proof` passed. |
 | 2026-08-30 | Established the specialized-union assembly measure | Both companion proof files now prove that each of the six branch/branch recursive pair shapes strictly decreases combined tree size, providing the well-founded measure for the remaining global worker theorem. `make union-proof` passed. |
