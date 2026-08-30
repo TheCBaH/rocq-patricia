@@ -326,3 +326,31 @@ Proof.
         intros [_ Hbit]. rewrite E in Hbit. discriminate. }
       rewrite Eoperand. now destruct (get key left).
 Qed.
+
+(** The worker's successful bounded-prefix test identifies the side occupied
+    by every binding of the deeper right branch. *)
+Lemma union_left_specialized_left_outer_routing:
+  forall (A : Type) outer_sample inner_sample outer_split inner_split
+      (inner_left inner_right : t A),
+    outer_split < inner_split ->
+    agrees_before_bounded outer_sample inner_sample outer_split = true ->
+    all_keys (fun key =>
+      same_prefix inner_sample key inner_split /\ bit_at key inner_split = false)
+      inner_left ->
+    all_keys (fun key =>
+      same_prefix inner_sample key inner_split /\ bit_at key inner_split = true)
+      inner_right ->
+    all_keys (fun key =>
+      same_prefix outer_sample key outer_split /\
+      bit_at key outer_split = bit_at inner_sample outer_split)
+      (Branch inner_sample inner_split inner_left inner_right).
+Proof.
+  intros A outer_sample inner_sample outer_split inner_split inner_left inner_right
+    Hlt Hagree Hleft Hright.
+  apply all_keys_contained_prefix with
+    (inner_sample := inner_sample) (inner_split := inner_split).
+  - unfold same_prefix. now apply (proj1
+      (agrees_before_bounded_spec outer_sample inner_sample outer_split)).
+  - exact Hlt.
+  - now apply branch_all_prefix.
+Qed.
