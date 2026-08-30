@@ -4,9 +4,14 @@ OCAMLOPT ?= /opt/opam/4.14.3/bin/ocamlopt
 OCAMLDEP ?= /opt/opam/4.14.3/bin/ocamldep
 ROCQFLAGS := -q -Q . ''
 
-VFILES := PatriciaBits.v Patricia.v PatriciaProof.v \
+CORE_VFILES := PatriciaBits.v Patricia.v PatriciaProof.v \
 	StringBits.v NativeRefinement.v StringPatricia.v StringPatriciaProof.v
+UNION_VFILES := PatriciaUnion.v PatriciaUnionProof.v \
+	StringPatriciaUnion.v StringPatriciaUnionProof.v
+VFILES := $(CORE_VFILES) $(UNION_VFILES)
 VOFILES := $(VFILES:.v=.vo)
+CORE_VOFILES := $(CORE_VFILES:.v=.vo)
+UNION_VOFILES := $(UNION_VFILES:.v=.vo)
 PUBLIC_INTERFACES := PatriciaMap.mli StringPatriciaMap.mli
 PUBLIC_IMPLEMENTATIONS := PatriciaMap.ml StringPatriciaMap.ml
 PUBLIC_CMOS := PatriciaMap.cmo StringPatriciaMap.cmo
@@ -14,13 +19,21 @@ PUBLIC_CMXS := PatriciaMap.cmx StringPatriciaMap.cmx
 REFERENCE_DIR := reference_extracted
 REFERENCE_PACK := PatriciaReference.cmo
 
-.PHONY: all proof assumptions extraction reference-extraction ocaml \
-	reference-ocaml test differential benchmark benchmark-smoke clean
+.PHONY: all proof core-proof union-proof assumptions extraction \
+	reference-extraction ocaml reference-ocaml test union-oracle differential \
+	benchmark benchmark-smoke clean
 
 all: proof assumptions extraction reference-extraction ocaml reference-ocaml \
-	test differential
+	test union-oracle differential
 
 proof: $(VOFILES)
+
+core-proof: $(CORE_VOFILES)
+
+# Fast iteration boundary for the experimental specialized-union workers and
+# certificates.  Established map proofs are reused through their cached .vo
+# files and are rebuilt only when their own sources changed.
+union-proof: $(UNION_VOFILES)
 
 assumptions: proof check-assumptions.sh
 	sh ./check-assumptions.sh $(ROCQ) $(ROCQFLAGS)
@@ -32,6 +45,10 @@ extraction: proof
 	mv extracted/Patricia.mli extracted/PatriciaInternal.mli
 	mv extracted/StringPatricia.ml extracted/StringPatriciaInternal.ml
 	mv extracted/StringPatricia.mli extracted/StringPatriciaInternal.mli
+	sed -i 's/^open Patricia$$/open PatriciaInternal/' \
+	  extracted/PatriciaUnion.ml extracted/PatriciaUnion.mli
+	sed -i 's/^open StringPatricia$$/open StringPatriciaInternal/' \
+	  extracted/StringPatriciaUnion.ml extracted/StringPatriciaUnion.mli
 	$(RM) extracted/Patricia.cmi extracted/Patricia.cmo extracted/Patricia.cmx extracted/Patricia.o
 	$(RM) extracted/StringPatricia.cmi extracted/StringPatricia.cmo \
 	  extracted/StringPatricia.cmx extracted/StringPatricia.o
@@ -67,6 +84,12 @@ test: ocaml PatriciaTest.ml
 	    $(addprefix ../,$(PUBLIC_CMOS)) ../PatriciaTest.ml
 	./patricia-test
 
+union-oracle: ocaml PatriciaUnionTest.ml
+	cd extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
+	  $(OCAMLC) -I . -I .. -o ../patricia-union-test $$objects \
+	    ../PatriciaUnionTest.ml
+	./patricia-union-test
+
 differential: ocaml reference-ocaml PatriciaDifferentialTest.ml
 	cd extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
 	  $(OCAMLC) -I . -I .. -o ../patricia-differential-test $$objects \
@@ -96,6 +119,10 @@ PatriciaProof.vo: PatriciaBits.vo Patricia.vo
 StringPatricia.vo: StringBits.vo
 NativeRefinement.vo: PatriciaBits.vo StringBits.vo
 StringPatriciaProof.vo: StringBits.vo StringPatricia.vo
+PatriciaUnion.vo: PatriciaBits.vo Patricia.vo
+PatriciaUnionProof.vo: PatriciaProof.vo PatriciaUnion.vo
+StringPatriciaUnion.vo: StringBits.vo StringPatricia.vo
+StringPatriciaUnionProof.vo: StringPatriciaProof.vo StringPatriciaUnion.vo
 
 %.vo: %.v
 	$(ROCQ) compile $(ROCQFLAGS) $<
@@ -109,6 +136,7 @@ clean:
 	rm -f StringPatriciaMap.cmi StringPatriciaMap.cmo StringPatriciaMap.cmx StringPatriciaMap.o
 	rm -f PatriciaReference.cmi PatriciaReference.cmo
 	rm -f PatriciaTest.cmi PatriciaTest.cmo PatriciaDifferentialTest.cmi \
-	  PatriciaDifferentialTest.cmo PatriciaBenchmark.cmi PatriciaBenchmark.cmx \
-	  PatriciaBenchmark.o
-	rm -f patricia-test patricia-differential-test patricia-benchmark
+	  PatriciaDifferentialTest.cmo PatriciaUnionTest.cmi PatriciaUnionTest.cmo \
+	  PatriciaBenchmark.cmi PatriciaBenchmark.cmx PatriciaBenchmark.o
+	rm -f patricia-test patricia-union-test patricia-differential-test \
+	  patricia-benchmark

@@ -2336,21 +2336,16 @@ Proof.
   intros A B C fuel. induction fuel as [|fuel IH]; intros f left right Hfuel.
   - cbn in Hfuel. contradiction.
   - destruct left as [|lk lv|ls lsplit ll lr];
-      destruct right as [|rk rv|rs rsplit rl rr]; cbn in Hfuel |- *; auto.
+      destruct right as [|rk rv|rs rsplit rl rr]; cbn in Hfuel.
+    all: rewrite combine_structural_equation; cbn [combine_fuel].
+    all: try reflexivity.
     destruct Hfuel as [Hll [Hrr [Hlr [Hrright [Hlleft Hlright]]]]].
-    cbn [combine_structural, combine_fuel].
-    destruct (lsplit =? rsplit) eqn:Esplit; cbn.
-    + destruct (agrees_before_bounded ls rs lsplit) eqn:Eagree; cbn; auto.
-      rewrite (IH f ll rl Hll), (IH f lr rr Hrr). reflexivity.
-    + destruct (lsplit <? rsplit) eqn:Eorder; cbn.
-      * destruct (agrees_before_bounded ls rs lsplit) eqn:Eagree; cbn; auto.
-        destruct (bit_at rs lsplit) eqn:Ebit; cbn.
-        -- rewrite (IH f lr (Branch rs rsplit rl rr) Hrright). reflexivity.
-        -- rewrite (IH f ll (Branch rs rsplit rl rr) Hlr). reflexivity.
-      * destruct (agrees_before_bounded ls rs rsplit) eqn:Eagree; cbn; auto.
-        destruct (bit_at ls rsplit) eqn:Ebit; cbn.
-        -- rewrite (IH f (Branch ls lsplit ll lr) rr Hlright). reflexivity.
-        -- rewrite (IH f (Branch ls lsplit ll lr) rl Hlleft). reflexivity.
+    rewrite (IH f ll rl Hll), (IH f lr rr Hrr),
+      (IH f ll (Branch rs rsplit rl rr) Hlr),
+      (IH f lr (Branch rs rsplit rl rr) Hrright),
+      (IH f (Branch ls lsplit ll lr) rl Hlleft),
+      (IH f (Branch ls lsplit ll lr) rr Hlright).
+    reflexivity.
 Qed.
 
 Corollary combine_structural_eq_public_combine_fuel:
@@ -2980,34 +2975,6 @@ Proof.
   split; [exact Hwf|].
   intro key. rewrite Hget.
   now destruct (get key right).
-Qed.
-
-(** Exact no-change and immediate-disjoint-result certificates for the
-    specialized source worker.  They expose the cases in which the optimized
-    extraction may retain an existing subtree without consulting generic
-    [combine]. *)
-Theorem union_left_specialized_empty_right:
-  forall (A : Type) (left : t A),
-    union_left_specialized left Empty = left.
-Proof. intros. reflexivity. Qed.
-
-Theorem union_left_specialized_empty_left:
-  forall (A : Type) (right : t A),
-    union_left_specialized Empty right = right.
-Proof. intros. reflexivity. Qed.
-
-Theorem union_left_specialized_disjoint_samples:
-  forall (A : Type) sample_a split (left_a right_a : t A)
-      sample_b (left_b right_b : t A),
-    agrees_before_bounded sample_a sample_b split = false ->
-    union_left_specialized
-      (Branch sample_a split left_a right_a)
-      (Branch sample_b split left_b right_b) =
-    join (Branch sample_a split left_a right_a)
-      (Branch sample_b split left_b right_b).
-Proof.
-  intros A sample_a split left_a right_a sample_b left_b right_b Hagree.
-  cbn [union_left_specialized]. rewrite Nat.eqb_refl, Hagree. reflexivity.
 Qed.
 
 Definition sample : t nat :=

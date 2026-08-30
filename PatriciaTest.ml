@@ -1,5 +1,8 @@
 open PatriciaInternal
 
+let union_left_specialized = PatriciaUnion.union_left_specialized
+let union_right_specialized = PatriciaUnion.union_right_specialized
+
 let positive_of_int n =
   if n <= 0 then invalid_arg "positive_of_int" else n
 
@@ -152,6 +155,7 @@ let check_int_wide_keys () =
   done
 
 module S = StringPatriciaInternal
+module SU = StringPatriciaUnion
 
 let string_of_bytes bytes =
   Bytes.init (Array.length bytes) (fun i -> Char.chr bytes.(i))
@@ -370,12 +374,12 @@ let check_string_keys () =
     Hashtbl.iter (Hashtbl.replace expected_left) left_ref;
     check_string_table round "union_left" keys expected_left (S.union_left !left !right);
     check_string_table round "specialized union_left" keys expected_left
-      (S.union_left_specialized !left !right);
+      (SU.union_left_specialized !left !right);
     let expected_right = Hashtbl.copy left_ref in
     Hashtbl.iter (Hashtbl.replace expected_right) right_ref;
     check_string_table round "union_right" keys expected_right (S.union_right !left !right);
     check_string_table round "specialized union_right" keys expected_right
-      (S.union_right_specialized !left !right)
+      (SU.union_right_specialized !left !right)
   done
 
 (** Exercise every root relationship selected by the direct-string merge:
@@ -447,13 +451,13 @@ let check_string_merge_shapes () =
        check_string_table (-100 - round) (expected_shape ^ " union_left") keys
          expected_left (S.union_left left right);
        check_string_table (-100 - round) (expected_shape ^ " specialized union_left")
-         keys expected_left (S.union_left_specialized left right);
+         keys expected_left (SU.union_left_specialized left right);
        let expected_right = Hashtbl.copy left_ref in
        Hashtbl.iter (Hashtbl.replace expected_right) right_ref;
        check_string_table (-100 - round) (expected_shape ^ " union_right") keys
          expected_right (S.union_right left right);
        check_string_table (-100 - round) (expected_shape ^ " specialized union_right")
-         keys expected_right (S.union_right_specialized left right))
+         keys expected_right (SU.union_right_specialized left right))
     cases
 
 let check_abstract_interfaces () =

@@ -150,18 +150,26 @@ Required only for an end-to-end native-refinement claim.
   directions; `set_one_descent_eq_set` concludes `set_one_descent` and `set`
   are the same function, and `set_one_descent_correct_wf` restates wf
   preservation and the `get` law for free by rewriting through it.
-- [x] Replace proof-side fuelled `combine` with well-founded structural
-  recursion and prove equivalence to sufficiently fuelled `combine_fuel`.
-  `combine_structural` uses the strict measure `size left + size right`, and
+- [x] Replace proof-side fuelled `combine` with direct structural recursion
+  and prove equivalence to sufficiently fuelled `combine_fuel`.
+  `combine_structural` uses nested fixpoints: the outer recursion consumes the
+  left tree and the inner recursion consumes the right tree. The compact
+  `combine_structural_equation` avoids reducing termination proof terms, and
   `combine_structural_eq_combine_fuel` proves exact agreement with every
   sufficient fuel bound in both backends.
 - [ ] Define and prove source-level specialized left- and right-biased unions,
-  including their unchanged/disjoint subtree result certificates.
-- [ ] Isolate experimental specialized-union workers in companion Rocq modules
+  including their unchanged/disjoint subtree result certificates. The source
+  workers, compact proof-facing equation lemmas, and exact
+  empty/immediate-join certificates are now defined in the isolated companion
+  modules; the general well-formedness and pointwise union theorems remain
+  open.
+- [x] Isolate experimental specialized-union workers in companion Rocq modules
   and give them a targeted extraction/oracle target, so iteration on N2 does
   not invalidate the expensive established `PatriciaProof.v` and
   `StringPatriciaProof.v` proof closures. Integrate a worker into the core
-  modules only with its completed refinement theorem.
+  modules only with its completed refinement theorem. `make union-proof`
+  recompiles the companion closure, while `make union-oracle` extracts and
+  checks both workers against the established biased unions.
 - [ ] Remove the corresponding handwritten `set`, `combine`, and union
   realizers when proved extracted workers meet the performance requirements;
   otherwise prove the realizers against those workers.
@@ -266,6 +274,8 @@ From this directory:
 
 ```sh
 make
+make union-proof
+make union-oracle
 make benchmark
 git diff --check
 ```
@@ -277,7 +287,8 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
-| 2026-08-30 | Replaced the public fuelled combine with a well-founded structural worker in both backends | `Patricia.v` and `StringPatricia.v` define `combine_structural` over `size left + size right`; their proof files establish exact equality with `combine_fuel` under `combine_fuel_sufficient` and derive the public fuel-bound corollary |
+| 2026-08-30 | Isolated specialized biased-union iteration and removed the pathological structural-combine proof reduction | `PatriciaUnion.v`/`StringPatriciaUnion.v` contain nested structural workers; their companion proof files contain the initial exact-result certificates. `combine_structural` was reformulated as nested structural recursion with compact equation lemmas, reducing fresh `PatriciaProof.v` and `StringPatriciaProof.v` compilation from more than 199 seconds at the interrupted unfolding point to under one second each. `make proof`, `make union-oracle`, full `make`, and `git diff --check` passed; the assumption audit reported 307 closed declarations. |
+| 2026-08-30 | Replaced the public fuelled combine with a direct structural worker in both backends | `Patricia.v` and `StringPatricia.v` define nested structurally recursive `combine_structural`; their proof files establish exact equality with `combine_fuel` under `combine_fuel_sufficient` and derive the public fuel-bound corollary |
 | 2026-08-30 | Completed the N1 byte-string primitive model and guarded-access contract | `NativeRefinement.v` proves `native_bytes_length`, `native_bytes_get`, guarded `unsafe_get` access, `native_code_bit_ascii`, and `native_packed_bit_at_refines_representation`; `make` and `git diff --check` passed |
 | 2026-08-30 | Completed the N2 one-descent string `set` worker, fixing a dropped-sibling bug the proof caught in the pre-existing stub | `StringPatriciaProof.v`'s `set_descend_matches_insert_at`/`set_one_descent_eq_set`/`set_one_descent_correct_wf`; full `make`: 281 declarations closed, oracle and differential tests passed; `git diff --check` passed |
 | 2026-08-30 | Completed the N1 native XOR/leading-zeroes first-difference refinement | `NativeRefinement.v`'s `native_byte_first_diff_correct`/`native_string_first_diff_refines` connect the realizer's `lxor`/mask-shift loop to the existing safe source model; full `make` and `git diff --check` passed |

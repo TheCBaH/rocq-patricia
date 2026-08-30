@@ -1328,25 +1328,16 @@ Proof.
   intros A B C fuel. induction fuel as [|fuel IH]; intros f left right Hfuel.
   - cbn in Hfuel. contradiction.
   - destruct left as [|lk lv|lp lm ll lr];
-      destruct right as [|rk rv|rp rm rl rr]; cbn in Hfuel |- *; auto.
+      destruct right as [|rk rv|rp rm rl rr]; cbn in Hfuel.
+    all: rewrite combine_structural_equation; cbn [combine_fuel].
+    all: try reflexivity.
     destruct Hfuel as [Hll [Hrr [Hlr [Hrright [Hlleft Hlright]]]]].
-    cbn [combine_structural, combine_fuel].
-    destruct (N.eqb lm rm && N.eqb lp rp)%bool eqn:Eequal; cbn.
-    + rewrite (IH f ll rl Hll), (IH f lr rr Hrr). reflexivity.
-    + destruct (mask_above lm rm) eqn:Eleft; cbn.
-      * destruct (representative (Branch rp rm rl rr)) as [key|] eqn:Erep; cbn.
-        -- destruct (matches_prefix key lp lm) eqn:Eprefix; cbn; auto.
-           destruct (zero_bit key lm) eqn:Ebit; cbn.
-           ++ rewrite (IH f ll (Branch rp rm rl rr) Hlr). reflexivity.
-           ++ rewrite (IH f lr (Branch rp rm rl rr) Hrright). reflexivity.
-        -- reflexivity.
-      * destruct (mask_above rm lm) eqn:Eright; cbn; auto.
-        destruct (representative (Branch lp lm ll lr)) as [key|] eqn:Erep; cbn.
-        -- destruct (matches_prefix key rp rm) eqn:Eprefix; cbn; auto.
-           destruct (zero_bit key rm) eqn:Ebit; cbn.
-           ++ rewrite (IH f (Branch lp lm ll lr) rl Hlleft). reflexivity.
-           ++ rewrite (IH f (Branch lp lm ll lr) rr Hlright). reflexivity.
-        -- reflexivity.
+    rewrite (IH f ll rl Hll), (IH f lr rr Hrr),
+      (IH f ll (Branch rp rm rl rr) Hlr),
+      (IH f lr (Branch rp rm rl rr) Hrright),
+      (IH f (Branch lp lm ll lr) rl Hlleft),
+      (IH f (Branch lp lm ll lr) rr Hlright).
+    reflexivity.
 Qed.
 
 Corollary combine_structural_eq_public_combine_fuel:
@@ -1862,31 +1853,6 @@ Proof.
     left right eq_refl Hleft Hright) as [Hwf Hget].
   split; [exact Hwf|].
   intro key. rewrite Hget. now destruct (get key right).
-Qed.
-
-(** Small exact-result certificates for the specialized worker.  They are the
-    source counterparts of the native realizer's no-change and immediate-join
-    paths; the forthcoming general refinement theorem composes them through
-    recursive overlap cases. *)
-Theorem union_left_specialized_empty_right:
-  forall (A : Type) (left : t A),
-    union_left_specialized left Empty = left.
-Proof. intros. reflexivity. Qed.
-
-Theorem union_left_specialized_empty_left:
-  forall (A : Type) (right : t A),
-    union_left_specialized Empty right = right.
-Proof. intros. reflexivity. Qed.
-
-Theorem union_left_specialized_disjoint_masks:
-  forall (A : Type) pa ma (la ra : t A) pb mb (lb rb : t A),
-    mask_above ma mb = false ->
-    mask_above mb ma = false ->
-    union_left_specialized (Branch pa ma la ra) (Branch pb mb lb rb) =
-    join (Branch pa ma la ra) (Branch pb mb lb rb).
-Proof.
-  intros A pa ma la ra pb mb lb rb Hab Hba.
-  cbn [union_left_specialized]. rewrite Hab, Hba. reflexivity.
 Qed.
 
 Lemma wf_empty_ok:

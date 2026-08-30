@@ -316,105 +316,89 @@ Fixpoint combine_fuel {A B C : Type}
       end
   end.
 
-(** The fuelled worker above is the simple termination reference.  The public
-    worker recurses directly on the strictly smaller combined size of its
-    Patricia arguments. *)
-Program Fixpoint combine_structural {A B C : Type}
-    (f : option A -> option B -> option C)
-    (a : t A) (b : t B) {measure (size a + size b)%nat} : t C :=
-  match a, b with
-  | Empty, _ => map_right f b
-  | _, Empty => map_left f a
-  | Leaf ka va, _ => combine_leaf_left f ka va b
-  | _, Leaf kb vb => combine_leaf_right f a kb vb
-  | Branch sample_a split_a left_a right_a,
-    Branch sample_b split_b left_b right_b =>
-      if split_a =? split_b then
-        if agrees_before_bounded sample_a sample_b split_a then
-          branch sample_a split_a
-            (combine_structural f left_a left_b)
-            (combine_structural f right_a right_b)
-        else join (map_left f a) (map_right f b)
-      else if split_a <? split_b then
-        if agrees_before_bounded sample_a sample_b split_a then
-          if bit_at sample_b split_a
-          then branch sample_a split_a (map_left f left_a)
-                 (combine_structural f right_a b)
-          else branch sample_a split_a
-                 (combine_structural f left_a b) (map_left f right_a)
-        else join (map_left f a) (map_right f b)
-      else
-        if agrees_before_bounded sample_a sample_b split_b then
-          if bit_at sample_a split_b
-          then branch sample_b split_b (map_right f left_b)
-                 (combine_structural f a right_b)
-          else branch sample_b split_b
-                 (combine_structural f a left_b) (map_right f right_b)
-        else join (map_left f a) (map_right f b)
+(** The fuelled worker above is the simple termination reference.  Nested
+    structural recursion expresses the same decreasing calls directly: the
+    outer fixpoint handles a smaller [a], and the local fixpoint handles a
+    smaller [b] while [a] is unchanged.  This also keeps unfolding in the
+    equivalence proof small and predictable. *)
+Fixpoint combine_structural {A B C : Type}
+    (f : option A -> option B -> option C) (a : t A) {struct a}
+    : t B -> t C :=
+  match a with
+  | Empty => fun b => map_right f b
+  | Leaf ka va => fun b => combine_leaf_left f ka va b
+  | Branch sample_a split_a left_a right_a =>
+      fix combine_right (b : t B) {struct b} : t C :=
+        match b with
+        | Empty => map_left f a
+        | Leaf kb vb => combine_leaf_right f a kb vb
+        | Branch sample_b split_b left_b right_b =>
+            if split_a =? split_b then
+              if agrees_before_bounded sample_a sample_b split_a then
+                branch sample_a split_a
+                  (combine_structural f left_a left_b)
+                  (combine_structural f right_a right_b)
+              else join (map_left f a) (map_right f b)
+            else if split_a <? split_b then
+              if agrees_before_bounded sample_a sample_b split_a then
+                if bit_at sample_b split_a
+                then branch sample_a split_a (map_left f left_a)
+                       (combine_structural f right_a b)
+                else branch sample_a split_a
+                       (combine_structural f left_a b) (map_left f right_a)
+              else join (map_left f a) (map_right f b)
+            else
+              if agrees_before_bounded sample_a sample_b split_b then
+                if bit_at sample_a split_b
+                then branch sample_b split_b (map_right f left_b)
+                       (combine_right right_b)
+                else branch sample_b split_b
+                       (combine_right left_b) (map_right f right_b)
+              else join (map_left f a) (map_right f b)
+        end
   end.
-Next Obligation. intros; cbn [size]; lia. Qed.
-Next Obligation. intros; cbn [size]; lia. Qed.
-Next Obligation. intros; cbn in *; lia. Qed.
-Next Obligation. intros; cbn in *; lia. Qed.
-Next Obligation. intros; cbn in *; lia. Qed.
-Next Obligation. intros; cbn in *; lia. Qed.
-Next Obligation. split; intros; intuition discriminate. Qed.
+
+(** Compact two-argument unfolding, folding the local right-tree recursion
+    back to calls of the public structural worker. *)
+Lemma combine_structural_equation:
+  forall (A B C : Type) (f : option A -> option B -> option C)
+      (a : t A) (b : t B),
+    combine_structural f a b =
+    match a, b with
+    | Empty, _ => map_right f b
+    | _, Empty => map_left f a
+    | Leaf ka va, _ => combine_leaf_left f ka va b
+    | _, Leaf kb vb => combine_leaf_right f a kb vb
+    | Branch sample_a split_a left_a right_a,
+      Branch sample_b split_b left_b right_b =>
+        if split_a =? split_b then
+          if agrees_before_bounded sample_a sample_b split_a then
+            branch sample_a split_a
+              (combine_structural f left_a left_b)
+              (combine_structural f right_a right_b)
+          else join (map_left f a) (map_right f b)
+        else if split_a <? split_b then
+          if agrees_before_bounded sample_a sample_b split_a then
+            if bit_at sample_b split_a
+            then branch sample_a split_a (map_left f left_a)
+                   (combine_structural f right_a b)
+            else branch sample_a split_a
+                   (combine_structural f left_a b) (map_left f right_a)
+          else join (map_left f a) (map_right f b)
+        else
+          if agrees_before_bounded sample_a sample_b split_b then
+            if bit_at sample_a split_b
+            then branch sample_b split_b (map_right f left_b)
+                   (combine_structural f a right_b)
+            else branch sample_b split_b
+                   (combine_structural f a left_b) (map_right f right_b)
+          else join (map_left f a) (map_right f b)
+    end.
+Proof. intros A B C f a b. destruct a; destruct b; reflexivity. Qed.
 
 Definition combine {A B C : Type}
     (f : option A -> option B -> option C) (a : t A) (b : t B) : t C :=
   combine_structural f a b.
-
-(** Source counterpart of the optimized left-biased union.  One-sided
-    subtrees are retained directly and recursion follows only the potentially
-    overlapping branch.  The native realizer may additionally reuse a whole
-    node by physical identity; that is an optimization outside this pure
-    functional worker. *)
-Program Fixpoint union_left_specialized {A : Type}
-    (a b : t A) {measure (size a + size b)%nat} : t A :=
-  match a, b with
-  | Empty, tree => tree
-  | tree, Empty => tree
-  | Leaf ka va, Leaf kb _ =>
-      if String.eqb ka kb then a else set ka va b
-  | Leaf ka va, tree => set ka va tree
-  | tree, Leaf kb vb =>
-      match get kb tree with Some _ => tree | None => set kb vb tree end
-  | Branch sample_a split_a left_a right_a,
-    Branch sample_b split_b left_b right_b =>
-      if split_a =? split_b then
-        if agrees_before_bounded sample_a sample_b split_a then
-          branch sample_a split_a
-            (union_left_specialized left_a left_b)
-            (union_left_specialized right_a right_b)
-        else join a b
-      else if split_a <? split_b then
-        if agrees_before_bounded sample_a sample_b split_a then
-          if bit_at sample_b split_a then
-            branch sample_a split_a left_a
-              (union_left_specialized right_a b)
-          else branch sample_a split_a
-              (union_left_specialized left_a b) right_a
-        else join a b
-      else
-        if agrees_before_bounded sample_a sample_b split_b then
-          if bit_at sample_a split_b then
-            branch sample_b split_b left_b
-              (union_left_specialized a right_b)
-          else branch sample_b split_b
-              (union_left_specialized a left_b) right_b
-        else join a b
-  end.
-Next Obligation. intros; cbn [size]; lia. Qed.
-Next Obligation. intros; cbn [size]; lia. Qed.
-Next Obligation. intros; cbn in *; lia. Qed.
-Next Obligation. intros; cbn in *; lia. Qed.
-Next Obligation. intros; cbn in *; lia. Qed.
-Next Obligation. intros; cbn in *; lia. Qed.
-Next Obligation. split; intros; intuition discriminate. Qed.
-Next Obligation. repeat split; intros; intuition discriminate. Qed.
-
-Definition union_right_specialized {A : Type} (a b : t A) : t A :=
-  union_left_specialized b a.
 
 Definition union_left {A : Type} (a b : t A) : t A :=
   combine (fun x y => match x with Some _ => x | None => y end) a b.

@@ -9,6 +9,7 @@
 *.o
 *.lia.cache
 /patricia-test
+/patricia-union-test
 /patricia-differential-test
 /patricia-benchmark
 /extracted/
