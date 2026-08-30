@@ -135,13 +135,17 @@ Executing the supported native library additionally trusts:
   keys, and the restricted combine callback;
 - integer realizer code for equality/order tests, shifts, masks, prefixes,
   routing bits, and highest-differing-bit selection;
-- fuel-free native integer `combine` and specialized biased unions, including
-  their physical-equality sharing decisions;
+- specialized native integer biased unions, including their physical-equality
+  sharing decisions;
 - packed string positions, native `bit_at`, bytewise first difference,
   bounded prefix comparison, `Char.code`, integer XOR/leading-zeroes, and
   guarded `String.unsafe_get` calls;
 - cached string representatives, the exception-based one-descent string
-  `set`, fuel-free string `combine`, and specialized string biased unions.
+  `set`, and specialized string biased unions.
+
+Both general `combine` definitions are extracted directly from the proved
+fuel-free structural workers; as usual, this still trusts ordinary extraction
+and the OCaml compiler rather than proving compilation correctness.
 
 `NativeRefinement.v` proves part of the representation-level source model,
 including the packed-position codec and safe first-difference model. It does

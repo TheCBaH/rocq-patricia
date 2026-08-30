@@ -26,49 +26,9 @@ Extract Constant PatriciaBits.highest_differing_bit =>
      in log2 (left lxor right) 0)".
 Extract Constant PatriciaBits.mask_above => "(fun high low -> low < high)".
 
-(** The proof-side fuel establishes totality of [combine_fuel], but a native
-    merge can recurse directly: every recursive call consumes a branch from at
-    least one input.  Keeping the fuel calculation out of the extracted hot
-    path is important for disjoint maps, where walking both whole trees just
-    to derive a bound would otherwise dominate the actual join.  The proved
-    leaf workers fuse an overlapping replacement into their mapping pass. *)
-Extract Constant Patricia.combine =>
-  "(fun combine_values first second ->
-     let rec merge left right =
-       match left, right with
-       | Empty, tree -> map_right combine_values tree
-       | tree, Empty -> map_left combine_values tree
-       | Leaf (key, value), tree ->
-           combine_leaf_left combine_values key value tree
-       | tree, Leaf (key, value) ->
-           combine_leaf_right combine_values tree key value
-       | Branch (prefix_left, mask_left, left_left, right_left),
-         Branch (prefix_right, mask_right, left_right, right_right) ->
-           if mask_left = mask_right && prefix_left = prefix_right then
-             branch prefix_left mask_left
-               (merge left_left left_right) (merge right_left right_right)
-           else if mask_above mask_left mask_right then
-             match representative right with
-             | Some key when matches_prefix key prefix_left mask_left ->
-                 if zero_bit key mask_left then
-                   branch prefix_left mask_left
-                     (merge left_left right) (map_left combine_values right_left)
-                 else
-                   branch prefix_left mask_left
-                     (map_left combine_values left_left) (merge right_left right)
-             | _ -> join (map_left combine_values left) (map_right combine_values right)
-           else if mask_above mask_right mask_left then
-             match representative left with
-             | Some key when matches_prefix key prefix_right mask_right ->
-                 if zero_bit key mask_right then
-                   branch prefix_right mask_right
-                     (merge left left_right) (map_right combine_values right_right)
-                 else
-                   branch prefix_right mask_right
-                     (map_right combine_values left_right) (merge left right_right)
-             | _ -> join (map_left combine_values left) (map_right combine_values right)
-           else join (map_left combine_values left) (map_right combine_values right)
-     in merge first second)".
+(** [Patricia.combine] is the proved, fuel-free structural worker.  Extract it
+    directly so the optimized backend no longer substitutes a handwritten
+    general merge implementation. *)
 
 (** A biased union maps one-sided bindings identically.  Reuse those subtrees
     directly, and join disjoint prefixes immediately.  Physical-identity
@@ -235,46 +195,9 @@ Extract Constant StringPatricia.set =>
      try descend root with
      | Fresh_key differing -> branch_at key differing fresh root)".
 
-(** The proof-side fuel establishes termination, but need not survive
-    extraction.  Every recursive native call consumes a branch from at least
-    one input, so generic combine can execute directly without first walking
-    both trees to compute their sizes.  The proved leaf workers fuse an
-    overlapping replacement into their mapping pass. *)
-Extract Constant StringPatricia.combine =>
-  "(fun combine_values first second ->
-     let rec merge left right =
-       match left, right with
-       | Empty, tree -> map_right combine_values tree
-       | tree, Empty -> map_left combine_values tree
-       | Leaf (key, value), tree ->
-           combine_leaf_left combine_values key value tree
-       | tree, Leaf (key, value) ->
-           combine_leaf_right combine_values tree key value
-       | Branch (sample_left, split_left, left_left, right_left),
-         Branch (sample_right, split_right, left_right, right_right) ->
-           if split_left = split_right then
-             if agrees_before_bounded sample_left sample_right split_left then
-               branch sample_left split_left
-                 (merge left_left left_right) (merge right_left right_right)
-             else join (map_left combine_values left) (map_right combine_values right)
-           else if split_left < split_right then
-             if agrees_before_bounded sample_left sample_right split_left then
-               if bit_at sample_right split_left then
-                 branch sample_left split_left (map_left combine_values left_left)
-                   (merge right_left right)
-               else
-                 branch sample_left split_left (merge left_left right)
-                   (map_left combine_values right_left)
-             else join (map_left combine_values left) (map_right combine_values right)
-           else if agrees_before_bounded sample_left sample_right split_right then
-             if bit_at sample_left split_right then
-               branch sample_right split_right (map_right combine_values left_right)
-                 (merge left right_right)
-             else
-               branch sample_right split_right (merge left left_right)
-                 (map_right combine_values right_right)
-           else join (map_left combine_values left) (map_right combine_values right)
-     in merge first second)".
+(** [StringPatricia.combine] is likewise the proved fuel-free structural
+    worker, so extraction retains it instead of replacing it with native
+    handwritten merge code. *)
 
 (** Biased union has identity behavior on one-sided subtrees, so it can share
     them instead of going through generic [combine].  Disjoint prefixes are

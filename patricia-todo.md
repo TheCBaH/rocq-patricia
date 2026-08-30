@@ -176,18 +176,19 @@ Required only for an end-to-end native-refinement claim.
   modules only with its completed refinement theorem. `make union-proof`
   recompiles the companion closure, while `make union-oracle` extracts and
   checks both workers against the established biased unions.
-- [ ] Remove the corresponding handwritten `set`, `combine`, and union
-  realizers when proved extracted workers meet the performance requirements;
-  otherwise prove the realizers against those workers. The companion modules
-  now define and extract source-level `union_left_specialized_changed` workers:
+- [ ] Remove the remaining handwritten `set` and union realizers when proved
+  extracted workers meet the performance requirements; otherwise prove the
+  realizers against those workers. Both general `combine` realizers have been
+  removed: `Patricia.combine` and `StringPatricia.combine` now extract directly
+  from the proved structural workers. The companion modules now define and
+  extract source-level `union_left_specialized_changed` workers:
   `None` means the original left tree can be reused and `Some out` carries a
   rebuilt result. The extraction oracle checks both certificate outcomes. A
   10K wrapper trial reduced overlapping allocation to about 70K words for
   each backend (below `Stdlib.Map`'s 81K), but still above the handwritten
-  physical-equality implementation. The direct-string changed-result worker
-  now has a full structural correctness proof; the corresponding integer proof
-  and source-level allocation refinement remain open, so public wrappers
-  continue to use the handwritten unions for now.
+  physical-equality implementation. Both changed-result workers now have full
+  structural correctness proofs; source-level allocation refinement remains
+  open, so public wrappers continue to use the handwritten unions for now.
 
 Exit gate: optimized public operations are linked by refinement theorems to the
 proved finite-map semantics. Physical sharing remains outside the claim unless
@@ -302,6 +303,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Removed handwritten general `combine` realizers | `PatriciaExtract.v` now extracts both proved `combine_structural` workers directly, eliminating the two Patricia-specific merge substitutions. Full `make` passed with 360 closed declarations; `make benchmark` passed, retaining the checked 10K workload's allocation and functional checks. |
 | 2026-08-30 | Expanded changed-worker extraction coverage | `PatriciaUnionTest.ml` now runs 32 deterministic mixed-shape workloads per backend, comparing every result against the established left-biased union across 127 keys. `make union-oracle` and `git diff --check` passed. |
 | 2026-08-30 | Completed integer changed-worker terminal cases | `PatriciaUnionProof.v` maps all three disjoint branch outcomes to a `Some` separated join: both outer-prefix mismatches and equal masks with distinct prefixes. `make PatriciaUnionProof.vo`, `make union-oracle`, and `git diff --check` passed. |
 | 2026-08-30 | Completed integer changed-worker branch reconstruction | `PatriciaUnionProof.v` now has changed-result certificates for equal headers and all four unequal-mask routing sides. The right-outer rules account for the mandatory enclosing-branch rebuild. `make PatriciaUnionProof.vo` and `make union-oracle` passed. |

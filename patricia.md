@@ -31,7 +31,7 @@ The verification claim must therefore be split into three layers:
 | --- | --- |
 | Pure positive-key Rocq model | Kernel-checked functional map laws, including general `combine` and finite-map extensionality, with no project axioms found in the inspected theorem closure |
 | Pure direct-string Rocq model | Lookup, update, removal, ordered traversal, filtering, structural invariants, general `combine`, biased unions, and finite-map extensionality are proved |
-| Extracted native OCaml | Extensive oracle, invariant, and optimized-versus-proof-aligned differential testing passes, but the standard numeric/string mappings and 19 explicit handwritten realizers are trusted; neither their refinement nor the Rocq-to-OCaml compilation pipeline is proved here |
+| Extracted native OCaml | Extensive oracle, invariant, and optimized-versus-proof-aligned differential testing passes, but the standard numeric/string mappings and remaining explicit handwritten realizers are trusted; neither their refinement nor the Rocq-to-OCaml compilation pipeline is proved here |
 
 Consequently, “formally verified” is accurate for the stated theorems about the
 pure definitions. It is not yet accurate as an end-to-end claim about the
@@ -76,10 +76,11 @@ outer fixpoint consumes the left tree; when that tree is held fixed, an inner
 fixpoint consumes the right tree.
 `combine_structural_eq_combine_fuel` proves that each worker exactly agrees
 with the retained fuelled reference at every sufficient fuel bound. The native
-extraction also replaces `combine` with its own direct structural recursion,
-so it does not compute that bound at runtime. Its leaf/tree cases delegate to
-source-level workers with proved lookup and well-formedness laws, fusing an
-overlapping replacement into the mapping pass. It also replaces `union_left`
+extraction now retains those direct structural `combine` definitions, so it
+does not compute the bound at runtime or substitute a handwritten merge. Its
+leaf/tree cases delegate to source-level workers with proved lookup and
+well-formedness laws, fusing an overlapping replacement into the mapping pass.
+It still replaces `union_left`
 with a specialized structural algorithm in both the integer and string
 backends (`union_right` reverses its arguments).  Disjoint prefixes are joined
 immediately, one-sided subtrees are reused, and only a changed recursive path
@@ -91,9 +92,9 @@ less allocation for the overlapping workload.  This restores the intended
 operational behavior, but it is benchmark evidence rather than a complexity
 proof.
 
-The remaining native-refinement task is to connect the direct extracted
-recursion to this proved structural source worker. A cost semantics is
-additionally needed before making a formal asymptotic claim.
+The remaining native-refinement task is the exception-based string `set` and
+the specialized native unions. A cost semantics is additionally needed before
+making a formal asymptotic claim.
 
 ### 2. The direct-string biased unions are verified
 
@@ -166,9 +167,10 @@ differential and structural validation.
 The Rocq model uses unbounded `positive`, `N`, and `nat`, while the optimized
 OCaml implementation uses bounded `int`, native shifts, and native strings.
 `bit_at`, `first_diff`, prefix matching, routing bits, highest-differing-bit
-selection, cached representatives, fused string insertion, direct `combine`,
-and specialized biased union are replaced with handwritten OCaml realizers.
-Rocq proves the pure definitions, not the equivalence of these replacements.
+selection, cached representatives, fused string insertion, and specialized
+biased union are replaced with handwritten OCaml realizers. Both general
+`combine` definitions are now extracted from their proved structural source
+workers. Rocq does not prove the equivalence of the remaining replacements.
 
 This is not merely a general warning about extraction. The
 [Rocq extraction manual](https://rocq-prover.org/doc/master/refman/addendum/extraction.html)
@@ -189,9 +191,9 @@ does not inspect either kind of extraction directive.
 | Integer `word`, prefix, prefix match, routing bit, highest differing bit, and mask ordering | Boundary-key fuzzing and structural checks found no mismatch | `native_prefix_word_refines`, `native_matches_prefix_refines`, `native_zero_bit_refines`, `native_highest_differing_bit_refines`, and `native_mask_above_refines` identify the bounded source model with the pure operations. The 62-bit payload/mask closure lemmas cover shifted prefixes and XOR-derived split bits. The custom OCaml `lsr`/`land`/`lxor`/loop realization is still trusted until a target-language primitive contract proves it implements this model. |
 | Packed string split token `(byte << 4) | tag`, native `bit_at`, and bytewise `first_diff` | `first_diff` is checked for all 65,536 one-byte pairs plus prefix and long-prefix cases; direct checks cover all 16 tags at in-range and out-of-range byte indices, and structural tests check `bit_at` routing over NUL, non-ASCII, and randomized strings | `NativeRefinement.v` proves the logical `9*b+t` to packed `16*b+t` codec, valid-tag property, injectivity, ordering, and valid-token decode/encode round trips. Its native byte-code-array model proves byte length/access/bounds, the guard conditions for every `unsafe_get` site, and `native_packed_bit_at_refines_representation`; its safe structural bytewise scanner is proved equal to packed `first_diff`, and its mismatching-byte choice is equivalent to the Boolean-XOR leading-zeroes model. The remaining FFI contract is only that OCaml byte strings implement this array model, `String.length`/`Char.code` return the stated length/code, and short-circuit guards precede each unsafe access; OCaml execution itself is not kernel-verified. Logical position 9 remains token 16, so direct equality at the same extracted integer is intentionally false. |
 | A branch sample returned as its constant-time `representative` | `wf_branch` requires `resident sample (Branch ...)`, and every smart constructor and public-operation preservation theorem discharges that premise; structural tests independently check the property | Cached-sample residency is kernel-checked (`wf_cached_sample_resident`). The cached and pure representatives can differ, but `wf_cached_sample_same_prefix_representative` proves agreement below the branch split. `wf_cached_sample_agrees_before_representative` and `wf_cached_sample_bit_at_before_representative` therefore justify every bounded-prefix comparison and strictly-outer routing-bit use in native merge/union without requiring representative equality. |
-| Exception-based one-descent string `set` | Existing/fresh-key oracle tests and structural checks pass | Define a source worker returning either a rebuilt tree or a discriminator to bubble upward, prove it equivalent to `set`, and extract it. Proving the exact local-exception OCaml code instead requires a target-language logic supporting exceptions. |
-| Fuel-free integer and string `combine` | The public source workers use nested structural fixpoints and are proved equal to every sufficient `combine_fuel` run; randomized native merges agree with reference maps | Connect the handwritten native direct recursion to the proved structural source workers, or extract those workers once they meet performance requirements. |
-| Specialized biased unions and physical-identity (`==`) sharing | Disjoint and overlap results agree with `Stdlib.Map`; allocation demonstrates sharing. Isolated source workers now mirror the recursive cases and have exact empty/immediate-join certificates plus a targeted extraction oracle. | Prove the general well-formedness and pointwise union laws for the isolated source workers. Functional correctness does not prove physical sharing; a sharing/allocation claim needs a cost or heap semantics. A source worker can return a `changed` certificate to justify returning the original tree without relying on target physical equality. |
+| Exception-based one-descent string `set` | Existing/fresh-key oracle tests and structural checks pass | The source-level `set_descend`/`set_one_descent` worker is proved equal to `set` on well-formed inputs. Extract it when its performance is acceptable, or prove the exact local-exception realization in a target-language logic. |
+| Fuel-free integer and string `combine` | The public source workers use nested structural fixpoints and are proved equal to every sufficient `combine_fuel` run; the optimized extraction now retains those definitions, and randomized native merges agree with the reference maps | No Patricia-specific `Extract Constant` remains for general `combine`; ordinary extraction/compiler correctness and the retained primitive mappings remain in the trusted base. |
+| Specialized biased unions and physical-identity (`==`) sharing | Disjoint and overlap results agree with `Stdlib.Map`; allocation demonstrates sharing. The isolated specialized and changed-result source workers have invariant and pointwise union proofs plus a targeted extraction oracle. | Integrate an extracted worker once it meets the performance target, or prove the native realizer against it. Functional correctness does not prove physical sharing; a sharing/allocation claim needs a cost or heap semantics. A source worker's `changed` certificate can justify reusing the original tree without target physical equality. |
 
 The packed-token and cached-representative rows are the most important subtle
 cases. They are representation refinements, not pointwise replacements of the
