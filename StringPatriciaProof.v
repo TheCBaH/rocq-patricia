@@ -1895,6 +1895,221 @@ Proof.
   rewrite Hget. apply String.eqb_neq in Hneq. now rewrite Hneq.
 Qed.
 
+(** ** The native one-descent [set] worker
+
+    [StringPatricia.set_descend]/[set_one_descent] mirror the native
+    exception-based [set] realizer: a single top-to-bottom descent finds
+    either an exact leaf match or the fresh key's first-difference position,
+    which then bubbles back up only until an enclosing branch's split no
+    longer exceeds it.  This differs from [insert_at], which is handed that
+    same first-difference position from a separate top-down [routed_key]
+    pass and walks down deciding, at each branch, whether to stop there.
+    [set_descend_matches_insert_at] shows both processes land on the same
+    split: bubbling stops exactly where a fresh top-down walk would have
+    stopped, one level higher than wherever the recursive descent's own
+    child stopped.  The proof needs the branch-split ordering
+    ([all_splits_after_of_all_keys]) to relate the two directions - a bubble
+    that survives past a child's own split is, by that ordering, still
+    below every split the child's own subtree could have stopped at. *)
+(** [cbn] on a [Branch] call whose recursed-into child is itself already a
+    concrete [Branch]/[Leaf] unfolds straight through that child's own call
+    too, leaving nothing for a later [rewrite] on the child's own IH to
+    match.  These two one-step unfolding equations - proved while the child
+    is still an opaque variable, so [cbn] cannot look inside it - give each
+    [Branch] step of the proof below exactly the reduction it needs and no
+    more. *)
+Lemma set_descend_branch_true:
+  forall (A : Type) key value sample split (ltree rtree : t A),
+    bit_at key split = true ->
+    set_descend key value (Branch sample split ltree rtree) =
+      match set_descend key value rtree with
+      | Set_complete updated => Set_complete (Branch sample split ltree updated)
+      | Set_bubble differing =>
+          if differing <? split then Set_bubble differing
+          else Set_complete
+                 (Branch sample split ltree
+                    (branch_at key differing (Leaf key value) rtree))
+      end.
+Proof. intros A key value sample split ltree rtree Ekey. cbn [set_descend]. now rewrite Ekey. Qed.
+
+Lemma set_descend_branch_false:
+  forall (A : Type) key value sample split (ltree rtree : t A),
+    bit_at key split = false ->
+    set_descend key value (Branch sample split ltree rtree) =
+      match set_descend key value ltree with
+      | Set_complete updated => Set_complete (Branch sample split updated rtree)
+      | Set_bubble differing =>
+          if differing <? split then Set_bubble differing
+          else Set_complete
+                 (Branch sample split
+                    (branch_at key differing (Leaf key value) ltree) rtree)
+      end.
+Proof. intros A key value sample split ltree rtree Ekey. cbn [set_descend]. now rewrite Ekey. Qed.
+
+Theorem set_descend_matches_insert_at:
+  forall (A : Type) key value (m : t A),
+    wf m ->
+    forall routed differing,
+      routed_key key m = Some routed -> first_diff key routed = Some differing ->
+      match m with
+      | Branch _ split _ _ =>
+          (set_descend key value m = Set_bubble differing /\ differing < split) \/
+          (set_descend key value m = Set_complete (insert_at key value differing m) /\
+           split <= differing)
+      | _ => set_descend key value m = Set_bubble differing
+      end.
+Proof.
+  intros A key value m Hwf.
+  induction Hwf as
+      [|stored stored_value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr Hresident]; intros routed differing Hrouted Hdiff.
+  - discriminate Hrouted.
+  - cbn [set_descend]. cbn in Hrouted. inversion Hrouted; subst routed.
+    rewrite Hdiff. reflexivity.
+  - destruct (bit_at key split) eqn:Ekey.
+    + cbn [routed_key] in Hrouted. rewrite Ekey in Hrouted.
+      specialize (IHr routed differing Hrouted Hdiff).
+      destruct rtree as [|stored_r value_r|sample_r split_r ltree_r rtree_r].
+      * exfalso. apply Hner. reflexivity.
+      * cbn [set_descend] in IHr |- *. rewrite Ekey, IHr.
+        destruct (differing <? split) eqn:Ebefore.
+        -- left. split; [reflexivity|]. apply Nat.ltb_lt. exact Ebefore.
+        -- right. split.
+           ++ cbn [insert_at]. rewrite Ebefore, Ekey. reflexivity.
+           ++ apply Nat.ltb_ge. exact Ebefore.
+      * destruct IHr as [[Er Hlt]|[Er Hge]].
+        -- rewrite (set_descend_branch_true A key value sample split ltree
+             (Branch sample_r split_r ltree_r rtree_r) Ekey), Er.
+           destruct (differing <? split) eqn:Ebefore.
+           ++ left. split; [reflexivity|]. apply Nat.ltb_lt. exact Ebefore.
+           ++ right. split.
+              ** cbn [insert_at]. rewrite Ebefore, Ekey.
+                 assert (Ebefore_r : (differing <? split_r) = true) by
+                   (apply Nat.ltb_lt; exact Hlt).
+                 rewrite Ebefore_r. reflexivity.
+              ** apply Nat.ltb_ge. exact Ebefore.
+        -- rewrite (set_descend_branch_true A key value sample split ltree
+             (Branch sample_r split_r ltree_r rtree_r) Ekey), Er.
+           assert (Hsplits_after_r :
+             splits_after split (Branch sample_r split_r ltree_r rtree_r)).
+           { apply (all_splits_after_of_all_keys A sample split true);
+               [exact Hwr | exact Hr]. }
+           cbn [splits_after] in Hsplits_after_r.
+           destruct Hsplits_after_r as [Hsplit_lt _].
+           assert (Hge_outer : split <= differing) by lia.
+           assert (Ebefore : (differing <? split) = false) by
+             (apply Nat.ltb_ge; exact Hge_outer).
+           right. split.
+           ++ cbn [insert_at]. rewrite Ebefore, Ekey. reflexivity.
+           ++ exact Hge_outer.
+    + cbn [routed_key] in Hrouted. rewrite Ekey in Hrouted.
+      specialize (IHl routed differing Hrouted Hdiff).
+      destruct ltree as [|stored_l value_l|sample_l split_l ltree_l rtree_l].
+      * exfalso. apply Hnel. reflexivity.
+      * cbn [set_descend] in IHl |- *. rewrite Ekey, IHl.
+        destruct (differing <? split) eqn:Ebefore.
+        -- left. split; [reflexivity|]. apply Nat.ltb_lt. exact Ebefore.
+        -- right. split.
+           ++ cbn [insert_at]. rewrite Ebefore, Ekey. reflexivity.
+           ++ apply Nat.ltb_ge. exact Ebefore.
+      * destruct IHl as [[El Hlt]|[El Hge]].
+        -- rewrite (set_descend_branch_false A key value sample split
+             (Branch sample_l split_l ltree_l rtree_l) rtree Ekey), El.
+           destruct (differing <? split) eqn:Ebefore.
+           ++ left. split; [reflexivity|]. apply Nat.ltb_lt. exact Ebefore.
+           ++ right. split.
+              ** cbn [insert_at]. rewrite Ebefore, Ekey.
+                 assert (Ebefore_l : (differing <? split_l) = true) by
+                   (apply Nat.ltb_lt; exact Hlt).
+                 rewrite Ebefore_l. reflexivity.
+              ** apply Nat.ltb_ge. exact Ebefore.
+        -- rewrite (set_descend_branch_false A key value sample split
+             (Branch sample_l split_l ltree_l rtree_l) rtree Ekey), El.
+           assert (Hsplits_after_l :
+             splits_after split (Branch sample_l split_l ltree_l rtree_l)).
+           { apply (all_splits_after_of_all_keys A sample split false);
+               [exact Hwl | exact Hl]. }
+           cbn [splits_after] in Hsplits_after_l.
+           destruct Hsplits_after_l as [Hsplit_lt _].
+           assert (Hge_outer : split <= differing) by lia.
+           assert (Ebefore : (differing <? split) = false) by
+             (apply Nat.ltb_ge; exact Hge_outer).
+           right. split.
+           ++ cbn [insert_at]. rewrite Ebefore, Ekey. reflexivity.
+           ++ exact Hge_outer.
+Qed.
+
+(** The other base case of the native realizer's leaf comparison: an exact
+    match needs no bubbling at all, and [set_descend] finds it exactly where
+    a direct structural [replace] would.  Unlike
+    [set_descend_matches_insert_at] this needs no invariant - the two
+    functions walk the identical [bit_at]-routed path regardless of [wf]. *)
+Lemma set_descend_replace_when_none:
+  forall (A : Type) key value (m : t A) routed,
+    routed_key key m = Some routed -> first_diff key routed = None ->
+    set_descend key value m = Set_complete (replace key value m).
+Proof.
+  intros A key value m. induction m as
+      [|stored svalue|sample split ltree IHl rtree IHr];
+    intros routed Hrouted Hdiff.
+  - discriminate Hrouted.
+  - cbn in Hrouted. inversion Hrouted; subst stored.
+    cbn [set_descend replace]. now rewrite Hdiff.
+  - cbn [routed_key] in Hrouted. cbn [set_descend replace].
+    destruct (bit_at key split) eqn:Ekey.
+    + now rewrite (IHr routed Hrouted Hdiff).
+    + now rewrite (IHl routed Hrouted Hdiff).
+Qed.
+
+Lemma set_one_descent_eq:
+  forall (A : Type) key value (m : t A) routed,
+    wf m -> routed_key key m = Some routed ->
+    set_one_descent key value m =
+      match first_diff key routed with
+      | None => replace key value m
+      | Some differing => insert_at key value differing m
+      end.
+Proof.
+  intros A key value m routed Hwf Hrouted. unfold set_one_descent.
+  destruct (first_diff key routed) as [differing|] eqn:Hdiff.
+  - destruct m as [|stored stored_value|sample split ltree rtree].
+    + discriminate Hrouted.
+    + pose proof (set_descend_matches_insert_at A key value
+        (Leaf stored stored_value) Hwf routed differing Hrouted Hdiff) as Hcase.
+      cbn [insert_at]. now rewrite Hcase.
+    + destruct (set_descend_matches_insert_at A key value
+        (Branch sample split ltree rtree) Hwf routed differing Hrouted Hdiff)
+        as [[Hcase Hlt]|[Hcase Hge]].
+      * rewrite Hcase. cbn [insert_at].
+        assert (Eb : (differing <? split) = true) by (apply Nat.ltb_lt; exact Hlt).
+        now rewrite Eb.
+      * now rewrite Hcase.
+  - now rewrite (set_descend_replace_when_none A key value m routed Hrouted Hdiff).
+Qed.
+
+Corollary set_one_descent_eq_set:
+  forall (A : Type) key value (m : t A),
+    wf m -> set_one_descent key value m = set key value m.
+Proof.
+  intros A key value m Hwf. unfold set.
+  destruct (routed_key key m) as [routed|] eqn:Hrouted.
+  - now apply (set_one_descent_eq A key value m routed).
+  - unfold set_one_descent.
+    now rewrite (wf_routed_key_none A m key Hwf Hrouted).
+Qed.
+
+Corollary set_one_descent_correct_wf:
+  forall (A : Type) key value (m : t A),
+    wf m -> wf (set_one_descent key value m) /\
+    forall query,
+      get query (set_one_descent key value m) =
+        if String.eqb query key then Some value else get query m.
+Proof.
+  intros A key value m Hwf.
+  rewrite (set_one_descent_eq_set A key value m Hwf).
+  apply (set_correct_wf A key value m Hwf).
+Qed.
+
 Theorem replace_binding_correct_wf:
   forall (A : Type) key (value : option A) (m : t A),
     wf m -> wf (replace_binding key value m) /\

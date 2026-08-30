@@ -142,14 +142,18 @@ Fixpoint set_descend {A : Type}
         | Set_complete updated => Set_complete (Branch sample split ltree updated)
         | Set_bubble differing =>
             if differing <? split then Set_bubble differing
-            else Set_complete (branch_at key differing fresh rtree)
+            else Set_complete
+                   (Branch sample split ltree
+                      (branch_at key differing fresh rtree))
         end
       else
         match set_descend key value ltree with
         | Set_complete updated => Set_complete (Branch sample split updated rtree)
         | Set_bubble differing =>
             if differing <? split then Set_bubble differing
-            else Set_complete (branch_at key differing fresh ltree)
+            else Set_complete
+                   (Branch sample split
+                      (branch_at key differing fresh ltree) rtree)
         end
   end.
 

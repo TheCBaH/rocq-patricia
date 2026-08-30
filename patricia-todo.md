@@ -99,8 +99,13 @@ Required only for an end-to-end native-refinement claim.
   obligation, recorded by the mapping audit below.
 - [ ] Connect OCaml byte length/access and `Char.code` to the source byte model,
   including the guards around `String.unsafe_get`.
-- [ ] Prove the native XOR/leading-zeroes first-difference calculation refines
-  the source model.
+- [x] Prove the native XOR/leading-zeroes first-difference calculation refines
+  the source model. `NativeRefinement.v`'s `native_byte_first_diff_correct` and
+  `native_string_first_diff_refines` model the realizer's `lxor`/mask-shift
+  loop directly (`N.lxor`, `N.land` against `2 ^ (7 - offset)`) and prove it
+  finds the same split as the safe `ascii_xor`/`ascii_leading_zeroes` source
+  model, hence (via the existing `bytewise_first_diff_correct`) the same split
+  as `StringBits.first_diff` itself.
 - [x] Audit the remaining standard `positive`, `N`, `nat`, and string extraction
   mappings and record which pieces remain axiomatic or foreign.  The public
   specification now names `ExtrOcamlZInt`, `ExtrOcamlNatInt`,
@@ -125,11 +130,19 @@ Required only for an end-to-end native-refinement claim.
   `wf_cached_sample_agrees_before_representative` and
   `wf_cached_sample_bit_at_before_representative` carry this to every
   prefix-comparison and strictly-outer routing-bit use in native merge/union.
-- [ ] Define and prove a source-level one-descent string `set` worker, or verify
+- [x] Define and prove a source-level one-descent string `set` worker, or verify
   the exception-based native realization in a target-language logic.
-  `set_descend` and `set_one_descent` now state the exception-free source
-  worker and its bubble result; its refinement and well-formedness proof is
-  still required before extraction can use it.
+  `set_descend`/`set_one_descent` mirror the native exception-based `set`
+  realizer's single descend-then-bubble control flow exactly (matched against
+  `PatriciaExtract.v`'s `StringPatricia.set` realizer, which caught a real bug:
+  the original stub's bubble-caught-here case dropped the sibling subtree and
+  the branch's own sample/split, fixed to rebuild the full `Branch`).
+  `set_descend_matches_insert_at` proves the descent lands on the same split
+  `insert_at` would from a separate top-down `routed_key` pass, using the
+  branch-split ordering (`all_splits_after_of_all_keys`) to relate the two
+  directions; `set_one_descent_eq_set` concludes `set_one_descent` and `set`
+  are the same function, and `set_one_descent_correct_wf` restates wf
+  preservation and the `get` law for free by rewriting through it.
 - [ ] Replace proof-side fuelled `combine` with well-founded structural
   recursion and prove equivalence to sufficiently fuelled `combine_fuel`.
 - [ ] Define and prove source-level specialized left- and right-biased unions,
@@ -249,6 +262,8 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-30 | Completed the N2 one-descent string `set` worker, fixing a dropped-sibling bug the proof caught in the pre-existing stub | `StringPatriciaProof.v`'s `set_descend_matches_insert_at`/`set_one_descent_eq_set`/`set_one_descent_correct_wf`; full `make`: 281 declarations closed, oracle and differential tests passed; `git diff --check` passed |
+| 2026-08-30 | Completed the N1 native XOR/leading-zeroes first-difference refinement | `NativeRefinement.v`'s `native_byte_first_diff_correct`/`native_string_first_diff_refines` connect the realizer's `lxor`/mask-shift loop to the existing safe source model; full `make` and `git diff --check` passed |
 | 2026-08-30 | Completed the N1 audit of standard extraction mappings | `SPECIFICATION.md` records the exact imported mapping modules, native representations, and remaining foreign obligations; `git diff --check` passed |
 | 2026-08-30 | Completed cached-string-sample representative independence for N2 | `StringPatriciaProof.v` proves prefix, bounded-agreement, and outer-routing-bit equivalence between the cached resident sample and pure representative; full `make` and `git diff --check` passed |
 | 2026-08-30 | Completed the bounded integer-routing source refinement for N1 | `NativeRefinement.v` proves prefix, prefix-match, routing-bit, highest-differing-bit, and mask-order correspondence, plus 62-bit payload/mask closure; full `make` and `git diff --check` passed |
