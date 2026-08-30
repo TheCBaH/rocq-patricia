@@ -77,9 +77,10 @@ thresholds.
   as the unique unequal valid token after an equal prefix; the safe worker also
   rejects out-of-range byte reads and tags 9–15, while its marker is true
   exactly for an in-range byte. A safe structural bytewise scanner is proved
-  equal to packed `first_diff`, including its first-differing-character-bit
-  choice. Proving the handwritten OCaml primitive/string correspondence and
-  XOR/leading-zeroes realization against that scanner is next.
+  equal to packed `first_diff`, including a Boolean-XOR leading-zeroes model
+  for its first-differing-character-bit choice. Proving the handwritten OCaml
+  `Char.code`/integer-XOR and unsafe-string correspondence against that model
+  is next.
 - **done**: require every well-formed string branch's cached sample to be a
   resident binding and preserve that requirement through all smart operations.
 - **later**: replace handwritten direct `set`, `combine`, and biased-union
@@ -230,6 +231,11 @@ thresholds.
   character, and proved it equal to `packed_first_diff`. This closes the
   source-level scan equivalence; correspondence to OCaml unsafe reads and its
   XOR/leading-zeroes implementation remains a target-language obligation.
+- **2026-08-29 — XOR leading-zeroes character model**: proved that the safe
+  Boolean-XOR leading-zeroes calculation for a differing character returns
+  exactly the same tag as the eight-bit source scanner. The remaining gap is
+  specifically the native `Char.code`/integer-XOR and unsafe-access
+  correspondence, rather than the choice of first differing character bit.
 - **2026-08-29 — exact packed-token specification**: proved that decoding then
   re-encoding any valid packed token is identity, and used this to state both
   directions of `packed_first_diff` directly over native tokens: its result is

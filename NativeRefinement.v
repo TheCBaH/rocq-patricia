@@ -321,6 +321,144 @@ Proof.
     subst right. exfalso. apply Hdiff. reflexivity.
 Qed.
 
+(** Boolean-XOR model of the differing-byte calculation performed by the
+    extracted worker.  The character constructor stores bits least
+    significant first, whereas [ascii_bit] exposes them most significant
+    first; [ascii_xor_bit] below connects those two views. *)
+Definition ascii_xor (left right : Ascii.ascii) : Ascii.ascii :=
+  match left, right with
+  | Ascii.Ascii l0 l1 l2 l3 l4 l5 l6 l7,
+    Ascii.Ascii r0 r1 r2 r3 r4 r5 r6 r7 =>
+      Ascii.Ascii (xorb l0 r0) (xorb l1 r1) (xorb l2 r2) (xorb l3 r3)
+        (xorb l4 r4) (xorb l5 r5) (xorb l6 r6) (xorb l7 r7)
+  end.
+
+Fixpoint ascii_leading_zeroes_from
+    (fuel offset : nat) (difference : Ascii.ascii) : option nat :=
+  match fuel with
+  | 0 => None
+  | S fuel' =>
+      if StringBits.ascii_bit difference offset
+      then Some offset
+      else ascii_leading_zeroes_from fuel' (S offset) difference
+  end.
+
+Definition ascii_leading_zeroes (difference : Ascii.ascii) : option nat :=
+  ascii_leading_zeroes_from 8 0 difference.
+
+Definition xor_first_diff (left right : Ascii.ascii) : option nat :=
+  if Ascii.eqb left right then None else ascii_leading_zeroes (ascii_xor left right).
+
+Lemma ascii_xor_bit:
+  forall left right n, n < 8 ->
+    StringBits.ascii_bit (ascii_xor left right) n =
+      xorb (StringBits.ascii_bit left n) (StringBits.ascii_bit right n).
+Proof.
+  intros [l0 l1 l2 l3 l4 l5 l6 l7]
+         [r0 r1 r2 r3 r4 r5 r6 r7] n Hn.
+  destruct n as [|[|[|[|[|[|[|[|n]]]]]]]]; cbn; try reflexivity; lia.
+Qed.
+
+Lemma ascii_xor_zero_iff:
+  forall left right, ascii_xor left right = Ascii.zero <-> left = right.
+Proof.
+  intros left right. split.
+  - intro Hzero. apply StringBits.ascii_bit_ext. intros n Hn.
+    assert (Hbit : StringBits.ascii_bit (ascii_xor left right) n = false).
+    { rewrite Hzero. destruct n as [|[|[|[|[|[|[|[|n]]]]]]]]; reflexivity. }
+    rewrite ascii_xor_bit in Hbit by exact Hn.
+    destruct (StringBits.ascii_bit left n), (StringBits.ascii_bit right n);
+      cbn in Hbit; try discriminate; reflexivity.
+  - intros ->. destruct right as [r0 r1 r2 r3 r4 r5 r6 r7].
+    cbn. repeat rewrite Bool.xorb_nilpotent. reflexivity.
+Qed.
+
+Lemma ascii_leading_zeroes_from_none:
+  forall fuel offset difference,
+    ascii_leading_zeroes_from fuel offset difference = None <->
+    forall n, offset <= n < offset + fuel ->
+      StringBits.ascii_bit difference n = false.
+Proof.
+  induction fuel as [|fuel IH]; intros offset difference; cbn.
+  - split; intros; [lia | reflexivity].
+  - destruct (StringBits.ascii_bit difference offset) eqn:E.
+    + split.
+      * discriminate.
+      * intros H. specialize (H offset ltac:(lia)). rewrite E in H. discriminate.
+    + rewrite IH. split.
+      * intros H n Hrange. destruct (Nat.eq_dec n offset) as [->|Hneq].
+        -- exact E.
+        -- apply H. lia.
+      * intros H n Hrange. apply H. lia.
+Qed.
+
+Lemma ascii_leading_zeroes_from_some:
+  forall fuel offset difference differing,
+    ascii_leading_zeroes_from fuel offset difference = Some differing ->
+    offset <= differing < offset + fuel /\
+    StringBits.ascii_bit difference differing = true /\
+    (forall n, offset <= n < differing ->
+      StringBits.ascii_bit difference n = false).
+Proof.
+  induction fuel as [|fuel IH]; intros offset difference differing H; cbn in H.
+  - discriminate.
+  - destruct (StringBits.ascii_bit difference offset) eqn:E.
+    + inversion H; subst differing. split; [lia|]. split; [exact E|]. intros; lia.
+    + specialize (IH (S offset) difference differing H).
+      destruct IH as [Hrange [Hbit Hbefore]].
+      split; [lia|]. split; [assumption|]. intros n Hn.
+      destruct (Nat.eq_dec n offset) as [->|Hneq]; [exact E|].
+      apply Hbefore. lia.
+Qed.
+
+Lemma ascii_leading_zeroes_nonzero:
+  forall difference,
+    difference <> Ascii.zero ->
+    exists differing, ascii_leading_zeroes difference = Some differing.
+Proof.
+  intros difference Hnonzero. unfold ascii_leading_zeroes.
+  destruct (ascii_leading_zeroes_from 8 0 difference) as [differing|] eqn:H.
+  - eauto.
+  - exfalso. apply Hnonzero. apply StringBits.ascii_bit_ext. intros n Hn.
+    assert (Hbit : StringBits.ascii_bit difference n = false).
+    { apply (proj1 (ascii_leading_zeroes_from_none 8 0 difference) H). lia. }
+    destruct n as [|[|[|[|[|[|[|[|n]]]]]]]]; cbn in Hbit |- *;
+      try exact Hbit; lia.
+Qed.
+
+Lemma ascii_first_diff_same:
+  forall character, ascii_first_diff character character = None.
+Proof.
+  intros character. unfold ascii_first_diff. cbn.
+  repeat rewrite Bool.eqb_reflx. reflexivity.
+Qed.
+
+Lemma xor_first_diff_correct:
+  forall left right, xor_first_diff left right = ascii_first_diff left right.
+Proof.
+  intros left right. unfold xor_first_diff.
+  destruct (Ascii.eqb left right) eqn:Heq.
+  - apply Ascii.eqb_eq in Heq. subst right.
+    now rewrite ascii_first_diff_same.
+  - assert (Hneq : left <> right) by (apply Ascii.eqb_neq; exact Heq).
+    destruct (ascii_leading_zeroes_nonzero (ascii_xor left right)) as
+      [offset Hoffset].
+    { intro Hzero. apply Hneq. apply (proj1 (ascii_xor_zero_iff _ _) Hzero). }
+    rewrite Hoffset.
+    assert (Hoffset_spec := ascii_leading_zeroes_from_some 8 0
+      (ascii_xor left right) offset Hoffset).
+    destruct Hoffset_spec as [Hrange [Hbit Hbefore]].
+    symmetry. apply ascii_first_diff_characterization.
+    + rewrite ascii_xor_bit in Hbit by lia.
+      destruct (StringBits.ascii_bit left offset),
+               (StringBits.ascii_bit right offset); cbn in Hbit;
+        try discriminate; discriminate.
+    + intros n Hn. pose proof (Hbefore n ltac:(lia)) as Hprior.
+      rewrite ascii_xor_bit in Hprior by lia.
+      destruct (StringBits.ascii_bit left n), (StringBits.ascii_bit right n);
+        cbn in Hprior; try discriminate; reflexivity.
+Qed.
+
 (** A safe structural counterpart of the native bytewise scanner.  The
     recursive call consumes one byte from each common prefix; a mismatching
     byte is resolved by [ascii_first_diff], while unequal lengths select the
