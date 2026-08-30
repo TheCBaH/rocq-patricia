@@ -139,6 +139,35 @@ Proof.
       simpl; assumption || reflexivity.
 Qed.
 
+Lemma nonempty_map:
+  forall (A B : Type) (f : positive -> A -> B) (m : t A),
+    nonempty m -> nonempty (map f m).
+Proof.
+  intros A B f m [key [value Hget]].
+  exists key, (f key value). rewrite get_map, Hget. reflexivity.
+Qed.
+
+Lemma all_keys_map:
+  forall (A B : Type) (f : positive -> A -> B)
+      (P : positive -> Prop) (m : t A),
+    all_keys P m -> all_keys P (map f m).
+Proof.
+  intros A B f P m Hall key value Hget.
+  rewrite get_map in Hget.
+  destruct (get key m) as [old|] eqn:E; cbn in Hget; [|discriminate].
+  apply (Hall key old E).
+Qed.
+
+Theorem map_wf:
+  forall (A B : Type) (f : positive -> A -> B) (m : t A),
+    wf m -> wf (map f m).
+Proof.
+  intros A B f m Hwf. induction Hwf; cbn [map].
+  - constructor.
+  - constructor.
+  - constructor; eauto using nonempty_map, all_keys_map.
+Qed.
+
 Lemma elements_aux_spec:
   forall (A : Type) (m : t A) tail,
     elements_aux m tail = elements m ++ tail.
@@ -1749,6 +1778,46 @@ Theorem combine_correct_wf:
 Proof.
   intros. unfold combine. eapply combine_fuel_correct_wf; eauto.
   apply public_combine_fuel_sufficient.
+Qed.
+
+Theorem union_left_correct_wf:
+  forall (A : Type) (left right : t A),
+    wf left -> wf right ->
+    wf (union_left left right) /\
+    forall key,
+      get key (union_left left right) =
+      match get key left with
+      | Some value => Some value
+      | None => get key right
+      end.
+Proof.
+  intros A left right Hleft Hright.
+  unfold union_left.
+  destruct (@combine_correct_wf A A A
+    (fun x y => match x with Some _ => x | None => y end)
+    left right eq_refl Hleft Hright) as [Hwf Hget].
+  split; [exact Hwf|].
+  intro key. rewrite Hget. now destruct (get key left).
+Qed.
+
+Theorem union_right_correct_wf:
+  forall (A : Type) (left right : t A),
+    wf left -> wf right ->
+    wf (union_right left right) /\
+    forall key,
+      get key (union_right left right) =
+      match get key right with
+      | Some value => Some value
+      | None => get key left
+      end.
+Proof.
+  intros A left right Hleft Hright.
+  unfold union_right.
+  destruct (@combine_correct_wf A A A
+    (fun x y => match y with Some _ => y | None => x end)
+    left right eq_refl Hleft Hright) as [Hwf Hget].
+  split; [exact Hwf|].
+  intro key. rewrite Hget. now destruct (get key right).
 Qed.
 
 Lemma wf_empty_ok:

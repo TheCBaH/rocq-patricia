@@ -2,7 +2,9 @@
 
 Review date: 2026-08-30
 
-The active implementation plan and status tracker are maintained separately in
+The supported public contracts, theorem checklist, and trusted computing base
+are fixed in [`SPECIFICATION.md`](SPECIFICATION.md). The active implementation
+plan and status tracker are maintained separately in
 [`patricia-todo.md`](patricia-todo.md). Performance analysis is in
 [`patricia-str.md`](patricia-str.md), and measured results are in
 [`patricia-bench.md`](patricia-bench.md).

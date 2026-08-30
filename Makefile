@@ -15,7 +15,7 @@ REFERENCE_DIR := reference_extracted
 REFERENCE_PACK := PatriciaReference.cmo
 
 .PHONY: all proof assumptions extraction reference-extraction ocaml \
-	reference-ocaml test differential benchmark clean
+	reference-ocaml test differential benchmark benchmark-smoke clean
 
 all: proof assumptions extraction reference-extraction ocaml reference-ocaml \
 	test differential
@@ -82,6 +82,14 @@ benchmark: ocaml PatriciaBenchmark.ml
 	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../patricia-benchmark $$objects \
 	    $(addprefix ../,$(PUBLIC_CMXS)) ../PatriciaBenchmark.ml
 	./patricia-benchmark
+
+# Small checked workload for CI.  It exercises every benchmark operation but
+# neither records the timings nor treats them as performance thresholds.
+benchmark-smoke: benchmark
+
+benchmark-smoke: export PATRICIA_BENCH_SIZE := 100
+benchmark-smoke: export PATRICIA_BENCH_STRING_LENGTHS := 2
+benchmark-smoke: export PATRICIA_BENCH_VARIABLE_STRING_MAX_LENGTH := 2
 
 Patricia.vo: PatriciaBits.vo
 PatriciaProof.vo: PatriciaBits.vo Patricia.vo

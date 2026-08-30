@@ -5,6 +5,11 @@
 *.vos
 *.cmi
 *.cmo
+*.cmx
+*.o
 *.lia.cache
 /patricia-test
 /patricia-differential-test
+/patricia-benchmark
+/extracted/
+/reference_extracted/

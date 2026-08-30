@@ -9,17 +9,22 @@ Patricia-tree sketches:
   differing-bit positions; lookups route to one leaf and compare the key once.
   Strings are not converted to integers.
 
+The supported contracts, theorem checklist, and trusted computing base are in
+[`SPECIFICATION.md`](SPECIFICATION.md). The verification review and active
+tracker are in [`patricia.md`](patricia.md) and
+[`patricia-todo.md`](patricia-todo.md).
+
 Run:
 
 ```sh
-make -C patricia
+make
 ```
 
 For a native-code comparison with OCaml's standard-library AVL tree and hash
 table, run:
 
 ```sh
-make -C patricia benchmark
+make benchmark
 ```
 
 The comparison verifies each measured Patricia and `Stdlib.Hashtbl` result
