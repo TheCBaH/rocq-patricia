@@ -57,6 +57,16 @@ let positive_env name default =
          parsed
        with Failure _ -> invalid_arg (name ^ " must be an integer"))
 
+let nonnegative_env name default =
+  match Sys.getenv_opt name with
+  | None -> default
+  | Some value ->
+      (try
+         let parsed = int_of_string value in
+         if parsed < 0 then invalid_arg (name ^ " must be non-negative");
+         parsed
+       with Failure _ -> invalid_arg (name ^ " must be an integer"))
+
 (* A single disjoint union can take less than one clock tick.  Repeat only
    these short, pure operations inside each sample and take several samples;
    larger map traversals retain their single-run measurement cost. *)
@@ -64,7 +74,11 @@ let short_operation_samples =
   positive_env "PATRICIA_BENCH_SHORT_SAMPLES" 5
 
 let short_operation_batch =
-  positive_env "PATRICIA_BENCH_SHORT_BATCH" 32
+  positive_env "PATRICIA_BENCH_SHORT_BATCH"
+    (if benchmark_size <= 100_000 then 32 else 1)
+
+let long_prefix_length =
+  nonnegative_env "PATRICIA_BENCH_LONG_PREFIX_LENGTH" 192
 
 let string_key_space_at_least length required =
   let rec loop remaining capacity =
@@ -203,11 +217,11 @@ let measure_short_operation operation =
   measure_operation ~samples:short_operation_samples
     ~batch:short_operation_batch operation
 
-let report_build title patricia avl hash =
+let report_build ?(operation = "build") title patricia avl hash =
   let report name measurement =
     Printf.printf
-      "  %-9s build %7.3f ms  retained %8d words (%5.2f/binding)  allocated %10.0f words\n"
-      name
+      "  %-9s %-12s %7.3f ms  retained %8d words (%5.2f/binding)  allocated %10.0f words\n"
+      name operation
       (1000. *. measurement.seconds)
       measurement.retained_words
       (float_of_int measurement.retained_words /. float_of_int benchmark_size)
@@ -270,6 +284,17 @@ let build_hash_string keys =
   Array.iter
     (fun key -> String_hash.replace map key (Stdlib.String.length key)) keys;
   map
+
+let permuted_keys keys =
+  let result = Array.copy keys in
+  let state = Random.State.make [| 0x50_4154 |] in
+  for index = Array.length result - 1 downto 1 do
+    let other = Random.State.int state (index + 1) in
+    let saved = result.(index) in
+    result.(index) <- result.(other);
+    result.(other) <- saved
+  done;
+  result
 
 let patricia_cardinal map =
   Patricia.fold (fun count _ _ -> count + 1) map 0
@@ -891,6 +916,201 @@ let time_string_mutations keys fresh_keys patricia avl hash =
     keys;
   report_operation "remove keys" patricia_remove avl_remove hash_remove benchmark_size
 
+(* A deterministic mixed trace covers successful and unsuccessful lookup and
+   removal, replacement of an existing binding, and insertion of a fresh one.
+   Every implementation executes the same trace and its final map is checked
+   against the AVL result. *)
+let time_int_mixed_operations keys fresh_keys patricia avl hash =
+  let run_patricia () =
+    let current = ref patricia and checksum = ref 0 in
+    Array.iteri
+      (fun index key ->
+         let fresh = fresh_keys.(index) in
+         match index mod 6 with
+         | 0 ->
+             (match Patricia.get (patricia_key key) !current with
+              | Some value -> checksum := !checksum lxor value
+              | None -> failwith "integer mixed Patricia lookup missed")
+         | 1 ->
+             if Patricia.get (patricia_key fresh) !current <> None then
+               failwith "integer mixed Patricia lookup found fresh key"
+         | 2 -> current := Patricia.set (patricia_key key) (-key) !current
+         | 3 -> current := Patricia.remove (patricia_key fresh) !current
+         | 4 -> current := Patricia.remove (patricia_key key) !current
+         | _ -> current := Patricia.set (patricia_key fresh) fresh !current)
+      keys;
+    !current, !checksum
+  in
+  let run_avl () =
+    let current = ref avl and checksum = ref 0 in
+    Array.iteri
+      (fun index key ->
+         let fresh = fresh_keys.(index) in
+         match index mod 6 with
+         | 0 ->
+             (match Int_avl.find_opt key !current with
+              | Some value -> checksum := !checksum lxor value
+              | None -> failwith "integer mixed AVL lookup missed")
+         | 1 ->
+             if Int_avl.find_opt fresh !current <> None then
+               failwith "integer mixed AVL lookup found fresh key"
+         | 2 -> current := Int_avl.add key (-key) !current
+         | 3 -> current := Int_avl.remove fresh !current
+         | 4 -> current := Int_avl.remove key !current
+         | _ -> current := Int_avl.add fresh fresh !current)
+      keys;
+    !current, !checksum
+  in
+  let run_hash () =
+    let current = Int_hash.copy hash and checksum = ref 0 in
+    Array.iteri
+      (fun index key ->
+         let fresh = fresh_keys.(index) in
+         match index mod 6 with
+         | 0 ->
+             (match Int_hash.find_opt current key with
+              | Some value -> checksum := !checksum lxor value
+              | None -> failwith "integer mixed hash lookup missed")
+         | 1 ->
+             if Int_hash.find_opt current fresh <> None then
+               failwith "integer mixed hash lookup found fresh key"
+         | 2 -> Int_hash.replace current key (-key)
+         | 3 -> Int_hash.remove current fresh
+         | 4 -> Int_hash.remove current key
+         | _ -> Int_hash.replace current fresh fresh)
+      keys;
+    current, !checksum
+  in
+  let (patricia_result, patricia_checksum), patricia_measurement =
+    measure_operation run_patricia
+  in
+  let (avl_result, avl_checksum), avl_measurement = measure_operation run_avl in
+  let (hash_result, hash_checksum), hash_measurement = measure_operation run_hash in
+  if patricia_checksum <> avl_checksum || patricia_checksum <> hash_checksum then
+    failwith "integer mixed-operation checksums differ";
+  check_int_equivalent (Array.append keys fresh_keys) patricia_result avl_result;
+  check_int_hash_equivalent (Array.append keys fresh_keys) hash_result avl_result;
+  report_operation "mixed operations" patricia_measurement avl_measurement
+    hash_measurement benchmark_size
+
+let time_string_mixed_operations keys fresh_keys patricia avl hash =
+  let run_patricia () =
+    let current = ref patricia and checksum = ref 0 in
+    Array.iteri
+      (fun index key ->
+         let fresh = fresh_keys.(index) in
+         match index mod 6 with
+         | 0 ->
+             (match StringPatricia.get key !current with
+              | Some value -> checksum := !checksum lxor value
+              | None -> failwith "string mixed Patricia lookup missed")
+         | 1 ->
+             if StringPatricia.get fresh !current <> None then
+               failwith "string mixed Patricia lookup found fresh key"
+         | 2 ->
+             current := StringPatricia.set key (-Stdlib.String.length key) !current
+         | 3 -> current := StringPatricia.remove fresh !current
+         | 4 -> current := StringPatricia.remove key !current
+         | _ ->
+             current := StringPatricia.set fresh (Stdlib.String.length fresh) !current)
+      keys;
+    !current, !checksum
+  in
+  let run_avl () =
+    let current = ref avl and checksum = ref 0 in
+    Array.iteri
+      (fun index key ->
+         let fresh = fresh_keys.(index) in
+         match index mod 6 with
+         | 0 ->
+             (match String_avl.find_opt key !current with
+              | Some value -> checksum := !checksum lxor value
+              | None -> failwith "string mixed AVL lookup missed")
+         | 1 ->
+             if String_avl.find_opt fresh !current <> None then
+               failwith "string mixed AVL lookup found fresh key"
+         | 2 -> current := String_avl.add key (-Stdlib.String.length key) !current
+         | 3 -> current := String_avl.remove fresh !current
+         | 4 -> current := String_avl.remove key !current
+         | _ ->
+             current := String_avl.add fresh (Stdlib.String.length fresh) !current)
+      keys;
+    !current, !checksum
+  in
+  let run_hash () =
+    let current = String_hash.copy hash and checksum = ref 0 in
+    Array.iteri
+      (fun index key ->
+         let fresh = fresh_keys.(index) in
+         match index mod 6 with
+         | 0 ->
+             (match String_hash.find_opt current key with
+              | Some value -> checksum := !checksum lxor value
+              | None -> failwith "string mixed hash lookup missed")
+         | 1 ->
+             if String_hash.find_opt current fresh <> None then
+               failwith "string mixed hash lookup found fresh key"
+         | 2 -> String_hash.replace current key (-Stdlib.String.length key)
+         | 3 -> String_hash.remove current fresh
+         | 4 -> String_hash.remove current key
+         | _ -> String_hash.replace current fresh (Stdlib.String.length fresh))
+      keys;
+    current, !checksum
+  in
+  let (patricia_result, patricia_checksum), patricia_measurement =
+    measure_operation run_patricia
+  in
+  let (avl_result, avl_checksum), avl_measurement = measure_operation run_avl in
+  let (hash_result, hash_checksum), hash_measurement = measure_operation run_hash in
+  if patricia_checksum <> avl_checksum || patricia_checksum <> hash_checksum then
+    failwith "string mixed-operation checksums differ";
+  check_string_equivalent (Array.append keys fresh_keys) patricia_result avl_result;
+  check_string_hash_equivalent (Array.append keys fresh_keys) hash_result avl_result;
+  report_operation "mixed operations" patricia_measurement avl_measurement
+    hash_measurement benchmark_size
+
+let time_int_union name keys expected_cardinal first_patricia first_avl first_hash
+    second_patricia second_avl second_hash =
+  let patricia_result, patricia_measurement =
+    measure_short_operation (fun () ->
+        Patricia.union_left first_patricia second_patricia)
+  in
+  let avl_result, avl_measurement =
+    measure_short_operation (fun () ->
+        Int_avl.union (fun _ left _ -> Some left) first_avl second_avl)
+  in
+  let hash_result, hash_measurement =
+    measure_short_operation (fun () -> union_left_int_hash first_hash second_hash)
+  in
+  if patricia_cardinal patricia_result <> expected_cardinal
+     || Int_avl.cardinal avl_result <> expected_cardinal
+     || Int_hash.length hash_result <> expected_cardinal then
+    failwith ("integer " ^ name ^ " produced the wrong cardinality");
+  check_int_equivalent keys patricia_result avl_result;
+  check_int_hash_equivalent keys hash_result avl_result;
+  report_operation name patricia_measurement avl_measurement hash_measurement 1
+
+let time_string_union name keys expected_cardinal first_patricia first_avl first_hash
+    second_patricia second_avl second_hash =
+  let patricia_result, patricia_measurement =
+    measure_short_operation (fun () ->
+        StringPatricia.union_left first_patricia second_patricia)
+  in
+  let avl_result, avl_measurement =
+    measure_short_operation (fun () ->
+        String_avl.union (fun _ left _ -> Some left) first_avl second_avl)
+  in
+  let hash_result, hash_measurement =
+    measure_short_operation (fun () -> union_left_string_hash first_hash second_hash)
+  in
+  if string_patricia_cardinal patricia_result <> expected_cardinal
+     || String_avl.cardinal avl_result <> expected_cardinal
+     || String_hash.length hash_result <> expected_cardinal then
+    failwith ("string " ^ name ^ " produced the wrong cardinality");
+  check_string_equivalent keys patricia_result avl_result;
+  check_string_hash_equivalent keys hash_result avl_result;
+  report_operation name patricia_measurement avl_measurement hash_measurement 1
+
 let benchmark_int () =
   let left_keys = Array.init benchmark_size (fun index -> index + 1) in
   let disjoint_keys = Array.init benchmark_size (fun index -> benchmark_size + index + 1) in
@@ -909,11 +1129,26 @@ let benchmark_int () =
   check_int_equivalent left_keys patricia_left avl_left;
   check_int_hash_equivalent left_keys hash_left avl_left;
   report_build "Integer keys" patricia_build avl_build hash_build;
+  let random_keys = permuted_keys left_keys in
+  let random_patricia, random_patricia_build =
+    measure_build patricia_cardinal (fun () -> build_patricia_int random_keys)
+  in
+  let random_avl, random_avl_build =
+    measure_build Int_avl.cardinal (fun () -> build_avl_int random_keys)
+  in
+  let random_hash, random_hash_build =
+    measure_build Int_hash.length (fun () -> build_hash_int random_keys)
+  in
+  check_int_equivalent left_keys random_patricia random_avl;
+  check_int_hash_equivalent left_keys random_hash random_avl;
+  report_build ~operation:"random build" "Integer keys (random insertion order)"
+    random_patricia_build random_avl_build random_hash_build;
   time_int_lookups left_keys patricia_left avl_left hash_left;
   time_int_membership left_keys disjoint_keys patricia_left avl_left hash_left;
   time_int_elements patricia_left avl_left hash_left;
   time_int_generic_combine left_keys patricia_left avl_left hash_left;
   time_int_mutations left_keys disjoint_keys patricia_left avl_left hash_left;
+  time_int_mixed_operations left_keys disjoint_keys patricia_left avl_left hash_left;
   let patricia_disjoint = build_patricia_int disjoint_keys in
   let avl_disjoint = build_avl_int disjoint_keys in
   let hash_disjoint = build_hash_int disjoint_keys in
@@ -957,6 +1192,28 @@ let benchmark_int () =
   check_int_equivalent all_overlap patricia_merged avl_merged;
   check_int_hash_equivalent all_overlap hash_merged avl_merged;
   report_operation "overlap union" patricia_merge avl_merge hash_merge 1;
+  let subset_keys = Array.sub left_keys 0 (max 1 (benchmark_size / 2)) in
+  let subset_patricia = build_patricia_int subset_keys in
+  let subset_avl = build_avl_int subset_keys in
+  let subset_hash = build_hash_int subset_keys in
+  time_int_union "subset union" left_keys benchmark_size patricia_left avl_left
+    hash_left subset_patricia subset_avl subset_hash;
+  time_int_union "equal union" left_keys benchmark_size patricia_left avl_left
+    hash_left patricia_left avl_left hash_left;
+  time_int_union "no-op union" left_keys benchmark_size patricia_left avl_left
+    hash_left Patricia.empty Int_avl.empty (Int_hash.create 1);
+  let sparse_existing = max 1 (benchmark_size / 8) in
+  let sparse_keys =
+    Array.init (2 * sparse_existing) (fun index ->
+        if index mod 2 = 0 then 1 + ((index / 2) * 8)
+        else benchmark_size + (index / 2) + 1)
+  in
+  let sparse_patricia = build_patricia_int sparse_keys in
+  let sparse_avl = build_avl_int sparse_keys in
+  let sparse_hash = build_hash_int sparse_keys in
+  time_int_union "sparse-overlap union" (Array.append left_keys sparse_keys)
+    (benchmark_size + sparse_existing) patricia_left avl_left hash_left
+    sparse_patricia sparse_avl sparse_hash;
   print_newline ()
 
 let short_string_key length index =
@@ -1000,11 +1257,27 @@ let benchmark_strings title make_key =
   check_string_equivalent left_keys patricia_left avl_left;
   check_string_hash_equivalent left_keys hash_left avl_left;
   report_build title patricia_build avl_build hash_build;
+  let random_keys = permuted_keys left_keys in
+  let random_patricia, random_patricia_build =
+    measure_build string_patricia_cardinal (fun () -> build_patricia_string random_keys)
+  in
+  let random_avl, random_avl_build =
+    measure_build String_avl.cardinal (fun () -> build_avl_string random_keys)
+  in
+  let random_hash, random_hash_build =
+    measure_build String_hash.length (fun () -> build_hash_string random_keys)
+  in
+  check_string_equivalent left_keys random_patricia random_avl;
+  check_string_hash_equivalent left_keys random_hash random_avl;
+  report_build ~operation:"random build"
+    (title ^ " (random insertion order)") random_patricia_build
+    random_avl_build random_hash_build;
   time_string_lookups left_keys patricia_left avl_left hash_left;
   time_string_membership left_keys disjoint_keys patricia_left avl_left hash_left;
   time_string_elements patricia_left avl_left hash_left;
   time_string_generic_combine left_keys patricia_left avl_left hash_left;
   time_string_mutations left_keys disjoint_keys patricia_left avl_left hash_left;
+  time_string_mixed_operations left_keys disjoint_keys patricia_left avl_left hash_left;
   let patricia_disjoint = build_patricia_string disjoint_keys in
   let avl_disjoint = build_avl_string disjoint_keys in
   let hash_disjoint = build_hash_string disjoint_keys in
@@ -1048,7 +1321,33 @@ let benchmark_strings title make_key =
   check_string_equivalent all_overlap patricia_merged avl_merged;
   check_string_hash_equivalent all_overlap hash_merged avl_merged;
   report_operation "overlap union" patricia_merge avl_merge hash_merge 1;
+  let subset_keys = Array.sub left_keys 0 (max 1 (benchmark_size / 2)) in
+  let subset_patricia = build_patricia_string subset_keys in
+  let subset_avl = build_avl_string subset_keys in
+  let subset_hash = build_hash_string subset_keys in
+  time_string_union "subset union" left_keys benchmark_size patricia_left avl_left
+    hash_left subset_patricia subset_avl subset_hash;
+  time_string_union "equal union" left_keys benchmark_size patricia_left avl_left
+    hash_left patricia_left avl_left hash_left;
+  time_string_union "no-op union" left_keys benchmark_size patricia_left avl_left
+    hash_left StringPatricia.empty String_avl.empty (String_hash.create 1);
+  let sparse_existing = max 1 (benchmark_size / 8) in
+  let sparse_keys =
+    Array.init (2 * sparse_existing) (fun index ->
+        if index mod 2 = 0 then make_key ((index / 2) * 8)
+        else make_key (benchmark_size + (index / 2)))
+  in
+  let sparse_patricia = build_patricia_string sparse_keys in
+  let sparse_avl = build_avl_string sparse_keys in
+  let sparse_hash = build_hash_string sparse_keys in
+  time_string_union "sparse-overlap union" (Array.append left_keys sparse_keys)
+    (benchmark_size + sparse_existing) patricia_left avl_left hash_left
+    sparse_patricia sparse_avl sparse_hash;
   print_newline ()
+
+let long_prefix_string_key =
+  let prefix = Stdlib.String.make long_prefix_length 'p' in
+  fun index -> prefix ^ short_string_key 4 index
 
 let () =
   Printf.printf
@@ -1064,4 +1363,7 @@ let () =
     (Printf.sprintf "String keys (variable length, up to %d characters)"
        variable_string_max_length)
     (variable_string_key variable_string_max_length);
+  benchmark_strings
+    (Printf.sprintf "String keys (%d-byte common prefix)" long_prefix_length)
+    long_prefix_string_key;
   print_endline "Patricia comparison benchmark: ok"

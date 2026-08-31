@@ -64,8 +64,12 @@ default `PATRICIA_BENCH_SIZE=10000`, so each input map has 10,000 bindings.
 
 - Integer keys are consecutive positive OCaml integers. String keys are
   fixed-width base-62 strings of lengths 3, 4, and 5.
-- Build, lookup (three complete passes), add fresh keys, update existing keys,
-  remove one absent key repeatedly, and remove all keys are timed independently.
+- Each build is also repeated after a deterministic Fisher--Yates permutation
+  of the same keys, separating insertion-order effects from key-set effects.
+- Lookup (three complete passes), add fresh keys, update existing keys, remove
+  one absent key repeatedly, and remove all keys are timed independently. A
+  mixed trace additionally interleaves successful and failed lookups and
+  removals with existing-key updates and fresh insertions.
 - Membership alternates complete passes over present and disjoint absent keys;
   `elements` is checked against the corresponding AVL bindings.
 - Generic combine is measured in both leaf/tree orientations. Its function
@@ -73,10 +77,16 @@ default `PATRICIA_BENCH_SIZE=10000`, so each input map has 10,000 bindings.
   bindings are checked against `Stdlib.Map.merge`.
 - A disjoint left-biased union joins ranges `[1, n]` and `[n+1, 2n]`; the
   overlap workload joins `[1, n]` and `[n/2+1, 3n/2]`. Both use
-  `union_left`; the expected binding counts are checked. Current benchmark
-  union rows are per-union medians from five samples of 32 unions, with the
-  min--max range reported beside them. Set `PATRICIA_BENCH_SHORT_SAMPLES` and
-  `PATRICIA_BENCH_SHORT_BATCH` to override those positive defaults.
+  `union_left`; the expected binding counts are checked. Equal, subset, no-op,
+  and sparse-overlap inputs complement those two baseline shapes. Current union
+  rows are per-union medians from five samples; batches contain 32 unions up to
+  100K bindings and one union above that threshold. Set
+  `PATRICIA_BENCH_SHORT_SAMPLES` and `PATRICIA_BENCH_SHORT_BATCH` to override
+  those positive defaults.
+- An adversarial string family shares a 192-byte prefix and differs only in a
+  four-character suffix. Set `PATRICIA_BENCH_LONG_PREFIX_LENGTH` to a
+  non-negative prefix length; zero removes the common prefix while retaining
+  the same workload shape.
 - Retained size is measured after a major collection and compaction.
   Allocation is the OCaml GC minor-plus-major word counter. The operation
   timings include their benchmark loop and are reported per key except for
@@ -315,9 +325,6 @@ lower-allocation extracted source worker.
 The benchmark is a useful checked comparison and smoke benchmark. Future
 performance decisions would benefit from:
 
-- random insertion order, successful and unsuccessful lookups/removals,
-  subset/no-op union, equal maps, sparse overlap, and adversarial long-prefix
-  strings in addition to consecutive ranges;
 - a bulk-build workload if a bulk builder is added (the benchmark already
   includes generic leaf/tree `combine`, `elements`, and mixed hit/miss `mem`);
 - physical-sharing counters or retained-node checks, so low allocation is

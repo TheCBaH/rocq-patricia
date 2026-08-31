@@ -259,11 +259,15 @@ Use this track before making new performance decisions or regression claims.
   extends the 10K/100K post-follow-up evidence to one million bindings.
 - [x] Calibrate short operations with batched samples and report median and
   dispersion. `PatriciaBenchmark.ml` now measures each union in five samples
-  of 32 operations by default, reporting the per-union median and min--max
-  range; `PATRICIA_BENCH_SHORT_SAMPLES` and `PATRICIA_BENCH_SHORT_BATCH`
-  make both parameters explicit and configurable.
-- [ ] Add random insertion order, mixed successful/unsuccessful operations,
+  of 32 operations at sizes through 100K (one operation per sample above that
+  threshold), reporting the per-union median and min--max range;
+  `PATRICIA_BENCH_SHORT_SAMPLES` and `PATRICIA_BENCH_SHORT_BATCH` make both
+  parameters explicit and configurable.
+- [x] Add random insertion order, mixed successful/unsuccessful operations,
   subset/no-op/equal/sparse-overlap unions, and adversarial long-prefix strings.
+  The checked benchmark now uses a deterministic Fisher--Yates insertion
+  permutation, a six-way hit/miss/update/remove/add trace, all four additional
+  union shapes, and a configurable 192-byte-common-prefix string workload.
 - [ ] Add physical-sharing counters or retained-node checks when a sharing
   decision cannot be supported by allocation totals alone.
 - [ ] Time the proof-aligned backend when extraction overhead itself becomes a
@@ -313,7 +317,8 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
-| 2026-08-31 | Calibrated short-union timing | `PatriciaBenchmark.ml` now takes five 32-operation union samples by default, reports per-union median and min--max dispersion, and accepts explicit sample/batch environment overrides. `make benchmark-smoke` and `git diff --check` passed. |
+| 2026-08-31 | Expanded checked benchmark coverage | Added deterministic random-order builds, a mixed successful/unsuccessful lookup/update/remove/add trace, subset/equal/no-op/sparse-overlap unions, and 192-byte common-prefix strings with `PATRICIA_BENCH_LONG_PREFIX_LENGTH` override. `make benchmark-smoke` and `git diff --check` passed. |
+| 2026-08-31 | Calibrated short-union timing | `PatriciaBenchmark.ml` now takes five union samples, batching 32 operations through 100K bindings and one above that size; it reports per-union median and min--max dispersion and accepts explicit sample/batch overrides. `make benchmark-smoke` and `git diff --check` passed. |
 | 2026-08-31 | Completed the 1M bounded-string-overlap rerun | `PATRICIA_BENCH_SIZE=1000000 PATRICIA_BENCH_STRING_LENGTHS=4 PATRICIA_BENCH_VARIABLE_STRING_MAX_LENGTH=4 make benchmark` passed. Four-character half-overlap allocated 113 Patricia words versus 10,193,264 AVL words (7.169 ms versus 23.891 ms); the variable-length checked workload also passed. |
 | 2026-08-31 | Measured and retained the native string `set` realizer | Ordinary extraction of `set_one_descent` is now exercised in the randomized structural/oracle test. A checked 10K native trial found its result correct but allocated 993,458 versus 726,896 words for fixed-width-string construction and 1,578,027 versus 923,171 for updates, so the supported wrapper retains the exception realizer. `make`, `make benchmark`, and `git diff --check` passed. |
 | 2026-08-30 | Removed handwritten general `combine` realizers | `PatriciaExtract.v` now extracts both proved `combine_structural` workers directly, eliminating the two Patricia-specific merge substitutions. Full `make` passed with 360 closed declarations; `make benchmark` passed, retaining the checked 10K workload's allocation and functional checks. |
