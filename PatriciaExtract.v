@@ -30,6 +30,58 @@ Extract Constant PatriciaBits.mask_above => "(fun high low -> low < high)".
     directly so the optimized backend no longer substitutes a handwritten
     general merge implementation. *)
 
+(** A biased union maps one-sided bindings identically. Reuse those subtrees
+    directly, and join disjoint prefixes immediately. Physical-identity checks
+    preserve the left tree (or the containing right tree) when a recursive
+    merge makes no observable change. The companion source worker is the
+    functional oracle; refining these [==] decisions requires a heap model. *)
+Extract Constant Patricia.union_left =>
+  "(fun first second ->
+     let rec union left right =
+       match left, right with
+       | Empty, tree | tree, Empty -> tree
+       | (Leaf (left_key, _) as leaf), Leaf (right_key, _)
+         when left_key = right_key -> leaf
+       | Leaf (key, value), tree -> set key value tree
+       | tree, Leaf (key, value) ->
+           (match get key tree with Some _ -> tree | None -> set key value tree)
+       | (Branch (prefix_left, mask_left, left_left, right_left) as left_tree),
+         (Branch (prefix_right, mask_right, left_right, right_right) as right_tree) ->
+           if mask_left = mask_right && prefix_left = prefix_right then
+             let merged_left = union left_left left_right in
+             let merged_right = union right_left right_right in
+             if merged_left == left_left && merged_right == right_left then left_tree
+             else Branch (prefix_left, mask_left, merged_left, merged_right)
+           else if mask_above mask_left mask_right then
+             match representative right with
+             | Some key when matches_prefix key prefix_left mask_left ->
+                 if zero_bit key mask_left then
+                   let merged = union left_left right_tree in
+                   if merged == left_left then left_tree
+                   else Branch (prefix_left, mask_left, merged, right_left)
+                 else
+                   let merged = union right_left right_tree in
+                   if merged == right_left then left_tree
+                   else Branch (prefix_left, mask_left, left_left, merged)
+             | _ -> join left_tree right_tree
+           else if mask_above mask_right mask_left then
+             match representative left with
+             | Some key when matches_prefix key prefix_right mask_right ->
+                 if zero_bit key mask_right then
+                   let merged = union left_tree left_right in
+                   if merged == left_right then right_tree
+                   else Branch (prefix_right, mask_right, merged, right_right)
+                 else
+                   let merged = union left_tree right_right in
+                   if merged == right_right then right_tree
+                   else Branch (prefix_right, mask_right, left_right, merged)
+             | _ -> join left_tree right_tree
+           else join left_tree right_tree
+     in union first second)".
+
+Extract Constant Patricia.union_right =>
+  "(fun first second -> union_left second first)".
+
 (** Proof-side definitions remain pure Rocq.  Extracted string branches use a
     packed critical-bit token [(byte_index << 4) | tag], where tag zero is the
     continuation marker and tags 1--8 are the byte's bits from most to least
@@ -147,6 +199,58 @@ Extract Constant StringPatricia.set =>
 (** [StringPatricia.combine] is likewise the proved fuel-free structural
     worker, so extraction retains it instead of replacing it with native
     handwritten merge code. *)
+
+(** Biased union has identity behavior on one-sided subtrees, so it can share
+    them instead of going through generic [combine]. Disjoint prefixes are
+    joined immediately; containment recurses only into the potentially
+    overlapping child. The source changed worker specifies its observable map
+    result; the physical [==] tests remain a native-refinement obligation. *)
+Extract Constant StringPatricia.union_left =>
+  "(fun first second ->
+     let rec union left right =
+       match left, right with
+       | Empty, tree | tree, Empty -> tree
+       | (Leaf (left_key, _) as leaf), Leaf (right_key, _) when left_key = right_key ->
+           leaf
+       | Leaf (key, value), tree -> set key value tree
+       | tree, Leaf (key, value) ->
+           (match get key tree with
+            | Some _ -> tree
+            | None -> set key value tree)
+       | (Branch (sample_left, split_left, left_left, right_left) as left_tree),
+         (Branch (sample_right, split_right, left_right, right_right) as right_tree) ->
+           if split_left = split_right then
+             if agrees_before_bounded sample_left sample_right split_left then
+               let merged_left = union left_left left_right in
+               let merged_right = union right_left right_right in
+               if merged_left == left_left && merged_right == right_left then left_tree
+               else Branch (sample_left, split_left, merged_left, merged_right)
+             else join left_tree right_tree
+           else if split_left < split_right then
+             if agrees_before_bounded sample_left sample_right split_left then
+               if bit_at sample_right split_left then
+                 let merged = union right_left right_tree in
+                 if merged == right_left then left_tree
+                 else Branch (sample_left, split_left, left_left, merged)
+               else
+                 let merged = union left_left right_tree in
+                 if merged == left_left then left_tree
+                 else Branch (sample_left, split_left, merged, right_left)
+             else join left_tree right_tree
+           else if agrees_before_bounded sample_left sample_right split_right then
+             if bit_at sample_left split_right then
+               let merged = union left_tree right_right in
+               if merged == right_right then right_tree
+               else Branch (sample_right, split_right, left_right, merged)
+             else
+               let merged = union left_tree left_right in
+               if merged == left_right then right_tree
+               else Branch (sample_right, split_right, merged, right_right)
+           else join left_tree right_tree
+     in union first second)".
+
+Extract Constant StringPatricia.union_right =>
+  "(fun first second -> union_left second first)".
 
 Separate Extraction
   PatriciaBits.mask_above

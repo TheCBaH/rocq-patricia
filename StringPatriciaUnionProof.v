@@ -28,6 +28,32 @@ Proof.
   - reflexivity.
 Qed.
 
+(** The semantic contract required of OCaml physical equality. A false
+    negative only rebuilds a branch, so the proof needs soundness in the
+    positive direction only. *)
+Definition native_same_sound {A : Type} (same : t A -> t A -> bool) : Prop :=
+  forall changed original,
+    same changed original = true -> equiv changed original.
+
+Lemma native_reuse_child_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) (original right changed : t A),
+    native_same_sound same ->
+    wf original -> wf changed ->
+    (forall key,
+      get key changed =
+      match get key original with Some value => Some value | None => get key right end) ->
+    wf (native_reuse_child same original changed) /\
+    forall key,
+      get key (native_reuse_child same original changed) =
+      match get key original with Some value => Some value | None => get key right end.
+Proof.
+  intros A same original right changed Hsame Hwor Hwch Hget.
+  unfold native_reuse_child. destruct (same changed original) eqn:Esame.
+  - split; [exact Hwor|]. intro key.
+    rewrite <- (Hsame changed original Esame key) at 1. apply Hget.
+  - split; [exact Hwch|exact Hget].
+Qed.
+
 Lemma biased_output_nonempty_left:
   forall (A : Type) (left right out : t A),
     nonempty left ->

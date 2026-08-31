@@ -80,10 +80,12 @@ extraction now retains those direct structural `combine` definitions, so it
 does not compute the bound at runtime or substitute a handwritten merge. Its
 leaf/tree cases delegate to source-level workers with proved lookup and
 well-formedness laws, fusing an overlapping replacement into the mapping pass.
-Both public wrappers call extracted, proved changed-result workers, whose
-`Empty` result reuses the original left tree (`union_right` reverses its
-arguments). Disjoint prefixes are joined immediately, one-sided subtrees are
-reused, and only a changed recursive path is rebuilt.
+Both public wrappers currently call the handwritten native biased-union
+realizers, which use physical identity to reuse an unchanged original branch
+(`union_right` reverses its arguments). The extracted changed-result workers,
+including the fuel worker now proved equal to them, remain the source-level
+functional oracle. Disjoint prefixes are joined immediately, one-sided
+subtrees are reused, and only a changed recursive path is rebuilt.
 
 The 10,000- and 100,000-binding benchmark checks in `patricia-bench.md`
 confirm constant-sized allocation for disjoint native unions and substantially
@@ -192,7 +194,7 @@ does not inspect either kind of extraction directive.
 | A branch sample returned as its constant-time `representative` | `wf_branch` requires `resident sample (Branch ...)`, and every smart constructor and public-operation preservation theorem discharges that premise; structural tests independently check the property | Cached-sample residency is kernel-checked (`wf_cached_sample_resident`). The cached and pure representatives can differ, but `wf_cached_sample_same_prefix_representative` proves agreement below the branch split. `wf_cached_sample_agrees_before_representative` and `wf_cached_sample_bit_at_before_representative` therefore justify every bounded-prefix comparison and strictly-outer routing-bit use in native merge/union without requiring representative equality. |
 | Exception-based one-descent string `set` | Existing/fresh-key oracle tests and structural checks pass; its ordinarily extracted source worker is checked in the randomized oracle | The source-level `set_descend`/`set_one_descent` worker is proved equal to `set` on well-formed inputs. A 10K native trial allocated substantially more for the extracted worker (fixed-width build 993,458 vs. 726,896 words; updates 1,578,027 vs. 923,171), so the supported wrapper retains the exception realizer. Prove that exact realization in a target-language logic, or improve the extracted worker before replacing it. |
 | Fuel-free integer and string `combine` | The public source workers use nested structural fixpoints and are proved equal to every sufficient `combine_fuel` run; the optimized extraction now retains those definitions, and randomized native merges agree with the reference maps | No Patricia-specific `Extract Constant` remains for general `combine`; ordinary extraction/compiler correctness and the retained primitive mappings remain in the trusted base. |
-| Specialized biased unions and physical-identity (`==`) sharing | Disjoint and overlap results agree with `Stdlib.Map`; both public wrappers use the ordinarily extracted, closure-free fuel worker. Its exact-equivalence theorem reduces it to the established changed worker, and the isolated workers have invariant and pointwise union proofs plus a targeted extraction oracle. The checked `union-profile` also reports constant extra retained graphs and left-root reuse for subset/equal/no-op inputs. | The workers' `Empty` certificates justify source-level reuse of the original tree, but not a physical-sharing or allocation theorem. Any physical-sharing/allocation claim needs a cost or heap semantics. |
+| Specialized biased unions and physical-identity (`==`) sharing | Disjoint and overlap results agree with `Stdlib.Map`; both public wrappers use the handwritten native realization. The closure-free fuel worker is proved equal to the established changed worker and is the source-level functional oracle; the isolated workers have invariant and pointwise union proofs plus a targeted extraction oracle. The checked `union-profile` reports the native realization's fixed allocation and left-root reuse for subset/equal/no-op inputs. A source model now proves sound child replacement for both backends and the integer equal-header sharing branch. | The handwritten realization's `==` branch-reuse decisions are still trusted. The source workers' `Empty` certificates identify the needed semantic change signal, but a target-language/heap refinement must connect it to `==`; direct-string cached-sample and containment branches remain. Any physical-sharing/allocation claim needs a cost or heap semantics. |
 
 The packed-token and cached-representative rows are the most important subtle
 cases. They are representation refinements, not pointwise replacements of the

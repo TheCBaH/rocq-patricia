@@ -320,15 +320,14 @@ single-machine allocation comparison, not a formal cost result; the remaining
 N2 task is to prove the exact realizer in a target-language logic or develop a
 lower-allocation extracted source worker.
 
-### 8. Proved closure-free `union_left` worker selected
+### 8. Native `union_left` retained; extracted workers are the proof oracle
 
-The public integer and string wrappers use the extracted,
-`union_left_specialized_changed_fuel_result` worker. Its `Empty` result is a
-source-level certificate that lets the wrapper return the original left root.
-It replaces the branch-local recursive closure with one fuel-decreasing
-function. `union_left_specialized_changed_fuel_exact` proves every fuel above
-the combined input size agrees with the established changed worker, and the
-result-wrapper theorem proves the public bound exactly.
+The public integer and string wrappers use the handwritten native
+`union_left` realizers. Their physical-identity checks preserve unchanged
+branches. The extracted `union_left_specialized_changed_fuel_result` worker is
+now proved equal to the established changed worker at its public bound, making
+it the source-level functional oracle for a future refinement of the native
+realizer, rather than the selected implementation.
 
 The profile forces a major collection before and after each single operation,
 keeps both input roots live during the final collection, checks every queried
@@ -337,22 +336,23 @@ result graph.  These are 100,000-binding runs on the platform named above;
 the string figures were the same for ordinary eight-byte keys and keys with a
 192-byte common prefix.
 
-| Workload | Integer proved / fuel allocation | String proved / fuel allocation | Retained result graph | Left root reused? |
+| Workload | Integer native / proved / fuel | String native / proved / fuel | Retained result graph | Left root reused? |
 | --- | ---: | ---: | ---: | --- |
-| Disjoint | 438 / 463 | 165 / 186 | 50–87 words | No |
-| Half overlap | 700,641 / 600,523 | 700,447 / 600,261 | 50–86 words | No |
-| Subset | 700,524 / 600,310 | 700,361 / 600,202 | measurement baseline | Yes |
-| Equal | 1,400,586 / 1,200,178 | 1,400,676 / 1,200,226 | measurement baseline | Yes |
-| Empty right | 35 / 32 | 35 / 32 | measurement baseline | Yes |
+| Disjoint | 379 / 438 / 463 | 100 / 165 / 186 | 50–87 words | No |
+| Half overlap | 365 / 700,641 / 600,523 | 81 / 700,447 / 600,261 | 50–86 words | No |
+| Subset | 176 / 700,524 / 600,310 | 26 / 700,361 / 600,202 | measurement baseline | Yes |
+| Equal | 26 / 1,400,586 / 1,200,178 | 26 / 1,400,676 / 1,200,226 | measurement baseline | Yes |
+| Empty right | 26 / 35 / 32 | 26 / 35 / 32 | measurement baseline | Yes |
 
 “Measurement baseline” is the fixed GC-accounting noise (within five words)
-when the result is the original root.  The pattern matters more than the
-small fixed disjoint numbers: both workers physically retain only a
+when the result is the original root. The pattern matters more than the small
+fixed disjoint numbers: both extracted workers physically retain only a
 constant-size extra graph, but their recursive traversal allocates temporary
 frames/closures linearly even when the final result is exactly the old left
-tree.  The fuel experiment reduces this transient cost from about 14 to about
-12 words per left binding; its `size` prepass has no observed linear allocation
-cost. No timing or heap theorem is claimed.
+tree. The fuel worker reduces this transient cost from about 14 to about 12
+words per left binding, but remains orders of magnitude above the native
+physical-sharing realization. Its `size` prepass has no observed linear
+allocation cost. No timing or heap theorem is claimed.
 
 ## Further benchmark coverage
 

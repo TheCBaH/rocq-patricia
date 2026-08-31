@@ -42,11 +42,11 @@ let combine combiner =
            combiner.both left_value right_value
        | None, None -> None)
 
-(* The fuel worker is proved extensionally identical to the companion changed
-   worker.  [Empty] is its allocation-free certificate that the original first
-   input can be reused. *)
-let union_left = PatriciaUnion.union_left_specialized_changed_fuel_result
-let union_right = PatriciaUnion.union_right_specialized_changed_result
+(* This native realization uses physical identity to preserve unchanged input
+   branches. The proved changed-result worker remains its source-level oracle;
+   a heap-aware refinement is still required for the [==] decisions. *)
+let union_left = PatriciaInternal.union_left
+let union_right = PatriciaInternal.union_right
 let elements = PatriciaInternal.elements
 let fold = PatriciaInternal.fold
 let beq = PatriciaInternal.beq

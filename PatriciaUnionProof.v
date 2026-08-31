@@ -21,6 +21,32 @@ Proof.
   destruct Hnonempty as [key [value Hget]]. discriminate.
 Qed.
 
+(** The semantic contract required of OCaml physical equality.  It need not
+    recognize every observationally equal pair; a false negative only rebuilds
+    a branch. *)
+Definition native_same_sound {A : Type} (same : t A -> t A -> bool) : Prop :=
+  forall changed original,
+    same changed original = true -> equiv changed original.
+
+Lemma native_reuse_child_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) (original right changed : t A),
+    native_same_sound same ->
+    wf original -> wf changed ->
+    (forall key,
+      get key changed =
+      match get key original with Some value => Some value | None => get key right end) ->
+    wf (native_reuse_child same original changed) /\
+    forall key,
+      get key (native_reuse_child same original changed) =
+      match get key original with Some value => Some value | None => get key right end.
+Proof.
+  intros A same original right changed Hsame Hwor Hwch Hget.
+  unfold native_reuse_child. destruct (same changed original) eqn:Esame.
+  - split; [exact Hwor|]. intro key.
+    rewrite <- (Hsame changed original Esame key) at 1. apply Hget.
+  - split; [exact Hwch|exact Hget].
+Qed.
+
 Lemma biased_output_nonempty_left:
   forall (A : Type) (left right out : t A),
     nonempty left ->
@@ -280,6 +306,55 @@ Proof.
     destruct (matches_prefix key prefix mask) eqn:Kprefix;
       [destruct (zero_bit key mask) eqn:Kbit|]; cbn;
       rewrite ?Kprefix, ?Kbit; auto.
+Qed.
+
+(** The common-header fragment of the handwritten native worker.  A positive
+    physical-equality test may substitute the original child; soundness of
+    that substitution is the only property required here. *)
+Lemma native_reuse_same_branch_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) prefix mask
+      (left_a right_a left_b right_b out_left out_right : t A),
+    native_same_sound same ->
+    wf (Branch prefix mask left_a right_a) ->
+    wf (Branch prefix mask left_b right_b) ->
+    (wf out_left /\
+      forall key,
+        get key out_left =
+        match get key left_a with Some value => Some value | None => get key left_b end) ->
+    (wf out_right /\
+      forall key,
+        get key out_right =
+        match get key right_a with Some value => Some value | None => get key right_b end) ->
+    wf (native_reuse_same_branch same prefix mask left_a right_a out_left out_right) /\
+    forall key,
+      get key (native_reuse_same_branch same prefix mask left_a right_a out_left out_right) =
+      match get key (Branch prefix mask left_a right_a) with
+      | Some value => Some value
+      | None => get key (Branch prefix mask left_b right_b)
+      end.
+Proof.
+  intros A same prefix mask left_a right_a left_b right_b out_left out_right
+    Hsame Hwa Hwb Hleft Hright.
+  inversion Hwa as [| |? ? ? ? Hwla Hwra Hnla Hnra Hla Hra]; subst.
+  inversion Hwb as [| |? ? ? ? Hwlb Hwrb Hnlb Hnrb Hlb Hrb]; subst.
+  destruct (native_reuse_child_correct_wf A same left_a left_b out_left
+    Hsame Hwla (proj1 Hleft) (proj2 Hleft)) as [Hwol Hgetol].
+  destruct (native_reuse_child_correct_wf A same right_a right_b out_right
+    Hsame Hwra (proj1 Hright) (proj2 Hright)) as [Hwor Hgetor].
+  assert (Hnlout : nonempty (native_reuse_child same left_a out_left)).
+  { destruct Hnla as [key [value Hget]]. exists key, value.
+    rewrite Hgetol, Hget. reflexivity. }
+  assert (Hnrout : nonempty (native_reuse_child same right_a out_right)).
+  { destruct Hnra as [key [value Hget]]. exists key, value.
+    rewrite Hgetor, Hget. reflexivity. }
+  assert (Ebranch : branch prefix mask
+      (native_reuse_child same left_a out_left)
+      (native_reuse_child same right_a out_right) =
+      native_reuse_same_branch same prefix mask left_a right_a out_left out_right).
+  { unfold native_reuse_same_branch.
+    now apply branch_unchanged. }
+  rewrite <- Ebranch.
+  eapply union_left_specialized_same_branch_correct_wf; eauto.
 Qed.
 
 (** Changed-result composition for equal integer branch headers. *)

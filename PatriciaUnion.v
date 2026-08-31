@@ -130,6 +130,21 @@ Definition reuse_changed {A : Type} (original changed : t A) : t A :=
 Definition union_left_specialized_changed_result {A : Type} (a b : t A) : t A :=
   reuse_changed a (union_left_specialized_changed a b).
 
+(** Source model of the native [==] child-reuse decision.  It is deliberately
+    parameterized by a Boolean test: the proof only needs a test reporting
+    [true] to imply observational equality.  Native refinement later
+    instantiates it with physical identity. *)
+Definition native_reuse_child {A : Type} (same : t A -> t A -> bool)
+    (original changed : t A) : t A :=
+  if same changed original then original else changed.
+
+Definition native_reuse_same_branch {A : Type} (same : t A -> t A -> bool)
+    (prefix mask : N) (left_original right_original left_changed right_changed : t A)
+    : t A :=
+  Branch prefix mask
+    (native_reuse_child same left_original left_changed)
+    (native_reuse_child same right_original right_changed).
+
 (** One-step equation for changed-result refinement proofs. *)
 Lemma union_left_specialized_changed_equation:
   forall (A : Type) (a b : t A),
