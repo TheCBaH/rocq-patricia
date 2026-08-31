@@ -218,10 +218,11 @@ Required only for an end-to-end native-refinement claim.
   first source fragment is now present: `native_reuse_child` is parameterized
   by a Boolean whose `true` result need only imply lookup equivalence. Both
   companion proofs establish that replacing a recursive child under that
-  contract preserves its biased-union result; the integer proof also closes
-  the equal-header branch reconstruction. Complete the direct-string
-  cached-sample reconstruction and the four containment branches next, then
-  state the OCaml `==` soundness contract once for the extracted tree type.
+  contract preserves its biased-union result; both equal-header branch
+  reconstructions are now closed. The direct-string proof carries the original
+  cached sample through left-biased child replacement, so it adds no stronger
+  heap assumption. Complete the four containment branches next, then state the
+  OCaml `==` soundness contract once for the extracted tree type.
   The normally extracted `set_one_descent` worker is also exercised directly
   by the randomized oracle, but a 10K wrapper trial allocated 993,458 versus
   726,896 words for fixed-width-string construction and 1,578,027 versus
@@ -351,7 +352,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
-| 2026-08-31 | Started the native-union sharing refinement | `PatriciaUnion.v` and `StringPatriciaUnion.v` now contain the source-level `native_reuse_child`/`native_reuse_same_branch` model. `native_same_sound` requires only a positive equality test to imply lookup equivalence; both proof modules prove child reuse preserves the biased result, and `PatriciaUnionProof.v` proves the integer equal-header reconstruction. This isolates OCaml `==` as the remaining heap contract for that fragment. `make PatriciaUnionProof.vo`, `make StringPatriciaUnionProof.vo`, and `git diff --check` passed. |
+| 2026-08-31 | Started the native-union sharing refinement | `PatriciaUnion.v` and `StringPatriciaUnion.v` now contain the source-level `native_reuse_child`/`native_reuse_same_branch` model. `native_same_sound` requires only a positive equality test to imply lookup equivalence; both proof modules prove child reuse and their integer/direct-string equal-header reconstructions. The direct-string proof preserves the old cached sample through the biased result. This isolates OCaml `==` as the remaining heap contract for that fragment. `make PatriciaUnionProof.vo`, `make StringPatriciaUnionProof.vo`, and `git diff --check` passed. |
 | 2026-08-31 | Proved the closure-free `union_left` oracle and restored the native realization | `union_left_specialized_changed_fuel_exact` proves that every fuel above the combined source-tree size agrees exactly with the established changed worker; `union_left_specialized_changed_fuel_result_exact` discharges the `S (size left + size right)` bound. The 100K three-way profile showed 600,523/600,261 fuel words for integer/string half-overlap versus 365/81 native words, so both wrappers again select the handwritten native realization. The fuel worker remains the proved source model for the next target-language refinement. `make`, `make union-proof`, `make union-oracle`, `PATRICIA_UNION_PROFILE_SIZE=100000 make union-profile`, and `git diff --check` passed. |
 | 2026-08-31 | Profiled the proved and closure-free `union_left` workers | Added `PatriciaUnionProfile.ml` and `make union-profile`, which directly compare the established changed-result worker with the fuel candidate on checked disjoint, half-overlap, subset, equal, no-op, and 192-byte-common-prefix workloads. At 100K inputs the proved/fuel allocations were respectively 700,641/600,523 words for integer half-overlap, 700,524/600,310 for subset, and 1,400,586/1,200,178 for equality; eight-byte strings and long-prefix strings had the same 14-versus-12-word-per-binding pattern. Both retained only roughly 50–90 extra words for changed results and reused the left root for subset, equality, and empty-right. `make union-profile`, `PATRICIA_UNION_PROFILE_SIZE=100000 make union-profile`, and `git diff --check` passed. |
 | 2026-08-31 | Added the closure-free changed-worker experiment | `PatriciaUnion.v` and `StringPatriciaUnion.v` now define direct fuel-decreasing changed workers and structural-bound result wrappers. `PatriciaExtract.v` exports them, and `PatriciaUnionTest.ml` checks their deterministic and randomized pointwise outputs. `make union-oracle` and `git diff --check` passed. The workers remain unproved and are not used by public wrappers pending an exact refinement theorem and native allocation profile. |

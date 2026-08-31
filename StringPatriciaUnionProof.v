@@ -389,6 +389,77 @@ Proof.
     + apply Hgetol.
 Qed.
 
+(** Cached samples add one obligation to the native equal-header fragment:
+    the original sample must remain resident after a sound child replacement.
+    Left bias supplies that fact, so no stronger property of [same] is needed. *)
+Lemma native_reuse_same_branch_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) sample_a sample_b split
+      (left_a right_a left_b right_b out_left out_right : t A),
+    native_same_sound same ->
+    wf (Branch sample_a split left_a right_a) ->
+    wf (Branch sample_b split left_b right_b) ->
+    agrees_before_bounded sample_a sample_b split = true ->
+    (wf out_left /\
+      forall key,
+        get key out_left =
+        match get key left_a with Some value => Some value | None => get key left_b end) ->
+    (wf out_right /\
+      forall key,
+        get key out_right =
+        match get key right_a with Some value => Some value | None => get key right_b end) ->
+    wf (native_reuse_same_branch same sample_a split
+      left_a right_a out_left out_right) /\
+    forall key,
+      get key (native_reuse_same_branch same sample_a split
+        left_a right_a out_left out_right) =
+      match get key (Branch sample_a split left_a right_a) with
+      | Some value => Some value
+      | None => get key (Branch sample_b split left_b right_b)
+      end.
+Proof.
+  intros A same sample_a sample_b split left_a right_a left_b right_b out_left out_right
+    Hsame Hwa Hwb Hagree Hleft Hright.
+  inversion Hwa as
+      [| |? ? ? ? Hwla Hwra Hnla Hnra Hla Hra Hresidenta]; subst.
+  inversion Hwb as
+      [| |? ? ? ? Hwlb Hwrb Hnlb Hnrb Hlb Hrb Hresidentb]; subst.
+  destruct (native_reuse_child_correct_wf A same left_a left_b out_left
+    Hsame Hwla (proj1 Hleft) (proj2 Hleft)) as [Hwol Hgetol].
+  destruct (native_reuse_child_correct_wf A same right_a right_b out_right
+    Hsame Hwra (proj1 Hright) (proj2 Hright)) as [Hwor Hgetor].
+  destruct (union_left_specialized_same_split_output_keys A sample_a sample_b split
+    left_a right_a left_b right_b
+    (native_reuse_child same left_a out_left)
+    (native_reuse_child same right_a out_right)
+    Hagree Hla Hra Hlb Hrb Hwol Hgetol Hwor Hgetor) as [Houtl Houtr].
+  split.
+  - unfold native_reuse_same_branch. apply wf_branch.
+    + exact Hwol.
+    + exact Hwor.
+    + destruct (representative left_a) as [key|] eqn:Eleft.
+      * destruct (representative_resident_wf A left_a key Hwla Eleft)
+          as [value Hget].
+        eapply wf_representative_nonempty_get; [exact Hwol|].
+        rewrite Hgetol, Hget. reflexivity.
+      * exfalso. exact (Hnla eq_refl).
+    + destruct (representative right_a) as [key|] eqn:Eright.
+      * destruct (representative_resident_wf A right_a key Hwra Eright)
+          as [value Hget].
+        eapply wf_representative_nonempty_get; [exact Hwor|].
+        rewrite Hgetor, Hget. reflexivity.
+      * exfalso. exact (Hnra eq_refl).
+    + exact Houtl.
+    + exact Houtr.
+    + destruct Hresidenta as [value Hget]. exists value.
+      destruct (bit_at sample_a split) eqn:Ebit;
+        cbn [get] in Hget |- *; rewrite Ebit in Hget |- *.
+      * rewrite Hgetor, Hget. reflexivity.
+      * rewrite Hgetol, Hget. reflexivity.
+  - intro key. unfold native_reuse_same_branch.
+    destruct (bit_at key split) eqn:Ebit;
+      cbn [get]; rewrite Ebit; [rewrite Hgetor|rewrite Hgetol]; reflexivity.
+Qed.
+
 Lemma union_left_specialized_changed_same_branch_correct_wf:
   forall (A : Type) sample_a sample_b split
       (left_a right_a left_b right_b : t A),
