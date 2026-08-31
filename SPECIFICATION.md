@@ -135,8 +135,9 @@ Executing the supported native library additionally trusts:
   keys, and the restricted combine callback;
 - integer realizer code for equality/order tests, shifts, masks, prefixes,
   routing bits, and highest-differing-bit selection;
-- specialized native integer biased unions, including their physical-equality
-  sharing decisions;
+- the source-level biased-union workers and ordinary extraction/compiler
+  boundary; their `Empty` change certificates do not establish physical
+  identity or allocation bounds;
 - packed string positions, native `bit_at`, bytewise first difference,
   bounded prefix comparison, `Char.code`, integer XOR/leading-zeroes, and
   guarded `String.unsafe_get` calls;

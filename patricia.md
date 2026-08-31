@@ -80,12 +80,10 @@ extraction now retains those direct structural `combine` definitions, so it
 does not compute the bound at runtime or substitute a handwritten merge. Its
 leaf/tree cases delegate to source-level workers with proved lookup and
 well-formedness laws, fusing an overlapping replacement into the mapping pass.
-The integer backend still replaces `union_left` with a specialized structural
-algorithm (`union_right` reverses its arguments). The direct-string public
-wrapper instead calls the extracted, proved changed-result worker, whose
-`Empty` result reuses the original left tree. Disjoint prefixes are joined
-immediately, one-sided subtrees are reused, and only a changed recursive path
-is rebuilt.
+Both public wrappers call extracted, proved changed-result workers, whose
+`Empty` result reuses the original left tree (`union_right` reverses its
+arguments). Disjoint prefixes are joined immediately, one-sided subtrees are
+reused, and only a changed recursive path is rebuilt.
 
 The 10,000- and 100,000-binding benchmark checks in `patricia-bench.md`
 confirm constant-sized allocation for disjoint native unions and substantially
@@ -168,11 +166,10 @@ differential and structural validation.
 The Rocq model uses unbounded `positive`, `N`, and `nat`, while the optimized
 OCaml implementation uses bounded `int`, native shifts, and native strings.
 `bit_at`, `first_diff`, prefix matching, routing bits, highest-differing-bit
-selection, cached representatives, fused string insertion, and the integer
-specialized biased union are replaced with handwritten OCaml realizers. Both
-general `combine` definitions and the direct-string public biased unions are
-now extracted from proved structural source workers. Rocq does not prove the
-equivalence of the remaining replacements.
+selection, cached representatives, and fused string insertion are replaced
+with handwritten OCaml realizers. Both general `combine` definitions and both
+public biased unions are now extracted from proved structural source workers.
+Rocq does not prove the equivalence of the remaining replacements.
 
 This is not merely a general warning about extraction. The
 [Rocq extraction manual](https://rocq-prover.org/doc/master/refman/addendum/extraction.html)
@@ -195,7 +192,7 @@ does not inspect either kind of extraction directive.
 | A branch sample returned as its constant-time `representative` | `wf_branch` requires `resident sample (Branch ...)`, and every smart constructor and public-operation preservation theorem discharges that premise; structural tests independently check the property | Cached-sample residency is kernel-checked (`wf_cached_sample_resident`). The cached and pure representatives can differ, but `wf_cached_sample_same_prefix_representative` proves agreement below the branch split. `wf_cached_sample_agrees_before_representative` and `wf_cached_sample_bit_at_before_representative` therefore justify every bounded-prefix comparison and strictly-outer routing-bit use in native merge/union without requiring representative equality. |
 | Exception-based one-descent string `set` | Existing/fresh-key oracle tests and structural checks pass; its ordinarily extracted source worker is checked in the randomized oracle | The source-level `set_descend`/`set_one_descent` worker is proved equal to `set` on well-formed inputs. A 10K native trial allocated substantially more for the extracted worker (fixed-width build 993,458 vs. 726,896 words; updates 1,578,027 vs. 923,171), so the supported wrapper retains the exception realizer. Prove that exact realization in a target-language logic, or improve the extracted worker before replacing it. |
 | Fuel-free integer and string `combine` | The public source workers use nested structural fixpoints and are proved equal to every sufficient `combine_fuel` run; the optimized extraction now retains those definitions, and randomized native merges agree with the reference maps | No Patricia-specific `Extract Constant` remains for general `combine`; ordinary extraction/compiler correctness and the retained primitive mappings remain in the trusted base. |
-| Specialized biased unions and physical-identity (`==`) sharing | Disjoint and overlap results agree with `Stdlib.Map`; the direct-string wrapper uses the extracted, proved changed-result worker, while the integer wrapper retains its handwritten optimization. The isolated workers have invariant and pointwise union proofs plus a targeted extraction oracle. | The direct-string worker's `Empty` certificate justifies source-level reuse of the original tree, but not a physical-sharing or allocation theorem. The integer native realizer still needs refinement against its worker; any physical-sharing/allocation claim needs a cost or heap semantics. |
+| Specialized biased unions and physical-identity (`==`) sharing | Disjoint and overlap results agree with `Stdlib.Map`; both public wrappers use extracted, proved changed-result workers. The isolated workers have invariant and pointwise union proofs plus a targeted extraction oracle. | The workers' `Empty` certificates justify source-level reuse of the original tree, but not a physical-sharing or allocation theorem. Any physical-sharing/allocation claim needs a cost or heap semantics. |
 
 The packed-token and cached-representative rows are the most important subtle
 cases. They are representation refinements, not pointwise replacements of the
