@@ -110,7 +110,7 @@ benchmark: ocaml PatriciaBenchmark.ml
 # nested changed-result union with the selected closure-free fuel worker
 # through their generated implementation modules.
 union-profile: extraction PatriciaUnionProfile.ml
-	cd extracted && $(OCAMLOPT) -c `$(OCAMLDEP) -sort *.ml`
+	cd extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
 	cd extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
 	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../patricia-union-profile $$objects \
 	    ../PatriciaUnionProfile.ml

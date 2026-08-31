@@ -139,6 +139,123 @@ Definition native_reuse_right_branch {A : Type} (same : t A -> t A -> bool)
   Branch sample split left_original
     (native_reuse_child same right_original right_changed).
 
+(** Exact root-reuse forms used by the extracted worker. *)
+Definition native_reuse_same_branch_root {A : Type} (same : t A -> t A -> bool)
+    (original : t A) (sample : string) (split : nat)
+    (left_original right_original left_changed right_changed : t A) : t A :=
+  if (same left_changed left_original && same right_changed right_original)%bool
+  then original
+  else Branch sample split
+    (native_reuse_child same left_original left_changed)
+    (native_reuse_child same right_original right_changed).
+
+Definition native_reuse_left_branch_root {A : Type} (same : t A -> t A -> bool)
+    (original : t A) (sample : string) (split : nat)
+    (left_original right_original left_changed : t A) : t A :=
+  if same left_changed left_original then original
+  else Branch sample split (native_reuse_child same left_original left_changed)
+    right_original.
+
+Definition native_reuse_right_branch_root {A : Type} (same : t A -> t A -> bool)
+    (original : t A) (sample : string) (split : nat)
+    (left_original right_original right_changed : t A) : t A :=
+  if same right_changed right_original then original
+  else Branch sample split left_original
+    (native_reuse_child same right_original right_changed).
+
+(** Rocq counterpart of the handwritten sharing union.  The Boolean argument
+    is extracted as physical equality only at the final boundary. *)
+Fixpoint union_left_native {A : Type} (same : t A -> t A -> bool) (a : t A)
+    {struct a} : t A -> t A :=
+  match a with
+  | Empty => fun b => b
+  | Leaf ka va => fun b =>
+      match b with
+      | Empty => a
+      | Leaf kb _ => if String.eqb ka kb then a else set ka va b
+      | Branch _ _ _ _ => set ka va b
+      end
+  | Branch sample_a split_a left_a right_a =>
+      fix union_right_tree (b : t A) {struct b} : t A :=
+        match b with
+        | Empty => a
+        | Leaf kb vb =>
+            match get kb a with Some _ => a | None => set kb vb a end
+        | Branch sample_b split_b left_b right_b =>
+            if split_a =? split_b then
+              if agrees_before_bounded sample_a sample_b split_a then
+                native_reuse_same_branch_root same a sample_a split_a left_a right_a
+                  (union_left_native same left_a left_b)
+                  (union_left_native same right_a right_b)
+              else join a b
+            else if split_a <? split_b then
+              if agrees_before_bounded sample_a sample_b split_a then
+                if bit_at sample_b split_a then
+                  native_reuse_right_branch_root same a sample_a split_a left_a right_a
+                    (union_left_native same right_a b)
+                else native_reuse_left_branch_root same a sample_a split_a left_a right_a
+                    (union_left_native same left_a b)
+              else join a b
+            else
+              if agrees_before_bounded sample_a sample_b split_b then
+                if bit_at sample_a split_b then
+                  native_reuse_right_branch_root same b sample_b split_b left_b right_b
+                    (union_right_tree right_b)
+                else native_reuse_left_branch_root same b sample_b split_b left_b right_b
+                    (union_right_tree left_b)
+              else join a b
+        end
+  end.
+
+(** Pure source placeholder for the extraction-only physical comparison. *)
+Definition native_same {A : Type} (_ _ : t A) : bool := false.
+
+Definition union_left_native_default {A : Type} : t A -> t A -> t A :=
+  union_left_native (@native_same A).
+
+(** Single-recursion fuel form of the native-shaped worker. *)
+Fixpoint union_left_native_fuel {A : Type} (same : t A -> t A -> bool)
+    (fuel : nat) (a b : t A) : t A :=
+  match fuel with
+  | O => union_left_specialized a b
+  | S fuel' =>
+      match a, b with
+      | Empty, tree => tree
+      | tree, Empty => tree
+      | Leaf ka va, Leaf kb _ => if String.eqb ka kb then a else set ka va b
+      | Leaf ka va, tree => set ka va tree
+      | tree, Leaf kb vb =>
+          match get kb tree with Some _ => tree | None => set kb vb tree end
+      | Branch sample_a split_a left_a right_a,
+        Branch sample_b split_b left_b right_b =>
+          if split_a =? split_b then
+            if agrees_before_bounded sample_a sample_b split_a then
+              native_reuse_same_branch_root same a sample_a split_a left_a right_a
+                (union_left_native_fuel same fuel' left_a left_b)
+                (union_left_native_fuel same fuel' right_a right_b)
+            else join a b
+          else if split_a <? split_b then
+            if agrees_before_bounded sample_a sample_b split_a then
+              if bit_at sample_b split_a then
+                native_reuse_right_branch_root same a sample_a split_a left_a right_a
+                  (union_left_native_fuel same fuel' right_a b)
+              else native_reuse_left_branch_root same a sample_a split_a left_a right_a
+                (union_left_native_fuel same fuel' left_a b)
+            else join a b
+          else
+            if agrees_before_bounded sample_a sample_b split_b then
+              if bit_at sample_a split_b then
+                native_reuse_right_branch_root same b sample_b split_b left_b right_b
+                  (union_left_native_fuel same fuel' a right_b)
+              else native_reuse_left_branch_root same b sample_b split_b left_b right_b
+                (union_left_native_fuel same fuel' a left_b)
+            else join a b
+      end
+  end.
+
+Definition union_left_native_fuel_default {A : Type} (a b : t A) : t A :=
+  union_left_native_fuel (@native_same A) (S (size a + size b)) a b.
+
 (** Compact unfolding rule for the changed worker.  Proofs use this instead
     of reducing the nested fixpoint, which would duplicate its local recursion
     at every occurrence. *)

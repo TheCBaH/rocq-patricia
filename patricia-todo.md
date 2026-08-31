@@ -229,6 +229,27 @@ Required only for an end-to-end native-refinement claim.
   positive-direction contract explicitly. The portable OCaml guarantee for
   non-mutable values is only `compare = 0`, so proving the stronger tree-object
   property requires an OCaml heap/compiler semantics; it remains trusted here.
+  A native-shaped Rocq worker now mirrors the handwritten recursion and extracts
+  with only `native_same` mapped to `(==)`, but it is not public: at 100K it
+  allocates 800,904/800,628 integer/string words for half overlap and
+  1,600,788/1,600,948 for equality, despite recovering root reuse. The legacy
+  realizer remains at 365/81 and 26/26 words respectively. Its generated
+  helper/closure traffic must be eliminated before it can replace the custom
+  export.
+  The closure-free fuel-shaped native worker was also measured. Passing the
+  generic `same` callback through its single recursion made matters worse:
+  1,200,993/1,200,634 words on half overlap and 2,400,919/2,400,891 on
+  equality. It remains diagnostic-only. The remaining routes are (1) retain
+  the fully inlined legacy worker, (2) specialize the generated worker to a
+  direct, inlineable `native_same` rather than a higher-order argument and
+  inline root/child helpers, (3) apply an explicit extraction/postprocessing
+  inlining pass, accepting that as a small custom build boundary, or (4) keep
+  only the OCaml recursive skeleton handwritten and prove/refine its called
+  primitives. None removes the need for the target-level `==` contract.
+  Mapping `native_same` as an extraction-inline `(==)` primitive and compiling
+  with `ocamlopt -inline 1000` did not materially change the profiles. The
+  available OCaml 4.14.3 compiler has `flambda: false`; routine compiler
+  inlining is therefore not a viable elimination route for this allocation.
   The normally extracted `set_one_descent` worker is also exercised directly
   by the randomized oracle, but a 10K wrapper trial allocated 993,458 versus
   726,896 words for fixed-width-string construction and 1,578,027 versus
@@ -359,6 +380,8 @@ run, not a deterministic performance threshold.
 | Date | Item | Evidence |
 | --- | --- | --- |
 | 2026-08-31 | Completed the source-level native-union sharing cases | `PatriciaUnion.v` and `StringPatriciaUnion.v` contain the source-level child- and one-child-branch reuse model. `native_same_sound` requires only a positive equality test to imply lookup equivalence. Both proof modules close child reuse, equal-header reconstruction, and all four containment routes; direct-string proofs preserve cached-sample residency. Thus every branch shape in the handwritten union has a source refinement conditional on the one `==` soundness contract. `make PatriciaUnionProof.vo`, `make StringPatriciaUnionProof.vo`, and `git diff --check` passed. |
+| 2026-08-31 | Extracted the native-shaped union candidate and retained the legacy export | `union_left_native_default` mirrors the full custom branch control flow in both companion modules; only `native_same` is mapped to OCaml `(==)`. The 100K profile recovered subset/equal root reuse but allocated 800,904/800,628 words on half overlap and 1,600,788/1,600,948 on equality (integer/string), versus the legacy 365/81 and 26/26. Both wrappers were restored to the legacy realizers; `union-profile` now displays legacy, generated, proved, and fuel variants and recompiles interfaces safely. `make`, `PATRICIA_UNION_PROFILE_SIZE=100000 make union-profile`, and `git diff --check` passed. |
+| 2026-08-31 | Rejected the closure-free native-sharing fuel candidate | `union_left_native_fuel_default` removes the branch-local structural closure but retains a generic `same` callback. At 100K it allocated 1,200,993/1,200,634 words for half overlap and 2,400,919/2,400,891 for equal integer/string inputs—worse than the nested native-shaped candidate. It preserves no-op root sharing but is diagnostic-only; the public wrappers remain legacy. `PATRICIA_UNION_PROFILE_SIZE=100000 make union-profile` passed. |
 | 2026-08-31 | Proved the closure-free `union_left` oracle and restored the native realization | `union_left_specialized_changed_fuel_exact` proves that every fuel above the combined source-tree size agrees exactly with the established changed worker; `union_left_specialized_changed_fuel_result_exact` discharges the `S (size left + size right)` bound. The 100K three-way profile showed 600,523/600,261 fuel words for integer/string half-overlap versus 365/81 native words, so both wrappers again select the handwritten native realization. The fuel worker remains the proved source model for the next target-language refinement. `make`, `make union-proof`, `make union-oracle`, `PATRICIA_UNION_PROFILE_SIZE=100000 make union-profile`, and `git diff --check` passed. |
 | 2026-08-31 | Profiled the proved and closure-free `union_left` workers | Added `PatriciaUnionProfile.ml` and `make union-profile`, which directly compare the established changed-result worker with the fuel candidate on checked disjoint, half-overlap, subset, equal, no-op, and 192-byte-common-prefix workloads. At 100K inputs the proved/fuel allocations were respectively 700,641/600,523 words for integer half-overlap, 700,524/600,310 for subset, and 1,400,586/1,200,178 for equality; eight-byte strings and long-prefix strings had the same 14-versus-12-word-per-binding pattern. Both retained only roughly 50–90 extra words for changed results and reused the left root for subset, equality, and empty-right. `make union-profile`, `PATRICIA_UNION_PROFILE_SIZE=100000 make union-profile`, and `git diff --check` passed. |
 | 2026-08-31 | Added the closure-free changed-worker experiment | `PatriciaUnion.v` and `StringPatriciaUnion.v` now define direct fuel-decreasing changed workers and structural-bound result wrappers. `PatriciaExtract.v` exports them, and `PatriciaUnionTest.ml` checks their deterministic and randomized pointwise outputs. `make union-oracle` and `git diff --check` passed. The workers remain unproved and are not used by public wrappers pending an exact refinement theorem and native allocation profile. |

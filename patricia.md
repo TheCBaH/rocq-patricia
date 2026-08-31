@@ -87,6 +87,23 @@ including the fuel worker now proved equal to them, remain the source-level
 functional oracle. Disjoint prefixes are joined immediately, one-sided
 subtrees are reused, and only a changed recursive path is rebuilt.
 
+`union_left_native_default` now mirrors that custom recursion in Rocq and
+extracts with only `native_same` mapped to `(==)`. It restores root reuse but
+still allocates roughly 0.8M words for 100K half-overlap inputs and 1.6M for
+equal inputs, owing to generated helper/closure traffic; the 365/81 and 26/26
+word legacy integer/string results remain decisively lower. The public wrappers
+therefore retain the handwritten export while this candidate is improved.
+The closure-free fuel-shaped native candidate was worse still (1,200,993 /
+1,200,634 words for half overlap and 2,400,919 / 2,400,891 for equality),
+because its generic physical-equality callback is invoked through the recursive
+worker. Removing that higher-order and helper overhead is now the relevant
+generated-code experiment, not changing the recursion measure alone.
+Making `(==)` extraction-inline and compiling the diagnostic with
+`ocamlopt -inline 1000` made no material difference; this OCaml 4.14.3 build
+does not include Flambda. The practical next boundary is consequently a small
+handwritten recursive skeleton (with source-verified called primitives), or a
+separately verified target-language implementation.
+
 The 10,000- and 100,000-binding benchmark checks in `patricia-bench.md`
 confirm constant-sized allocation for disjoint native unions and substantially
 less allocation for the overlapping workload.  This restores the intended

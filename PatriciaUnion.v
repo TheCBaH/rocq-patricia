@@ -155,6 +155,204 @@ Definition native_reuse_right_branch {A : Type} (same : t A -> t A -> bool)
   Branch prefix mask left_original
     (native_reuse_child same right_original right_changed).
 
+(** Exact root-reuse forms used by the extracted worker.  The earlier helpers
+    model child substitution; these additionally avoid allocating the parent
+    when all of its changed children are physically reusable. *)
+Definition native_reuse_same_branch_root {A : Type} (same : t A -> t A -> bool)
+    (original : t A) (prefix mask : N)
+    (left_original right_original left_changed right_changed : t A) : t A :=
+  if (same left_changed left_original && same right_changed right_original)%bool
+  then original
+  else Branch prefix mask
+    (native_reuse_child same left_original left_changed)
+    (native_reuse_child same right_original right_changed).
+
+Definition native_reuse_left_branch_root {A : Type} (same : t A -> t A -> bool)
+    (original : t A) (prefix mask : N)
+    (left_original right_original left_changed : t A) : t A :=
+  if same left_changed left_original then original
+  else Branch prefix mask (native_reuse_child same left_original left_changed)
+    right_original.
+
+Definition native_reuse_right_branch_root {A : Type} (same : t A -> t A -> bool)
+    (original : t A) (prefix mask : N)
+    (left_original right_original right_changed : t A) : t A :=
+  if same right_changed right_original then original
+  else Branch prefix mask left_original
+    (native_reuse_child same right_original right_changed).
+
+(** The handwritten OCaml union, expressed in Rocq with its sole native
+    operation abstracted as [same].  Unlike the changed-result worker, this
+    retains the original branch whenever both recursive results are physically
+    reusable.  Extraction maps [native_same] to [(==)]; proofs use the worker
+    polymorphically under [native_same_sound]. *)
+Fixpoint union_left_native {A : Type} (same : t A -> t A -> bool) (a : t A)
+    {struct a} : t A -> t A :=
+  match a with
+  | Empty => fun b => b
+  | Leaf ka va => fun b =>
+      match b with
+      | Empty => a
+      | Leaf kb _ => if Pos.eqb ka kb then a else set ka va b
+      | Branch _ _ _ _ => set ka va b
+      end
+  | Branch pa ma la ra =>
+      fix union_right_tree (b : t A) {struct b} : t A :=
+        match b with
+        | Empty => a
+        | Leaf kb vb =>
+            match get kb a with Some _ => a | None => set kb vb a end
+        | Branch pb mb lb rb =>
+            if (N.eqb ma mb && N.eqb pa pb)%bool then
+              native_reuse_same_branch_root same a pa ma la ra
+                (union_left_native same la lb)
+                (union_left_native same ra rb)
+            else if mask_above ma mb then
+              match representative b with
+              | Some kb =>
+                  if matches_prefix kb pa ma then
+                    if zero_bit kb ma then
+                      native_reuse_left_branch_root same a pa ma la ra
+                        (union_left_native same la b)
+                    else native_reuse_right_branch_root same a pa ma la ra
+                        (union_left_native same ra b)
+                  else join a b
+              | None => a
+              end
+            else if mask_above mb ma then
+              match representative a with
+              | Some ka =>
+                  if matches_prefix ka pb mb then
+                    if zero_bit ka mb then
+                      native_reuse_left_branch_root same b pb mb lb rb
+                        (union_right_tree lb)
+                    else native_reuse_right_branch_root same b pb mb lb rb
+                        (union_right_tree rb)
+                  else join a b
+              | None => b
+              end
+            else join a b
+        end
+  end.
+
+(** Pure source placeholder for the extraction-only physical comparison. *)
+Definition native_same {A : Type} (_ _ : t A) : bool := false.
+
+Definition union_left_native_default {A : Type} : t A -> t A -> t A :=
+  union_left_native (@native_same A).
+
+(** Closure-free variant of [union_left_native].  Its single decreasing fuel
+    argument avoids extracting the branch-local recursive closure introduced
+    by the nested structural definition above.  A sufficient bound is supplied
+    by [size] at the public experimental entry point. *)
+Fixpoint union_left_native_fuel {A : Type} (same : t A -> t A -> bool)
+    (fuel : nat) (a b : t A) : t A :=
+  match fuel with
+  | O => union_left_specialized a b
+  | S fuel' =>
+      match a, b with
+      | Empty, tree => tree
+      | tree, Empty => tree
+      | Leaf ka va, Leaf kb _ => if Pos.eqb ka kb then a else set ka va b
+      | Leaf ka va, tree => set ka va tree
+      | tree, Leaf kb vb =>
+          match get kb tree with Some _ => tree | None => set kb vb tree end
+      | Branch pa ma la ra, Branch pb mb lb rb =>
+          if (N.eqb ma mb && N.eqb pa pb)%bool then
+            native_reuse_same_branch_root same a pa ma la ra
+              (union_left_native_fuel same fuel' la lb)
+              (union_left_native_fuel same fuel' ra rb)
+          else if mask_above ma mb then
+            match representative b with
+            | Some kb =>
+                if matches_prefix kb pa ma then
+                  if zero_bit kb ma then
+                    native_reuse_left_branch_root same a pa ma la ra
+                      (union_left_native_fuel same fuel' la b)
+                  else native_reuse_right_branch_root same a pa ma la ra
+                    (union_left_native_fuel same fuel' ra b)
+                else join a b
+            | None => a
+            end
+          else if mask_above mb ma then
+            match representative a with
+            | Some ka =>
+                if matches_prefix ka pb mb then
+                  if zero_bit ka mb then
+                    native_reuse_left_branch_root same b pb mb lb rb
+                      (union_left_native_fuel same fuel' a lb)
+                  else native_reuse_right_branch_root same b pb mb lb rb
+                    (union_left_native_fuel same fuel' a rb)
+                else join a b
+            | None => b
+            end
+          else join a b
+      end
+  end.
+
+Definition union_left_native_fuel_default {A : Type} (a b : t A) : t A :=
+  union_left_native_fuel (@native_same A) (S (size a + size b)) a b.
+
+(** Code-generation experiment: specialize [same] and spell the root tests
+    directly in the recursive worker, avoiding higher-order calls and the
+    reusable helper functions. *)
+Fixpoint union_left_native_fuel_inline {A : Type}
+    (fuel : nat) (a b : t A) : t A :=
+  match fuel with
+  | O => union_left_specialized a b
+  | S fuel' =>
+      match a, b with
+      | Empty, tree => tree
+      | tree, Empty => tree
+      | Leaf ka va, Leaf kb _ => if Pos.eqb ka kb then a else set ka va b
+      | Leaf ka va, tree => set ka va tree
+      | tree, Leaf kb vb =>
+          match get kb tree with Some _ => tree | None => set kb vb tree end
+      | Branch pa ma la ra, Branch pb mb lb rb =>
+          if (N.eqb ma mb && N.eqb pa pb)%bool then
+            let left' := union_left_native_fuel_inline fuel' la lb in
+            let right' := union_left_native_fuel_inline fuel' ra rb in
+            if (native_same left' la && native_same right' ra)%bool then a
+            else Branch pa ma
+              (if native_same left' la then la else left')
+              (if native_same right' ra then ra else right')
+          else if mask_above ma mb then
+            match representative b with
+            | Some kb =>
+                if matches_prefix kb pa ma then
+                  if zero_bit kb ma then
+                    let left' := union_left_native_fuel_inline fuel' la b in
+                    if native_same left' la then a
+                    else Branch pa ma (if native_same left' la then la else left') ra
+                  else
+                    let right' := union_left_native_fuel_inline fuel' ra b in
+                    if native_same right' ra then a
+                    else Branch pa ma la (if native_same right' ra then ra else right')
+                else join a b
+            | None => a
+            end
+          else if mask_above mb ma then
+            match representative a with
+            | Some ka =>
+                if matches_prefix ka pb mb then
+                  if zero_bit ka mb then
+                    let left' := union_left_native_fuel_inline fuel' a lb in
+                    if native_same left' lb then b
+                    else Branch pb mb (if native_same left' lb then lb else left') rb
+                  else
+                    let right' := union_left_native_fuel_inline fuel' a rb in
+                    if native_same right' rb then b
+                    else Branch pb mb lb (if native_same right' rb then rb else right')
+                else join a b
+            | None => b
+            end
+          else join a b
+      end
+  end.
+
+Definition union_left_native_fuel_inline_default {A : Type} (a b : t A) : t A :=
+  union_left_native_fuel_inline (S (size a + size b)) a b.
+
 (** One-step equation for changed-result refinement proofs. *)
 Lemma union_left_specialized_changed_equation:
   forall (A : Type) (a b : t A),

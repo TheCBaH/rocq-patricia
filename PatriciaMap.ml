@@ -42,9 +42,8 @@ let combine combiner =
            combiner.both left_value right_value
        | None, None -> None)
 
-(* This native realization uses physical identity to preserve unchanged input
-   branches. The proved changed-result worker remains its source-level oracle;
-   a heap-aware refinement is still required for the [==] decisions. *)
+(* The generated native-shaped worker remains a refinement candidate, but its
+   closure/helper allocation currently loses to this fully inlined worker. *)
 let union_left = PatriciaInternal.union_left
 let union_right = PatriciaInternal.union_right
 let elements = PatriciaInternal.elements

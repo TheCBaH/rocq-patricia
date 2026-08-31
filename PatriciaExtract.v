@@ -26,6 +26,10 @@ Extract Constant PatriciaBits.highest_differing_bit =>
      in log2 (left lxor right) 0)".
 Extract Constant PatriciaBits.mask_above => "(fun high low -> low < high)".
 
+(** The generic native union is extracted normally; physical equality is its
+    only target-specific primitive. *)
+Extract Inlined Constant PatriciaUnion.native_same => "(==)".
+
 (** [Patricia.combine] is the proved, fuel-free structural worker.  Extract it
     directly so the optimized backend no longer substitutes a handwritten
     general merge implementation. *)
@@ -95,6 +99,8 @@ Extract Constant StringBits.bit_at =>
        (tag = 0 ||
         (tag <= 8 &&
          ((Char.code (Stdlib.String.unsafe_get s byte) lsr (8 - tag)) land 1) <> 0)))".
+
+Extract Inlined Constant StringPatriciaUnion.native_same => "(==)".
 
 Extract Constant StringBits.first_diff =>
   "(fun left right ->
@@ -264,6 +270,9 @@ Separate Extraction
   PatriciaUnion.union_left_specialized_changed_result
   PatriciaUnion.union_left_specialized_changed_fuel
   PatriciaUnion.union_left_specialized_changed_fuel_result
+  PatriciaUnion.union_left_native_default
+  PatriciaUnion.union_left_native_fuel_default
+  PatriciaUnion.union_left_native_fuel_inline_default
   PatriciaUnion.union_right_specialized_changed
   PatriciaUnion.union_right_specialized_changed_result
   Patricia.map Patricia.fold Patricia.elements Patricia.beq
@@ -283,6 +292,8 @@ Separate Extraction
   StringPatriciaUnion.union_left_specialized_changed_result
   StringPatriciaUnion.union_left_specialized_changed_fuel
   StringPatriciaUnion.union_left_specialized_changed_fuel_result
+  StringPatriciaUnion.union_left_native_default
+  StringPatriciaUnion.union_left_native_fuel_default
   StringPatriciaUnion.union_right_specialized_changed
   StringPatriciaUnion.union_right_specialized_changed_result
   StringPatricia.map StringPatricia.fold StringPatricia.elements

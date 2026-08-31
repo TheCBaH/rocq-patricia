@@ -378,6 +378,46 @@ Proof.
   eapply union_left_specialized_same_branch_correct_wf; eauto.
 Qed.
 
+(** Root-level reuse adds no semantic obligation beyond the established
+    child-reuse reconstruction: when both tests succeed, the raw branch in
+    that theorem is definitionally the retained original branch. *)
+Lemma native_reuse_same_branch_root_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) prefix mask
+      (left_a right_a left_b right_b out_left out_right : t A),
+    native_same_sound same ->
+    wf (Branch prefix mask left_a right_a) ->
+    wf (Branch prefix mask left_b right_b) ->
+    (wf out_left /\
+      forall key, get key out_left =
+        match get key left_a with Some value => Some value | None => get key left_b end) ->
+    (wf out_right /\
+      forall key, get key out_right =
+        match get key right_a with Some value => Some value | None => get key right_b end) ->
+    wf (native_reuse_same_branch_root same (Branch prefix mask left_a right_a)
+      prefix mask left_a right_a out_left out_right) /\
+    forall key,
+      get key (native_reuse_same_branch_root same (Branch prefix mask left_a right_a)
+        prefix mask left_a right_a out_left out_right) =
+      match get key (Branch prefix mask left_a right_a) with
+      | Some value => Some value
+      | None => get key (Branch prefix mask left_b right_b)
+      end.
+Proof.
+  intros A same prefix mask left_a right_a left_b right_b out_left out_right
+    Hsame Hwa Hwb Hleft Hright.
+  destruct (native_reuse_same_branch_correct_wf A same prefix mask
+    left_a right_a left_b right_b out_left out_right
+    Hsame Hwa Hwb Hleft Hright) as [Hwf Hget].
+  unfold native_reuse_same_branch_root.
+  destruct (same out_left left_a) eqn:Eleft;
+    destruct (same out_right right_a) eqn:Eright;
+    unfold native_reuse_same_branch, native_reuse_child in Hwf, Hget;
+    rewrite Eleft, Eright in Hwf, Hget; cbn in Hwf, Hget;
+    cbn; try rewrite Eleft; try rewrite Eright; cbn;
+    unfold native_reuse_child; try rewrite Eleft; try rewrite Eright; cbn;
+    exact (conj Hwf Hget).
+Qed.
+
 (** Changed-result composition for equal integer branch headers. *)
 Lemma union_left_specialized_changed_same_branch_correct_wf:
   forall (A : Type) prefix mask (left_a right_a left_b right_b : t A),
@@ -533,6 +573,33 @@ Proof.
   { unfold native_reuse_left_branch. now apply branch_unchanged. }
   rewrite <- Ebranch.
   eapply union_left_specialized_left_outer_branch_correct_wf; eauto.
+Qed.
+
+Lemma native_reuse_left_branch_root_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) prefix mask
+      (left right operand out_left : t A),
+    native_same_sound same ->
+    wf (Branch prefix mask left right) -> wf operand ->
+    all_keys (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = true)
+      operand ->
+    (wf out_left /\ forall key, get key out_left =
+      match get key left with Some value => Some value | None => get key operand end) ->
+    wf (native_reuse_left_branch_root same (Branch prefix mask left right)
+      prefix mask left right out_left) /\
+    forall key, get key (native_reuse_left_branch_root same
+      (Branch prefix mask left right) prefix mask left right out_left) =
+      match get key (Branch prefix mask left right) with
+      | Some value => Some value | None => get key operand end.
+Proof.
+  intros A same prefix mask left right operand out_left Hsame Houter Hoperand Hall Hchild.
+  destruct (native_reuse_left_branch_correct_wf A same prefix mask left right operand out_left
+    Hsame Houter Hoperand Hall Hchild) as [Hwf Hget].
+  unfold native_reuse_left_branch_root.
+  destruct (same out_left left) eqn:Echild.
+  - unfold native_reuse_left_branch, native_reuse_child in Hwf, Hget.
+    rewrite Echild in Hwf, Hget; cbn in Hwf, Hget |- *.
+    exact (conj Hwf Hget).
+  - exact (conj Hwf Hget).
 Qed.
 
 (** Changed-result composition for a left-outer zero-bit route. *)
@@ -710,6 +777,33 @@ Proof.
   { unfold native_reuse_right_branch. now apply branch_unchanged. }
   rewrite <- Ebranch.
   eapply union_left_specialized_left_outer_right_branch_correct_wf; eauto.
+Qed.
+
+Lemma native_reuse_right_branch_root_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) prefix mask
+      (left right operand out_right : t A),
+    native_same_sound same ->
+    wf (Branch prefix mask left right) -> wf operand ->
+    all_keys (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = false)
+      operand ->
+    (wf out_right /\ forall key, get key out_right =
+      match get key right with Some value => Some value | None => get key operand end) ->
+    wf (native_reuse_right_branch_root same (Branch prefix mask left right)
+      prefix mask left right out_right) /\
+    forall key, get key (native_reuse_right_branch_root same
+      (Branch prefix mask left right) prefix mask left right out_right) =
+      match get key (Branch prefix mask left right) with
+      | Some value => Some value | None => get key operand end.
+Proof.
+  intros A same prefix mask left right operand out_right Hsame Houter Hoperand Hall Hchild.
+  destruct (native_reuse_right_branch_correct_wf A same prefix mask left right operand out_right
+    Hsame Houter Hoperand Hall Hchild) as [Hwf Hget].
+  unfold native_reuse_right_branch_root.
+  destruct (same out_right right) eqn:Echild.
+  - unfold native_reuse_right_branch, native_reuse_child in Hwf, Hget.
+    rewrite Echild in Hwf, Hget; cbn in Hwf, Hget |- *.
+    exact (conj Hwf Hget).
+  - exact (conj Hwf Hget).
 Qed.
 
 (** Changed-result composition for a left-outer one-bit route. *)
