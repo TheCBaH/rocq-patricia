@@ -89,7 +89,7 @@ let check_string () =
   let actual_right = SU.union_right_specialized left right in
   let changed_left = SU.union_left_specialized_changed left right in
   let changed_result =
-    match changed_left with None -> left | Some changed -> changed
+    match changed_left with S.Empty -> left | changed -> changed
   in
   List.iter
     (fun key ->
@@ -101,17 +101,17 @@ let check_string () =
         failwith "string changed-worker union mismatch")
     keys;
   let subset = add_selected 2 S.empty in
-  if SU.union_left_specialized_changed left subset <> None then
+  if SU.union_left_specialized_changed left subset <> S.Empty then
     failwith "string changed worker missed unchanged certificate";
-  if changed_left = None then
+  if changed_left = S.Empty then
     failwith "string changed worker missed fresh right bindings";
   let nested = S.set "ab" 2 (S.set "aa" 1 S.empty) in
   let enclosing = S.set "z" 3 nested in
   let nested_changed = SU.union_left_specialized_changed nested enclosing in
   let nested_result =
-    match nested_changed with None -> nested | Some changed -> changed
+    match nested_changed with S.Empty -> nested | changed -> changed
   in
-  if nested_changed = None || S.get "z" nested_result <> Some 3 then
+  if nested_changed = S.Empty || S.get "z" nested_result <> Some 3 then
     failwith "string changed worker dropped an outer sibling";
   for seed = 1 to 32 do
     let state = ref seed in
@@ -129,7 +129,7 @@ let check_string () =
     let random_right = add 48 S.empty in
     let random_changed = SU.union_left_specialized_changed random_left random_right in
     let random_result =
-      match random_changed with None -> random_left | Some changed -> changed
+      match random_changed with S.Empty -> random_left | changed -> changed
     in
     let random_expected = S.union_left random_left random_right in
     for key = 0 to 126 do

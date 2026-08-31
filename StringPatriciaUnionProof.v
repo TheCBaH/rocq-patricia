@@ -4,6 +4,60 @@
 From Stdlib Require Import Arith.Wf_nat Lia PeanoNat Strings.String.
 Require Import StringBits StringPatricia StringPatriciaProof StringPatriciaUnion.
 
+Definition nonempty {A : Type} (tree : t A) : Prop :=
+  exists key value, get key tree = Some value.
+
+Lemma set_nonempty_unconditional:
+  forall (A : Type) key (value : A) (tree : t A),
+    wf tree ->
+    nonempty (set key value tree).
+Proof.
+  intros A key value tree Hwf. exists key, value. apply get_set_same; exact Hwf.
+Qed.
+
+Lemma changed_result_nonempty:
+  forall (A : Type) (original changed : t A),
+    nonempty changed ->
+    reuse_changed original changed = changed.
+Proof.
+  intros A original changed Hnonempty.
+  unfold reuse_changed.
+  destruct changed as [|key value|sample split left right].
+  - destruct Hnonempty as [key [value Hget]]. discriminate.
+  - reflexivity.
+  - reflexivity.
+Qed.
+
+Lemma biased_output_nonempty_left:
+  forall (A : Type) (left right out : t A),
+    nonempty left ->
+    (forall key,
+      get key out =
+      match get key left with Some value => Some value | None => get key right end) ->
+    nonempty out.
+Proof.
+  intros A left right out [key [value Hget]] Hout.
+  exists key, value. rewrite Hout, Hget. reflexivity.
+Qed.
+
+Lemma reuse_changed_correct_nonempty_left:
+  forall (A : Type) (original changed left right : t A),
+    nonempty left ->
+    (wf changed /\
+      forall key,
+        get key changed =
+        match get key left with Some value => Some value | None => get key right end) ->
+    wf (reuse_changed original changed) /\
+    forall key,
+      get key (reuse_changed original changed) =
+      match get key left with Some value => Some value | None => get key right end.
+Proof.
+  intros A original changed left right Hleft Hcorrect.
+  assert (Hchanged : nonempty changed).
+  { eapply biased_output_nonempty_left; [exact Hleft|exact (proj2 Hcorrect)]. }
+  rewrite changed_result_nonempty by exact Hchanged. exact Hcorrect.
+Qed.
+
 Theorem union_left_specialized_empty_right:
   forall (A : Type) (left : t A),
     union_left_specialized left Empty = left.
@@ -14,9 +68,9 @@ Theorem union_left_specialized_empty_left:
     union_left_specialized Empty right = right.
 Proof. reflexivity. Qed.
 
-(** Definitionally identical boundary cases for the source-level changed
-    worker.  The remaining refinement proof is consequently branch/branch
-    only. *)
+(** The changed worker agrees with the original worker in all non-recursive
+    shapes.  These bridge lemmas keep the branch/branch proof focused on
+    reconstruction. *)
 Lemma union_left_specialized_changed_empty_left:
   forall (A : Type) (right : t A),
     union_left_specialized_changed_result Empty right =
@@ -31,31 +85,47 @@ Proof. intros A left. destruct left; reflexivity. Qed.
 
 Lemma union_left_specialized_changed_leaf_left:
   forall (A : Type) key (value : A) (right : t A),
+    wf right ->
     union_left_specialized_changed_result (Leaf key value) right =
     union_left_specialized (Leaf key value) right.
 Proof.
-  intros A key value right. destruct right as [|stored stored_value|sample split l r].
+  intros A key value right Hright. destruct right as [|stored stored_value|sample split l r].
   - reflexivity.
-  - unfold union_left_specialized_changed_result,
-      union_left_specialized_changed, union_left_specialized; cbn.
-    destruct (String.eqb key stored); reflexivity.
-  - reflexivity.
+  - destruct (String.eqb key stored) eqn:Eequal.
+    + unfold union_left_specialized_changed_result.
+      rewrite union_left_specialized_changed_equation, Eequal.
+      rewrite union_left_specialized_equation, Eequal. reflexivity.
+    + unfold union_left_specialized_changed_result.
+      rewrite union_left_specialized_changed_equation, Eequal.
+      rewrite union_left_specialized_equation, Eequal.
+      apply changed_result_nonempty. apply set_nonempty_unconditional; exact Hright.
+  - unfold union_left_specialized_changed_result.
+    rewrite union_left_specialized_changed_equation.
+    rewrite union_left_specialized_equation.
+    apply changed_result_nonempty. apply set_nonempty_unconditional; exact Hright.
 Qed.
 
 Lemma union_left_specialized_changed_leaf_right:
   forall (A : Type) (left : t A) key (value : A),
+    wf left ->
     union_left_specialized_changed_result left (Leaf key value) =
     union_left_specialized left (Leaf key value).
 Proof.
-  intros A left key value. destruct left as [|stored stored_value|sample split l r].
+  intros A left key value Hleft. destruct left as [|stored stored_value|sample split l r].
   - reflexivity.
-  - unfold union_left_specialized_changed_result,
-      union_left_specialized_changed, union_left_specialized; cbn.
-    destruct (String.eqb stored key); reflexivity.
-  - unfold union_left_specialized_changed_result,
-      union_left_specialized_changed, union_left_specialized; cbn.
-    destruct (bit_at key split) eqn:B; cbn [get];
-      [destruct (get key r)|destruct (get key l)]; reflexivity.
+  - destruct (String.eqb stored key) eqn:Eequal.
+    + unfold union_left_specialized_changed_result.
+      rewrite union_left_specialized_changed_equation, Eequal.
+      rewrite union_left_specialized_equation, Eequal. reflexivity.
+    + unfold union_left_specialized_changed_result.
+      rewrite union_left_specialized_changed_equation, Eequal.
+      rewrite union_left_specialized_equation, Eequal.
+      apply changed_result_nonempty. apply set_nonempty_unconditional; constructor.
+  - unfold union_left_specialized_changed_result.
+    rewrite union_left_specialized_changed_equation.
+    rewrite union_left_specialized_equation.
+    destruct (get key (Branch sample split l r)); [reflexivity|].
+    apply changed_result_nonempty. apply set_nonempty_unconditional; exact Hleft.
 Qed.
 
 (** Smart branches may refresh their cached sample, but lookup ignores that
@@ -325,32 +395,52 @@ Proof.
   inversion Hwb as [| |? ? ? ? Hwlb Hwrb Hnlb Hnrb Hlb Hrb Hresidentb]; subst.
   unfold union_left_specialized_changed_result.
   rewrite union_left_specialized_changed_equation.
-  cbn. rewrite Nat.eqb_refl, Hagree.
+  cbn -[branch reuse_changed]. rewrite Nat.eqb_refl, Hagree.
   destruct (union_left_specialized_changed left_a left_b) eqn:Eleft;
     destruct (union_left_specialized_changed right_a right_b) eqn:Eright.
-  - unfold union_left_specialized_changed_result in Hleft, Hright.
-    rewrite Eleft in Hleft. rewrite Eright in Hright.
-    eapply union_left_specialized_same_branch_correct_wf; eauto.
-  - unfold union_left_specialized_changed_result in Hleft, Hright.
-    rewrite Eleft in Hleft. rewrite Eright in Hright.
-    eapply union_left_specialized_same_branch_correct_wf; eauto.
-  - unfold union_left_specialized_changed_result in Hleft, Hright.
-    rewrite Eleft in Hleft. rewrite Eright in Hright.
-    eapply union_left_specialized_same_branch_correct_wf; eauto.
   - unfold union_left_specialized_changed_result in Hleft, Hright.
     rewrite Eleft in Hleft. rewrite Eright in Hright.
     destruct (union_left_specialized_same_branch_correct_wf A sample_a sample_b split
       left_a right_a left_b right_b left_a right_a Hwa Hwb Hagree Hleft Hright)
       as [_ Hget].
     split; [exact Hwa|]. intro key.
-    rewrite <- (get_branch_cached_sample_irrelevant A sample_a split left_a right_a key
-      Hnla Hnra).
-    change (get key (branch sample_a split left_a right_a) =
+    change (get key (Branch sample_a split left_a right_a) =
       match get key (Branch sample_a split left_a right_a) with
       | Some value => Some value
       | None => get key (Branch sample_b split left_b right_b)
       end).
+    rewrite <- (get_branch_cached_sample_irrelevant A sample_a split left_a right_a key
+      Hnla Hnra) at 1.
     apply Hget.
+  Local Ltac solve_changed_case A sample_a sample_b split left_a right_a left_b right_b
+      Hwa Hwb Hagree Hleft Hright Eleft Eright Hresidenta :=
+    unfold union_left_specialized_changed_result in Hleft, Hright;
+    rewrite Eleft in Hleft; rewrite Eright in Hright;
+    cbn [reuse_changed] in Hleft, Hright;
+    assert (Horiginal : nonempty (Branch sample_a split left_a right_a)) by
+      (destruct Hresidenta as [sample_value Hget];
+       exists sample_a, sample_value; exact Hget);
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch sample_a split left_a right_a)
+      (right := Branch sample_b split left_b right_b);
+    [exact Horiginal|
+     eapply union_left_specialized_same_branch_correct_wf; eauto].
+  - solve_changed_case A sample_a sample_b split left_a right_a left_b right_b
+      Hwa Hwb Hagree Hleft Hright Eleft Eright Hresidenta.
+  - solve_changed_case A sample_a sample_b split left_a right_a left_b right_b
+      Hwa Hwb Hagree Hleft Hright Eleft Eright Hresidenta.
+  - solve_changed_case A sample_a sample_b split left_a right_a left_b right_b
+      Hwa Hwb Hagree Hleft Hright Eleft Eright Hresidenta.
+  - solve_changed_case A sample_a sample_b split left_a right_a left_b right_b
+      Hwa Hwb Hagree Hleft Hright Eleft Eright Hresidenta.
+  - solve_changed_case A sample_a sample_b split left_a right_a left_b right_b
+      Hwa Hwb Hagree Hleft Hright Eleft Eright Hresidenta.
+  - solve_changed_case A sample_a sample_b split left_a right_a left_b right_b
+      Hwa Hwb Hagree Hleft Hright Eleft Eright Hresidenta.
+  - solve_changed_case A sample_a sample_b split left_a right_a left_b right_b
+      Hwa Hwb Hagree Hleft Hright Eleft Eright Hresidenta.
+  - solve_changed_case A sample_a sample_b split left_a right_a left_b right_b
+      Hwa Hwb Hagree Hleft Hright Eleft Eright Hresidenta.
 Qed.
 
 (** Unequal-split reconstruction once routing has established that every key
@@ -448,22 +538,41 @@ Proof.
     (apply Nat.ltb_lt; exact Hlt).
   unfold union_left_specialized_changed_result.
   rewrite union_left_specialized_changed_equation.
-  rewrite Eequal, Eless, Hagree, Hside.
+  rewrite Eequal, Eless, Hagree, Hside. cbn -[branch reuse_changed].
   destruct (union_left_specialized_changed left
-    (Branch inner_sample inner_split inner_left inner_right)) eqn:Echild.
+    (Branch inner_sample inner_split inner_left inner_right)) as
+    [|changed_key changed_value|changed_sample changed_split changed_left changed_right]
+    eqn:Echild.
   - unfold union_left_specialized_changed_result in Hchild.
-    rewrite Echild in Hchild.
-    eapply union_left_specialized_left_outer_left_branch_correct_wf;
-      eauto.
-  - unfold union_left_specialized_changed_result in Hchild.
-    rewrite Echild in Hchild.
+    rewrite Echild in Hchild. cbn [reuse_changed] in Hchild |- *.
     destruct (union_left_specialized_left_outer_left_branch_correct_wf A
       sample split left right
       (Branch inner_sample inner_split inner_left inner_right) left
       Hwl Hwr Hinner Hleft Hright Hoperand Hchild) as [_ Hget].
     split; [exact Houter|]. intro key.
+    change (get key (Branch sample split left right) =
+      match get key (Branch sample split left right) with
+      | Some value => Some value
+      | None => get key (Branch inner_sample inner_split inner_left inner_right)
+      end).
     rewrite <- (get_branch_cached_sample_irrelevant A sample split left right key Hnl Hnr) at 1.
-    apply Hget.
+    exact (Hget key).
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild. cbn [reuse_changed] in Hchild.
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch sample split left right)
+      (right := Branch inner_sample inner_split inner_left inner_right).
+    + destruct Hresident as [sample_value Hget].
+      exists sample, sample_value. exact Hget.
+    + eapply union_left_specialized_left_outer_left_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild. cbn [reuse_changed] in Hchild.
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch sample split left right)
+      (right := Branch inner_sample inner_split inner_left inner_right).
+    + destruct Hresident as [sample_value Hget].
+      exists sample, sample_value. exact Hget.
+    + eapply union_left_specialized_left_outer_left_branch_correct_wf; eauto.
 Qed.
 
 Lemma union_left_specialized_left_outer_right_branch_correct_wf:
@@ -559,22 +668,41 @@ Proof.
     (apply Nat.ltb_lt; exact Hlt).
   unfold union_left_specialized_changed_result.
   rewrite union_left_specialized_changed_equation.
-  rewrite Eequal, Eless, Hagree, Hside.
+  rewrite Eequal, Eless, Hagree, Hside. cbn -[branch reuse_changed].
   destruct (union_left_specialized_changed right
-    (Branch inner_sample inner_split inner_left inner_right)) eqn:Echild.
+    (Branch inner_sample inner_split inner_left inner_right)) as
+    [|changed_key changed_value|changed_sample changed_split changed_left changed_right]
+    eqn:Echild.
   - unfold union_left_specialized_changed_result in Hchild.
-    rewrite Echild in Hchild.
-    eapply union_left_specialized_left_outer_right_branch_correct_wf;
-      eauto.
-  - unfold union_left_specialized_changed_result in Hchild.
-    rewrite Echild in Hchild.
+    rewrite Echild in Hchild. cbn [reuse_changed] in Hchild |- *.
     destruct (union_left_specialized_left_outer_right_branch_correct_wf A
       sample split left right
       (Branch inner_sample inner_split inner_left inner_right) right
       Hwl Hwr Hinner Hleft Hright Hoperand Hchild) as [_ Hget].
     split; [exact Houter|]. intro key.
+    change (get key (Branch sample split left right) =
+      match get key (Branch sample split left right) with
+      | Some value => Some value
+      | None => get key (Branch inner_sample inner_split inner_left inner_right)
+      end).
     rewrite <- (get_branch_cached_sample_irrelevant A sample split left right key Hnl Hnr) at 1.
-    apply Hget.
+    exact (Hget key).
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild. cbn [reuse_changed] in Hchild.
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch sample split left right)
+      (right := Branch inner_sample inner_split inner_left inner_right).
+    + destruct Hresident as [sample_value Hget].
+      exists sample, sample_value. exact Hget.
+    + eapply union_left_specialized_left_outer_right_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild. cbn [reuse_changed] in Hchild.
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch sample split left right)
+      (right := Branch inner_sample inner_split inner_left inner_right).
+    + destruct Hresident as [sample_value Hget].
+      exists sample, sample_value. exact Hget.
+    + eapply union_left_specialized_left_outer_right_branch_correct_wf; eauto.
 Qed.
 
 (** The worker's successful bounded-prefix test identifies the side occupied
@@ -755,10 +883,36 @@ Proof.
   rewrite union_left_specialized_changed_equation.
   rewrite Eequal, Enotless, Hagree, Hside.
   destruct (union_left_specialized_changed
-    (Branch inner_sample inner_split inner_left inner_right) outer_left) eqn:Echild;
-    unfold union_left_specialized_changed_result in Hchild;
-    rewrite Echild in Hchild;
-    eapply union_left_specialized_right_outer_left_branch_correct_wf; eauto.
+    (Branch inner_sample inner_split inner_left inner_right) outer_left) as
+    [|changed_key changed_value|changed_sample changed_split changed_left changed_right]
+    eqn:Echild.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild. cbn [reuse_changed] in Hchild.
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch inner_sample inner_split inner_left inner_right)
+      (right := Branch outer_sample outer_split outer_left outer_right).
+    + destruct (wf_cached_sample_resident A inner_sample inner_split
+        inner_left inner_right Hinner) as [sample_value Hget].
+      exists inner_sample, sample_value. exact Hget.
+    + eapply union_left_specialized_right_outer_left_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild. cbn [reuse_changed] in Hchild.
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch inner_sample inner_split inner_left inner_right)
+      (right := Branch outer_sample outer_split outer_left outer_right).
+    + destruct (wf_cached_sample_resident A inner_sample inner_split
+        inner_left inner_right Hinner) as [sample_value Hget].
+      exists inner_sample, sample_value. exact Hget.
+    + eapply union_left_specialized_right_outer_left_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild. cbn [reuse_changed] in Hchild.
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch inner_sample inner_split inner_left inner_right)
+      (right := Branch outer_sample outer_split outer_left outer_right).
+    + destruct (wf_cached_sample_resident A inner_sample inner_split
+        inner_left inner_right Hinner) as [sample_value Hget].
+      exists inner_sample, sample_value. exact Hget.
+    + eapply union_left_specialized_right_outer_left_branch_correct_wf; eauto.
 Qed.
 
 (** Changed-result composition for the right child of an enclosing branch. *)
@@ -806,10 +960,36 @@ Proof.
   rewrite union_left_specialized_changed_equation.
   rewrite Eequal, Enotless, Hagree, Hside.
   destruct (union_left_specialized_changed
-    (Branch inner_sample inner_split inner_left inner_right) outer_right) eqn:Echild;
-    unfold union_left_specialized_changed_result in Hchild;
-    rewrite Echild in Hchild;
-    eapply union_left_specialized_right_outer_right_branch_correct_wf; eauto.
+    (Branch inner_sample inner_split inner_left inner_right) outer_right) as
+    [|changed_key changed_value|changed_sample changed_split changed_left changed_right]
+    eqn:Echild.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild. cbn [reuse_changed] in Hchild.
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch inner_sample inner_split inner_left inner_right)
+      (right := Branch outer_sample outer_split outer_left outer_right).
+    + destruct (wf_cached_sample_resident A inner_sample inner_split
+        inner_left inner_right Hinner) as [sample_value Hget].
+      exists inner_sample, sample_value. exact Hget.
+    + eapply union_left_specialized_right_outer_right_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild. cbn [reuse_changed] in Hchild.
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch inner_sample inner_split inner_left inner_right)
+      (right := Branch outer_sample outer_split outer_left outer_right).
+    + destruct (wf_cached_sample_resident A inner_sample inner_split
+        inner_left inner_right Hinner) as [sample_value Hget].
+      exists inner_sample, sample_value. exact Hget.
+    + eapply union_left_specialized_right_outer_right_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild. cbn [reuse_changed] in Hchild.
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch inner_sample inner_split inner_left inner_right)
+      (right := Branch outer_sample outer_split outer_left outer_right).
+    + destruct (wf_cached_sample_resident A inner_sample inner_split
+        inner_left inner_right Hinner) as [sample_value Hget].
+      exists inner_sample, sample_value. exact Hget.
+    + eapply union_left_specialized_right_outer_right_branch_correct_wf; eauto.
 Qed.
 
 Lemma union_left_specialized_branch_calls_smaller:
@@ -1044,15 +1224,15 @@ Proof.
       now apply union_left_specialized_correct_wf.
     - rewrite union_left_specialized_changed_empty_left.
       now apply union_left_specialized_correct_wf.
-    - rewrite union_left_specialized_changed_leaf_left.
+    - rewrite union_left_specialized_changed_leaf_left by exact Hwr.
       now apply union_left_specialized_correct_wf.
-    - rewrite union_left_specialized_changed_leaf_left.
+    - rewrite union_left_specialized_changed_leaf_left by exact Hwr.
       now apply union_left_specialized_correct_wf.
-    - rewrite union_left_specialized_changed_leaf_left.
+    - rewrite union_left_specialized_changed_leaf_left by exact Hwr.
       now apply union_left_specialized_correct_wf.
     - rewrite union_left_specialized_changed_empty_right.
       now apply union_left_specialized_correct_wf.
-    - rewrite union_left_specialized_changed_leaf_right.
+    - rewrite union_left_specialized_changed_leaf_right by exact Hwl.
       now apply union_left_specialized_correct_wf.
     - inversion Hwl as
         [| |? ? ? ? Hwll Hwlr _ _ Hall Halr _]; subst.
@@ -1075,7 +1255,14 @@ Proof.
             ltac:(now rewrite Nat.min_id)) as [Hwj Hgetj].
           unfold union_left_specialized_changed_result.
           rewrite union_left_specialized_changed_equation.
-          rewrite Nat.eqb_refl, Eagrees. exact (conj Hwj Hgetj).
+          rewrite Nat.eqb_refl, Eagrees.
+          eapply reuse_changed_correct_nonempty_left with
+            (left := Branch left_sample left_split left_left left_right)
+            (right := Branch right_sample left_split right_left right_right);
+            [destruct (wf_cached_sample_resident A left_sample left_split
+              left_left left_right Hwl) as [sample_value Hget];
+             exists left_sample, sample_value; exact Hget
+            |exact (conj Hwj Hgetj)].
       + destruct (left_split <? right_split) eqn:Eorder.
         * apply Nat.ltb_lt in Eorder.
           destruct (agrees_before_bounded left_sample right_sample left_split)
@@ -1108,7 +1295,14 @@ Proof.
              rewrite union_left_specialized_changed_equation.
              assert (Eorderb : (left_split <? right_split) = true) by
                (apply Nat.ltb_lt; exact Eorder).
-             rewrite Esplits, Eorderb, Eagrees. exact (conj Hwj Hgetj).
+             rewrite Esplits, Eorderb, Eagrees.
+             eapply reuse_changed_correct_nonempty_left with
+               (left := Branch left_sample left_split left_left left_right)
+               (right := Branch right_sample right_split right_left right_right);
+               [destruct (wf_cached_sample_resident A left_sample left_split
+                 left_left left_right Hwl) as [sample_value Hget];
+                exists left_sample, sample_value; exact Hget
+               |exact (conj Hwj Hgetj)].
         * apply Nat.ltb_ge in Eorder.
           assert (Hreverse : right_split < left_split) by
             (apply Nat.eqb_neq in Esplits; lia).
@@ -1147,7 +1341,14 @@ Proof.
              rewrite union_left_specialized_changed_equation.
              assert (Eorderb : (left_split <? right_split) = false) by
                (apply Nat.ltb_ge; exact Eorder).
-             rewrite Esplits, Eorderb, Eagrees. exact (conj Hwj Hgetj).
+             rewrite Esplits, Eorderb, Eagrees.
+             eapply reuse_changed_correct_nonempty_left with
+               (left := Branch left_sample left_split left_left left_right)
+               (right := Branch right_sample right_split right_left right_right);
+               [destruct (wf_cached_sample_resident A left_sample left_split
+                 left_left left_right Hwl) as [sample_value Hget];
+                exists left_sample, sample_value; exact Hget
+               |exact (conj Hwj Hgetj)].
   }
   intros left right Hwl Hwr.
   eapply Hstrong with (total := size left + size right); eauto.

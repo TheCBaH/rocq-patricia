@@ -27,8 +27,11 @@ let combine combiner =
            combiner.both left_value right_value
        | None, None -> None)
 
-let union_left = StringPatriciaInternal.union_left
-let union_right = StringPatriciaInternal.union_right
+(* The companion worker is proved against the pure left-/right-biased union.
+   [Empty] is its allocation-free certificate that the original first input
+   can be reused. *)
+let union_left = StringPatriciaUnion.union_left_specialized_changed_result
+let union_right = StringPatriciaUnion.union_right_specialized_changed_result
 let elements = StringPatriciaInternal.elements
 let fold = StringPatriciaInternal.fold
 let beq = StringPatriciaInternal.beq

@@ -181,16 +181,16 @@ Required only for an end-to-end native-refinement claim.
   realizers against those workers. Both general `combine` realizers have been
   removed: `Patricia.combine` and `StringPatricia.combine` now extract directly
   from the proved structural workers. The companion modules now define and
-  extract source-level `union_left_specialized_changed` workers. The integer
-  worker uses `Empty` to mean the original left tree can be reused; every
-  nonempty result is rebuilt. The direct-string worker retains its
-  `None`/`Some out` signal pending the corresponding proof refactor. The extraction
-  oracle checks both certificate outcomes. A
-  10K wrapper trial reduced overlapping allocation to about 70K words for
-  each backend (below `Stdlib.Map`'s 81K), but still above the handwritten
-  physical-equality implementation. Both changed-result workers now have full
-  structural correctness proofs; source-level allocation refinement remains
-  open, so public wrappers continue to use the handwritten unions for now.
+  extract source-level `union_left_specialized_changed` workers. Both workers
+  use `Empty` to mean the original left tree can be reused; every nonempty
+  result is rebuilt. The extraction oracle checks both certificate outcomes,
+  and both workers have full structural correctness proofs.
+  `StringPatriciaMap` now exports the proved direct-string worker and
+  interprets its `Empty` sentinel; the integer wrapper retains its handwritten
+  physical-equality union. A checked 10K string profile (four-character keys)
+  allocated 70,218 words for half-overlap and 140,058 for equal maps, versus
+  85,211 and 159,005 for `Stdlib.Map`; allocation refinement and a formal
+  physical-sharing claim remain open.
   The normally extracted `set_one_descent` worker is also exercised directly
   by the randomized oracle, but a 10K wrapper trial allocated 993,458 versus
   726,896 words for fixed-width-string construction and 1,578,027 versus
@@ -319,6 +319,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-31 | Refactored and enabled the direct-string changed-worker sentinel | `StringPatriciaUnion.v` now uses `Empty` rather than `None` as the reusable-left certificate, with `reuse_changed` preserving the original tree only for that sentinel. `StringPatriciaUnionProof.v` proves the interpretation through all equal-header, containment, right-outer, and terminal-join shapes. `StringPatriciaMap` now exports the proved changed-result workers. `make union-proof`, `make union-oracle`, `make test`, `make benchmark-smoke`, `PATRICIA_BENCH_STRING_LENGTHS=4 PATRICIA_BENCH_VARIABLE_STRING_MAX_LENGTH=4 make benchmark`, and `git diff --check` passed. |
 | 2026-08-31 | Refactored the integer changed-worker signal to `Empty` | `PatriciaUnion.v` now reuses the nullary tree constructor to represent a match/reusable original tree, eliminating the extracted `option` wrapper. `PatriciaUnionProof.v` proves the sentinel interpretation through equal-header, containment, right-outer rebuild, and terminal-join cases; `PatriciaUnionTest.ml` checks the new signal. `make PatriciaUnionProof.vo`, `make union-oracle`, and `git diff --check` passed. |
 | 2026-08-31 | Expanded checked benchmark coverage | Added deterministic random-order builds, a mixed successful/unsuccessful lookup/update/remove/add trace, subset/equal/no-op/sparse-overlap unions, and 192-byte common-prefix strings with `PATRICIA_BENCH_LONG_PREFIX_LENGTH` override. `make benchmark-smoke` and `git diff --check` passed. |
 | 2026-08-31 | Calibrated short-union timing | `PatriciaBenchmark.ml` now takes five union samples, batching 32 operations through 100K bindings and one above that size; it reports per-union median and min--max dispersion and accepts explicit sample/batch overrides. `make benchmark-smoke` and `git diff --check` passed. |
