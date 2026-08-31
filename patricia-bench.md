@@ -21,8 +21,8 @@ one-sided subtrees and joins disjoint inputs directly. Across the 10,000 to
 1,000,000-binding runs below, disjoint-union allocation stayed below 500 words
 for both Patricia variants, while AVL allocation rose from 2,404 to 4,940
 words. Half-overlapping union is also substantially less allocating than AVL.
-The shortest union times are near the resolution of `Unix.gettimeofday`;
-allocation is the more dependable signal for those operations.
+Short union timings are now batched and sampled, but allocation remains the
+more dependable signal for tiny operations.
 
 These are measurements from one machine, not complexity proofs or regression
 thresholds.
@@ -73,7 +73,10 @@ default `PATRICIA_BENCH_SIZE=10000`, so each input map has 10,000 bindings.
   bindings are checked against `Stdlib.Map.merge`.
 - A disjoint left-biased union joins ranges `[1, n]` and `[n+1, 2n]`; the
   overlap workload joins `[1, n]` and `[n/2+1, 3n/2]`. Both use
-  `union_left`; the expected binding counts are checked.
+  `union_left`; the expected binding counts are checked. Current benchmark
+  union rows are per-union medians from five samples of 32 unions, with the
+  min--max range reported beside them. Set `PATRICIA_BENCH_SHORT_SAMPLES` and
+  `PATRICIA_BENCH_SHORT_BATCH` to override those positive defaults.
 - Retained size is measured after a major collection and compaction.
   Allocation is the OCaml GC minor-plus-major word counter. The operation
   timings include their benchmark loop and are reported per key except for
@@ -81,9 +84,10 @@ default `PATRICIA_BENCH_SIZE=10000`, so each input map has 10,000 bindings.
 
 ## Measurements
 
-All allocation and retained-size figures are OCaml heap words. Times are a
-single run; `0.000 ms` means that the measured interval rounded to zero at the
-clock precision, not that the operation took no time.
+All allocation and retained-size figures are OCaml heap words. Historical
+tables below used one timing run; current union rows report a batched-sample
+median and min--max range. `0.000 ms` means that the displayed interval rounded
+to zero at the clock precision, not that the operation took no time.
 These tables are the pre-bounded-scanner baseline; the completed follow-up and
 fresh 10K/100K overlap measurements appear below.
 
@@ -311,9 +315,6 @@ lower-allocation extracted source worker.
 The benchmark is a useful checked comparison and smoke benchmark. Future
 performance decisions would benefit from:
 
-- calibrated batches and multiple samples for union, reporting median and
-  dispersion instead of timing one sub-millisecond operation with
-  `Unix.gettimeofday`;
 - random insertion order, successful and unsuccessful lookups/removals,
   subset/no-op union, equal maps, sparse overlap, and adversarial long-prefix
   strings in addition to consecutive ranges;

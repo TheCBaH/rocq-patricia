@@ -257,8 +257,11 @@ Use this track before making new performance decisions or regression claims.
   bindings. The checked four-character run allocated 113 Patricia words versus
   10,193,264 AVL words (7.169 ms versus 23.891 ms); the allocation result
   extends the 10K/100K post-follow-up evidence to one million bindings.
-- [ ] Calibrate short operations with batched samples and report median and
-  dispersion instead of relying on one `Unix.gettimeofday` interval.
+- [x] Calibrate short operations with batched samples and report median and
+  dispersion. `PatriciaBenchmark.ml` now measures each union in five samples
+  of 32 operations by default, reporting the per-union median and min--max
+  range; `PATRICIA_BENCH_SHORT_SAMPLES` and `PATRICIA_BENCH_SHORT_BATCH`
+  make both parameters explicit and configurable.
 - [ ] Add random insertion order, mixed successful/unsuccessful operations,
   subset/no-op/equal/sparse-overlap unions, and adversarial long-prefix strings.
 - [ ] Add physical-sharing counters or retained-node checks when a sharing
@@ -310,6 +313,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-31 | Calibrated short-union timing | `PatriciaBenchmark.ml` now takes five 32-operation union samples by default, reports per-union median and min--max dispersion, and accepts explicit sample/batch environment overrides. `make benchmark-smoke` and `git diff --check` passed. |
 | 2026-08-31 | Completed the 1M bounded-string-overlap rerun | `PATRICIA_BENCH_SIZE=1000000 PATRICIA_BENCH_STRING_LENGTHS=4 PATRICIA_BENCH_VARIABLE_STRING_MAX_LENGTH=4 make benchmark` passed. Four-character half-overlap allocated 113 Patricia words versus 10,193,264 AVL words (7.169 ms versus 23.891 ms); the variable-length checked workload also passed. |
 | 2026-08-31 | Measured and retained the native string `set` realizer | Ordinary extraction of `set_one_descent` is now exercised in the randomized structural/oracle test. A checked 10K native trial found its result correct but allocated 993,458 versus 726,896 words for fixed-width-string construction and 1,578,027 versus 923,171 for updates, so the supported wrapper retains the exception realizer. `make`, `make benchmark`, and `git diff --check` passed. |
 | 2026-08-30 | Removed handwritten general `combine` realizers | `PatriciaExtract.v` now extracts both proved `combine_structural` workers directly, eliminating the two Patricia-specific merge substitutions. Full `make` passed with 360 closed declarations; `make benchmark` passed, retaining the checked 10K workload's allocation and functional checks. |

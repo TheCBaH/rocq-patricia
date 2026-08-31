@@ -57,6 +57,15 @@ let positive_env name default =
          parsed
        with Failure _ -> invalid_arg (name ^ " must be an integer"))
 
+(* A single disjoint union can take less than one clock tick.  Repeat only
+   these short, pure operations inside each sample and take several samples;
+   larger map traversals retain their single-run measurement cost. *)
+let short_operation_samples =
+  positive_env "PATRICIA_BENCH_SHORT_SAMPLES" 5
+
+let short_operation_batch =
+  positive_env "PATRICIA_BENCH_SHORT_BATCH" 32
+
 let string_key_space_at_least length required =
   let rec loop remaining capacity =
     if capacity >= required then true
@@ -120,6 +129,10 @@ type build_measurement = {
 type operation_measurement = {
   operation_seconds : float;
   operation_allocated_words : float;
+  operation_min_seconds : float;
+  operation_max_seconds : float;
+  operation_samples : int;
+  operation_batch : int;
 }
 
 let allocated_words () =
@@ -142,14 +155,53 @@ let measure_build cardinal build =
   let retained_words = (Gc.stat ()).Gc.live_words - before_live in
   (map, { seconds; allocated_words; retained_words })
 
-let measure_operation operation =
-  Gc.full_major ();
-  let before_allocated = allocated_words () in
-  let started = Unix.gettimeofday () in
-  let result = operation () in
-  let operation_seconds = Unix.gettimeofday () -. started in
-  let operation_allocated_words = allocated_words () -. before_allocated in
-  (result, { operation_seconds; operation_allocated_words })
+let median values =
+  match List.sort Stdlib.compare values with
+  | [] -> invalid_arg "median of an empty sample"
+  | sorted -> List.nth sorted (List.length sorted / 2)
+
+let measure_operation ?(samples = 1) ?(batch = 1) operation =
+  if samples <= 0 then invalid_arg "measure_operation: samples must be positive";
+  if batch <= 0 then invalid_arg "measure_operation: batch must be positive";
+  let measure_sample () =
+    Gc.full_major ();
+    let before_allocated = allocated_words () in
+    let started = Unix.gettimeofday () in
+    let rec run remaining =
+      let result = operation () in
+      if remaining = 1 then result else run (remaining - 1)
+    in
+    let result = run batch in
+    let operation_seconds =
+      (Unix.gettimeofday () -. started) /. float_of_int batch
+    in
+    let operation_allocated_words =
+      (allocated_words () -. before_allocated) /. float_of_int batch
+    in
+    (result, operation_seconds, operation_allocated_words)
+  in
+  let first_result, first_seconds, first_allocated = measure_sample () in
+  let rec collect remaining last_result seconds allocated =
+    if remaining = 0 then last_result, seconds, allocated
+    else
+      let result, elapsed, words = measure_sample () in
+      collect (remaining - 1) result (elapsed :: seconds) (words :: allocated)
+  in
+  let result, seconds, allocated =
+    collect (samples - 1) first_result [first_seconds] [first_allocated]
+  in
+  (result, {
+     operation_seconds = median seconds;
+     operation_allocated_words = median allocated;
+     operation_min_seconds = List.fold_left min infinity seconds;
+     operation_max_seconds = List.fold_left max neg_infinity seconds;
+     operation_samples = samples;
+     operation_batch = batch;
+   })
+
+let measure_short_operation operation =
+  measure_operation ~samples:short_operation_samples
+    ~batch:short_operation_batch operation
 
 let report_build title patricia avl hash =
   let report name measurement =
@@ -168,12 +220,23 @@ let report_build title patricia avl hash =
 
 let report_operation name patricia avl hash operations =
   let report implementation measurement =
-    Printf.printf
-      "  %-9s %-17s %7.3f ms  %8.1f ns/op  allocated %10.0f words\n"
-      implementation name
-      (1000. *. measurement.operation_seconds)
-      (1e9 *. measurement.operation_seconds /. float_of_int operations)
-      measurement.operation_allocated_words
+    if measurement.operation_samples = 1 then
+      Printf.printf
+        "  %-9s %-17s %7.3f ms  %8.1f ns/op  allocated %10.0f words\n"
+        implementation name
+        (1000. *. measurement.operation_seconds)
+        (1e9 *. measurement.operation_seconds /. float_of_int operations)
+        measurement.operation_allocated_words
+    else
+      Printf.printf
+        "  %-9s %-17s median %7.3f ms  %8.1f ns/op  range %7.3f-%7.3f us  allocated %10.0f words (%dx%d)\n"
+        implementation name
+        (1000. *. measurement.operation_seconds)
+        (1e9 *. measurement.operation_seconds /. float_of_int operations)
+        (1e6 *. measurement.operation_min_seconds)
+        (1e6 *. measurement.operation_max_seconds)
+        measurement.operation_allocated_words
+        measurement.operation_samples measurement.operation_batch
   in
   report "Patricia" patricia;
   report "Stdlib.Map" avl;
@@ -855,14 +918,14 @@ let benchmark_int () =
   let avl_disjoint = build_avl_int disjoint_keys in
   let hash_disjoint = build_hash_int disjoint_keys in
   let patricia_merged, patricia_merge =
-    measure_operation (fun () -> Patricia.union_left patricia_left patricia_disjoint)
+    measure_short_operation (fun () -> Patricia.union_left patricia_left patricia_disjoint)
   in
   let avl_merged, avl_merge =
-    measure_operation (fun () ->
+    measure_short_operation (fun () ->
         Int_avl.union (fun _ left _ -> Some left) avl_left avl_disjoint)
   in
   let hash_merged, hash_merge =
-    measure_operation (fun () -> union_left_int_hash hash_left hash_disjoint)
+    measure_short_operation (fun () -> union_left_int_hash hash_left hash_disjoint)
   in
   let all_disjoint = Array.append left_keys disjoint_keys in
   if patricia_cardinal patricia_merged <> 2 * benchmark_size
@@ -876,14 +939,14 @@ let benchmark_int () =
   let avl_overlap = build_avl_int overlap_keys in
   let hash_overlap = build_hash_int overlap_keys in
   let patricia_merged, patricia_merge =
-    measure_operation (fun () -> Patricia.union_left patricia_left patricia_overlap)
+    measure_short_operation (fun () -> Patricia.union_left patricia_left patricia_overlap)
   in
   let avl_merged, avl_merge =
-    measure_operation (fun () ->
+    measure_short_operation (fun () ->
         Int_avl.union (fun _ left _ -> Some left) avl_left avl_overlap)
   in
   let hash_merged, hash_merge =
-    measure_operation (fun () -> union_left_int_hash hash_left hash_overlap)
+    measure_short_operation (fun () -> union_left_int_hash hash_left hash_overlap)
   in
   let all_overlap = Array.append left_keys overlap_keys in
   let expected_overlap = benchmark_size + (benchmark_size / 2) in
@@ -946,14 +1009,14 @@ let benchmark_strings title make_key =
   let avl_disjoint = build_avl_string disjoint_keys in
   let hash_disjoint = build_hash_string disjoint_keys in
   let patricia_merged, patricia_merge =
-    measure_operation (fun () -> StringPatricia.union_left patricia_left patricia_disjoint)
+    measure_short_operation (fun () -> StringPatricia.union_left patricia_left patricia_disjoint)
   in
   let avl_merged, avl_merge =
-    measure_operation (fun () ->
+    measure_short_operation (fun () ->
         String_avl.union (fun _ left _ -> Some left) avl_left avl_disjoint)
   in
   let hash_merged, hash_merge =
-    measure_operation (fun () -> union_left_string_hash hash_left hash_disjoint)
+    measure_short_operation (fun () -> union_left_string_hash hash_left hash_disjoint)
   in
   let all_disjoint = Array.append left_keys disjoint_keys in
   if string_patricia_cardinal patricia_merged <> 2 * benchmark_size
@@ -967,14 +1030,14 @@ let benchmark_strings title make_key =
   let avl_overlap = build_avl_string overlap_keys in
   let hash_overlap = build_hash_string overlap_keys in
   let patricia_merged, patricia_merge =
-    measure_operation (fun () -> StringPatricia.union_left patricia_left patricia_overlap)
+    measure_short_operation (fun () -> StringPatricia.union_left patricia_left patricia_overlap)
   in
   let avl_merged, avl_merge =
-    measure_operation (fun () ->
+    measure_short_operation (fun () ->
         String_avl.union (fun _ left _ -> Some left) avl_left avl_overlap)
   in
   let hash_merged, hash_merge =
-    measure_operation (fun () -> union_left_string_hash hash_left hash_overlap)
+    measure_short_operation (fun () -> union_left_string_hash hash_left hash_overlap)
   in
   let all_overlap = Array.append left_keys overlap_keys in
   let expected_overlap = benchmark_size + (benchmark_size / 2) in
