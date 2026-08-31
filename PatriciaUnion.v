@@ -50,36 +50,38 @@ Fixpoint union_left_specialized {A : Type} (a : t A) {struct a}
         end
   end.
 
-(** A source-level change signal for the sharing optimization.  [None] means
+(** A source-level change signal for the sharing optimization.  [Empty] means
     that the left-biased union has exactly the original left tree as its
-    result; [Some out] carries the rebuilt result otherwise.  Unlike OCaml
-    physical equality, this is ordinary data in the source semantics and can
+    result; every nonempty tree is the rebuilt result otherwise.  A changed
+    biased union cannot be empty, so this reuses the nullary tree constructor
+    as an allocation-free sentinel after extraction.  Unlike OCaml physical
+    equality, the signal is ordinary data in the source semantics and can
     therefore receive a refinement proof. *)
 Fixpoint union_left_specialized_changed {A : Type} (a : t A) {struct a}
-    : t A -> option (t A) :=
+    : t A -> t A :=
   match a with
   | Empty => fun b =>
-      match b with Empty => None | _ => Some b end
+      b
   | Leaf ka va => fun b =>
       match b with
-      | Empty => None
-      | Leaf kb _ => if Pos.eqb ka kb then None else Some (set ka va b)
-      | Branch _ _ _ _ => Some (set ka va b)
+      | Empty => Empty
+      | Leaf kb _ => if Pos.eqb ka kb then Empty else set ka va b
+      | Branch _ _ _ _ => set ka va b
       end
   | Branch pa ma la ra =>
-      fix union_right_tree (b : t A) {struct b} : option (t A) :=
+      fix union_right_tree (b : t A) {struct b} : t A :=
         match b with
-        | Empty => None
+        | Empty => Empty
         | Leaf kb vb =>
-            match get kb a with Some _ => None | None => Some (set kb vb a) end
+            match get kb a with Some _ => Empty | None => set kb vb a end
         | Branch pb mb lb rb =>
             if (N.eqb ma mb && N.eqb pa pb)%bool then
               match union_left_specialized_changed la lb,
                     union_left_specialized_changed ra rb with
-              | None, None => None
-              | Some left', None => Some (branch pa ma left' ra)
-              | None, Some right' => Some (branch pa ma la right')
-              | Some left', Some right' => Some (branch pa ma left' right')
+              | Empty, Empty => Empty
+              | left', Empty => branch pa ma left' ra
+              | Empty, right' => branch pa ma la right'
+              | left', right' => branch pa ma left' right'
               end
             else if mask_above ma mb then
               match representative b with
@@ -87,16 +89,16 @@ Fixpoint union_left_specialized_changed {A : Type} (a : t A) {struct a}
                   if matches_prefix kb pa ma then
                     if zero_bit kb ma then
                       match union_left_specialized_changed la b with
-                      | None => None
-                      | Some left' => Some (branch pa ma left' ra)
+                      | Empty => Empty
+                      | left' => branch pa ma left' ra
                       end
                     else
                       match union_left_specialized_changed ra b with
-                      | None => None
-                      | Some right' => Some (branch pa ma la right')
+                      | Empty => Empty
+                      | right' => branch pa ma la right'
                       end
-                  else Some (join a b)
-              | None => None
+                  else join a b
+              | None => Empty
               end
             else if mask_above mb ma then
               match representative a with
@@ -104,48 +106,50 @@ Fixpoint union_left_specialized_changed {A : Type} (a : t A) {struct a}
                   if matches_prefix ka pb mb then
                     if zero_bit ka mb then
                       match union_right_tree lb with
-                      | None => Some (branch pb mb a rb)
-                      | Some left' => Some (branch pb mb left' rb)
+                      | Empty => branch pb mb a rb
+                      | left' => branch pb mb left' rb
                       end
                     else
                       match union_right_tree rb with
-                      | None => Some (branch pb mb lb a)
-                      | Some right' => Some (branch pb mb lb right')
+                      | Empty => branch pb mb lb a
+                      | right' => branch pb mb lb right'
                       end
-                  else Some (join a b)
-              | None => Some b
+                  else join a b
+              | None => b
               end
-            else Some (join a b)
+            else join a b
         end
   end.
 
-Definition union_left_specialized_changed_result {A : Type} (a b : t A) : t A :=
-  match union_left_specialized_changed a b with
-  | None => a
-  | Some out => out
+Definition reuse_changed {A : Type} (original changed : t A) : t A :=
+  match changed with
+  | Empty => original
+  | out => out
   end.
+
+Definition union_left_specialized_changed_result {A : Type} (a b : t A) : t A :=
+  reuse_changed a (union_left_specialized_changed a b).
 
 (** One-step equation for changed-result refinement proofs. *)
 Lemma union_left_specialized_changed_equation:
   forall (A : Type) (a b : t A),
     union_left_specialized_changed a b =
     match a, b with
-    | Empty, Empty => None
-    | Empty, tree => Some tree
-    | _, Empty => None
+    | Empty, tree => tree
+    | _, Empty => Empty
     | Leaf ka va, Leaf kb _ =>
-        if Pos.eqb ka kb then None else Some (set ka va b)
-    | Leaf ka va, tree => Some (set ka va tree)
+        if Pos.eqb ka kb then Empty else set ka va b
+    | Leaf ka va, tree => set ka va tree
     | tree, Leaf kb vb =>
-        match get kb tree with Some _ => None | None => Some (set kb vb tree) end
+        match get kb tree with Some _ => Empty | None => set kb vb tree end
     | Branch pa ma la ra, Branch pb mb lb rb =>
         if (N.eqb ma mb && N.eqb pa pb)%bool then
           match union_left_specialized_changed la lb,
                 union_left_specialized_changed ra rb with
-          | None, None => None
-          | Some left', None => Some (branch pa ma left' ra)
-          | None, Some right' => Some (branch pa ma la right')
-          | Some left', Some right' => Some (branch pa ma left' right')
+          | Empty, Empty => Empty
+          | left', Empty => branch pa ma left' ra
+          | Empty, right' => branch pa ma la right'
+          | left', right' => branch pa ma left' right'
           end
         else if mask_above ma mb then
           match representative b with
@@ -153,16 +157,16 @@ Lemma union_left_specialized_changed_equation:
               if matches_prefix kb pa ma then
                 if zero_bit kb ma then
                   match union_left_specialized_changed la b with
-                  | None => None
-                  | Some left' => Some (branch pa ma left' ra)
+                  | Empty => Empty
+                  | left' => branch pa ma left' ra
                   end
                 else
                   match union_left_specialized_changed ra b with
-                  | None => None
-                  | Some right' => Some (branch pa ma la right')
+                  | Empty => Empty
+                  | right' => branch pa ma la right'
                   end
-              else Some (join a b)
-          | None => None
+              else join a b
+          | None => Empty
           end
         else if mask_above mb ma then
           match representative a with
@@ -170,18 +174,18 @@ Lemma union_left_specialized_changed_equation:
               if matches_prefix ka pb mb then
                 if zero_bit ka mb then
                   match union_left_specialized_changed a lb with
-                  | None => Some (branch pb mb a rb)
-                  | Some left' => Some (branch pb mb left' rb)
+                  | Empty => branch pb mb a rb
+                  | left' => branch pb mb left' rb
                   end
                 else
                   match union_left_specialized_changed a rb with
-                  | None => Some (branch pb mb lb a)
-                  | Some right' => Some (branch pb mb lb right')
+                  | Empty => branch pb mb lb a
+                  | right' => branch pb mb lb right'
                   end
-              else Some (join a b)
-          | None => Some b
+              else join a b
+          | None => b
           end
-        else Some (join a b)
+        else join a b
     end.
 Proof. intros A a b. destruct a; destruct b; reflexivity. Qed.
 
@@ -231,7 +235,7 @@ Definition union_right_specialized {A : Type} (a b : t A) : t A :=
   union_left_specialized b a.
 
 Definition union_right_specialized_changed {A : Type} (a b : t A)
-    : option (t A) :=
+    : t A :=
   union_left_specialized_changed b a.
 
 Definition union_right_specialized_changed_result {A : Type} (a b : t A) : t A :=

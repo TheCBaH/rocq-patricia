@@ -18,7 +18,7 @@ let check_integer () =
   let actual_right = IU.union_right_specialized left right in
   let changed_left = IU.union_left_specialized_changed left right in
   let changed_result =
-    match changed_left with None -> left | Some changed -> changed
+    match changed_left with I.Empty -> left | changed -> changed
   in
   for key = 1 to 64 do
     if I.get key actual_left <> I.get key expected_left then
@@ -29,17 +29,17 @@ let check_integer () =
       failwith "integer changed-worker union mismatch"
   done;
   let subset = build (fun key -> key mod 2 = 0) (fun key -> -key) 64 I.empty in
-  if IU.union_left_specialized_changed left subset <> None then
+  if IU.union_left_specialized_changed left subset <> I.Empty then
     failwith "integer changed worker missed unchanged certificate";
-  if changed_left = None then
+  if changed_left = I.Empty then
     failwith "integer changed worker missed fresh right bindings";
   let nested = I.set 3 30 (I.set 1 10 I.empty) in
   let enclosing = I.set 8 80 nested in
   let nested_changed = IU.union_left_specialized_changed nested enclosing in
   let nested_result =
-    match nested_changed with None -> nested | Some changed -> changed
+    match nested_changed with I.Empty -> nested | changed -> changed
   in
-  if nested_changed = None || I.get 8 nested_result <> Some 80 then
+  if nested_changed = I.Empty || I.get 8 nested_result <> Some 80 then
     failwith "integer changed worker dropped an outer sibling";
   for seed = 1 to 32 do
     let state = ref seed in
@@ -57,7 +57,7 @@ let check_integer () =
     let random_right = add 48 I.empty in
     let random_changed = IU.union_left_specialized_changed random_left random_right in
     let random_result =
-      match random_changed with None -> random_left | Some changed -> changed
+      match random_changed with I.Empty -> random_left | changed -> changed
     in
     let random_expected = I.union_left random_left random_right in
     for key = 1 to 127 do

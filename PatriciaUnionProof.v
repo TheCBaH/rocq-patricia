@@ -4,6 +4,53 @@
 From Stdlib Require Import Arith.Wf_nat Bool Lia NArith.
 Require Import PatriciaBits Patricia PatriciaProof PatriciaUnion.
 
+Lemma set_nonempty_unconditional:
+  forall (A : Type) key (value : A) (tree : t A),
+    nonempty (set key value tree).
+Proof.
+  intros A key value tree. exists key, value. apply get_set_same.
+Qed.
+
+Lemma changed_result_nonempty:
+  forall (A : Type) (original changed : t A),
+    nonempty changed ->
+    reuse_changed original changed = changed.
+Proof.
+  intros A original changed Hnonempty. unfold reuse_changed.
+  destruct changed; try reflexivity.
+  destruct Hnonempty as [key [value Hget]]. discriminate.
+Qed.
+
+Lemma biased_output_nonempty_left:
+  forall (A : Type) (left right out : t A),
+    nonempty left ->
+    (forall key,
+      get key out =
+      match get key left with Some value => Some value | None => get key right end) ->
+    nonempty out.
+Proof.
+  intros A left right out [key [value Hget]] Hout.
+  exists key, value. rewrite Hout, Hget. reflexivity.
+Qed.
+
+Lemma reuse_changed_correct_nonempty_left:
+  forall (A : Type) (original changed left right : t A),
+    nonempty left ->
+    (wf changed /\
+      forall key,
+        get key changed =
+        match get key left with Some value => Some value | None => get key right end) ->
+    wf (reuse_changed original changed) /\
+    forall key,
+      get key (reuse_changed original changed) =
+      match get key left with Some value => Some value | None => get key right end.
+Proof.
+  intros A original changed left right Hleft Hcorrect.
+  assert (Hchanged : nonempty changed).
+  { eapply biased_output_nonempty_left; [exact Hleft|exact (proj2 Hcorrect)]. }
+  rewrite changed_result_nonempty by exact Hchanged. exact Hcorrect.
+Qed.
+
 Theorem union_left_specialized_empty_right:
   forall (A : Type) (left : t A),
     union_left_specialized left Empty = left.
@@ -34,11 +81,20 @@ Lemma union_left_specialized_changed_leaf_left:
     union_left_specialized_changed_result (Leaf key value) right =
     union_left_specialized (Leaf key value) right.
 Proof.
-  intros A key value right. destruct right;
-    unfold union_left_specialized_changed_result,
-      union_left_specialized_changed, union_left_specialized; cbn;
-    try reflexivity.
-  destruct (Pos.eqb key key0); reflexivity.
+  intros A key value right. destruct right as [|stored stored_value|p m l r].
+  - reflexivity.
+  - destruct (Pos.eqb key stored) eqn:Eequal.
+    + unfold union_left_specialized_changed_result.
+      rewrite union_left_specialized_changed_equation, Eequal.
+      rewrite union_left_specialized_equation, Eequal. reflexivity.
+    + unfold union_left_specialized_changed_result.
+      rewrite union_left_specialized_changed_equation, Eequal.
+      rewrite union_left_specialized_equation, Eequal.
+    apply changed_result_nonempty. apply set_nonempty_unconditional.
+  - unfold union_left_specialized_changed_result.
+    rewrite union_left_specialized_changed_equation.
+    rewrite union_left_specialized_equation.
+    apply changed_result_nonempty. apply set_nonempty_unconditional.
 Qed.
 
 Lemma union_left_specialized_changed_leaf_right:
@@ -48,15 +104,19 @@ Lemma union_left_specialized_changed_leaf_right:
 Proof.
   intros A left key value. destruct left as [|stored stored_value|p m l r].
   - reflexivity.
-  - unfold union_left_specialized_changed_result,
-      union_left_specialized_changed, union_left_specialized; cbn.
-    destruct (Pos.eqb stored key); reflexivity.
-  - unfold union_left_specialized_changed_result,
-      union_left_specialized_changed, union_left_specialized; cbn.
-    destruct (matches_prefix key p m) eqn:P; cbn [get].
-    + destruct (zero_bit key m) eqn:Z;
-        [destruct (get key l)|destruct (get key r)]; reflexivity.
-    + reflexivity.
+  - destruct (Pos.eqb stored key) eqn:Eequal.
+    + unfold union_left_specialized_changed_result.
+      rewrite union_left_specialized_changed_equation, Eequal.
+      rewrite union_left_specialized_equation, Eequal. reflexivity.
+    + unfold union_left_specialized_changed_result.
+      rewrite union_left_specialized_changed_equation, Eequal.
+      rewrite union_left_specialized_equation, Eequal.
+      apply changed_result_nonempty. apply set_nonempty_unconditional.
+  - unfold union_left_specialized_changed_result.
+    rewrite union_left_specialized_changed_equation.
+    rewrite union_left_specialized_equation.
+    destruct (get key (Branch p m l r)); [reflexivity|].
+    apply changed_result_nonempty. apply set_nonempty_unconditional.
 Qed.
 
 Theorem union_left_specialized_disjoint_masks:
@@ -250,25 +310,41 @@ Proof.
   inversion Hwb as [| |? ? ? ? Hwlb Hwrb Hnlb Hnrb Hlb Hrb]; subst.
   unfold union_left_specialized_changed_result.
   rewrite union_left_specialized_changed_equation.
-  rewrite !N.eqb_refl. cbn.
+  rewrite !N.eqb_refl. cbn -[branch reuse_changed].
   destruct (union_left_specialized_changed left_a left_b) eqn:Eleft;
     destruct (union_left_specialized_changed right_a right_b) eqn:Eright.
   - unfold union_left_specialized_changed_result in Hleft, Hright.
     rewrite Eleft in Hleft. rewrite Eright in Hright.
+    rewrite <- (@branch_unchanged A prefix mask left_a right_a Hnla Hnra).
     eapply union_left_specialized_same_branch_correct_wf; eauto.
-  - unfold union_left_specialized_changed_result in Hleft, Hright.
-    rewrite Eleft in Hleft. rewrite Eright in Hright.
-    eapply union_left_specialized_same_branch_correct_wf; eauto.
-  - unfold union_left_specialized_changed_result in Hleft, Hright.
-    rewrite Eleft in Hleft. rewrite Eright in Hright.
-    eapply union_left_specialized_same_branch_correct_wf; eauto.
-  - unfold union_left_specialized_changed_result in Hleft, Hright.
-    rewrite Eleft in Hleft. rewrite Eright in Hright.
-    assert (Ebranch : branch prefix mask left_a right_a =
-      Branch prefix mask left_a right_a).
-    { now apply branch_unchanged. }
-    rewrite <- Ebranch.
-    eapply union_left_specialized_same_branch_correct_wf; eauto.
+  Local Ltac solve_changed_case A prefix mask left_a right_a left_b right_b
+      Hwa Hwb Hnla Hnra Hleft Hright Eleft Eright :=
+      unfold union_left_specialized_changed_result in Hleft, Hright;
+      rewrite Eleft in Hleft; rewrite Eright in Hright;
+      assert (Horiginal : nonempty (Branch prefix mask left_a right_a)) by
+        (destruct (wf_empty_or_nonempty Hwa) as [Hempty|Hnonempty];
+         [discriminate|exact Hnonempty]);
+      eapply reuse_changed_correct_nonempty_left with
+        (left := Branch prefix mask left_a right_a)
+        (right := Branch prefix mask left_b right_b);
+      [exact Horiginal|
+       eapply union_left_specialized_same_branch_correct_wf; eauto].
+  - solve_changed_case A prefix mask left_a right_a left_b right_b
+      Hwa Hwb Hnla Hnra Hleft Hright Eleft Eright.
+  - solve_changed_case A prefix mask left_a right_a left_b right_b
+      Hwa Hwb Hnla Hnra Hleft Hright Eleft Eright.
+  - solve_changed_case A prefix mask left_a right_a left_b right_b
+      Hwa Hwb Hnla Hnra Hleft Hright Eleft Eright.
+  - solve_changed_case A prefix mask left_a right_a left_b right_b
+      Hwa Hwb Hnla Hnra Hleft Hright Eleft Eright.
+  - solve_changed_case A prefix mask left_a right_a left_b right_b
+      Hwa Hwb Hnla Hnra Hleft Hright Eleft Eright.
+  - solve_changed_case A prefix mask left_a right_a left_b right_b
+      Hwa Hwb Hnla Hnra Hleft Hright Eleft Eright.
+  - solve_changed_case A prefix mask left_a right_a left_b right_b
+      Hwa Hwb Hnla Hnra Hleft Hright Eleft Eright.
+  - solve_changed_case A prefix mask left_a right_a left_b right_b
+      Hwa Hwb Hnla Hnra Hleft Hright Eleft Eright.
 Qed.
 
 (** When every binding of the right operand lies in the left side of the
@@ -368,20 +444,51 @@ Proof.
   rewrite union_left_specialized_changed_equation.
   rewrite Hsame, Habove, Hrep, Hprefix, Hside.
   destruct (union_left_specialized_changed left
-    (Branch operand_prefix operand_mask operand_left operand_right)) eqn:Echild.
-  - unfold union_left_specialized_changed_result in Hchild.
-    rewrite Echild in Hchild.
-    eapply union_left_specialized_left_outer_branch_correct_wf; eauto.
+    (Branch operand_prefix operand_mask operand_left operand_right)) as
+    [|changed_key changed_value|changed_prefix changed_mask changed_left changed_right]
+    eqn:Echild.
   - unfold union_left_specialized_changed_result in Hchild.
     rewrite Echild in Hchild.
     destruct (union_left_specialized_left_outer_branch_correct_wf A prefix mask
       left right (Branch operand_prefix operand_mask operand_left operand_right) left
-      Hwl Hwr Hoperand Hleft Hright Hall Hchild) as [_ Hget].
-    split; [exact Houter|]. intro stored.
+      Hwl Hwr Hoperand Hleft Hright Hall Hchild) as [Hwf Hget].
     assert (Ebranch : branch prefix mask left right = Branch prefix mask left right).
     { now apply branch_unchanged. }
-    rewrite <- Ebranch at 1.
-    apply Hget.
+    rewrite Ebranch in Hwf, Hget. exact (conj Hwf Hget).
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild.
+    change (wf (reuse_changed (Branch prefix mask left right)
+      (branch prefix mask (Leaf changed_key changed_value) right)) /\
+      forall stored, get stored (reuse_changed (Branch prefix mask left right)
+        (branch prefix mask (Leaf changed_key changed_value) right)) =
+        match get stored (Branch prefix mask left right) with
+        | Some value => Some value
+        | None => get stored (Branch operand_prefix operand_mask operand_left operand_right)
+        end).
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch prefix mask left right)
+      (right := Branch operand_prefix operand_mask operand_left operand_right).
+    + destruct (wf_empty_or_nonempty Houter) as [Hempty|Hnonempty];
+        [discriminate|exact Hnonempty].
+    + eapply union_left_specialized_left_outer_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild.
+    change (wf (reuse_changed (Branch prefix mask left right)
+      (branch prefix mask
+        (Branch changed_prefix changed_mask changed_left changed_right) right)) /\
+      forall stored, get stored (reuse_changed (Branch prefix mask left right)
+        (branch prefix mask
+          (Branch changed_prefix changed_mask changed_left changed_right) right)) =
+        match get stored (Branch prefix mask left right) with
+        | Some value => Some value
+        | None => get stored (Branch operand_prefix operand_mask operand_left operand_right)
+        end).
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch prefix mask left right)
+      (right := Branch operand_prefix operand_mask operand_left operand_right).
+    + destruct (wf_empty_or_nonempty Houter) as [Hempty|Hnonempty];
+        [discriminate|exact Hnonempty].
+    + eapply union_left_specialized_left_outer_branch_correct_wf; eauto.
 Qed.
 
 Lemma union_left_specialized_left_outer_right_branch_correct_wf:
@@ -479,20 +586,51 @@ Proof.
   rewrite union_left_specialized_changed_equation.
   rewrite Hsame, Habove, Hrep, Hprefix, Hside.
   destruct (union_left_specialized_changed right
-    (Branch operand_prefix operand_mask operand_left operand_right)) eqn:Echild.
-  - unfold union_left_specialized_changed_result in Hchild.
-    rewrite Echild in Hchild.
-    eapply union_left_specialized_left_outer_right_branch_correct_wf; eauto.
+    (Branch operand_prefix operand_mask operand_left operand_right)) as
+    [|changed_key changed_value|changed_prefix changed_mask changed_left changed_right]
+    eqn:Echild.
   - unfold union_left_specialized_changed_result in Hchild.
     rewrite Echild in Hchild.
     destruct (union_left_specialized_left_outer_right_branch_correct_wf A prefix mask
       left right (Branch operand_prefix operand_mask operand_left operand_right) right
-      Hwl Hwr Hoperand Hleft Hright Hall Hchild) as [_ Hget].
-    split; [exact Houter|]. intro stored.
+      Hwl Hwr Hoperand Hleft Hright Hall Hchild) as [Hwf Hget].
     assert (Ebranch : branch prefix mask left right = Branch prefix mask left right).
     { now apply branch_unchanged. }
-    rewrite <- Ebranch at 1.
-    apply Hget.
+    rewrite Ebranch in Hwf, Hget. exact (conj Hwf Hget).
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild.
+    change (wf (reuse_changed (Branch prefix mask left right)
+      (branch prefix mask left (Leaf changed_key changed_value))) /\
+      forall stored, get stored (reuse_changed (Branch prefix mask left right)
+        (branch prefix mask left (Leaf changed_key changed_value))) =
+        match get stored (Branch prefix mask left right) with
+        | Some value => Some value
+        | None => get stored (Branch operand_prefix operand_mask operand_left operand_right)
+        end).
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch prefix mask left right)
+      (right := Branch operand_prefix operand_mask operand_left operand_right).
+    + destruct (wf_empty_or_nonempty Houter) as [Hempty|Hnonempty];
+        [discriminate|exact Hnonempty].
+    + eapply union_left_specialized_left_outer_right_branch_correct_wf; eauto.
+  - unfold union_left_specialized_changed_result in Hchild.
+    rewrite Echild in Hchild.
+    change (wf (reuse_changed (Branch prefix mask left right)
+      (branch prefix mask left
+        (Branch changed_prefix changed_mask changed_left changed_right))) /\
+      forall stored, get stored (reuse_changed (Branch prefix mask left right)
+        (branch prefix mask left
+          (Branch changed_prefix changed_mask changed_left changed_right))) =
+        match get stored (Branch prefix mask left right) with
+        | Some value => Some value
+        | None => get stored (Branch operand_prefix operand_mask operand_left operand_right)
+        end).
+    eapply reuse_changed_correct_nonempty_left with
+      (left := Branch prefix mask left right)
+      (right := Branch operand_prefix operand_mask operand_left operand_right).
+    + destruct (wf_empty_or_nonempty Houter) as [Hempty|Hnonempty];
+        [discriminate|exact Hnonempty].
+    + eapply union_left_specialized_left_outer_right_branch_correct_wf; eauto.
 Qed.
 
 (** Dual unequal-split reconstruction for the branch traversed by the
@@ -644,14 +782,36 @@ Proof.
     prefix mask left right key Hoperand Houter Hsame Hnotabove Habove
     Hrep Hprefix Hside Hall Hchild.
   inversion Houter as [| |? ? ? ? Hwl Hwr _ _ Hleft Hright]; subst.
-  unfold union_left_specialized_changed_result.
+  change (wf (reuse_changed
+      (Branch operand_prefix operand_mask operand_left operand_right)
+      (union_left_specialized_changed
+        (Branch operand_prefix operand_mask operand_left operand_right)
+        (Branch prefix mask left right))) /\
+    forall stored,
+      get stored (reuse_changed
+        (Branch operand_prefix operand_mask operand_left operand_right)
+        (union_left_specialized_changed
+          (Branch operand_prefix operand_mask operand_left operand_right)
+          (Branch prefix mask left right))) =
+      match get stored (Branch operand_prefix operand_mask operand_left operand_right) with
+      | Some value => Some value
+      | None => get stored (Branch prefix mask left right)
+      end).
   rewrite union_left_specialized_changed_equation.
   rewrite Hsame, Hnotabove, Habove, Hrep, Hprefix, Hside.
+  assert (Hoperand_nonempty :
+    nonempty (Branch operand_prefix operand_mask operand_left operand_right)) by
+    (destruct (wf_empty_or_nonempty Hoperand) as [Hempty|Hnonempty];
+     [discriminate|exact Hnonempty]).
   destruct (union_left_specialized_changed
     (Branch operand_prefix operand_mask operand_left operand_right) left) eqn:Echild;
     unfold union_left_specialized_changed_result in Hchild;
-    rewrite Echild in Hchild;
-    eapply union_left_specialized_right_outer_left_branch_correct_wf; eauto.
+    rewrite Echild in Hchild.
+  all: eapply reuse_changed_correct_nonempty_left with
+    (left := Branch operand_prefix operand_mask operand_left operand_right)
+    (right := Branch prefix mask left right);
+    [exact Hoperand_nonempty|].
+  all: eapply union_left_specialized_right_outer_left_branch_correct_wf; eauto.
 Qed.
 
 (** Changed-result composition for the one-bit child of an outer right branch. *)
@@ -694,14 +854,36 @@ Proof.
     prefix mask left right key Hoperand Houter Hsame Hnotabove Habove
     Hrep Hprefix Hside Hall Hchild.
   inversion Houter as [| |? ? ? ? Hwl Hwr _ _ Hleft Hright]; subst.
-  unfold union_left_specialized_changed_result.
+  change (wf (reuse_changed
+      (Branch operand_prefix operand_mask operand_left operand_right)
+      (union_left_specialized_changed
+        (Branch operand_prefix operand_mask operand_left operand_right)
+        (Branch prefix mask left right))) /\
+    forall stored,
+      get stored (reuse_changed
+        (Branch operand_prefix operand_mask operand_left operand_right)
+        (union_left_specialized_changed
+          (Branch operand_prefix operand_mask operand_left operand_right)
+          (Branch prefix mask left right))) =
+      match get stored (Branch operand_prefix operand_mask operand_left operand_right) with
+      | Some value => Some value
+      | None => get stored (Branch prefix mask left right)
+      end).
   rewrite union_left_specialized_changed_equation.
   rewrite Hsame, Hnotabove, Habove, Hrep, Hprefix, Hside.
+  assert (Hoperand_nonempty :
+    nonempty (Branch operand_prefix operand_mask operand_left operand_right)) by
+    (destruct (wf_empty_or_nonempty Hoperand) as [Hempty|Hnonempty];
+     [discriminate|exact Hnonempty]).
   destruct (union_left_specialized_changed
     (Branch operand_prefix operand_mask operand_left operand_right) right) eqn:Echild;
     unfold union_left_specialized_changed_result in Hchild;
-    rewrite Echild in Hchild;
-    eapply union_left_specialized_right_outer_right_branch_correct_wf; eauto.
+    rewrite Echild in Hchild.
+  all: eapply reuse_changed_correct_nonempty_left with
+    (left := Branch operand_prefix operand_mask operand_left operand_right)
+    (right := Branch prefix mask left right);
+    [exact Hoperand_nonempty|].
+  all: eapply union_left_specialized_right_outer_right_branch_correct_wf; eauto.
 Qed.
 
 (** Package the common precondition of [join_disjoint_correct] for the
@@ -786,7 +968,12 @@ Proof.
     pb lb rb Hwa Hwb Eprefix) as [Hwf Hget].
   unfold union_left_specialized_changed_result.
   rewrite union_left_specialized_changed_equation.
-  rewrite Hsame, Hab. exact (conj Hwf Hget).
+  rewrite Hsame, Hab.
+  eapply reuse_changed_correct_nonempty_left with
+    (left := Branch pa ma la ra) (right := Branch pb ma lb rb).
+  - destruct (wf_empty_or_nonempty Hwa) as [Hempty|Hnonempty];
+      [discriminate|exact Hnonempty].
+  - exact (conj Hwf Hget).
 Qed.
 
 (** If the right root is deeper and its representative misses the left
@@ -901,7 +1088,12 @@ Proof.
     pb mb lb rb kb Hwa Hwb Hlt Hrep Hmiss) as [Hwf Hget].
   unfold union_left_specialized_changed_result.
   rewrite union_left_specialized_changed_equation.
-  rewrite Hsame, Habove, Hrep, Hmiss. exact (conj Hwf Hget).
+  rewrite Hsame, Habove, Hrep, Hmiss.
+  eapply reuse_changed_correct_nonempty_left with
+    (left := Branch pa ma la ra) (right := Branch pb mb lb rb).
+  - destruct (wf_empty_or_nonempty Hwa) as [Hempty|Hnonempty];
+      [discriminate|exact Hnonempty].
+  - exact (conj Hwf Hget).
 Qed.
 
 (** Symmetric terminal signal case when the left root is deeper. *)
@@ -930,7 +1122,12 @@ Proof.
     pb mb lb rb ka Hwa Hwb Hlt Hrep Hmiss) as [Hwf Hget].
   unfold union_left_specialized_changed_result.
   rewrite union_left_specialized_changed_equation.
-  rewrite Hsame, Hnotabove, Habove, Hrep, Hmiss. exact (conj Hwf Hget).
+  rewrite Hsame, Hnotabove, Habove, Hrep, Hmiss.
+  eapply reuse_changed_correct_nonempty_left with
+    (left := Branch pa ma la ra) (right := Branch pb mb lb rb).
+  - destruct (wf_empty_or_nonempty Hwa) as [Hempty|Hnonempty];
+      [discriminate|exact Hnonempty].
+  - exact (conj Hwf Hget).
 Qed.
 
 (** Every recursive pair selected by the nested worker is smaller in the

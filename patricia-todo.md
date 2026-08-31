@@ -181,9 +181,11 @@ Required only for an end-to-end native-refinement claim.
   realizers against those workers. Both general `combine` realizers have been
   removed: `Patricia.combine` and `StringPatricia.combine` now extract directly
   from the proved structural workers. The companion modules now define and
-  extract source-level `union_left_specialized_changed` workers:
-  `None` means the original left tree can be reused and `Some out` carries a
-  rebuilt result. The extraction oracle checks both certificate outcomes. A
+  extract source-level `union_left_specialized_changed` workers. The integer
+  worker uses `Empty` to mean the original left tree can be reused; every
+  nonempty result is rebuilt. The direct-string worker retains its
+  `None`/`Some out` signal pending the corresponding proof refactor. The extraction
+  oracle checks both certificate outcomes. A
   10K wrapper trial reduced overlapping allocation to about 70K words for
   each backend (below `Stdlib.Map`'s 81K), but still above the handwritten
   physical-equality implementation. Both changed-result workers now have full
@@ -317,6 +319,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-31 | Refactored the integer changed-worker signal to `Empty` | `PatriciaUnion.v` now reuses the nullary tree constructor to represent a match/reusable original tree, eliminating the extracted `option` wrapper. `PatriciaUnionProof.v` proves the sentinel interpretation through equal-header, containment, right-outer rebuild, and terminal-join cases; `PatriciaUnionTest.ml` checks the new signal. `make PatriciaUnionProof.vo`, `make union-oracle`, and `git diff --check` passed. |
 | 2026-08-31 | Expanded checked benchmark coverage | Added deterministic random-order builds, a mixed successful/unsuccessful lookup/update/remove/add trace, subset/equal/no-op/sparse-overlap unions, and 192-byte common-prefix strings with `PATRICIA_BENCH_LONG_PREFIX_LENGTH` override. `make benchmark-smoke` and `git diff --check` passed. |
 | 2026-08-31 | Calibrated short-union timing | `PatriciaBenchmark.ml` now takes five union samples, batching 32 operations through 100K bindings and one above that size; it reports per-union median and min--max dispersion and accepts explicit sample/batch overrides. `make benchmark-smoke` and `git diff --check` passed. |
 | 2026-08-31 | Completed the 1M bounded-string-overlap rerun | `PATRICIA_BENCH_SIZE=1000000 PATRICIA_BENCH_STRING_LENGTHS=4 PATRICIA_BENCH_VARIABLE_STRING_MAX_LENGTH=4 make benchmark` passed. Four-character half-overlap allocated 113 Patricia words versus 10,193,264 AVL words (7.169 ms versus 23.891 ms); the variable-length checked workload also passed. |
