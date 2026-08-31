@@ -240,3 +240,73 @@ Definition union_right_specialized_changed {A : Type} (a b : t A)
 
 Definition union_right_specialized_changed_result {A : Type} (a b : t A) : t A :=
   union_left_specialized_changed_result b a.
+
+(** Closure-free changed worker.  Recursion is directly on [fuel], so the
+    extracted code has one recursive function rather than a branch-local
+    closure.  The public experiment supplies the structural bound below;
+    its equality to the nested worker is proved in the companion closure
+    before this worker can replace the current exported implementation. *)
+Fixpoint union_left_specialized_changed_fuel {A : Type}
+    (fuel : nat) (a b : t A) : t A :=
+  match fuel with
+  | O => Empty
+  | S fuel' =>
+      match a, b with
+      | Empty, tree => tree
+      | _, Empty => Empty
+      | Leaf ka va, Leaf kb _ =>
+          if Pos.eqb ka kb then Empty else set ka va b
+      | Leaf ka va, tree => set ka va tree
+      | tree, Leaf kb vb =>
+          match get kb tree with Some _ => Empty | None => set kb vb tree end
+      | Branch pa ma la ra, Branch pb mb lb rb =>
+          if (N.eqb ma mb && N.eqb pa pb)%bool then
+            match union_left_specialized_changed_fuel fuel' la lb,
+                  union_left_specialized_changed_fuel fuel' ra rb with
+            | Empty, Empty => Empty
+            | left', Empty => branch pa ma left' ra
+            | Empty, right' => branch pa ma la right'
+            | left', right' => branch pa ma left' right'
+            end
+          else if mask_above ma mb then
+            match representative b with
+            | Some kb =>
+                if matches_prefix kb pa ma then
+                  if zero_bit kb ma then
+                    match union_left_specialized_changed_fuel fuel' la b with
+                    | Empty => Empty
+                    | left' => branch pa ma left' ra
+                    end
+                  else
+                    match union_left_specialized_changed_fuel fuel' ra b with
+                    | Empty => Empty
+                    | right' => branch pa ma la right'
+                    end
+                else join a b
+            | None => Empty
+            end
+          else if mask_above mb ma then
+            match representative a with
+            | Some ka =>
+                if matches_prefix ka pb mb then
+                  if zero_bit ka mb then
+                    match union_left_specialized_changed_fuel fuel' a lb with
+                    | Empty => branch pb mb a rb
+                    | left' => branch pb mb left' rb
+                    end
+                  else
+                    match union_left_specialized_changed_fuel fuel' a rb with
+                    | Empty => branch pb mb lb a
+                    | right' => branch pb mb lb right'
+                    end
+                else join a b
+            | None => b
+            end
+          else join a b
+      end
+  end.
+
+Definition union_left_specialized_changed_fuel_result {A : Type} (a b : t A)
+    : t A :=
+  reuse_changed a
+    (union_left_specialized_changed_fuel (S (size a + size b)) a b).

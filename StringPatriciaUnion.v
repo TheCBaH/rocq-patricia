@@ -216,3 +216,66 @@ Definition union_right_specialized_changed {A : Type} (a b : t A)
 
 Definition union_right_specialized_changed_result {A : Type} (a b : t A) : t A :=
   union_left_specialized_changed_result b a.
+
+(** Closure-free changed worker.  Recursion is directly on [fuel], so ordinary
+    extraction emits one recursive function instead of a branch-local
+    closure.  The structural bound is kept experimental until its companion
+    refinement theorem equates it with the established nested worker. *)
+Fixpoint union_left_specialized_changed_fuel {A : Type}
+    (fuel : nat) (a b : t A) : t A :=
+  match fuel with
+  | O => Empty
+  | S fuel' =>
+      match a, b with
+      | Empty, tree => tree
+      | _, Empty => Empty
+      | Leaf ka va, Leaf kb _ =>
+          if String.eqb ka kb then Empty else set ka va b
+      | Leaf ka va, tree => set ka va tree
+      | tree, Leaf kb vb =>
+          match get kb tree with Some _ => Empty | None => set kb vb tree end
+      | Branch sample_a split_a left_a right_a,
+        Branch sample_b split_b left_b right_b =>
+          if split_a =? split_b then
+            if agrees_before_bounded sample_a sample_b split_a then
+              match union_left_specialized_changed_fuel fuel' left_a left_b,
+                    union_left_specialized_changed_fuel fuel' right_a right_b with
+              | Empty, Empty => Empty
+              | left', Empty => branch sample_a split_a left' right_a
+              | Empty, right' => branch sample_a split_a left_a right'
+              | left', right' => branch sample_a split_a left' right'
+              end
+            else join a b
+          else if split_a <? split_b then
+            if agrees_before_bounded sample_a sample_b split_a then
+              if bit_at sample_b split_a then
+                match union_left_specialized_changed_fuel fuel' right_a b with
+                | Empty => Empty
+                | right' => branch sample_a split_a left_a right'
+                end
+              else
+                match union_left_specialized_changed_fuel fuel' left_a b with
+                | Empty => Empty
+                | left' => branch sample_a split_a left' right_a
+                end
+            else join a b
+          else
+            if agrees_before_bounded sample_a sample_b split_b then
+              if bit_at sample_a split_b then
+                match union_left_specialized_changed_fuel fuel' a right_b with
+                | Empty => branch sample_b split_b left_b a
+                | right' => branch sample_b split_b left_b right'
+                end
+              else
+                match union_left_specialized_changed_fuel fuel' a left_b with
+                | Empty => branch sample_b split_b a right_b
+                | left' => branch sample_b split_b left' right_b
+                end
+            else join a b
+      end
+  end.
+
+Definition union_left_specialized_changed_fuel_result {A : Type} (a b : t A)
+    : t A :=
+  reuse_changed a
+    (union_left_specialized_changed_fuel (S (size a + size b)) a b).

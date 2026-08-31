@@ -158,6 +158,8 @@ Separate Extraction
   PatriciaUnion.union_left_specialized PatriciaUnion.union_right_specialized
   PatriciaUnion.union_left_specialized_changed
   PatriciaUnion.union_left_specialized_changed_result
+  PatriciaUnion.union_left_specialized_changed_fuel
+  PatriciaUnion.union_left_specialized_changed_fuel_result
   PatriciaUnion.union_right_specialized_changed
   PatriciaUnion.union_right_specialized_changed_result
   Patricia.map Patricia.fold Patricia.elements Patricia.beq
@@ -175,6 +177,8 @@ Separate Extraction
   StringPatriciaUnion.union_right_specialized
   StringPatriciaUnion.union_left_specialized_changed
   StringPatriciaUnion.union_left_specialized_changed_result
+  StringPatriciaUnion.union_left_specialized_changed_fuel
+  StringPatriciaUnion.union_left_specialized_changed_fuel_result
   StringPatriciaUnion.union_right_specialized_changed
   StringPatriciaUnion.union_right_specialized_changed_result
   StringPatricia.map StringPatricia.fold StringPatricia.elements
