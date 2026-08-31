@@ -47,6 +47,27 @@ Proof.
   - split; [exact Hwch|exact Hget].
 Qed.
 
+(** The dual child-reuse fact, for a recursive result whose left-biased
+    operand is outside the branch being rebuilt. *)
+Lemma native_reuse_child_right_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) (operand original changed : t A),
+    native_same_sound same ->
+    wf original -> wf changed ->
+    (forall key,
+      get key changed =
+      match get key operand with Some value => Some value | None => get key original end) ->
+    wf (native_reuse_child same original changed) /\
+    forall key,
+      get key (native_reuse_child same original changed) =
+      match get key operand with Some value => Some value | None => get key original end.
+Proof.
+  intros A same operand original changed Hsame Hwor Hwch Hget.
+  unfold native_reuse_child. destruct (same changed original) eqn:Esame.
+  - split; [exact Hwor|]. intro key.
+    rewrite <- (Hsame changed original Esame key) at 1. apply Hget.
+  - split; [exact Hwch|exact Hget].
+Qed.
+
 Lemma biased_output_nonempty_left:
   forall (A : Type) (left right out : t A),
     nonempty left ->
@@ -477,6 +498,43 @@ Proof.
       now rewrite Eoperand.
 Qed.
 
+(** One-child reconstruction used when the right operand is contained in the
+    outer left child. The native [==] test can reuse the complete outer branch
+    exactly when this source model selects the original child. *)
+Lemma native_reuse_left_branch_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) prefix mask
+      (left right operand out_left : t A),
+    native_same_sound same ->
+    wf (Branch prefix mask left right) -> wf operand ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = true)
+      operand ->
+    (wf out_left /\
+      forall key,
+        get key out_left =
+        match get key left with Some value => Some value | None => get key operand end) ->
+    wf (native_reuse_left_branch same prefix mask left right out_left) /\
+    forall key,
+      get key (native_reuse_left_branch same prefix mask left right out_left) =
+      match get key (Branch prefix mask left right) with
+      | Some value => Some value
+      | None => get key operand
+      end.
+Proof.
+  intros A same prefix mask left right operand out_left Hsame Houter Hoperand Hall Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr Hnl Hnr Hleft Hright]; subst.
+  destruct (native_reuse_child_correct_wf A same left operand out_left
+    Hsame Hwl (proj1 Hchild) (proj2 Hchild)) as [Hwout Hgetout].
+  assert (Hnout : nonempty (native_reuse_child same left out_left)).
+  { destruct Hnl as [key [value Hget]]. exists key, value.
+    rewrite Hgetout, Hget. reflexivity. }
+  assert (Ebranch : branch prefix mask (native_reuse_child same left out_left) right =
+      native_reuse_left_branch same prefix mask left right out_left).
+  { unfold native_reuse_left_branch. now apply branch_unchanged. }
+  rewrite <- Ebranch.
+  eapply union_left_specialized_left_outer_branch_correct_wf; eauto.
+Qed.
+
 (** Changed-result composition for a left-outer zero-bit route. *)
 Lemma union_left_specialized_changed_left_outer_left_branch_correct_wf:
   forall (A : Type) prefix mask (left right : t A)
@@ -617,6 +675,41 @@ Proof.
       { eapply all_keys_none; [exact Hoperand|].
         intros [Hprefix _]. rewrite P in Hprefix. discriminate. }
       now rewrite Eoperand.
+Qed.
+
+(** Symmetric one-child reconstruction for the outer right child. *)
+Lemma native_reuse_right_branch_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) prefix mask
+      (left right operand out_right : t A),
+    native_same_sound same ->
+    wf (Branch prefix mask left right) -> wf operand ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = false)
+      operand ->
+    (wf out_right /\
+      forall key,
+        get key out_right =
+        match get key right with Some value => Some value | None => get key operand end) ->
+    wf (native_reuse_right_branch same prefix mask left right out_right) /\
+    forall key,
+      get key (native_reuse_right_branch same prefix mask left right out_right) =
+      match get key (Branch prefix mask left right) with
+      | Some value => Some value
+      | None => get key operand
+      end.
+Proof.
+  intros A same prefix mask left right operand out_right Hsame Houter Hoperand Hall Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr Hnl Hnr Hleft Hright]; subst.
+  destruct (native_reuse_child_correct_wf A same right operand out_right
+    Hsame Hwr (proj1 Hchild) (proj2 Hchild)) as [Hwout Hgetout].
+  assert (Hnout : nonempty (native_reuse_child same right out_right)).
+  { destruct Hnr as [key [value Hget]]. exists key, value.
+    rewrite Hgetout, Hget. reflexivity. }
+  assert (Ebranch : branch prefix mask left (native_reuse_child same right out_right) =
+      native_reuse_right_branch same prefix mask left right out_right).
+  { unfold native_reuse_right_branch. now apply branch_unchanged. }
+  rewrite <- Ebranch.
+  eapply union_left_specialized_left_outer_right_branch_correct_wf; eauto.
 Qed.
 
 (** Changed-result composition for a left-outer one-bit route. *)
@@ -763,6 +856,50 @@ Proof.
       now rewrite Eoperand.
 Qed.
 
+(** Source model of the native outer-right, zero-bit reconstruction. *)
+Lemma native_reuse_right_outer_left_branch_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) prefix mask
+      (operand left right out_left : t A),
+    native_same_sound same ->
+    wf operand -> wf (Branch prefix mask left right) ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = true)
+      operand ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = true)
+      left ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = false)
+      right ->
+    (wf out_left /\
+      forall key,
+        get key out_left =
+        match get key operand with Some value => Some value | None => get key left end) ->
+    wf (native_reuse_left_branch same prefix mask left right out_left) /\
+    forall key,
+      get key (native_reuse_left_branch same prefix mask left right out_left) =
+      match get key operand with
+      | Some value => Some value
+      | None => get key (Branch prefix mask left right)
+      end.
+Proof.
+  intros A same prefix mask operand left right out_left Hsame Hoperand Houter
+    Hall Hleft Hright Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr Hnl Hnr Hleftwf Hrightwf]; subst.
+  destruct (native_reuse_child_right_correct_wf A same operand left out_left
+    Hsame Hwl (proj1 Hchild) (proj2 Hchild)) as [Hwout Hgetout].
+  assert (Hnout : nonempty (native_reuse_child same left out_left)).
+  { destruct Hnl as [key [value Hget]].
+    destruct (get key operand) as [operand_value|] eqn:Eoperand.
+    - exists key, operand_value. rewrite Hgetout, Eoperand. reflexivity.
+    - exists key, value. rewrite Hgetout, Eoperand, Hget. reflexivity. }
+  assert (Ebranch : branch prefix mask (native_reuse_child same left out_left) right =
+      native_reuse_left_branch same prefix mask left right out_left).
+  { unfold native_reuse_left_branch. now apply branch_unchanged. }
+  rewrite <- Ebranch.
+  eapply union_left_specialized_right_outer_left_branch_correct_wf; eauto.
+Qed.
+
 Lemma union_left_specialized_right_outer_right_branch_correct_wf:
   forall (A : Type) prefix mask (operand left right out_right : t A),
     wf operand -> wf left -> wf right ->
@@ -814,6 +951,50 @@ Proof.
       { eapply all_keys_none; [exact Hoperand|].
         intros [Hprefix _]. rewrite P in Hprefix. discriminate. }
       now rewrite Eoperand.
+Qed.
+
+(** Source model of the native outer-right, one-bit reconstruction. *)
+Lemma native_reuse_right_outer_right_branch_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) prefix mask
+      (operand left right out_right : t A),
+    native_same_sound same ->
+    wf operand -> wf (Branch prefix mask left right) ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = false)
+      operand ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = true)
+      left ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = false)
+      right ->
+    (wf out_right /\
+      forall key,
+        get key out_right =
+        match get key operand with Some value => Some value | None => get key right end) ->
+    wf (native_reuse_right_branch same prefix mask left right out_right) /\
+    forall key,
+      get key (native_reuse_right_branch same prefix mask left right out_right) =
+      match get key operand with
+      | Some value => Some value
+      | None => get key (Branch prefix mask left right)
+      end.
+Proof.
+  intros A same prefix mask operand left right out_right Hsame Hoperand Houter
+    Hall Hleft Hright Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr Hnl Hnr Hleftwf Hrightwf]; subst.
+  destruct (native_reuse_child_right_correct_wf A same operand right out_right
+    Hsame Hwr (proj1 Hchild) (proj2 Hchild)) as [Hwout Hgetout].
+  assert (Hnout : nonempty (native_reuse_child same right out_right)).
+  { destruct Hnr as [key [value Hget]].
+    destruct (get key operand) as [operand_value|] eqn:Eoperand.
+    - exists key, operand_value. rewrite Hgetout, Eoperand. reflexivity.
+    - exists key, value. rewrite Hgetout, Eoperand, Hget. reflexivity. }
+  assert (Ebranch : branch prefix mask left (native_reuse_child same right out_right) =
+      native_reuse_right_branch same prefix mask left right out_right).
+  { unfold native_reuse_right_branch. now apply branch_unchanged. }
+  rewrite <- Ebranch.
+  eapply union_left_specialized_right_outer_right_branch_correct_wf; eauto.
 Qed.
 
 (** Changed-result composition when the right operand has the outer mask and

@@ -145,6 +145,16 @@ Definition native_reuse_same_branch {A : Type} (same : t A -> t A -> bool)
     (native_reuse_child same left_original left_changed)
     (native_reuse_child same right_original right_changed).
 
+Definition native_reuse_left_branch {A : Type} (same : t A -> t A -> bool)
+    (prefix mask : N) (left_original right_original left_changed : t A) : t A :=
+  Branch prefix mask (native_reuse_child same left_original left_changed)
+    right_original.
+
+Definition native_reuse_right_branch {A : Type} (same : t A -> t A -> bool)
+    (prefix mask : N) (left_original right_original right_changed : t A) : t A :=
+  Branch prefix mask left_original
+    (native_reuse_child same right_original right_changed).
+
 (** One-step equation for changed-result refinement proofs. *)
 Lemma union_left_specialized_changed_equation:
   forall (A : Type) (a b : t A),

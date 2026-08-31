@@ -127,6 +127,18 @@ Definition native_reuse_same_branch {A : Type} (same : t A -> t A -> bool)
     (native_reuse_child same left_original left_changed)
     (native_reuse_child same right_original right_changed).
 
+Definition native_reuse_left_branch {A : Type} (same : t A -> t A -> bool)
+    (sample : string) (split : nat) (left_original right_original left_changed : t A)
+    : t A :=
+  Branch sample split (native_reuse_child same left_original left_changed)
+    right_original.
+
+Definition native_reuse_right_branch {A : Type} (same : t A -> t A -> bool)
+    (sample : string) (split : nat) (left_original right_original right_changed : t A)
+    : t A :=
+  Branch sample split left_original
+    (native_reuse_child same right_original right_changed).
+
 (** Compact unfolding rule for the changed worker.  Proofs use this instead
     of reducing the nested fixpoint, which would duplicate its local recursion
     at every occurrence. *)

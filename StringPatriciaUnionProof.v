@@ -54,6 +54,27 @@ Proof.
   - split; [exact Hwch|exact Hget].
 Qed.
 
+(** Dual form for a recursive result where the outside operand has priority
+    over the original child of the enclosing branch. *)
+Lemma native_reuse_child_right_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) (operand original changed : t A),
+    native_same_sound same ->
+    wf original -> wf changed ->
+    (forall key,
+      get key changed =
+      match get key operand with Some value => Some value | None => get key original end) ->
+    wf (native_reuse_child same original changed) /\
+    forall key,
+      get key (native_reuse_child same original changed) =
+      match get key operand with Some value => Some value | None => get key original end.
+Proof.
+  intros A same operand original changed Hsame Hwor Hwch Hget.
+  unfold native_reuse_child. destruct (same changed original) eqn:Esame.
+  - split; [exact Hwor|]. intro key.
+    rewrite <- (Hsame changed original Esame key) at 1. apply Hget.
+  - split; [exact Hwch|exact Hget].
+Qed.
+
 Lemma biased_output_nonempty_left:
   forall (A : Type) (left right out : t A),
     nonempty left ->
@@ -593,6 +614,78 @@ Proof.
     + apply Hgetout.
 Qed.
 
+(** Direct source model of the native zero-bit containment reconstruction.
+    Unlike the integer version, the raw [Branch] retains its cached sample,
+    so the final premise of [wf_branch] records that it remains resident. *)
+Lemma native_reuse_left_branch_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) sample split
+      (left right operand out_left : t A),
+    native_same_sound same ->
+    wf (Branch sample split left right) -> wf operand ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) left ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) right ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) operand ->
+    (wf out_left /\
+      forall key,
+        get key out_left =
+        match get key left with Some value => Some value | None => get key operand end) ->
+    wf (native_reuse_left_branch same sample split left right out_left) /\
+    forall key,
+      get key (native_reuse_left_branch same sample split left right out_left) =
+      match get key (Branch sample split left right) with
+      | Some value => Some value
+      | None => get key operand
+      end.
+Proof.
+  intros A same sample split left right operand out_left Hsame Houter Hoperand
+    Hleft Hright Hcontained Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr Hnl Hnr Hleftkeys Hrightkeys Hresident]; subst.
+  destruct (native_reuse_child_correct_wf A same left operand out_left
+    Hsame Hwl (proj1 Hchild) (proj2 Hchild)) as [Hwout Hgetout].
+  assert (Houtkeys : all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false)
+      (native_reuse_child same left out_left)).
+  { eapply all_keys_of_combine_lookup with
+      (left := left) (right := operand) (out := native_reuse_child same left out_left)
+      (f := fun x y => match x with Some _ => x | None => y end).
+    - reflexivity.
+    - exact Hwout.
+    - intro key. specialize (Hgetout key).
+      destruct (get key left); cbn in Hgetout |- *; exact Hgetout.
+    - exact Hleftkeys.
+    - exact Hcontained. }
+  split.
+  - unfold native_reuse_left_branch. apply wf_branch.
+    + exact Hwout.
+    + exact Hwr.
+    + destruct (representative left) as [key|] eqn:Eleft.
+      * destruct (representative_resident_wf A left key Hwl Eleft) as [value Hget].
+        eapply wf_representative_nonempty_get; [exact Hwout|].
+        rewrite Hgetout, Hget. reflexivity.
+      * exfalso. exact (Hnl eq_refl).
+    + destruct (representative right) as [key|] eqn:Eright.
+      * exact Hnr.
+      * exfalso. exact (Hnr eq_refl).
+    + exact Houtkeys.
+    + exact Hrightkeys.
+    + destruct Hresident as [value Hget]. exists value.
+      destruct (bit_at sample split) eqn:Ebit;
+        cbn [get] in Hget |- *; rewrite Ebit in Hget |- *.
+      * exact Hget.
+      * rewrite Hgetout, Hget. reflexivity.
+  - intro key. unfold native_reuse_left_branch.
+    destruct (bit_at key split) eqn:Ebit;
+      cbn [get]; rewrite Ebit.
+    + assert (Eoperand : get key operand = None).
+      { eapply get_none_if_all_keys; [exact Hcontained|].
+        intros [_ Hbit]. rewrite Ebit in Hbit. discriminate. }
+      rewrite Eoperand. now destruct (get key right).
+    + apply Hgetout.
+Qed.
+
 (** Changed-result variant of the left-outer, left-child containment case. *)
 Lemma union_left_specialized_changed_left_outer_left_branch_correct_wf:
   forall (A : Type) sample split (left right : t A)
@@ -720,6 +813,76 @@ Proof.
     + assert (Eoperand : get key operand = None).
       { eapply get_none_if_all_keys; [exact Hoperand|].
         intros [_ Hbit]. rewrite E in Hbit. discriminate. }
+      rewrite Eoperand. now destruct (get key left).
+Qed.
+
+(** Direct source model of the native one-bit containment reconstruction. *)
+Lemma native_reuse_right_branch_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) sample split
+      (left right operand out_right : t A),
+    native_same_sound same ->
+    wf (Branch sample split left right) -> wf operand ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) left ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) right ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) operand ->
+    (wf out_right /\
+      forall key,
+        get key out_right =
+        match get key right with Some value => Some value | None => get key operand end) ->
+    wf (native_reuse_right_branch same sample split left right out_right) /\
+    forall key,
+      get key (native_reuse_right_branch same sample split left right out_right) =
+      match get key (Branch sample split left right) with
+      | Some value => Some value
+      | None => get key operand
+      end.
+Proof.
+  intros A same sample split left right operand out_right Hsame Houter Hoperand
+    Hleft Hright Hcontained Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr Hnl Hnr Hleftkeys Hrightkeys Hresident]; subst.
+  destruct (native_reuse_child_correct_wf A same right operand out_right
+    Hsame Hwr (proj1 Hchild) (proj2 Hchild)) as [Hwout Hgetout].
+  assert (Houtkeys : all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true)
+      (native_reuse_child same right out_right)).
+  { eapply all_keys_of_combine_lookup with
+      (left := right) (right := operand) (out := native_reuse_child same right out_right)
+      (f := fun x y => match x with Some _ => x | None => y end).
+    - reflexivity.
+    - exact Hwout.
+    - intro key. specialize (Hgetout key).
+      destruct (get key right); cbn in Hgetout |- *; exact Hgetout.
+    - exact Hrightkeys.
+    - exact Hcontained. }
+  split.
+  - unfold native_reuse_right_branch. apply wf_branch.
+    + exact Hwl.
+    + exact Hwout.
+    + destruct (representative left) as [key|] eqn:Eleft.
+      * exact Hnl.
+      * exfalso. exact (Hnl eq_refl).
+    + destruct (representative right) as [key|] eqn:Eright.
+      * destruct (representative_resident_wf A right key Hwr Eright) as [value Hget].
+        eapply wf_representative_nonempty_get; [exact Hwout|].
+        rewrite Hgetout, Hget. reflexivity.
+      * exfalso. exact (Hnr eq_refl).
+    + exact Hleftkeys.
+    + exact Houtkeys.
+    + destruct Hresident as [value Hget]. exists value.
+      destruct (bit_at sample split) eqn:Ebit;
+        cbn [get] in Hget |- *; rewrite Ebit in Hget |- *.
+      * rewrite Hgetout, Hget. reflexivity.
+      * exact Hget.
+  - intro key. unfold native_reuse_right_branch.
+    destruct (bit_at key split) eqn:Ebit;
+      cbn [get]; rewrite Ebit.
+    + apply Hgetout.
+    + assert (Eoperand : get key operand = None).
+      { eapply get_none_if_all_keys; [exact Hcontained|].
+        intros [_ Hbit]. rewrite Ebit in Hbit. discriminate. }
       rewrite Eoperand. now destruct (get key left).
 Qed.
 
