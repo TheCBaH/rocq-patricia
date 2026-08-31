@@ -199,12 +199,15 @@ Fresh checked results are:
 | ---: | ---: | ---: | ---: |
 | 10,000 | 0.049 ms / 40,330 words | 0.051 ms / 128 words | 0.089 ms / 81,324 words |
 | 100,000 | 0.520 ms / 400,347 words | 0.532 ms / 143 words | 1.615 ms / 965,872 words |
+| 1,000,000 | 5.882 ms / 4,000,362 words | 7.169 ms / 113 words | 23.891 ms / 10,193,264 words |
 
-The single-run timing differences are noise-level observations. The reduction
-from per-binding to fixed measurement-sized allocation is the dependable
-result. The packed-position relation remains part of the already documented
-native extraction boundary; the bounded algorithm itself now has a source
-definition and equivalence proof.
+The before and bounded runs were separate executions, so their single-run
+timing differences are noise-level observations. The reduction from
+per-binding to fixed measurement-sized allocation is the dependable result;
+the one-million rerun confirms it beyond the original 10K and 100K evidence.
+The packed-position relation remains part of the already documented native
+extraction boundary; the bounded algorithm itself now has a source definition
+and equivalence proof.
 
 ### 2. Accumulator-based `elements` completed
 
