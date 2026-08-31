@@ -1,7 +1,7 @@
 # Patricia benchmark results
 
 - Run date: 2026-08-29
-- Last reviewed: 2026-08-30
+- Last reviewed: 2026-08-31
 - Command: `make -C patricia benchmark`
 - Platform: aarch64 Linux 7.0.0-28-generic; OCaml 4.14.3 native code
 
@@ -280,6 +280,28 @@ the prefix/discriminator in a fixed-width backend, or remove the string sample
 and accept representative descent. Each choice trades memory against lookup,
 join, or merge work and requires new invariant proofs. Pursue it only if
 retained memory dominates the target workload.
+
+### 7. Proof-aligned one-descent `set` trial rejected for now
+
+`StringPatricia.set_one_descent` is the source-level, one-pass counterpart of
+the exception-based native `set` realizer. It has a well-formedness and lookup
+refinement proof, and is now included in ordinary extraction and the randomized
+structural oracle. A checked 10,000-binding wrapper trial temporarily selected
+it in place of the realizer; functional checks passed, but allocation increased
+materially because extracted `Set_complete`/`Set_bubble` values are allocated
+along the routed path.
+
+| Fixed-width 4-character strings | Exception realizer | Extracted worker |
+| --- | ---: | ---: |
+| Build allocation | 726,896 words | 993,458 words |
+| Existing-key update allocation | 923,171 words | 1,578,027 words |
+
+The trial also raised variable-length build allocation from 1,083,549 to
+1,711,141 words and update allocation from 1,059,765 to 1,870,184 words.
+The wrapper therefore continues to use the exception realizer. This is a
+single-machine allocation comparison, not a formal cost result; the remaining
+N2 task is to prove the exact realizer in a target-language logic or develop a
+lower-allocation extracted source worker.
 
 ## Further benchmark coverage
 

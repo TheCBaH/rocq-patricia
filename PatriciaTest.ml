@@ -324,23 +324,34 @@ let check_string_keys () =
     let right_ref = Hashtbl.create 128 in
     let left = ref S.empty in
     let right = ref S.empty in
+    (* [set_one_descent] is extracted without a Patricia-specific OCaml
+       realizer.  Keep a parallel random oracle here so its ordinary
+       extraction is checked independently of the optimized [set] path. *)
+    let left_one_descent = ref S.empty in
+    let right_one_descent = ref S.empty in
     for _ = 1 to 120 do
-      let update tree reference =
+      let update tree one_descent reference =
         let key = List.nth keys (Random.int (List.length keys)) in
         if Random.bool () then begin
           let value = Random.int 10_000 in
           Hashtbl.replace reference key value;
-          tree := S.set key value !tree
+          tree := S.set key value !tree;
+          one_descent := S.set_one_descent key value !one_descent
         end else begin
           Hashtbl.remove reference key;
-          tree := S.remove key !tree
+          tree := S.remove key !tree;
+          one_descent := S.remove key !one_descent
         end
       in
-      update left left_ref;
-      update right right_ref
+      update left left_one_descent left_ref;
+      update right right_one_descent right_ref
     done;
     check_string_table round "left updates" keys left_ref !left;
     check_string_table round "right updates" keys right_ref !right;
+    check_string_table round "left one-descent updates" keys left_ref
+      !left_one_descent;
+    check_string_table round "right one-descent updates" keys right_ref
+      !right_one_descent;
     let rebuilt_left =
       List.fold_left
         (fun tree (key, value) -> S.set key value tree)

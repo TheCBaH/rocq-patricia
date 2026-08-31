@@ -189,6 +189,11 @@ Required only for an end-to-end native-refinement claim.
   physical-equality implementation. Both changed-result workers now have full
   structural correctness proofs; source-level allocation refinement remains
   open, so public wrappers continue to use the handwritten unions for now.
+  The normally extracted `set_one_descent` worker is also exercised directly
+  by the randomized oracle, but a 10K wrapper trial allocated 993,458 versus
+  726,896 words for fixed-width-string construction and 1,578,027 versus
+  923,171 for updates; the exception realizer remains in the wrapper pending
+  a target-language refinement proof or a lower-allocation source worker.
 
 Exit gate: optimized public operations are linked by refinement theorems to the
 proved finite-map semantics. Physical sharing remains outside the claim unless
@@ -303,6 +308,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-08-31 | Measured and retained the native string `set` realizer | Ordinary extraction of `set_one_descent` is now exercised in the randomized structural/oracle test. A checked 10K native trial found its result correct but allocated 993,458 versus 726,896 words for fixed-width-string construction and 1,578,027 versus 923,171 for updates, so the supported wrapper retains the exception realizer. `make`, `make benchmark`, and `git diff --check` passed. |
 | 2026-08-30 | Removed handwritten general `combine` realizers | `PatriciaExtract.v` now extracts both proved `combine_structural` workers directly, eliminating the two Patricia-specific merge substitutions. Full `make` passed with 360 closed declarations; `make benchmark` passed, retaining the checked 10K workload's allocation and functional checks. |
 | 2026-08-30 | Expanded changed-worker extraction coverage | `PatriciaUnionTest.ml` now runs 32 deterministic mixed-shape workloads per backend, comparing every result against the established left-biased union across 127 keys. `make union-oracle` and `git diff --check` passed. |
 | 2026-08-30 | Completed integer changed-worker terminal cases | `PatriciaUnionProof.v` maps all three disjoint branch outcomes to a `Some` separated join: both outer-prefix mismatches and equal masks with distinct prefixes. `make PatriciaUnionProof.vo`, `make union-oracle`, and `git diff --check` passed. |

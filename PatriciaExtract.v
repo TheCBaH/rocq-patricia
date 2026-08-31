@@ -270,7 +270,8 @@ Separate Extraction
   StringPatricia.join StringPatricia.map_filter StringPatricia.map_left
   StringPatricia.map_right StringPatricia.replace_binding
   StringPatricia.combine_leaf_left StringPatricia.combine_leaf_right
-  StringPatricia.get StringPatricia.mem StringPatricia.set StringPatricia.remove
+  StringPatricia.get StringPatricia.mem StringPatricia.set_one_descent
+  StringPatricia.set StringPatricia.remove
   StringPatricia.combine StringPatricia.union_left StringPatricia.union_right
   StringPatriciaUnion.union_left_specialized
   StringPatriciaUnion.union_right_specialized
