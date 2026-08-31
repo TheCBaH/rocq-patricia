@@ -97,7 +97,10 @@ The remaining native-refinement task is the exception-based string `set` and
 the target-level `==` contract for the specialized native unions.
 `SPECIFICATION.md` states that contract precisely: a successful physical test
 denotes the same current immutable tree and therefore equal lookups. A cost
-semantics is additionally needed before making a formal asymptotic claim.
+semantics is additionally needed before making a formal asymptotic claim. This
+is intentionally a runtime/compiler contract rather than a portable OCaml
+theorem: documented `==` behavior on non-mutable values guarantees only
+`compare = 0`, which is insufficient for arbitrary map payloads.
 
 ### 2. The direct-string biased unions are verified
 

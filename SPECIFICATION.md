@@ -140,10 +140,13 @@ Executing the supported native library additionally trusts:
   identity or allocation bounds;
 - the specialized handwritten union realizers' physical-equality contract:
   when `changed == original` succeeds, both references denote the same
-  current immutable tree value and hence have identical `get` results at every
-  key. This is exactly the positive-direction `native_same_sound` premise
-  used by the source refinement; it neither requires recognizing all equal
-  maps nor proves retained sharing or allocation behavior;
+  current tree object and hence have identical `get` results at every key.
+  This is exactly the positive-direction `native_same_sound` premise used by
+  the source refinement; it neither requires recognizing all equal maps nor
+  proves retained sharing or allocation behavior. It is a runtime/compiler
+  representation contract, not a portable consequence of OCaml `==`: for
+  non-mutable values the documented language guarantee is only `compare = 0`,
+  which is too weak for arbitrary (potentially mutable) map payloads;
 - packed string positions, native `bit_at`, bytewise first difference,
   bounded prefix comparison, `Char.code`, integer XOR/leading-zeroes, and
   guarded `String.unsafe_get` calls;

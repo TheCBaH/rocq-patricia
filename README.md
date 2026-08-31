@@ -186,6 +186,8 @@ sharing biased union. These custom extraction refinements form an explicit
 performance/correctness boundary. For the handwritten biased unions, Rocq now
 checks every equal-header and containment reconstruction under the sole
 positive-direction contract that OCaml `changed == original` implies identical
-current lookups. Connecting that heap-level fact to OCaml `==` (and any
-allocation or sharing claim) remains trusted; the source tree reasoning is no
-longer an unproved part of that boundary.
+current lookups. This is deliberately stronger than the portable documented
+`==` guarantee for non-mutable values (`compare = 0`), so connecting it to the
+runtime/compiler (and proving any allocation or sharing claim) remains
+trusted; the source tree reasoning is no longer an unproved part of that
+boundary.
