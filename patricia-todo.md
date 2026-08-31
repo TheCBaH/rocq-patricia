@@ -225,7 +225,9 @@ Required only for an end-to-end native-refinement claim.
   reconstructions now close; the latter preserve cached-sample residency in
   every route. The remaining step is to state the OCaml `==` soundness
   contract once for the extracted tree type and connect it to the source
-  `native_same_sound` assumption.
+  `native_same_sound` assumption. `SPECIFICATION.md` now names the required
+  positive-direction contract explicitly; proving it still requires an OCaml
+  heap semantics or treating that small runtime fact as trusted.
   The normally extracted `set_one_descent` worker is also exercised directly
   by the randomized oracle, but a 10K wrapper trial allocated 993,458 versus
   726,896 words for fixed-width-string construction and 1,578,027 versus

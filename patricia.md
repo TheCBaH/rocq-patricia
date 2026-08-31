@@ -94,8 +94,10 @@ operational behavior, but it is benchmark evidence rather than a complexity
 proof.
 
 The remaining native-refinement task is the exception-based string `set` and
-the specialized native unions. A cost semantics is additionally needed before
-making a formal asymptotic claim.
+the target-level `==` contract for the specialized native unions.
+`SPECIFICATION.md` states that contract precisely: a successful physical test
+denotes the same current immutable tree and therefore equal lookups. A cost
+semantics is additionally needed before making a formal asymptotic claim.
 
 ### 2. The direct-string biased unions are verified
 

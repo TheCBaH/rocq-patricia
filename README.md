@@ -183,5 +183,9 @@ logical bit positions; native extraction represents positions as packed
 byte/tag integer tokens. Native extraction also replaces proof-side fuelled
 `combine` with direct structural recursion and gives both Patricia variants a
 sharing biased union. These custom extraction refinements form an explicit
-performance/correctness boundary: their equivalence to the pure Rocq functions
-is trusted, rather than proved inside Rocq.
+performance/correctness boundary. For the handwritten biased unions, Rocq now
+checks every equal-header and containment reconstruction under the sole
+positive-direction contract that OCaml `changed == original` implies identical
+current lookups. Connecting that heap-level fact to OCaml `==` (and any
+allocation or sharing claim) remains trusted; the source tree reasoning is no
+longer an unproved part of that boundary.
