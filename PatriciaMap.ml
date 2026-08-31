@@ -42,10 +42,10 @@ let combine combiner =
            combiner.both left_value right_value
        | None, None -> None)
 
-(* The companion workers are proved against the pure biased unions.  [Empty]
-   is their allocation-free certificate that the original first input can be
-   reused. *)
-let union_left = PatriciaUnion.union_left_specialized_changed_result
+(* The fuel worker is proved extensionally identical to the companion changed
+   worker.  [Empty] is its allocation-free certificate that the original first
+   input can be reused. *)
+let union_left = PatriciaUnion.union_left_specialized_changed_fuel_result
 let union_right = PatriciaUnion.union_right_specialized_changed_result
 let elements = PatriciaInternal.elements
 let fold = PatriciaInternal.fold

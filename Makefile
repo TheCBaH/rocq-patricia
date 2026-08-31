@@ -21,7 +21,7 @@ REFERENCE_PACK := PatriciaReference.cmo
 
 .PHONY: all proof core-proof union-proof assumptions extraction \
 	reference-extraction ocaml reference-ocaml test union-oracle differential \
-	benchmark benchmark-smoke clean
+	benchmark benchmark-smoke union-profile clean
 
 all: proof assumptions extraction reference-extraction ocaml reference-ocaml \
 	test union-oracle differential
@@ -106,6 +106,16 @@ benchmark: ocaml PatriciaBenchmark.ml
 	    $(addprefix ../,$(PUBLIC_CMXS)) ../PatriciaBenchmark.ml
 	./patricia-benchmark
 
+# This is deliberately separate from [benchmark]: it compares the established
+# nested changed-result union with the selected closure-free fuel worker
+# through their generated implementation modules.
+union-profile: extraction PatriciaUnionProfile.ml
+	cd extracted && $(OCAMLOPT) -c `$(OCAMLDEP) -sort *.ml`
+	cd extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../patricia-union-profile $$objects \
+	    ../PatriciaUnionProfile.ml
+	./patricia-union-profile
+
 # Small checked workload for CI.  It exercises every benchmark operation but
 # neither records the timings nor treats them as performance thresholds.
 benchmark-smoke: benchmark
@@ -137,6 +147,7 @@ clean:
 	rm -f PatriciaReference.cmi PatriciaReference.cmo
 	rm -f PatriciaTest.cmi PatriciaTest.cmo PatriciaDifferentialTest.cmi \
 	  PatriciaDifferentialTest.cmo PatriciaUnionTest.cmi PatriciaUnionTest.cmo \
-	  PatriciaBenchmark.cmi PatriciaBenchmark.cmx PatriciaBenchmark.o
+	  PatriciaBenchmark.cmi PatriciaBenchmark.cmx PatriciaBenchmark.o \
+	  PatriciaUnionProfile.cmi PatriciaUnionProfile.cmx PatriciaUnionProfile.o
 	rm -f patricia-test patricia-union-test patricia-differential-test \
-	  patricia-benchmark
+	  patricia-benchmark patricia-union-profile

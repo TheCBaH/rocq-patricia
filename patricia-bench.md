@@ -320,6 +320,40 @@ single-machine allocation comparison, not a formal cost result; the remaining
 N2 task is to prove the exact realizer in a target-language logic or develop a
 lower-allocation extracted source worker.
 
+### 8. Proved closure-free `union_left` worker selected
+
+The public integer and string wrappers use the extracted,
+`union_left_specialized_changed_fuel_result` worker. Its `Empty` result is a
+source-level certificate that lets the wrapper return the original left root.
+It replaces the branch-local recursive closure with one fuel-decreasing
+function. `union_left_specialized_changed_fuel_exact` proves every fuel above
+the combined input size agrees with the established changed worker, and the
+result-wrapper theorem proves the public bound exactly.
+
+The profile forces a major collection before and after each single operation,
+keeps both input roots live during the final collection, checks every queried
+binding and result cardinality, and reports allocation plus the extra retained
+result graph.  These are 100,000-binding runs on the platform named above;
+the string figures were the same for ordinary eight-byte keys and keys with a
+192-byte common prefix.
+
+| Workload | Integer proved / fuel allocation | String proved / fuel allocation | Retained result graph | Left root reused? |
+| --- | ---: | ---: | ---: | --- |
+| Disjoint | 438 / 463 | 165 / 186 | 50–87 words | No |
+| Half overlap | 700,641 / 600,523 | 700,447 / 600,261 | 50–86 words | No |
+| Subset | 700,524 / 600,310 | 700,361 / 600,202 | measurement baseline | Yes |
+| Equal | 1,400,586 / 1,200,178 | 1,400,676 / 1,200,226 | measurement baseline | Yes |
+| Empty right | 35 / 32 | 35 / 32 | measurement baseline | Yes |
+
+“Measurement baseline” is the fixed GC-accounting noise (within five words)
+when the result is the original root.  The pattern matters more than the
+small fixed disjoint numbers: both workers physically retain only a
+constant-size extra graph, but their recursive traversal allocates temporary
+frames/closures linearly even when the final result is exactly the old left
+tree.  The fuel experiment reduces this transient cost from about 14 to about
+12 words per left binding; its `size` prepass has no observed linear allocation
+cost. No timing or heap theorem is claimed.
+
 ## Further benchmark coverage
 
 The benchmark is a useful checked comparison and smoke benchmark. Future
@@ -365,6 +399,9 @@ refinement or of asymptotic cost.
 
 ```sh
 make -C patricia benchmark
+
+make -C patricia union-profile
+PATRICIA_UNION_PROFILE_SIZE=100000 make -C patricia union-profile
 
 PATRICIA_BENCH_SIZE=100000 make -C patricia benchmark
 PATRICIA_BENCH_SIZE=1000000 PATRICIA_BENCH_STRING_LENGTHS=4,5 \\

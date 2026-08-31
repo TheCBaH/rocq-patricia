@@ -1385,3 +1385,99 @@ Proof.
   unfold union_right_specialized.
   now apply union_left_specialized_correct_wf.
 Qed.
+
+(** The direct fuel worker is an extraction-shape variant of the proved
+    changed worker.  Its counter is strictly larger than the combined source
+    tree size, so every recursive pair has a remaining sufficient counter. *)
+Theorem union_left_specialized_changed_fuel_exact:
+  forall (A : Type) (fuel : nat) (left right : t A),
+    size left + size right < fuel ->
+    union_left_specialized_changed_fuel fuel left right =
+    union_left_specialized_changed left right.
+Proof.
+  intros A.
+  assert (Hstrong : forall total, forall fuel (left right : t A),
+      size left + size right = total -> total < fuel ->
+      union_left_specialized_changed_fuel fuel left right =
+      union_left_specialized_changed left right).
+  { intro total. induction total using lt_wf_ind.
+    intros fuel left right Esize Hfuel.
+    destruct fuel as [|fuel']; [lia|].
+    destruct left as [|left_key left_value
+        |left_sample left_split left_left left_right];
+      destruct right as [|right_key right_value
+        |right_sample right_split right_left right_right];
+      try reflexivity.
+    cbn [size] in Esize.
+    assert (Ell : union_left_specialized_changed_fuel fuel' left_left right_left =
+        union_left_specialized_changed left_left right_left).
+    { eapply H with (m := size left_left + size right_left);
+        [cbn [size]; lia|reflexivity|lia]. }
+    assert (Err : union_left_specialized_changed_fuel fuel' left_right right_right =
+        union_left_specialized_changed left_right right_right).
+    { eapply H with (m := size left_right + size right_right);
+        [cbn [size]; lia|reflexivity|lia]. }
+    assert (Elb : union_left_specialized_changed_fuel fuel' left_left
+        (Branch right_sample right_split right_left right_right) =
+        union_left_specialized_changed left_left
+          (Branch right_sample right_split right_left right_right)).
+    { assert (Hsmaller : size left_left +
+          size (Branch right_sample right_split right_left right_right) < total).
+      { cbn [size] in Esize |- *. lia. }
+      assert (Hfuel' : size left_left +
+          size (Branch right_sample right_split right_left right_right) < fuel') by lia.
+      eapply H with (m := size left_left +
+        size (Branch right_sample right_split right_left right_right)); eauto. }
+    assert (Erb : union_left_specialized_changed_fuel fuel' left_right
+        (Branch right_sample right_split right_left right_right) =
+        union_left_specialized_changed left_right
+          (Branch right_sample right_split right_left right_right)).
+    { assert (Hsmaller : size left_right +
+          size (Branch right_sample right_split right_left right_right) < total).
+      { cbn [size] in Esize |- *. lia. }
+      assert (Hfuel' : size left_right +
+          size (Branch right_sample right_split right_left right_right) < fuel') by lia.
+      eapply H with (m := size left_right +
+        size (Branch right_sample right_split right_left right_right)); eauto. }
+    assert (Eal : union_left_specialized_changed_fuel fuel'
+        (Branch left_sample left_split left_left left_right) right_left =
+        union_left_specialized_changed
+          (Branch left_sample left_split left_left left_right) right_left).
+    { assert (Hsmaller : size (Branch left_sample left_split left_left left_right) +
+          size right_left < total).
+      { cbn [size] in Esize |- *. lia. }
+      assert (Hfuel' : size (Branch left_sample left_split left_left left_right) +
+          size right_left < fuel') by lia.
+      eapply H with (m := size (Branch left_sample left_split left_left left_right) +
+        size right_left); eauto. }
+    assert (Ear : union_left_specialized_changed_fuel fuel'
+        (Branch left_sample left_split left_left left_right) right_right =
+        union_left_specialized_changed
+          (Branch left_sample left_split left_left left_right) right_right).
+    { assert (Hsmaller : size (Branch left_sample left_split left_left left_right) +
+          size right_right < total).
+      { cbn [size] in Esize |- *. lia. }
+      assert (Hfuel' : size (Branch left_sample left_split left_left left_right) +
+          size right_right < fuel') by lia.
+      eapply H with (m := size (Branch left_sample left_split left_left left_right) +
+        size right_right); eauto. }
+    cbn [union_left_specialized_changed_fuel].
+    rewrite union_left_specialized_changed_equation.
+    rewrite Ell, Err, Elb, Erb, Eal, Ear.
+    reflexivity.
+  }
+  intros fuel left right Hfuel.
+  eapply Hstrong with (total := size left + size right); eauto.
+Qed.
+
+Theorem union_left_specialized_changed_fuel_result_exact:
+  forall (A : Type) (left right : t A),
+    union_left_specialized_changed_fuel_result left right =
+    union_left_specialized_changed_result left right.
+Proof.
+  intros A left right.
+  unfold union_left_specialized_changed_fuel_result,
+    union_left_specialized_changed_result.
+  rewrite union_left_specialized_changed_fuel_exact by lia.
+  reflexivity.
+Qed.

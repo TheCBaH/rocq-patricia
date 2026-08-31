@@ -27,10 +27,10 @@ let combine combiner =
            combiner.both left_value right_value
        | None, None -> None)
 
-(* The companion worker is proved against the pure left-/right-biased union.
-   [Empty] is its allocation-free certificate that the original first input
-   can be reused. *)
-let union_left = StringPatriciaUnion.union_left_specialized_changed_result
+(* The fuel worker is proved extensionally identical to the companion changed
+   worker.  [Empty] is its allocation-free certificate that the original first
+   input can be reused. *)
+let union_left = StringPatriciaUnion.union_left_specialized_changed_fuel_result
 let union_right = StringPatriciaUnion.union_right_specialized_changed_result
 let elements = StringPatriciaInternal.elements
 let fold = StringPatriciaInternal.fold
