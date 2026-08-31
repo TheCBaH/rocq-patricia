@@ -1046,6 +1046,70 @@ Proof.
     + apply Hgetout.
 Qed.
 
+(** Native source model for the outer-right zero-bit route.  The recursive
+    child is biased toward [operand], unlike the outer-left route above. *)
+Lemma native_reuse_right_outer_left_branch_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) sample split
+      (operand left right out_left : t A),
+    native_same_sound same ->
+    wf operand -> wf (Branch sample split left right) ->
+    all_keys (fun key => same_prefix sample key split /\ bit_at key split = false) operand ->
+    all_keys (fun key => same_prefix sample key split /\ bit_at key split = false) left ->
+    all_keys (fun key => same_prefix sample key split /\ bit_at key split = true) right ->
+    (wf out_left /\ forall key, get key out_left =
+      match get key operand with Some value => Some value | None => get key left end) ->
+    wf (native_reuse_left_branch same sample split left right out_left) /\
+    forall key, get key (native_reuse_left_branch same sample split left right out_left) =
+      match get key operand with Some value => Some value | None =>
+      get key (Branch sample split left right) end.
+Proof.
+  intros A same sample split operand left right out_left Hsame Hoperand Houter
+    Hcontained Hleft Hright Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr Hnl Hnr Hleftkeys Hrightkeys Hresident]; subst.
+  destruct (native_reuse_child_right_correct_wf A same operand left out_left
+    Hsame Hwl (proj1 Hchild) (proj2 Hchild)) as [Hwout Hgetout].
+  assert (Houtkeys : all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false)
+      (native_reuse_child same left out_left)).
+  { eapply all_keys_of_combine_lookup with
+      (left := operand) (right := left) (out := native_reuse_child same left out_left)
+      (f := fun x y => match x with Some _ => x | None => y end);
+      [reflexivity|exact Hwout| |exact Hcontained|exact Hleftkeys].
+    intro key. specialize (Hgetout key).
+    destruct (get key operand); cbn in Hgetout |- *; exact Hgetout. }
+  split.
+  - unfold native_reuse_left_branch. apply wf_branch.
+    + exact Hwout.
+    + exact Hwr.
+    + destruct (representative left) as [key|] eqn:Eleft.
+      * destruct (representative_resident_wf A left key Hwl Eleft) as [value Hget].
+        destruct (get key operand) as [operand_value|] eqn:Eoperand.
+        -- eapply wf_representative_nonempty_get; [exact Hwout|].
+           rewrite Hgetout, Eoperand. reflexivity.
+        -- eapply wf_representative_nonempty_get; [exact Hwout|].
+           rewrite Hgetout, Eoperand, Hget. reflexivity.
+      * exfalso. exact (Hnl eq_refl).
+    + exact Hnr.
+    + exact Houtkeys.
+    + exact Hrightkeys.
+    + destruct Hresident as [value Hget].
+      destruct (bit_at sample split) eqn:Ebit;
+        cbn [get] in Hget |- *; try rewrite Ebit in Hget; try rewrite Ebit.
+      * exists value. cbn [get]. try rewrite Ebit. exact Hget.
+      * destruct (get sample operand) as [operand_value|] eqn:Eoperand.
+        -- exists operand_value. cbn [get]. try rewrite Ebit.
+           rewrite Hgetout, Eoperand. reflexivity.
+        -- exists value. cbn [get]. try rewrite Ebit.
+           rewrite Hgetout, Eoperand, Hget. reflexivity.
+  - intro key. unfold native_reuse_left_branch.
+    destruct (bit_at key split) eqn:Ebit; cbn [get]; rewrite Ebit.
+    + assert (Eoperand : get key operand = None).
+      { eapply get_none_if_all_keys; [exact Hcontained|].
+        intros [_ Hbit]. rewrite Ebit in Hbit. discriminate. }
+      rewrite Eoperand. reflexivity.
+    + apply Hgetout.
+Qed.
+
 Lemma union_left_specialized_right_outer_right_branch_correct_wf:
   forall (A : Type) sample split (operand left right out_right : t A),
     wf operand -> wf left -> wf right ->
@@ -1095,6 +1159,69 @@ Proof.
       { eapply get_none_if_all_keys; [exact Hoperand|].
         intros [_ Hbit]. rewrite E in Hbit. discriminate. }
       now rewrite Eoperand.
+Qed.
+
+(** Native source model for the outer-right one-bit route. *)
+Lemma native_reuse_right_outer_right_branch_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) sample split
+      (operand left right out_right : t A),
+    native_same_sound same ->
+    wf operand -> wf (Branch sample split left right) ->
+    all_keys (fun key => same_prefix sample key split /\ bit_at key split = true) operand ->
+    all_keys (fun key => same_prefix sample key split /\ bit_at key split = false) left ->
+    all_keys (fun key => same_prefix sample key split /\ bit_at key split = true) right ->
+    (wf out_right /\ forall key, get key out_right =
+      match get key operand with Some value => Some value | None => get key right end) ->
+    wf (native_reuse_right_branch same sample split left right out_right) /\
+    forall key, get key (native_reuse_right_branch same sample split left right out_right) =
+      match get key operand with Some value => Some value | None =>
+      get key (Branch sample split left right) end.
+Proof.
+  intros A same sample split operand left right out_right Hsame Hoperand Houter
+    Hcontained Hleft Hright Hchild.
+  inversion Houter as [| |? ? ? ? Hwl Hwr Hnl Hnr Hleftkeys Hrightkeys Hresident]; subst.
+  destruct (native_reuse_child_right_correct_wf A same operand right out_right
+    Hsame Hwr (proj1 Hchild) (proj2 Hchild)) as [Hwout Hgetout].
+  assert (Houtkeys : all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true)
+      (native_reuse_child same right out_right)).
+  { eapply all_keys_of_combine_lookup with
+      (left := operand) (right := right) (out := native_reuse_child same right out_right)
+      (f := fun x y => match x with Some _ => x | None => y end);
+      [reflexivity|exact Hwout| |exact Hcontained|exact Hrightkeys].
+    intro key. specialize (Hgetout key).
+    destruct (get key operand); cbn in Hgetout |- *; exact Hgetout. }
+  split.
+  - unfold native_reuse_right_branch. apply wf_branch.
+    + exact Hwl.
+    + exact Hwout.
+    + exact Hnl.
+    + destruct (representative right) as [key|] eqn:Eright.
+      * destruct (representative_resident_wf A right key Hwr Eright) as [value Hget].
+        destruct (get key operand) as [operand_value|] eqn:Eoperand.
+        -- eapply wf_representative_nonempty_get; [exact Hwout|].
+           rewrite Hgetout, Eoperand. reflexivity.
+        -- eapply wf_representative_nonempty_get; [exact Hwout|].
+           rewrite Hgetout, Eoperand, Hget. reflexivity.
+      * exfalso. exact (Hnr eq_refl).
+    + exact Hleftkeys.
+    + exact Houtkeys.
+    + destruct Hresident as [value Hget].
+      destruct (bit_at sample split) eqn:Ebit;
+        cbn [get] in Hget |- *; try rewrite Ebit in Hget; try rewrite Ebit.
+      * destruct (get sample operand) as [operand_value|] eqn:Eoperand.
+        -- exists operand_value. cbn [get]. try rewrite Ebit.
+           rewrite Hgetout, Eoperand. reflexivity.
+        -- exists value. cbn [get]. try rewrite Ebit.
+           rewrite Hgetout, Eoperand, Hget. reflexivity.
+      * exists value. cbn [get]. try rewrite Ebit. exact Hget.
+  - intro key. unfold native_reuse_right_branch.
+    destruct (bit_at key split) eqn:Ebit; cbn [get]; rewrite Ebit.
+    + apply Hgetout.
+    + assert (Eoperand : get key operand = None).
+      { eapply get_none_if_all_keys; [exact Hcontained|].
+        intros [_ Hbit]. rewrite Ebit in Hbit. discriminate. }
+      rewrite Eoperand. reflexivity.
 Qed.
 
 (** In the right-outer case, even an unchanged routed child must be placed
