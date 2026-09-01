@@ -1,9 +1,13 @@
 # Patricia benchmark results
 
 - Run date: 2026-08-29
-- Last reviewed: 2026-08-31
+- Last reviewed: 2026-09-01
 - Command: `make -C patricia benchmark`
 - Platform: aarch64 Linux 7.0.0-28-generic; OCaml 4.14.3 native code
+- Compiler configuration: `architecture: arm64`, `model: default`,
+  `word_size: 64`, `system: linux`, `flambda: false`, `safe_string: true`,
+  `native_c_compiler: gcc -O2 -fno-strict-aliasing -fwrapv -pthread -fPIC
+  -D_FILE_OFFSET_BITS=64`
 
 This document is the measurement record and reproduction guide. Performance
 analysis is in [`patricia-str.md`](patricia-str.md), and all current or proposed
@@ -26,6 +30,11 @@ more dependable signal for tiny operations.
 
 These are measurements from one machine, not complexity proofs or regression
 thresholds.
+
+The CI workflow pins OCaml 4.14.3. Run `make compiler-config` with every
+comparable native benchmark series to record the target-dependent compiler
+configuration; the command reports the OCaml version, target, word size,
+Flambda setting, safe-string mode, and native C compiler flags.
 
 ### Small-operation follow-up
 
@@ -356,15 +365,17 @@ allocation cost. No timing or heap theorem is claimed.
 
 ## Further benchmark coverage
 
-The benchmark is a useful checked comparison and smoke benchmark. Future
-performance decisions would benefit from:
+The benchmark is a useful checked comparison and smoke benchmark. It now
+includes physical subtree-sharing counters in `make union-profile`: every
+result is traversed and the report gives its node count plus nodes physically
+reachable from either input. This is diagnostic evidence only, not a sharing
+or allocation guarantee. Future performance decisions would still benefit
+from:
 
 - a bulk-build workload if a bulk builder is added (the benchmark already
   includes generic leaf/tree `combine`, `elements`, and mixed hit/miss `mem`);
-- physical-sharing counters or retained-node checks, so low allocation is
-  attributed to reused nodes rather than inferred only from GC totals;
-- pinned compiler configuration. These results used OCaml 4.14.3 without
-  Flambda, so compiler changes must not be confused with data-structure changes.
+- timing the proof-aligned backend when extraction overhead itself becomes a
+  performance question.
 
 The normal build already links a proof-aligned extraction beside the optimized
 backend and differentially validates semantics. It is not timed by this

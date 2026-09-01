@@ -29,6 +29,98 @@ type measurement = {
   retained_words : int;
 }
 
+(* [==] is deliberately used only by this diagnostic.  The table records how
+   much of each immutable input tree the result still reaches by physical
+   identity; it is not part of either public map contract. *)
+module Physical_nodes = Hashtbl.Make (struct
+  type t = Obj.t
+
+  let equal left right = left == right
+  let hash value = Hashtbl.hash value
+end)
+
+type sharing = {
+  result_nodes : int;
+  left_shared_nodes : int;
+  right_shared_nodes : int;
+}
+
+let add_int_nodes table tree =
+  let rec visit = function
+    | I.Empty -> ()
+    | (I.Leaf _ as node) -> Physical_nodes.replace table (Obj.repr node) ()
+    | (I.Branch (_, _, left, right) as node) ->
+        Physical_nodes.replace table (Obj.repr node) ();
+        visit left;
+        visit right
+  in
+  visit tree
+
+let add_string_nodes table tree =
+  let rec visit = function
+    | S.Empty -> ()
+    | (S.Leaf _ as node) -> Physical_nodes.replace table (Obj.repr node) ()
+    | (S.Branch (_, _, left, right) as node) ->
+        Physical_nodes.replace table (Obj.repr node) ();
+        visit left;
+        visit right
+  in
+  visit tree
+
+let count_int_sharing left right result =
+  let left_nodes = Physical_nodes.create 128 in
+  let right_nodes = Physical_nodes.create 128 in
+  add_int_nodes left_nodes left;
+  add_int_nodes right_nodes right;
+  let rec visit counts = function
+    | I.Empty -> counts
+    | (I.Leaf _ as node) ->
+        let pointer = Obj.repr node in
+        { result_nodes = counts.result_nodes + 1;
+          left_shared_nodes = counts.left_shared_nodes +
+            if Physical_nodes.mem left_nodes pointer then 1 else 0;
+          right_shared_nodes = counts.right_shared_nodes +
+            if Physical_nodes.mem right_nodes pointer then 1 else 0 }
+    | (I.Branch (_, _, left, right) as node) ->
+        let pointer = Obj.repr node in
+        let counts =
+          { result_nodes = counts.result_nodes + 1;
+            left_shared_nodes = counts.left_shared_nodes +
+              if Physical_nodes.mem left_nodes pointer then 1 else 0;
+            right_shared_nodes = counts.right_shared_nodes +
+              if Physical_nodes.mem right_nodes pointer then 1 else 0 }
+        in
+        visit (visit counts left) right
+  in
+  visit { result_nodes = 0; left_shared_nodes = 0; right_shared_nodes = 0 } result
+
+let count_string_sharing left right result =
+  let left_nodes = Physical_nodes.create 128 in
+  let right_nodes = Physical_nodes.create 128 in
+  add_string_nodes left_nodes left;
+  add_string_nodes right_nodes right;
+  let rec visit counts = function
+    | S.Empty -> counts
+    | (S.Leaf _ as node) ->
+        let pointer = Obj.repr node in
+        { result_nodes = counts.result_nodes + 1;
+          left_shared_nodes = counts.left_shared_nodes +
+            if Physical_nodes.mem left_nodes pointer then 1 else 0;
+          right_shared_nodes = counts.right_shared_nodes +
+            if Physical_nodes.mem right_nodes pointer then 1 else 0 }
+    | (S.Branch (_, _, left, right) as node) ->
+        let pointer = Obj.repr node in
+        let counts =
+          { result_nodes = counts.result_nodes + 1;
+            left_shared_nodes = counts.left_shared_nodes +
+              if Physical_nodes.mem left_nodes pointer then 1 else 0;
+            right_shared_nodes = counts.right_shared_nodes +
+              if Physical_nodes.mem right_nodes pointer then 1 else 0 }
+        in
+        visit (visit counts left) right
+  in
+  visit { result_nodes = 0; left_shared_nodes = 0; right_shared_nodes = 0 } result
+
 let allocated_words () =
   let stats = Gc.quick_stat () in
   stats.Gc.minor_words +. stats.Gc.major_words
@@ -89,19 +181,25 @@ let check_string keys expected_cardinal actual =
 let print_header title =
   Printf.printf "\n%s (%d bindings in the left input)\n" title profile_size;
   Printf.printf
-    "  %-18s %-10s %14s %14s %10s\n"
-    "workload" "worker" "allocated words" "retained words" "left == out"
+    "  %-18s %-10s %12s %12s %10s %10s %10s\n"
+    "workload" "worker" "allocated" "retained" "nodes" "from left" "from right";
+  Printf.printf
+    "  %-18s %-10s %12s %12s %10s %10s %10s\n"
+    "" "" "words" "words" "left == out" "nodes" "nodes"
 
-let print_row name worker left result measurement =
-  Printf.printf "  %-18s %-10s %14.0f %14d %10b\n"
+let print_row name worker left result measurement sharing =
+  Printf.printf "  %-18s %-10s %12.0f %12d %10b %10d %10d\n"
     name worker measurement.allocated_words measurement.retained_words
-    (left == result)
+    (left == result) sharing.left_shared_nodes sharing.right_shared_nodes
 
 let profile_int_case name keys expected_cardinal left right =
   let run worker operation =
     let result, worker_measurement = measure left right operation in
     check_int keys expected_cardinal result;
-    print_row name worker left result worker_measurement
+    let sharing = count_int_sharing left right result in
+    if sharing.result_nodes <> I.size result then
+      failwith "integer union-profile sharing count mismatch";
+    print_row name worker left result worker_measurement sharing
   in
   run "legacy" (fun () -> I.union_left left right);
   run "generated" (fun () -> IU.union_left_native_default left right);
@@ -115,7 +213,10 @@ let profile_string_case name keys expected_cardinal left right =
   let run worker operation =
     let result, worker_measurement = measure left right operation in
     check_string keys expected_cardinal result;
-    print_row name worker left result worker_measurement
+    let sharing = count_string_sharing left right result in
+    if sharing.result_nodes <> S.size result then
+      failwith "string union-profile sharing count mismatch";
+    print_row name worker left result worker_measurement sharing
   in
   run "legacy" (fun () -> S.union_left left right);
   run "generated" (fun () -> SU.union_left_native_default left right);

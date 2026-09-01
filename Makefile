@@ -21,7 +21,7 @@ REFERENCE_PACK := PatriciaReference.cmo
 
 .PHONY: all proof core-proof union-proof assumptions extraction \
 	reference-extraction ocaml reference-ocaml test union-oracle differential \
-	benchmark benchmark-smoke union-profile clean
+	benchmark benchmark-smoke union-profile compiler-config clean
 
 all: proof assumptions extraction reference-extraction ocaml reference-ocaml \
 	test union-oracle differential
@@ -115,6 +115,16 @@ union-profile: extraction PatriciaUnionProfile.ml
 	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../patricia-union-profile $$objects \
 	    ../PatriciaUnionProfile.ml
 	./patricia-union-profile
+
+# Record the native compiler settings beside any comparable benchmark series.
+# CI pins the OCaml version; this target captures target-dependent details
+# such as architecture, word size, Flambda, and the C compiler flags.
+compiler-config:
+	$(OCAMLOPT) -version
+	$(OCAMLOPT) -config | sed -n \
+	  -e '/^architecture:/p' -e '/^model:/p' -e '/^system:/p' \
+	  -e '/^word_size:/p' -e '/^flambda:/p' -e '/^safe_string:/p' \
+	  -e '/^native_c_compiler:/p'
 
 # Small checked workload for CI.  It exercises every benchmark operation but
 # neither records the timings nor treats them as performance thresholds.

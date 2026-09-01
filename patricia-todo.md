@@ -329,11 +329,18 @@ Use this track before making new performance decisions or regression claims.
   The checked benchmark now uses a deterministic Fisher--Yates insertion
   permutation, a six-way hit/miss/update/remove/add trace, all four additional
   union shapes, and a configurable 192-byte-common-prefix string workload.
-- [ ] Add physical-sharing counters or retained-node checks when a sharing
-  decision cannot be supported by allocation totals alone.
+- [x] Add physical-sharing counters or retained-node checks when a sharing
+  decision cannot be supported by allocation totals alone. `make union-profile`
+  now traverses every profiled output, counts its distinct tree nodes, and
+  reports how many are physically identical to nodes reachable from each input.
+  This distinguishes root reuse from partial subtree reuse without making a
+  source-level sharing claim.
 - [ ] Time the proof-aligned backend when extraction overhead itself becomes a
   performance question.
-- [ ] Pin and report compiler configuration for any comparable benchmark series.
+- [x] Pin and report compiler configuration for any comparable benchmark series.
+  CI pins OCaml 4.14.3, while `make compiler-config` emits the version plus
+  target-dependent native settings. `patricia-bench.md` records the current
+  arm64/Linux, 64-bit, non-Flambda configuration and C compiler flags.
 
 ## Completed foundation
 
@@ -379,6 +386,8 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-09-01 | Pinned and made native compiler configuration reproducible | CI already pins OCaml 4.14.3; `make compiler-config` now records the version, architecture, model, system, word size, Flambda mode, safe-string mode, and native C compiler flags. The current arm64/Linux configuration is recorded in `patricia-bench.md`; `make compiler-config` and `git diff --check` passed. |
+| 2026-09-01 | Added physical subtree-sharing counters to the union profile | `PatriciaUnionProfile.ml` now indexes every nonempty input node by physical identity and reports the output's total nodes plus nodes shared with its left and right input. The diagnostic verifies its output-node traversal against each internal `size` function and remains measurement-only; `make union-profile` and `git diff --check` passed. |
 | 2026-08-31 | Completed the source-level native-union sharing cases | `PatriciaUnion.v` and `StringPatriciaUnion.v` contain the source-level child- and one-child-branch reuse model. `native_same_sound` requires only a positive equality test to imply lookup equivalence. Both proof modules close child reuse, equal-header reconstruction, and all four containment routes; direct-string proofs preserve cached-sample residency. Thus every branch shape in the handwritten union has a source refinement conditional on the one `==` soundness contract. `make PatriciaUnionProof.vo`, `make StringPatriciaUnionProof.vo`, and `git diff --check` passed. |
 | 2026-08-31 | Extracted the native-shaped union candidate and retained the legacy export | `union_left_native_default` mirrors the full custom branch control flow in both companion modules; only `native_same` is mapped to OCaml `(==)`. The 100K profile recovered subset/equal root reuse but allocated 800,904/800,628 words on half overlap and 1,600,788/1,600,948 on equality (integer/string), versus the legacy 365/81 and 26/26. Both wrappers were restored to the legacy realizers; `union-profile` now displays legacy, generated, proved, and fuel variants and recompiles interfaces safely. `make`, `PATRICIA_UNION_PROFILE_SIZE=100000 make union-profile`, and `git diff --check` passed. |
 | 2026-08-31 | Rejected the closure-free native-sharing fuel candidate | `union_left_native_fuel_default` removes the branch-local structural closure but retains a generic `same` callback. At 100K it allocated 1,200,993/1,200,634 words for half overlap and 2,400,919/2,400,891 for equal integer/string inputs—worse than the nested native-shaped candidate. It preserves no-op root sharing but is diagnostic-only; the public wrappers remain legacy. `PATRICIA_UNION_PROFILE_SIZE=100000 make union-profile` passed. |

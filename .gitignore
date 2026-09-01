@@ -12,5 +12,6 @@
 /patricia-union-test
 /patricia-differential-test
 /patricia-benchmark
+/patricia-union-profile
 /extracted/
 /reference_extracted/
