@@ -95,7 +95,8 @@ The positive-key proof file currently establishes, without axioms:
   key-aware `map` laws;
 - representative soundness and lookup/`wf` correctness for compatible and
   disjoint `join` operations;
-- simultaneous lookup correctness and `wf` preservation by `set`;
+- simultaneous lookup correctness and `wf` preservation by `set` and bulk
+  `of_list` (whose first duplicate binding wins);
 - general `remove` lookup correctness, `wf` preservation, and structural
   identity when the removed key is absent;
 - lookup correctness and `wf` preservation by `map_filter`, `map_left`, and
@@ -135,7 +136,8 @@ The direct-string proof files currently establish, without axioms:
 - the general lookup specification for `remove`, structural identity for an
   absent key, plus the corresponding `elements` filtering specification;
 - the unconditional `set` lookup law and well-formedness preservation,
-  including fresh and existing keys;
+  including fresh and existing keys, plus the corresponding first-binding-wins
+  `of_list` law;
 - `fold` agreement with `elements`, the key-aware `map` lookup law, and
   well-formedness/lookup laws for `map_filter`, `map_left`, and `map_right`
   (the latter two under `f None None = None`).

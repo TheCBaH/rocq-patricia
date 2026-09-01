@@ -28,7 +28,7 @@ Extract Inlined Constant String.length => "Stdlib.String.length".
 Separate Extraction
   PatriciaBits.mask_above
   Patricia.empty Patricia.is_empty Patricia.singleton Patricia.get Patricia.mem
-  Patricia.set Patricia.remove Patricia.map_filter Patricia.map_left
+  Patricia.set Patricia.remove Patricia.of_list Patricia.map_filter Patricia.map_left
   Patricia.map_right Patricia.replace_binding Patricia.combine_leaf_left
   Patricia.combine_leaf_right Patricia.combine
   Patricia.union_left Patricia.union_right
@@ -41,6 +41,7 @@ Separate Extraction
   StringPatricia.map_right StringPatricia.replace_binding
   StringPatricia.combine_leaf_left StringPatricia.combine_leaf_right
   StringPatricia.get StringPatricia.mem StringPatricia.set StringPatricia.remove
+  StringPatricia.of_list
   StringPatricia.combine StringPatricia.union_left StringPatricia.union_right
   StringPatricia.map StringPatricia.fold StringPatricia.elements
   StringPatricia.beq.

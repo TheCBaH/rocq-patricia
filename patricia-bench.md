@@ -337,11 +337,13 @@ implementations because the result is an option. Both `mem` implementations
 now traverse directly, and `mem_get` proves agreement with `get`; mixed
 present/absent benchmark passes allocate only fixed measurement overhead.
 
-Build uses repeated persistent `set` over already sorted ranges. A proved
-`of_sorted_array` or `of_sorted_list` builder could construct the Patricia
-shape directly with less allocation. It should be reported separately from
-incremental insertion because it answers a different API question. This is an
-optional N5 item in `patricia-todo.md`.
+Build uses repeated persistent `set` over already sorted ranges. The supported
+wrappers also expose proved generic `of_list` batch loading (with a documented
+first-binding-wins duplicate policy); its current source definition is exactly
+that `set` recurrence, so it is not measured as a separate performance result.
+A future direct `of_sorted_array` or `of_sorted_list` builder could construct
+the Patricia shape with less allocation and should be reported separately from
+incremental insertion because it answers a different API question.
 
 ### 6. Treat retained size as a representation tradeoff
 

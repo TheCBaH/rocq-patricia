@@ -96,6 +96,27 @@ Fixpoint set {A : Type} (k : positive) (v : A) (m : t A) : t A :=
       else join (Leaf k v) old
   end.
 
+(** Build a map from a batch of bindings.  Earlier bindings take precedence
+    over later bindings with the same key, matching the recursive order below.
+    Keeping this operation in the source model gives the extracted public
+    wrappers a bulk-loading entry point with the same invariant boundary as
+    repeated [set]. *)
+Fixpoint of_list {A : Type} (bindings : list (positive * A)) : t A :=
+  match bindings with
+  | [] => Empty
+  | (key, value) :: tail => set key value (of_list tail)
+  end.
+
+(** Lookup model for [of_list].  It makes the duplicate-key policy explicit:
+    the first binding in the input list wins. *)
+Fixpoint of_list_get {A : Type}
+    (query : positive) (bindings : list (positive * A)) : option A :=
+  match bindings with
+  | [] => None
+  | (key, value) :: tail =>
+      if Pos.eqb query key then Some value else of_list_get query tail
+  end.
+
 (* This structural version is kept as a simple proof reference.  The public
    deletion below uses [None] to propagate an unchanged result without
    rebuilding the routed path. *)

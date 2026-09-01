@@ -500,6 +500,10 @@ let check_abstract_interfaces () =
      || I.get (key 7) integers <> Some 71
      || I.get largest (I.singleton largest 99) <> Some 99 then
     failwith "abstract integer interface update failed";
+  let bulk = I.of_list [key 7, 70; key 3, 30; key 7, 71] in
+  if I.get (key 7) bulk <> Some 70 || I.get (key 3) bulk <> Some 30
+     || I.get largest bulk <> None then
+    failwith "abstract integer bulk loading failed";
   let mapped = I.map (fun key value -> I.Key.to_int key + value) integers in
   let filtered = I.map_filter
       (fun current value -> if I.Key.equal current (key 3) then None else Some value)
@@ -541,6 +545,10 @@ let check_abstract_interfaces () =
   if S.is_empty strings || not (S.mem "" strings)
      || S.get "a\000b" strings <> Some 3 then
     failwith "abstract string interface update failed";
+  let bulk = S.of_list ["a\000b", 10; "", 0; "a\000b", 11] in
+  if S.get "a\000b" bulk <> Some 10 || S.get "" bulk <> Some 0
+     || S.get "missing" bulk <> None then
+    failwith "abstract string bulk loading failed";
   let mapped = S.map (fun key value -> Stdlib.String.length key + value) strings in
   let filtered = S.map_filter
       (fun key value -> if key = "" then None else Some value) mapped in

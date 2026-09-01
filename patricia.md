@@ -18,8 +18,9 @@ harness.
 
 The implementation is a strong executable and proof development. Both pure
 source models have functional-correctness coverage for the current custom map
-API, and both extracted implementations behaved correctly in the supplied
-tests and in additional fuzzing. The supported OCaml wrappers now enforce the
+API, including first-binding-wins bulk `of_list`, and both extracted
+implementations behaved correctly in the supplied tests and in additional
+fuzzing. The supported OCaml wrappers now enforce the
 representable structural, positive-key, and combine preconditions. It is not
 yet a complete end-to-end formally verified mergeable-map library, however:
 the optimized native extraction remains a second implementation rather than a

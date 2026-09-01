@@ -16,6 +16,10 @@ val mem : key -> 'a t -> bool
 val set : key -> 'a -> 'a t -> 'a t
 val remove : key -> 'a t -> 'a t
 
+(** [of_list bindings] bulk-loads bindings into a map.  If a key occurs more
+    than once, its first occurrence in [bindings] wins. *)
+val of_list : (key * 'a) list -> 'a t
+
 val map : (key -> 'a -> 'b) -> 'a t -> 'b t
 val map_filter : (key -> 'a -> 'b option) -> 'a t -> 'b t
 

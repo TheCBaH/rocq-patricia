@@ -63,6 +63,7 @@ if their trees or physical identities differ.
 | `mem k m` | True exactly when `get k m` is `Some _`. |
 | `set k v m` | Returns `Some v` at `k` and preserves every other lookup. |
 | `remove k m` | Returns `None` at `k` and preserves every other lookup. Removing an absent key returns the identical pure tree; the wrapper tests also check native root identity. |
+| `of_list bindings` | Bulk-loads bindings. At `k`, returns the value in the first binding for `k`, if any, otherwise `None`. |
 | `map f m` | Preserves keys and changes `Some v` at `k` to `Some (f k v)`. |
 | `map_filter f m` | Changes `Some v` at `k` to `f k v`; absent keys remain absent. |
 | `combine f left right` | Uses `left_only`, `right_only`, or `both` according to the two lookups. A returned `None` omits the key. |
@@ -103,6 +104,7 @@ project lemmas, is closed under the global context.
 | Empty/singleton lookup and well-formedness | `get_empty`, `get_singleton_same`, `get_singleton_other`, `wf_empty_ok`, `wf_singleton_ok` | `get_empty`, `get_singleton_same`, `get_singleton_other`; `wf_empty` and `wf_leaf` constructors |
 | Membership and emptiness | `mem_spec`, `is_empty_spec` | `mem_spec`, `is_empty_spec` |
 | `set` law and invariant | `set_correct_wf` | `set_correct_wf` |
+| `of_list` law and invariant | `of_list_correct_wf` | `of_list_correct_wf` |
 | `remove` law, invariant, and absent identity | `remove_correct_wf`, `remove_absent_identity` | `get_remove`, `remove_wf`, `remove_absent_identity` |
 | `map` law and invariant | `get_map`, `map_wf` | `get_map`, `map_wf` |
 | `map_filter` law and invariant | `map_filter_correct_wf` | `get_map_filter_wf`, `map_filter_wf` |

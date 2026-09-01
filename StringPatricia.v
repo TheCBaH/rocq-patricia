@@ -175,6 +175,25 @@ Definition set {A : Type} (key : string) (value : A) (m : t A) : t A :=
       end
   end.
 
+(** Build a map from a batch of bindings.  Earlier bindings take precedence
+    over later bindings with the same key, matching the recursive order below.
+    This remains inside the proved source model instead of exposing a raw
+    constructor-based loader through the OCaml interface. *)
+Fixpoint of_list {A : Type} (bindings : list (string * A)) : t A :=
+  match bindings with
+  | [] => Empty
+  | (key, value) :: tail => set key value (of_list tail)
+  end.
+
+(** Lookup model for [of_list]; the first binding for a duplicate key wins. *)
+Fixpoint of_list_get {A : Type}
+    (query : string) (bindings : list (string * A)) : option A :=
+  match bindings with
+  | [] => None
+  | (key, value) :: tail =>
+      if String.eqb query key then Some value else of_list_get query tail
+  end.
+
 (* This structural version is kept as a simple proof reference.  The public
    deletion below uses [None] to propagate an unchanged result without
    rebuilding the routed path. *)

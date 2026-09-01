@@ -1895,6 +1895,20 @@ Proof.
   rewrite Hget. apply String.eqb_neq in Hneq. now rewrite Hneq.
 Qed.
 
+Theorem of_list_correct_wf:
+  forall (A : Type) (bindings : list (string * A)),
+    wf (of_list bindings) /\
+    forall query, get query (of_list bindings) = of_list_get query bindings.
+Proof.
+  intros A bindings. induction bindings as [|[key value] tail [Hwf Hget]].
+  - split; [constructor|]. intro query. reflexivity.
+  - cbn [of_list].
+    destruct (set_correct_wf A key value (of_list tail) Hwf) as [Hwf' Hset].
+    split; [exact Hwf'|]. intro query. rewrite Hset.
+    cbn [of_list_get]. destruct (String.eqb query key); [reflexivity|].
+    now rewrite Hget.
+Qed.
+
 (** ** The native one-descent [set] worker
 
     [StringPatricia.set_descend]/[set_one_descent] mirror the native

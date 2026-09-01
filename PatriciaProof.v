@@ -710,6 +710,20 @@ Corollary set_wf:
     wf m -> wf (set key value m).
 Proof. intros. now apply set_correct_wf. Qed.
 
+Theorem of_list_correct_wf:
+  forall (A : Type) (bindings : list (positive * A)),
+    wf (of_list bindings) /\
+    forall query, get query (of_list bindings) = of_list_get query bindings.
+Proof.
+  intros A bindings. induction bindings as [|[key value] tail [Hwf Hget]].
+  - split; [constructor|]. intro query. reflexivity.
+  - cbn [of_list].
+    destruct (set_correct_wf key value Hwf) as [Hwf' Hset].
+    split; [exact Hwf'|]. intro query. rewrite Hset.
+    cbn [of_list_get]. destruct (Pos.eqb query key); [reflexivity|].
+    now rewrite Hget.
+Qed.
+
 Lemma branch_wf:
   forall (A : Type) p mask (l r : t A),
     wf l -> wf r ->

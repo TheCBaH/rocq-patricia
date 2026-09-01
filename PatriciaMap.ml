@@ -23,6 +23,7 @@ let get = PatriciaInternal.get
 let mem = PatriciaInternal.mem
 let set = PatriciaInternal.set
 let remove = PatriciaInternal.remove
+let of_list = PatriciaInternal.of_list
 let map = PatriciaInternal.map
 let map_filter = PatriciaInternal.map_filter
 

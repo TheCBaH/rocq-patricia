@@ -8,6 +8,7 @@ let get = StringPatriciaInternal.get
 let mem = StringPatriciaInternal.mem
 let set = StringPatriciaInternal.set
 let remove = StringPatriciaInternal.remove
+let of_list = StringPatriciaInternal.of_list
 let map = StringPatriciaInternal.map
 let map_filter = StringPatriciaInternal.map_filter
 
