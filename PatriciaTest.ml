@@ -568,9 +568,46 @@ let check_abstract_interfaces () =
      || S.get "z" (S.remove "z" combined) <> None then
     failwith "abstract string interface combiner contract failed"
 
+(* Values are intentionally opaque to the Patricia algorithms.  Exercise
+   biased union with mutable payloads so this test cannot accidentally rely
+   on polymorphic value equality: overlapping bindings must select the exact
+   preferred payload object, while one-sided bindings retain their object. *)
+let check_mutable_union_payloads () =
+  let require_same label expected = function
+    | Some actual when actual == expected -> ()
+    | _ -> failwith (label ^ ": selected the wrong payload object")
+  in
+  let integer_left = ref 10 and integer_right = ref 20 and integer_only = ref 30 in
+  let integer_left_tree = empty |> set 1 integer_left |> set 3 integer_only in
+  let integer_right_tree = empty |> set 1 integer_right |> set 2 integer_right in
+  let integer_left_union = union_left integer_left_tree integer_right_tree in
+  let integer_right_union = union_right integer_left_tree integer_right_tree in
+  require_same "integer union_left overlap" integer_left (get 1 integer_left_union);
+  require_same "integer union_left one-sided" integer_right (get 2 integer_left_union);
+  require_same "integer union_right overlap" integer_right (get 1 integer_right_union);
+  require_same "integer union_right one-sided" integer_only (get 3 integer_right_union);
+  integer_left := 11;
+  (match get 1 integer_left_union with
+   | Some cell when !cell = 11 -> ()
+   | _ -> failwith "integer union_left lost mutable payload identity");
+  let string_left = ref 40 and string_right = ref 50 and string_only = ref 60 in
+  let string_left_tree = S.empty |> S.set "a" string_left |> S.set "c" string_only in
+  let string_right_tree = S.empty |> S.set "a" string_right |> S.set "b" string_right in
+  let string_left_union = S.union_left string_left_tree string_right_tree in
+  let string_right_union = S.union_right string_left_tree string_right_tree in
+  require_same "string union_left overlap" string_left (S.get "a" string_left_union);
+  require_same "string union_left one-sided" string_right (S.get "b" string_left_union);
+  require_same "string union_right overlap" string_right (S.get "a" string_right_union);
+  require_same "string union_right one-sided" string_only (S.get "c" string_right_union);
+  string_right := 51;
+  match S.get "a" string_right_union with
+  | Some cell when !cell = 51 -> ()
+  | _ -> failwith "string union_right lost mutable payload identity"
+
 let () =
   Random.init 0x504154;
   check_abstract_interfaces ();
+  check_mutable_union_payloads ();
   check_string_bits ();
   for round = 1 to 250 do
     let left_ref = Array.make 256 None in
