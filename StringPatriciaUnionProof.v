@@ -481,6 +481,48 @@ Proof.
       cbn [get]; rewrite Ebit; [rewrite Hgetor|rewrite Hgetol]; reflexivity.
 Qed.
 
+(** Root reuse is semantically conservative under [native_same_sound].  This
+    packages the exact two-child [==] shape used by the extracted worker,
+    rather than merely its rebuilt-branch fallback. *)
+Lemma native_reuse_same_branch_root_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) sample_a sample_b split
+      (left_a right_a left_b right_b out_left out_right : t A),
+    native_same_sound same ->
+    wf (Branch sample_a split left_a right_a) ->
+    wf (Branch sample_b split left_b right_b) ->
+    agrees_before_bounded sample_a sample_b split = true ->
+    (wf out_left /\
+      forall key, get key out_left =
+        match get key left_a with Some value => Some value | None => get key left_b end) ->
+    (wf out_right /\
+      forall key, get key out_right =
+        match get key right_a with Some value => Some value | None => get key right_b end) ->
+    wf (native_reuse_same_branch_root same
+      (Branch sample_a split left_a right_a) sample_a split left_a right_a
+      out_left out_right) /\
+    forall key, get key (native_reuse_same_branch_root same
+      (Branch sample_a split left_a right_a) sample_a split left_a right_a
+      out_left out_right) =
+      match get key (Branch sample_a split left_a right_a) with
+      | Some value => Some value
+      | None => get key (Branch sample_b split left_b right_b)
+      end.
+Proof.
+  intros A same sample_a sample_b split left_a right_a left_b right_b
+    out_left out_right Hsame Hwa Hwb Hagree Hleft Hright.
+  destruct (native_reuse_same_branch_correct_wf A same sample_a sample_b split
+    left_a right_a left_b right_b out_left out_right
+    Hsame Hwa Hwb Hagree Hleft Hright) as [Hwf Hget].
+  unfold native_reuse_same_branch_root.
+  destruct (same out_left left_a) eqn:Eleft;
+    destruct (same out_right right_a) eqn:Eright;
+    unfold native_reuse_same_branch, native_reuse_child in Hwf, Hget;
+    rewrite Eleft, Eright in Hwf, Hget; cbn in Hwf, Hget;
+    cbn; try rewrite Eleft; try rewrite Eright; cbn;
+    unfold native_reuse_child; try rewrite Eleft; try rewrite Eright; cbn;
+    exact (conj Hwf Hget).
+Qed.
+
 Lemma union_left_specialized_changed_same_branch_correct_wf:
   forall (A : Type) sample_a sample_b split
       (left_a right_a left_b right_b : t A),
@@ -686,6 +728,40 @@ Proof.
     + apply Hgetout.
 Qed.
 
+(** Exact root-reuse form of the zero-bit containment reconstruction. *)
+Lemma native_reuse_left_branch_root_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) sample split
+      (left right operand out_left : t A),
+    native_same_sound same ->
+    wf (Branch sample split left right) -> wf operand ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) left ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) right ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) operand ->
+    (wf out_left /\ forall key, get key out_left =
+      match get key left with Some value => Some value | None => get key operand end) ->
+    wf (native_reuse_left_branch_root same (Branch sample split left right)
+      sample split left right out_left) /\
+    forall key, get key (native_reuse_left_branch_root same
+      (Branch sample split left right) sample split left right out_left) =
+      match get key (Branch sample split left right) with
+      | Some value => Some value | None => get key operand end.
+Proof.
+  intros A same sample split left right operand out_left Hsame Houter Hoperand
+    Hleft Hright Hcontained Hchild.
+  destruct (native_reuse_left_branch_correct_wf A same sample split
+    left right operand out_left Hsame Houter Hoperand
+    Hleft Hright Hcontained Hchild) as [Hwf Hget].
+  unfold native_reuse_left_branch_root.
+  destruct (same out_left left) eqn:Echild.
+  - unfold native_reuse_left_branch, native_reuse_child in Hwf, Hget.
+    rewrite Echild in Hwf, Hget; cbn in Hwf, Hget |- *.
+    exact (conj Hwf Hget).
+  - exact (conj Hwf Hget).
+Qed.
+
 (** Changed-result variant of the left-outer, left-child containment case. *)
 Lemma union_left_specialized_changed_left_outer_left_branch_correct_wf:
   forall (A : Type) sample split (left right : t A)
@@ -884,6 +960,40 @@ Proof.
       { eapply get_none_if_all_keys; [exact Hcontained|].
         intros [_ Hbit]. rewrite Ebit in Hbit. discriminate. }
       rewrite Eoperand. now destruct (get key left).
+Qed.
+
+(** Exact root-reuse form of the one-bit containment reconstruction. *)
+Lemma native_reuse_right_branch_root_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) sample split
+      (left right operand out_right : t A),
+    native_same_sound same ->
+    wf (Branch sample split left right) -> wf operand ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) left ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) right ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) operand ->
+    (wf out_right /\ forall key, get key out_right =
+      match get key right with Some value => Some value | None => get key operand end) ->
+    wf (native_reuse_right_branch_root same (Branch sample split left right)
+      sample split left right out_right) /\
+    forall key, get key (native_reuse_right_branch_root same
+      (Branch sample split left right) sample split left right out_right) =
+      match get key (Branch sample split left right) with
+      | Some value => Some value | None => get key operand end.
+Proof.
+  intros A same sample split left right operand out_right Hsame Houter Hoperand
+    Hleft Hright Hcontained Hchild.
+  destruct (native_reuse_right_branch_correct_wf A same sample split
+    left right operand out_right Hsame Houter Hoperand
+    Hleft Hright Hcontained Hchild) as [Hwf Hget].
+  unfold native_reuse_right_branch_root.
+  destruct (same out_right right) eqn:Echild.
+  - unfold native_reuse_right_branch, native_reuse_child in Hwf, Hget.
+    rewrite Echild in Hwf, Hget; cbn in Hwf, Hget |- *.
+    exact (conj Hwf Hget).
+  - exact (conj Hwf Hget).
 Qed.
 
 (** Changed-result variant of the left-outer, right-child containment case. *)
