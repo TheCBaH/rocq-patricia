@@ -1220,6 +1220,37 @@ Proof.
     + apply Hgetout.
 Qed.
 
+(** Exact root-reuse form of the outer-right, zero-bit reconstruction. *)
+Lemma native_reuse_right_outer_left_branch_root_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) sample split
+      (operand left right out_left : t A),
+    native_same_sound same ->
+    wf operand -> wf (Branch sample split left right) ->
+    all_keys (fun key => same_prefix sample key split /\ bit_at key split = false) operand ->
+    all_keys (fun key => same_prefix sample key split /\ bit_at key split = false) left ->
+    all_keys (fun key => same_prefix sample key split /\ bit_at key split = true) right ->
+    (wf out_left /\ forall key, get key out_left =
+      match get key operand with Some value => Some value | None => get key left end) ->
+    wf (native_reuse_left_branch_root same (Branch sample split left right)
+      sample split left right out_left) /\
+    forall key, get key (native_reuse_left_branch_root same
+      (Branch sample split left right) sample split left right out_left) =
+      match get key operand with Some value => Some value | None =>
+      get key (Branch sample split left right) end.
+Proof.
+  intros A same sample split operand left right out_left Hsame Hoperand Houter
+    Hcontained Hleft Hright Hchild.
+  destruct (native_reuse_right_outer_left_branch_correct_wf A same sample split
+    operand left right out_left Hsame Hoperand Houter
+    Hcontained Hleft Hright Hchild) as [Hwf Hget].
+  unfold native_reuse_left_branch_root.
+  destruct (same out_left left) eqn:Echild.
+  - unfold native_reuse_left_branch, native_reuse_child in Hwf, Hget.
+    rewrite Echild in Hwf, Hget; cbn in Hwf, Hget |- *.
+    exact (conj Hwf Hget).
+  - exact (conj Hwf Hget).
+Qed.
+
 Lemma union_left_specialized_right_outer_right_branch_correct_wf:
   forall (A : Type) sample split (operand left right out_right : t A),
     wf operand -> wf left -> wf right ->
@@ -1332,6 +1363,37 @@ Proof.
       { eapply get_none_if_all_keys; [exact Hcontained|].
         intros [_ Hbit]. rewrite Ebit in Hbit. discriminate. }
       rewrite Eoperand. reflexivity.
+Qed.
+
+(** Exact root-reuse form of the outer-right, one-bit reconstruction. *)
+Lemma native_reuse_right_outer_right_branch_root_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) sample split
+      (operand left right out_right : t A),
+    native_same_sound same ->
+    wf operand -> wf (Branch sample split left right) ->
+    all_keys (fun key => same_prefix sample key split /\ bit_at key split = true) operand ->
+    all_keys (fun key => same_prefix sample key split /\ bit_at key split = false) left ->
+    all_keys (fun key => same_prefix sample key split /\ bit_at key split = true) right ->
+    (wf out_right /\ forall key, get key out_right =
+      match get key operand with Some value => Some value | None => get key right end) ->
+    wf (native_reuse_right_branch_root same (Branch sample split left right)
+      sample split left right out_right) /\
+    forall key, get key (native_reuse_right_branch_root same
+      (Branch sample split left right) sample split left right out_right) =
+      match get key operand with Some value => Some value | None =>
+      get key (Branch sample split left right) end.
+Proof.
+  intros A same sample split operand left right out_right Hsame Hoperand Houter
+    Hcontained Hleft Hright Hchild.
+  destruct (native_reuse_right_outer_right_branch_correct_wf A same sample split
+    operand left right out_right Hsame Hoperand Houter
+    Hcontained Hleft Hright Hchild) as [Hwf Hget].
+  unfold native_reuse_right_branch_root.
+  destruct (same out_right right) eqn:Echild.
+  - unfold native_reuse_right_branch, native_reuse_child in Hwf, Hget.
+    rewrite Echild in Hwf, Hget; cbn in Hwf, Hget |- *.
+    exact (conj Hwf Hget).
+  - exact (conj Hwf Hget).
 Qed.
 
 (** In the right-outer case, even an unchanged routed child must be placed

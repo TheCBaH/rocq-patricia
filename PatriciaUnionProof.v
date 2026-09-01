@@ -994,6 +994,43 @@ Proof.
   eapply union_left_specialized_right_outer_left_branch_correct_wf; eauto.
 Qed.
 
+(** Exact root-reuse form of the outer-right, zero-bit reconstruction. *)
+Lemma native_reuse_right_outer_left_branch_root_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) prefix mask
+      (operand left right out_left : t A),
+    native_same_sound same ->
+    wf operand -> wf (Branch prefix mask left right) ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = true)
+      operand ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = true)
+      left ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = false)
+      right ->
+    (wf out_left /\ forall key, get key out_left =
+      match get key operand with Some value => Some value | None => get key left end) ->
+    wf (native_reuse_left_branch_root same (Branch prefix mask left right)
+      prefix mask left right out_left) /\
+    forall key, get key (native_reuse_left_branch_root same
+      (Branch prefix mask left right) prefix mask left right out_left) =
+      match get key operand with Some value => Some value | None =>
+      get key (Branch prefix mask left right) end.
+Proof.
+  intros A same prefix mask operand left right out_left Hsame Hoperand Houter
+    Hcontained Hleft Hright Hchild.
+  destruct (native_reuse_right_outer_left_branch_correct_wf A same prefix mask
+    operand left right out_left Hsame Hoperand Houter
+    Hcontained Hleft Hright Hchild) as [Hwf Hget].
+  unfold native_reuse_left_branch_root.
+  destruct (same out_left left) eqn:Echild.
+  - unfold native_reuse_left_branch, native_reuse_child in Hwf, Hget.
+    rewrite Echild in Hwf, Hget; cbn in Hwf, Hget |- *.
+    exact (conj Hwf Hget).
+  - exact (conj Hwf Hget).
+Qed.
+
 Lemma union_left_specialized_right_outer_right_branch_correct_wf:
   forall (A : Type) prefix mask (operand left right out_right : t A),
     wf operand -> wf left -> wf right ->
@@ -1089,6 +1126,43 @@ Proof.
   { unfold native_reuse_right_branch. now apply branch_unchanged. }
   rewrite <- Ebranch.
   eapply union_left_specialized_right_outer_right_branch_correct_wf; eauto.
+Qed.
+
+(** Exact root-reuse form of the outer-right, one-bit reconstruction. *)
+Lemma native_reuse_right_outer_right_branch_root_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) prefix mask
+      (operand left right out_right : t A),
+    native_same_sound same ->
+    wf operand -> wf (Branch prefix mask left right) ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = false)
+      operand ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = true)
+      left ->
+    all_keys
+      (fun key => matches_prefix key prefix mask = true /\ zero_bit key mask = false)
+      right ->
+    (wf out_right /\ forall key, get key out_right =
+      match get key operand with Some value => Some value | None => get key right end) ->
+    wf (native_reuse_right_branch_root same (Branch prefix mask left right)
+      prefix mask left right out_right) /\
+    forall key, get key (native_reuse_right_branch_root same
+      (Branch prefix mask left right) prefix mask left right out_right) =
+      match get key operand with Some value => Some value | None =>
+      get key (Branch prefix mask left right) end.
+Proof.
+  intros A same prefix mask operand left right out_right Hsame Hoperand Houter
+    Hcontained Hleft Hright Hchild.
+  destruct (native_reuse_right_outer_right_branch_correct_wf A same prefix mask
+    operand left right out_right Hsame Hoperand Houter
+    Hcontained Hleft Hright Hchild) as [Hwf Hget].
+  unfold native_reuse_right_branch_root.
+  destruct (same out_right right) eqn:Echild.
+  - unfold native_reuse_right_branch, native_reuse_child in Hwf, Hget.
+    rewrite Echild in Hwf, Hget; cbn in Hwf, Hget |- *.
+    exact (conj Hwf Hget).
+  - exact (conj Hwf Hget).
 Qed.
 
 (** Changed-result composition when the right operand has the outer mask and
