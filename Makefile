@@ -21,7 +21,7 @@ REFERENCE_PACK := PatriciaReference.cmo
 
 .PHONY: all proof core-proof union-proof assumptions extraction \
 	reference-extraction ocaml reference-ocaml test union-oracle differential \
-	benchmark benchmark-smoke union-profile compiler-config clean
+	benchmark benchmark-smoke union-profile reference-profile compiler-config clean
 
 all: proof assumptions extraction reference-extraction ocaml reference-ocaml \
 	test union-oracle differential
@@ -116,6 +116,22 @@ union-profile: extraction PatriciaUnionProfile.ml
 	    ../PatriciaUnionProfile.ml
 	./patricia-union-profile
 
+# The proof-aligned extraction has deliberately separate module names from the
+# optimized backend.  Keep its native performance profile in a separate binary
+# so the normal supported-wrapper benchmark stays focused on its public API.
+reference-profile: reference-extraction PatriciaReferenceProfile.ml
+	cd $(REFERENCE_DIR) && \
+	  sources=`find . -maxdepth 1 -type f \( -name '*.mli' -o -name '*.ml' \) \
+	    ! -name 'String.mli' ! -name 'String.ml' -printf '%f '` && \
+	  $(OCAMLDEP) -sort $$sources | xargs $(OCAMLOPT) -c
+	cd $(REFERENCE_DIR) && \
+	  ml_sources=`find . -maxdepth 1 -type f -name '*.ml' \
+	    ! -name 'String.ml' -printf '%f '` && \
+	  objects=`$(OCAMLDEP) -sort $$ml_sources | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . unix.cmxa -o ../patricia-reference-profile $$objects \
+	    ../PatriciaReferenceProfile.ml
+	./patricia-reference-profile
+
 # Record the native compiler settings beside any comparable benchmark series.
 # CI pins the OCaml version; this target captures target-dependent details
 # such as architecture, word size, Flambda, and the C compiler flags.
@@ -158,6 +174,7 @@ clean:
 	rm -f PatriciaTest.cmi PatriciaTest.cmo PatriciaDifferentialTest.cmi \
 	  PatriciaDifferentialTest.cmo PatriciaUnionTest.cmi PatriciaUnionTest.cmo \
 	  PatriciaBenchmark.cmi PatriciaBenchmark.cmx PatriciaBenchmark.o \
-	  PatriciaUnionProfile.cmi PatriciaUnionProfile.cmx PatriciaUnionProfile.o
+	  PatriciaUnionProfile.cmi PatriciaUnionProfile.cmx PatriciaUnionProfile.o \
+	  PatriciaReferenceProfile.cmi PatriciaReferenceProfile.cmx PatriciaReferenceProfile.o
 	rm -f patricia-test patricia-union-test patricia-differential-test \
-	  patricia-benchmark patricia-union-profile
+	  patricia-benchmark patricia-union-profile patricia-reference-profile

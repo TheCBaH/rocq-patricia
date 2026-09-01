@@ -27,6 +27,11 @@ table, run:
 make benchmark
 ```
 
+To profile the ordinary extraction of the proof-side definitions separately,
+run `make reference-profile`. It checks every measured result against
+`Stdlib.Map`; use the same `PATRICIA_REFERENCE_PROFILE_SIZE` and compiler
+configuration when comparing its output with the optimized benchmark.
+
 The comparison verifies each measured Patricia and `Stdlib.Hashtbl` result
 against `Stdlib.Map`. It reports build, lookup, membership, traversal
 (`elements`), add, update, and present/absent remove time, retained heap words

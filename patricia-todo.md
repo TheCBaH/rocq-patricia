@@ -304,8 +304,13 @@ not close any formal cost theorem.
 
 These are performance features, not verification blockers.
 
-- [ ] Evaluate `set_if_changed` or an equality-aware update that preserves the
-  original tree for semantically unchanged values.
+- [x] Evaluate `set_if_changed` or an equality-aware update that preserves the
+  original tree for semantically unchanged values. `PatriciaBenchmark.ml` now
+  measures a benchmark-local lookup-first candidate with an explicit equality
+  function. At 10K unchanged updates it preserves the original root and
+  allocates 20,030 words for both integer and fixed four-character strings,
+  versus 769,162/923,179 for ordinary existing-key updates. It remains local:
+  exporting it needs an equality-reflection contract and a proved API addition.
 - [ ] Add a proved bulk builder such as `of_sorted_list` or `of_sorted_array`.
 - [ ] Re-evaluate successful-removal allocation before introducing a native
   physical-child-identity change signal.
@@ -335,8 +340,13 @@ Use this track before making new performance decisions or regression claims.
   reports how many are physically identical to nodes reachable from each input.
   This distinguishes root reuse from partial subtree reuse without making a
   source-level sharing claim.
-- [ ] Time the proof-aligned backend when extraction overhead itself becomes a
-  performance question.
+- [x] Time the proof-aligned backend when extraction overhead itself becomes a
+  performance question. `make reference-profile` natively compiles the ordinary
+  extraction in a separate executable, measures build, three lookup passes,
+  update, disjoint union, and half-overlap union, and checks each output against
+  `Stdlib.Map`. The recorded 1K profile confirms that extraction overhead is
+  material, especially for direct strings; the ordinary backend remains a
+  differential oracle rather than a runtime candidate.
 - [x] Pin and report compiler configuration for any comparable benchmark series.
   CI pins OCaml 4.14.3, while `make compiler-config` emits the version plus
   target-dependent native settings. `patricia-bench.md` records the current
@@ -376,6 +386,8 @@ make union-proof
 make union-oracle
 make benchmark
 make union-profile
+make reference-profile
+make compiler-config
 git diff --check
 ```
 
@@ -386,6 +398,8 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-09-01 | Evaluated equality-aware unchanged updates | `PatriciaBenchmark.ml` adds a local `get`-then-`set` candidate, validates root identity and map contents, and reports it beside `Stdlib.Map`. At 10K bindings it allocated 20,030 words versus 769,162/923,179 for ordinary integer/fixed-string existing-key updates, so the optimization is useful but remains unexported pending an equality contract and source proof. `make benchmark-smoke`, the targeted 10K benchmark, and `git diff --check` passed. |
+| 2026-09-01 | Timed the proof-aligned native extraction | Added `PatriciaReferenceProfile.ml` and `make reference-profile`, a separate native executable because reference and optimized extraction support-module names collide. It checks build, three lookup passes, update, disjoint union, and half-overlap union against `Stdlib.Map`. At 1K bindings, the integer reference build allocated 1,860,582 words versus optimized 33,677; eight-byte string build allocated 19,763,028 versus 56,098. The complete diagnostic table and reproduction commands are in `patricia-bench.md`; `make reference-profile`, matching `make benchmark`, and `git diff --check` passed. |
 | 2026-09-01 | Pinned and made native compiler configuration reproducible | CI already pins OCaml 4.14.3; `make compiler-config` now records the version, architecture, model, system, word size, Flambda mode, safe-string mode, and native C compiler flags. The current arm64/Linux configuration is recorded in `patricia-bench.md`; `make compiler-config` and `git diff --check` passed. |
 | 2026-09-01 | Added physical subtree-sharing counters to the union profile | `PatriciaUnionProfile.ml` now indexes every nonempty input node by physical identity and reports the output's total nodes plus nodes shared with its left and right input. The diagnostic verifies its output-node traversal against each internal `size` function and remains measurement-only; `make union-profile` and `git diff --check` passed. |
 | 2026-08-31 | Completed the source-level native-union sharing cases | `PatriciaUnion.v` and `StringPatriciaUnion.v` contain the source-level child- and one-child-branch reuse model. `native_same_sound` requires only a positive equality test to imply lookup equivalence. Both proof modules close child reuse, equal-header reconstruction, and all four containment routes; direct-string proofs preserve cached-sample residency. Thus every branch shape in the handwritten union has a source refinement conditional on the one `==` soundness contract. `make PatriciaUnionProof.vo`, `make StringPatriciaUnionProof.vo`, and `git diff --check` passed. |

@@ -256,6 +256,22 @@ let report_operation name patricia avl hash operations =
   report "Stdlib.Map" avl;
   report "Hashtbl" hash
 
+(* The equality-aware candidate is deliberately benchmark-local.  Exporting it
+   would add a new operation and an equality-reflection premise to the current
+   proof-oriented API, so first establish whether its root-reuse benefit is
+   worth that expansion. *)
+let report_persistent_candidate name patricia avl operations =
+  let report implementation measurement =
+    Printf.printf
+      "  %-9s %-17s %7.3f ms  %8.1f ns/op  allocated %10.0f words\n"
+      implementation name
+      (1000. *. measurement.operation_seconds)
+      (1e9 *. measurement.operation_seconds /. float_of_int operations)
+      measurement.operation_allocated_words
+  in
+  report "Patricia" patricia;
+  report "Stdlib.Map" avl
+
 let build_patricia_int keys =
   Array.fold_left
     (fun map key -> Patricia.set (patricia_key key) key map)
@@ -284,6 +300,26 @@ let build_hash_string keys =
   Array.iter
     (fun key -> String_hash.replace map key (Stdlib.String.length key)) keys;
   map
+
+let patricia_set_if_changed equal key value map =
+  match Patricia.get key map with
+  | Some current when equal current value -> map
+  | _ -> Patricia.set key value map
+
+let string_patricia_set_if_changed equal key value map =
+  match StringPatricia.get key map with
+  | Some current when equal current value -> map
+  | _ -> StringPatricia.set key value map
+
+let int_avl_set_if_changed equal key value map =
+  match Int_avl.find_opt key map with
+  | Some current when equal current value -> map
+  | _ -> Int_avl.add key value map
+
+let string_avl_set_if_changed equal key value map =
+  match String_avl.find_opt key map with
+  | Some current when equal current value -> map
+  | _ -> String_avl.add key value map
 
 let permuted_keys keys =
   let result = Array.copy keys in
@@ -752,6 +788,26 @@ let time_int_mutations keys fresh_keys patricia avl hash =
          failwith "integer update did not replace the binding")
     keys;
   report_operation "update keys" patricia_update avl_update hash_update benchmark_size;
+  let patricia_same, patricia_same_update =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key ->
+             patricia_set_if_changed Int.equal (patricia_key key) key map)
+          patricia keys)
+  in
+  let avl_same, avl_same_update =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key -> int_avl_set_if_changed Int.equal key key map)
+          avl keys)
+  in
+  if patricia_same != patricia then
+    failwith "unchanged integer equality-aware set did not preserve Patricia root";
+  if avl_same != avl then
+    failwith "unchanged integer equality-aware set did not preserve AVL root";
+  check_int_equivalent keys patricia_same avl_same;
+  report_persistent_candidate "set unchanged" patricia_same_update avl_same_update
+    benchmark_size;
   let absent_keys = Array.make benchmark_size fresh_keys.(0) in
   let patricia_unchanged, patricia_remove_absent =
     measure_operation (fun () ->
@@ -864,6 +920,28 @@ let time_string_mutations keys fresh_keys patricia avl hash =
          failwith "string update did not replace the binding")
     keys;
   report_operation "update keys" patricia_update avl_update hash_update benchmark_size;
+  let patricia_same, patricia_same_update =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key ->
+             string_patricia_set_if_changed Int.equal key
+               (Stdlib.String.length key) map)
+          patricia keys)
+  in
+  let avl_same, avl_same_update =
+    measure_operation (fun () ->
+        Array.fold_left
+          (fun map key ->
+             string_avl_set_if_changed Int.equal key (Stdlib.String.length key) map)
+          avl keys)
+  in
+  if patricia_same != patricia then
+    failwith "unchanged string equality-aware set did not preserve Patricia root";
+  if avl_same != avl then
+    failwith "unchanged string equality-aware set did not preserve AVL root";
+  check_string_equivalent keys patricia_same avl_same;
+  report_persistent_candidate "set unchanged" patricia_same_update avl_same_update
+    benchmark_size;
   let absent_keys = Array.make benchmark_size fresh_keys.(0) in
   let patricia_unchanged, patricia_remove_absent =
     measure_operation (fun () ->

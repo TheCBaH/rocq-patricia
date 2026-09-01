@@ -110,6 +110,42 @@ to zero at the clock precision, not that the operation took no time.
 These tables are the pre-bounded-scanner baseline; the completed follow-up and
 fresh 10K/100K overlap measurements appear below.
 
+### Proof-aligned extraction profile
+
+`make reference-profile` compiles a native executable containing only the
+ordinary extraction of the Rocq definitions. It measures 1,000 positive keys
+and 1,000 fixed eight-byte string keys by default, checking every build,
+update, and union result against `Stdlib.Map`. Its modules intentionally remain
+separate from the optimized backend because both extraction sets define support
+modules such as `Nat`; run it beside—not inside—the regular benchmark.
+
+On the recorded compiler configuration, the following 1,000-binding run used
+the same consecutive integers and eight-character hexadecimal strings as the
+matching optimized workload. Lookup is three complete successful passes. The
+optimized union rows are batched medians while the reference profile uses one
+operation, so the figures are diagnostic evidence of extraction overhead, not
+precision performance comparisons.
+
+| Workload | Optimized time / allocation | Proof-aligned time / allocation |
+| --- | ---: | ---: |
+| Integer build | 0.051 ms / 33,677 | 0.870 ms / 1,860,582 |
+| Integer lookup (3 passes) | 0.077 ms / 6,047 | 3.240 ms / 10,240,600 |
+| Integer update | 0.039 ms / 52,965 | 1.185 ms / 3,472,608 |
+| Integer disjoint union | 0.000 ms / 139 | 0.021 ms / 24,944 |
+| Integer half-overlap union | 0.002 ms / 125 | 0.116 ms / 316,776 |
+| String build (8 bytes) | 0.055 ms / 56,098 | 11.354 ms / 19,763,028 |
+| String lookup (3 passes) | 0.146 ms / 6,047 | 3.243 ms / 5,484,615 |
+| String update | 0.061 ms / 65,700 | 2.496 ms / 3,718,185 |
+| String disjoint union | 0.000 ms / 60 | 0.095 ms / 163,923 |
+| String half-overlap union | 0.008 ms / 36 | 4.786 ms / 8,307,071 |
+
+Reproduce the profile with `PATRICIA_REFERENCE_PROFILE_SIZE=1000 make
+reference-profile`; use `PATRICIA_BENCH_SIZE=1000
+PATRICIA_BENCH_STRING_LENGTHS=8 PATRICIA_BENCH_VARIABLE_STRING_MAX_LENGTH=8
+make benchmark` for the matching optimized workload. The ordinary extraction
+is retained for semantic differential testing, not as the selected runtime
+implementation.
+
 ### Integer keys
 
 | Operation | Patricia | Stdlib.Map | Patricia allocation | AVL allocation |
@@ -254,14 +290,25 @@ failed deletion returns the original source tree, while the existing lookup
 and well-formedness laws are retained. The native benchmark checks physical
 root identity and fixed allocation after 10,000 failed deletions.
 
-The benchmark already has a separate `update keys` case that replaces and
-checks every existing binding. An optional `set_if_changed`/`update` API
-supplied with value equality could additionally avoid rebuilding an existing
-binding whose value is unchanged. This remains relevant to persistent compiler
-data-flow maps, where converged updates are common. It is tracked as optional
-runtime work under N5 in `patricia-todo.md`.
+### 4. Equality-aware unchanged update evaluated
 
-### 4. Generic-combine leaf cases completed
+The benchmark now contains a local candidate for an equality-aware update: it
+performs `get key map` first, returns the original map when a supplied equality
+test accepts the existing value, and otherwise calls `set`. It is not exported
+by either supported wrapper: doing so would add an equality-reflection contract
+and a new proof-facing operation to the frozen custom API.
+
+The candidate was checked to return the exact original root after updating
+every existing binding with its current value. At 10,000 bindings, it allocated
+20,030 words for both integer and fixed four-character string maps, versus
+769,162 and 923,179 words respectively for the ordinary existing-key update.
+The remaining allocation is the `Some` result of each lookup; no tree path is
+rebuilt. It also measured 0.372 ms for integer maps and 0.551 ms for the fixed
+string maps, compared with 0.807 ms and 1.142 ms for ordinary updates in that
+run. This justifies a future API/proof extension if the operation becomes
+useful, but does not itself change the supported API.
+
+### 5. Generic-combine leaf cases completed
 
 For an overlapping leaf/tree pair, native `combine` previously mapped the
 whole tree and then called `remove` or `set` for the leaf key. Both maps now
@@ -281,7 +328,7 @@ sub-millisecond timings are too noisy to support a speedup claim.
 | 4-character leaf/tree | 140,170 words | 140,023 words | 147 words |
 | 4-character tree/leaf | 140,170 words | 140,023 words | 147 words |
 
-### 5. Allocation-free membership completed
+### 6. Allocation-free membership completed
 
 The lookup measurements allocate about two words per operation for both
 implementations because the result is an option. Both `mem` implementations
