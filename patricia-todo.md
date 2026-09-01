@@ -312,8 +312,12 @@ These are performance features, not verification blockers.
   versus 769,162/923,179 for ordinary existing-key updates. It remains local:
   exporting it needs an equality-reflection contract and a proved API addition.
 - [ ] Add a proved bulk builder such as `of_sorted_list` or `of_sorted_array`.
-- [ ] Re-evaluate successful-removal allocation before introducing a native
-  physical-child-identity change signal.
+- [x] Re-evaluate successful-removal allocation before introducing a native
+  physical-child-identity change signal. The 10K rerun allocated 452,104
+  integer and 588,296 fixed-string Patricia words, versus 433,422 AVL words in
+  both cases. The possible saving does not justify widening the extraction
+  boundary with a second OCaml physical-identity contract, so removal retains
+  the proved `Some changed` signal.
 
 ### N6 — Optional benchmark hardening
 
@@ -398,6 +402,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-09-01 | Re-evaluated successful-removal allocation | The targeted 10K benchmark measured 452,104 integer and 588,296 fixed-four-character-string Patricia words for removing every binding, versus 433,422 AVL words in each case. The source `Some changed` signal remains selected: a physical-child-identity signal would require the same trusted OCaml heap contract as native union sharing. `PATRICIA_BENCH_SIZE=10000 PATRICIA_BENCH_STRING_LENGTHS=4 PATRICIA_BENCH_VARIABLE_STRING_MAX_LENGTH=4 make benchmark` and `git diff --check` passed. |
 | 2026-09-01 | Evaluated equality-aware unchanged updates | `PatriciaBenchmark.ml` adds a local `get`-then-`set` candidate, validates root identity and map contents, and reports it beside `Stdlib.Map`. At 10K bindings it allocated 20,030 words versus 769,162/923,179 for ordinary integer/fixed-string existing-key updates, so the optimization is useful but remains unexported pending an equality contract and source proof. `make benchmark-smoke`, the targeted 10K benchmark, and `git diff --check` passed. |
 | 2026-09-01 | Timed the proof-aligned native extraction | Added `PatriciaReferenceProfile.ml` and `make reference-profile`, a separate native executable because reference and optimized extraction support-module names collide. It checks build, three lookup passes, update, disjoint union, and half-overlap union against `Stdlib.Map`. At 1K bindings, the integer reference build allocated 1,860,582 words versus optimized 33,677; eight-byte string build allocated 19,763,028 versus 56,098. The complete diagnostic table and reproduction commands are in `patricia-bench.md`; `make reference-profile`, matching `make benchmark`, and `git diff --check` passed. |
 | 2026-09-01 | Pinned and made native compiler configuration reproducible | CI already pins OCaml 4.14.3; `make compiler-config` now records the version, architecture, model, system, word size, Flambda mode, safe-string mode, and native C compiler flags. The current arm64/Linux configuration is recorded in `patricia-bench.md`; `make compiler-config` and `git diff --check` passed. |

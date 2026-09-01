@@ -59,12 +59,14 @@ physical identity, and allocates only the fixed 26-word measurement overhead.
 | 4-character absent removal | 17.1 ns/op | 84.4 ns/op | 26 | 26 |
 
 The source-level `Some changed` signal adds an option block at each rebuilt
-level of a successful deletion. In the same run, removing every present key
-allocated 452,101 words for integer Patricia and 588,290 words for string
-Patricia, compared with 308,608 and 441,976 in the earlier table below. A
-future extraction refinement could use physical child identity as the native
-change signal, but this implementation deliberately does not widen the trusted
-extraction boundary for that tradeoff.
+level of a successful deletion. The 2026-09-01 reevaluation at 10,000 bindings
+allocated 452,104 words for integer Patricia and 588,296 for fixed
+four-character strings, compared with 433,422 for `Stdlib.Map` in both cases.
+The previous lower Patricia figures (308,608 and 441,976) predate that proved
+change signal. A native physical-child-identity replacement could reduce this
+transient cost, but would widen the trusted extraction boundary with the same
+heap/compiler contract as handwritten union sharing. The current implementation
+therefore retains the proved option signal.
 
 ## Workloads and method
 
