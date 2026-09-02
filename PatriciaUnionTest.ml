@@ -24,6 +24,9 @@ let check_integer () =
   let native_result = IU.union_left_native_default left right in
   let native_fuel_result = IU.union_left_native_fuel_default left right in
   let native_inline_result = IU.union_left_native_fuel_inline_default left right in
+  if native_result <> expected_left || native_fuel_result <> expected_left
+     || native_inline_result <> expected_left then
+    failwith "integer native-shaped worker differs structurally from legacy union";
   for key = 1 to 64 do
     if I.get key actual_left <> I.get key expected_left then
       failwith "integer specialized left union mismatch";
@@ -93,6 +96,10 @@ let check_integer () =
       IU.union_left_native_fuel_inline_default random_left random_right
     in
     let random_expected = I.union_left random_left random_right in
+    if random_native_result <> random_expected
+       || random_native_fuel_result <> random_expected
+       || random_native_inline_result <> random_expected then
+      failwith "integer randomized native-shaped worker differs structurally from legacy union";
     for key = 1 to 127 do
       if I.get key random_result <> I.get key random_expected then
         failwith "integer randomized changed-worker union mismatch";
@@ -136,6 +143,9 @@ let check_string () =
   let native_result = SU.union_left_native_default left right in
   let native_fuel_result = SU.union_left_native_fuel_default left right in
   let native_inline_result = SU.union_left_native_fuel_inline_default left right in
+  if native_result <> expected_left || native_fuel_result <> expected_left
+     || native_inline_result <> expected_left then
+    failwith "string native-shaped worker differs structurally from legacy union";
   List.iter
     (fun key ->
       if S.get key actual_left <> S.get key expected_left then
@@ -206,6 +216,10 @@ let check_string () =
       SU.union_left_native_fuel_inline_default random_left random_right
     in
     let random_expected = S.union_left random_left random_right in
+    if random_native_result <> random_expected
+       || random_native_fuel_result <> random_expected
+       || random_native_inline_result <> random_expected then
+      failwith "string randomized native-shaped worker differs structurally from legacy union";
     for key = 0 to 126 do
       let key = Printf.sprintf "%03d" key in
       if S.get key random_result <> S.get key random_expected then
