@@ -176,9 +176,8 @@ Required only for an end-to-end native-refinement claim.
   modules only with its completed refinement theorem. `make union-proof`
   recompiles the companion closure, while `make union-oracle` extracts and
   checks both workers against the established biased unions.
-- [ ] Remove the remaining handwritten `set` and union realizers when proved
-  extracted workers meet the performance requirements; otherwise prove the
-  realizers against those workers. Both general `combine` realizers have been
+- [x] Prove source-level models and functional refinements for the remaining
+  handwritten `set` and union paths. Both general `combine` realizers have been
   removed: `Patricia.combine` and `StringPatricia.combine` now extract directly
   from the proved structural workers. The companion modules now define and
   extract source-level `union_left_specialized_changed` workers. Both workers
@@ -226,8 +225,12 @@ Required only for an end-to-end native-refinement claim.
   every route. `union_left_native_correct_wf` now assembles the integer
   per-branch certificates into the whole-worker invariant and left-biased
   lookup law; the direct-string theorem of the same name does the same while
-  retaining cached-sample residency. The remaining target-level step is to
-  state the OCaml `==` soundness contract once for the
+  retaining cached-sample residency.
+- [ ] Remove the remaining handwritten `set` and union realizers when proved
+  extracted workers meet the performance requirements, or link their OCaml
+  realizers to those source workers in a target-language refinement. The
+  remaining target-level step is to state the OCaml `==` soundness contract
+  once for the
   extracted tree type and connect it to the source
   `native_same_sound` assumption. `SPECIFICATION.md` now names the required
   positive-direction contract explicitly. The portable OCaml guarantee for
@@ -412,6 +415,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-09-02 | Closed the source-level refinement subtask for handwritten paths | The tracker now separates the completed source models/proofs for native unions and one-descent string `set` from the still-open target-language OCaml realizer link. `union_left_native_correct_wf` closes whole-worker union semantics under `native_same_sound` in both backends; `set_one_descent_eq_set` closes source-level fused-set equivalence. Full `make` passed with 402 closed declarations; the structural differential tests remain in the normal gate. |
 | 2026-09-02 | Added structural legacy/native union differential checks | `PatriciaUnionTest.ml` now requires each generated native-shaped worker (nested, fuel, and inline fuel) to be structurally equal to the handwritten legacy union on deterministic and randomized integer/direct-string workloads, in addition to pointwise comparison. This catches a branch-shape or cached-sample difference in the extracted control flow, while remaining finite runtime evidence rather than a target-language refinement proof. `make union-oracle` and `git diff --check` passed. |
 | 2026-09-02 | Strengthened exception-based string `set` differential coverage | `PatriciaTest.ml` now requires the handwritten exception realizer and ordinarily extracted `set_one_descent` worker to produce structurally equal trees after every arbitrary-byte randomized update trace, in addition to their existing independent oracle/invariant checks. This makes the runtime differential sensitive to representation differences as well as lookup semantics, but does not prove the OCaml exception/control-flow refinement. `make test`, `make`, and `git diff --check` passed. |
 | 2026-09-02 | Added generated-union mutable-payload regressions | `PatriciaUnionTest.ml` now applies every generated native-shaped union worker (nested, fuel, and inline fuel) to overlapping and one-sided `ref` payloads in both backends. It asserts physical identity of selected bindings and observes mutations through the result. This directly guards the workers’ `(==)` sharing paths, but is runtime evidence rather than a proof of `native_same_sound` for OCaml `(==)`. `make union-oracle`, `make`, and `git diff --check` passed. |
