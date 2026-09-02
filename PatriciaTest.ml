@@ -241,6 +241,66 @@ let check_string_bits () =
     ["", ""; "", "\000"; "a", "a\000"; "prefix", "prefix\255";
      Stdlib.String.make 192 'p', Stdlib.String.make 192 'p' ^ "\128"]
 
+(* The optimized [S.set] is the exception-based realizer from
+   [PatriciaExtract.v], whereas [S.set_one_descent] is ordinary extraction of
+   its proved source counterpart.  Random traces below exercise both, but this
+   compact deterministic suite makes every byte bit and the continuation token
+   a fresh-key split.  Every insertion order and every intermediate prefix is
+   checked structurally, so a misplaced exception catch or bubble rebuild is
+   visible even when lookup results happen to agree. *)
+let check_string_set_realizer_routes () =
+  let rec permutations = function
+    | [] -> [ [] ]
+    | item :: rest ->
+        List.concat_map
+          (fun permutation ->
+             let rec insert_everywhere before = function
+               | [] -> [List.rev_append before [item]]
+               | (head :: tail as after) ->
+                   List.rev_append before (item :: after)
+                   :: insert_everywhere (head :: before) tail
+             in
+             insert_everywhere [] permutation)
+          (permutations rest)
+  in
+  let check_equal label native source =
+    if native <> source then
+      failwith ("string set realizer differs structurally: " ^ label)
+  in
+  for bit = 0 to 7 do
+    let byte = Stdlib.String.make 1 (Char.chr (1 lsl bit)) in
+    (* ["\\000"] and [byte] differ at this exact byte bit.  The extension of
+       NUL differs at its continuation marker; the final byte makes the fresh
+       split bubble above an already-built inner branch in several orders. *)
+    let keys = ["\000"; byte; "\000\255"; "\255"] in
+    List.iteri
+      (fun order_index order ->
+         let native = ref S.empty and source = ref S.empty in
+         check_equal (Printf.sprintf "bit %d order %d empty" bit order_index)
+           !native !source;
+         List.iteri
+           (fun depth key ->
+              native := S.set key ((depth * 100) + bit) !native;
+              source := S.set_one_descent key ((depth * 100) + bit) !source;
+              check_equal
+                (Printf.sprintf "bit %d order %d depth %d" bit order_index depth)
+                !native !source;
+              List.iteri
+                (fun update_index update_key ->
+                   native := S.set update_key ((depth * 1000) + update_index) !native;
+                   source :=
+                     S.set_one_descent update_key ((depth * 1000) + update_index)
+                       !source;
+                   check_equal
+                     (Printf.sprintf
+                        "bit %d order %d depth %d update %d"
+                        bit order_index depth update_index)
+                     !native !source)
+                keys)
+           order)
+      (permutations keys)
+  done
+
 let check_string_structure round tree =
   let next_token token =
     if token land 15 = 8 then ((token lsr 4) + 1) lsl 4 else token + 1
@@ -638,6 +698,7 @@ let () =
   check_mutable_union_payloads ();
   check_union_root_reuse ();
   check_string_bits ();
+  check_string_set_realizer_routes ();
   for round = 1 to 250 do
     let left_ref = Array.make 256 None in
     let right_ref = Array.make 256 None in
