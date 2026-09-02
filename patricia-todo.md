@@ -1,6 +1,6 @@
 # Patricia plan and tracker
 
-Last updated: 2026-08-30
+Last updated: 2026-09-02
 
 This document is the single source of truth for Patricia planning and progress.
 The public contracts and trusted boundary are fixed in
