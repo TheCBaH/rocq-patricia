@@ -21,6 +21,8 @@ let check_integer () =
     match changed_left with I.Empty -> left | changed -> changed
   in
   let fuel_result = IU.union_left_specialized_changed_fuel_result left right in
+  let native_result = IU.union_left_native_default left right in
+  let native_fuel_result = IU.union_left_native_fuel_default left right in
   let native_inline_result = IU.union_left_native_fuel_inline_default left right in
   for key = 1 to 64 do
     if I.get key actual_left <> I.get key expected_left then
@@ -31,6 +33,10 @@ let check_integer () =
       failwith "integer changed-worker union mismatch";
     if I.get key fuel_result <> I.get key expected_left then
       failwith "integer closure-free changed-worker union mismatch";
+    if I.get key native_result <> I.get key expected_left then
+      failwith "integer native-shaped worker union mismatch";
+    if I.get key native_fuel_result <> I.get key expected_left then
+      failwith "integer native-shaped fuel-worker union mismatch";
     if I.get key native_inline_result <> I.get key expected_left then
       failwith "integer inline native-worker union mismatch"
   done;
@@ -68,6 +74,10 @@ let check_integer () =
     let random_fuel_result =
       IU.union_left_specialized_changed_fuel_result random_left random_right
     in
+    let random_native_result = IU.union_left_native_default random_left random_right in
+    let random_native_fuel_result =
+      IU.union_left_native_fuel_default random_left random_right
+    in
     let random_native_inline_result =
       IU.union_left_native_fuel_inline_default random_left random_right
     in
@@ -77,6 +87,10 @@ let check_integer () =
         failwith "integer randomized changed-worker union mismatch";
       if I.get key random_fuel_result <> I.get key random_expected then
         failwith "integer randomized closure-free changed-worker union mismatch";
+      if I.get key random_native_result <> I.get key random_expected then
+        failwith "integer randomized native-shaped worker union mismatch";
+      if I.get key random_native_fuel_result <> I.get key random_expected then
+        failwith "integer randomized native-shaped fuel-worker union mismatch";
       if I.get key random_native_inline_result <> I.get key random_expected then
         failwith "integer randomized inline native-worker union mismatch"
     done
@@ -108,6 +122,8 @@ let check_string () =
     match changed_left with S.Empty -> left | changed -> changed
   in
   let fuel_result = SU.union_left_specialized_changed_fuel_result left right in
+  let native_result = SU.union_left_native_default left right in
+  let native_fuel_result = SU.union_left_native_fuel_default left right in
   let native_inline_result = SU.union_left_native_fuel_inline_default left right in
   List.iter
     (fun key ->
@@ -119,6 +135,10 @@ let check_string () =
         failwith "string changed-worker union mismatch";
       if S.get key fuel_result <> S.get key expected_left then
         failwith "string closure-free changed-worker union mismatch";
+      if S.get key native_result <> S.get key expected_left then
+        failwith "string native-shaped worker union mismatch";
+      if S.get key native_fuel_result <> S.get key expected_left then
+        failwith "string native-shaped fuel-worker union mismatch";
       if S.get key native_inline_result <> S.get key expected_left then
         failwith "string inline native-worker union mismatch")
     keys;
@@ -156,6 +176,10 @@ let check_string () =
     let random_fuel_result =
       SU.union_left_specialized_changed_fuel_result random_left random_right
     in
+    let random_native_result = SU.union_left_native_default random_left random_right in
+    let random_native_fuel_result =
+      SU.union_left_native_fuel_default random_left random_right
+    in
     let random_native_inline_result =
       SU.union_left_native_fuel_inline_default random_left random_right
     in
@@ -166,6 +190,10 @@ let check_string () =
         failwith "string randomized changed-worker union mismatch";
       if S.get key random_fuel_result <> S.get key random_expected then
         failwith "string randomized closure-free changed-worker union mismatch";
+      if S.get key random_native_result <> S.get key random_expected then
+        failwith "string randomized native-shaped worker union mismatch";
+      if S.get key random_native_fuel_result <> S.get key random_expected then
+        failwith "string randomized native-shaped fuel-worker union mismatch";
       if S.get key random_native_inline_result <> S.get key random_expected then
         failwith "string randomized inline native-worker union mismatch"
     done
