@@ -239,13 +239,15 @@ Required only for an end-to-end native-refinement claim.
   The closure-free fuel-shaped native worker was also measured. Passing the
   generic `same` callback through its single recursion made matters worse:
   1,200,993/1,200,634 words on half overlap and 2,400,919/2,400,891 on
-  equality. It remains diagnostic-only. The remaining routes are (1) retain
-  the fully inlined legacy worker, (2) specialize the generated worker to a
-  direct, inlineable `native_same` rather than a higher-order argument and
-  inline root/child helpers, (3) apply an explicit extraction/postprocessing
-  inlining pass, accepting that as a small custom build boundary, or (4) keep
-  only the OCaml recursive skeleton handwritten and prove/refine its called
-  primitives. None removes the need for the target-level `==` contract.
+  equality. Directly inlining `native_same` and the root/child reconstruction
+  checks in that single worker improves the 100K half-overlap allocation to
+  1,100,853/1,100,598 words and equality to 2,200,677/2,200,707 words, but is
+  still diagnostic-only and remains worse than the nested candidate. The
+  remaining routes are (1) retain the fully inlined legacy worker, (2) apply
+  an explicit extraction/postprocessing inlining pass, accepting that as a
+  small custom build boundary, or (3) keep only the OCaml recursive skeleton
+  handwritten and prove/refine its called primitives. None removes the need
+  for the target-level `==` contract.
   Mapping `native_same` as an extraction-inline `(==)` primitive and compiling
   with `ocamlopt -inline 1000` did not materially change the profiles. The
   available OCaml 4.14.3 compiler has `flambda: false`; routine compiler
@@ -406,6 +408,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-09-02 | Rejected direct source inlining for the generated native union | Both companion modules now expose `union_left_native_fuel_inline_default`, which embeds `native_same` and all root/child reconstruction tests directly in the fuel-decreasing recursion. The extraction oracle checks it on deterministic and randomized integer/string workloads, and `union-profile` measures it beside all other workers. At 100K it reduces generic-fuel half-overlap allocation from 1,200,993/1,200,634 to 1,100,853/1,100,598 words and equality from 2,400,919/2,400,891 to 2,200,677/2,200,707 (integer/string), but remains decisively worse than the nested candidate and legacy 365/81 and 26/26 results. The public wrappers therefore retain the handwritten realizers. `make StringPatriciaUnion.vo`, `make union-oracle`, `PATRICIA_UNION_PROFILE_SIZE=100000 make union-profile`, and `git diff --check` passed. |
 | 2026-09-01 | Put native union root reuse in the normal test gate | `PatriciaTest.ml` now asserts that public `union_left` returns the identical first root for empty-right and subset/no-op cases in both integer and string backends. This protects the intended specialized-realizer behavior without making physical sharing part of the formal claim. `make` and `git diff --check` passed. |
 | 2026-09-01 | Added mutable-payload biased-union regression checks | `PatriciaTest.ml` now unions maps containing `ref` payloads and asserts physical identity of overlapping preferred bindings and one-sided bindings for both integer and string maps, then observes mutations through the selected result. This guards against accidentally replacing the required payload identity semantics with polymorphic equality in a native union path. It is runtime evidence only and does not establish the OCaml heap/`(==)` refinement contract. `make` and `git diff --check` passed. |
 | 2026-09-01 | Completed outer-containment native root-reuse certificates | Both union proof modules now package the two exact root-reuse forms for the right-outer containment routes. Alongside the previously added direct-string root forms and the existing integer equal-/left-outer forms, every physical-root-reuse decision in the native-shaped workers has a kernel-checked invariant and left-biased lookup certificate conditional only on `native_same_sound`. This remains a source-level refinement: it does not prove OCaml `(==)` satisfies that contract. `make PatriciaUnionProof.vo`, `make StringPatriciaUnionProof.vo`, `make union-oracle`, `make assumptions` (398 declarations closed), and `git diff --check` passed. |

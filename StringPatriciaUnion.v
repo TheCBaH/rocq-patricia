@@ -256,6 +256,64 @@ Fixpoint union_left_native_fuel {A : Type} (same : t A -> t A -> bool)
 Definition union_left_native_fuel_default {A : Type} (a b : t A) : t A :=
   union_left_native_fuel (@native_same A) (S (size a + size b)) a b.
 
+(** Code-generation experiment: specialize [same] and spell the root tests
+    directly in the recursive worker, avoiding higher-order calls and the
+    reusable helper functions. *)
+Fixpoint union_left_native_fuel_inline {A : Type}
+    (fuel : nat) (a b : t A) : t A :=
+  match fuel with
+  | O => union_left_specialized a b
+  | S fuel' =>
+      match a, b with
+      | Empty, tree => tree
+      | tree, Empty => tree
+      | Leaf ka va, Leaf kb _ => if String.eqb ka kb then a else set ka va b
+      | Leaf ka va, tree => set ka va tree
+      | tree, Leaf kb vb =>
+          match get kb tree with Some _ => tree | None => set kb vb tree end
+      | Branch sample_a split_a left_a right_a,
+        Branch sample_b split_b left_b right_b =>
+          if split_a =? split_b then
+            if agrees_before_bounded sample_a sample_b split_a then
+              let left' := union_left_native_fuel_inline fuel' left_a left_b in
+              let right' := union_left_native_fuel_inline fuel' right_a right_b in
+              if (native_same left' left_a && native_same right' right_a)%bool
+              then a
+              else Branch sample_a split_a
+                (if native_same left' left_a then left_a else left')
+                (if native_same right' right_a then right_a else right')
+            else join a b
+          else if split_a <? split_b then
+            if agrees_before_bounded sample_a sample_b split_a then
+              if bit_at sample_b split_a then
+                let right' := union_left_native_fuel_inline fuel' right_a b in
+                if native_same right' right_a then a
+                else Branch sample_a split_a left_a
+                  (if native_same right' right_a then right_a else right')
+              else
+                let left' := union_left_native_fuel_inline fuel' left_a b in
+                if native_same left' left_a then a
+                else Branch sample_a split_a
+                  (if native_same left' left_a then left_a else left') right_a
+            else join a b
+          else if agrees_before_bounded sample_a sample_b split_b then
+            if bit_at sample_a split_b then
+              let right' := union_left_native_fuel_inline fuel' a right_b in
+              if native_same right' right_b then b
+              else Branch sample_b split_b left_b
+                (if native_same right' right_b then right_b else right')
+            else
+              let left' := union_left_native_fuel_inline fuel' a left_b in
+              if native_same left' left_b then b
+              else Branch sample_b split_b
+                (if native_same left' left_b then left_b else left') right_b
+          else join a b
+      end
+  end.
+
+Definition union_left_native_fuel_inline_default {A : Type} (a b : t A) : t A :=
+  union_left_native_fuel_inline (S (size a + size b)) a b.
+
 (** Compact unfolding rule for the changed worker.  Proofs use this instead
     of reducing the nested fixpoint, which would duplicate its local recursion
     at every occurrence. *)

@@ -21,6 +21,7 @@ let check_integer () =
     match changed_left with I.Empty -> left | changed -> changed
   in
   let fuel_result = IU.union_left_specialized_changed_fuel_result left right in
+  let native_inline_result = IU.union_left_native_fuel_inline_default left right in
   for key = 1 to 64 do
     if I.get key actual_left <> I.get key expected_left then
       failwith "integer specialized left union mismatch";
@@ -29,7 +30,9 @@ let check_integer () =
     if I.get key changed_result <> I.get key expected_left then
       failwith "integer changed-worker union mismatch";
     if I.get key fuel_result <> I.get key expected_left then
-      failwith "integer closure-free changed-worker union mismatch"
+      failwith "integer closure-free changed-worker union mismatch";
+    if I.get key native_inline_result <> I.get key expected_left then
+      failwith "integer inline native-worker union mismatch"
   done;
   let subset = build (fun key -> key mod 2 = 0) (fun key -> -key) 64 I.empty in
   if IU.union_left_specialized_changed left subset <> I.Empty then
@@ -65,12 +68,17 @@ let check_integer () =
     let random_fuel_result =
       IU.union_left_specialized_changed_fuel_result random_left random_right
     in
+    let random_native_inline_result =
+      IU.union_left_native_fuel_inline_default random_left random_right
+    in
     let random_expected = I.union_left random_left random_right in
     for key = 1 to 127 do
       if I.get key random_result <> I.get key random_expected then
         failwith "integer randomized changed-worker union mismatch";
       if I.get key random_fuel_result <> I.get key random_expected then
-        failwith "integer randomized closure-free changed-worker union mismatch"
+        failwith "integer randomized closure-free changed-worker union mismatch";
+      if I.get key random_native_inline_result <> I.get key random_expected then
+        failwith "integer randomized inline native-worker union mismatch"
     done
   done;
   if IU.union_left_specialized left I.empty != left then
@@ -100,6 +108,7 @@ let check_string () =
     match changed_left with S.Empty -> left | changed -> changed
   in
   let fuel_result = SU.union_left_specialized_changed_fuel_result left right in
+  let native_inline_result = SU.union_left_native_fuel_inline_default left right in
   List.iter
     (fun key ->
       if S.get key actual_left <> S.get key expected_left then
@@ -109,7 +118,9 @@ let check_string () =
       if S.get key changed_result <> S.get key expected_left then
         failwith "string changed-worker union mismatch";
       if S.get key fuel_result <> S.get key expected_left then
-        failwith "string closure-free changed-worker union mismatch")
+        failwith "string closure-free changed-worker union mismatch";
+      if S.get key native_inline_result <> S.get key expected_left then
+        failwith "string inline native-worker union mismatch")
     keys;
   let subset = add_selected 2 S.empty in
   if SU.union_left_specialized_changed left subset <> S.Empty then
@@ -145,13 +156,18 @@ let check_string () =
     let random_fuel_result =
       SU.union_left_specialized_changed_fuel_result random_left random_right
     in
+    let random_native_inline_result =
+      SU.union_left_native_fuel_inline_default random_left random_right
+    in
     let random_expected = S.union_left random_left random_right in
     for key = 0 to 126 do
       let key = Printf.sprintf "%03d" key in
       if S.get key random_result <> S.get key random_expected then
         failwith "string randomized changed-worker union mismatch";
       if S.get key random_fuel_result <> S.get key random_expected then
-        failwith "string randomized closure-free changed-worker union mismatch"
+        failwith "string randomized closure-free changed-worker union mismatch";
+      if S.get key random_native_inline_result <> S.get key random_expected then
+        failwith "string randomized inline native-worker union mismatch"
     done
   done;
   if SU.union_left_specialized left S.empty != left then

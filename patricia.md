@@ -97,8 +97,12 @@ therefore retain the handwritten export while this candidate is improved.
 The closure-free fuel-shaped native candidate was worse still (1,200,993 /
 1,200,634 words for half overlap and 2,400,919 / 2,400,891 for equality),
 because its generic physical-equality callback is invoked through the recursive
-worker. Removing that higher-order and helper overhead is now the relevant
-generated-code experiment, not changing the recursion measure alone.
+worker. Inlining that callback and the root/child reconstruction checks in the
+single fuel worker improves the corresponding results to 1,100,853 / 1,100,598
+and 2,200,677 / 2,200,707 words, respectively, but remains far above both the
+nested candidate and the legacy implementation. This rules out direct source
+inlining as the relevant generated-code improvement; changing the recursion
+measure alone is not useful either.
 Making `(==)` extraction-inline and compiling the diagnostic with
 `ocamlopt -inline 1000` made no material difference; this OCaml 4.14.3 build
 does not include Flambda. The practical next boundary is consequently a small
