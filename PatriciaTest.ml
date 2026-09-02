@@ -604,10 +604,29 @@ let check_mutable_union_payloads () =
   | Some cell when !cell = 51 -> ()
   | _ -> failwith "string union_right lost mutable payload identity"
 
+(* The public native unions intentionally retain the first argument's root
+   whenever the second input adds no binding.  Keep this allocation/sharing
+   behavior under the ordinary deterministic test gate, separately from the
+   semantic tests above. *)
+let check_union_root_reuse () =
+  let integer_tree = empty |> set 1 10 |> set 3 30 in
+  let integer_subset = empty |> set 1 99 in
+  if union_left integer_tree empty != integer_tree then
+    failwith "integer union_left did not reuse its empty-right root";
+  if union_left integer_tree integer_subset != integer_tree then
+    failwith "integer union_left did not reuse its subset root";
+  let string_tree = S.empty |> S.set "a" 10 |> S.set "c" 30 in
+  let string_subset = S.empty |> S.set "a" 99 in
+  if S.union_left string_tree S.empty != string_tree then
+    failwith "string union_left did not reuse its empty-right root";
+  if S.union_left string_tree string_subset != string_tree then
+    failwith "string union_left did not reuse its subset root"
+
 let () =
   Random.init 0x504154;
   check_abstract_interfaces ();
   check_mutable_union_payloads ();
+  check_union_root_reuse ();
   check_string_bits ();
   for round = 1 to 250 do
     let left_ref = Array.make 256 None in
