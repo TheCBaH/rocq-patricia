@@ -1945,6 +1945,175 @@ Proof.
   now apply union_left_specialized_correct_wf.
 Qed.
 
+(** Whole-worker source refinement for the direct-string native-shaped union.
+    Cached samples are handled by the established routing and reconstruction
+    certificates; only a positive [same] result is assumed observationally
+    sound. *)
+Theorem union_left_native_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) (left right : t A),
+    native_same_sound same -> wf left -> wf right ->
+    wf (union_left_native same left right) /\
+    forall key,
+      get key (union_left_native same left right) =
+      match get key left with Some value => Some value | None => get key right end.
+Proof.
+  intros A same.
+  assert (Hstrong : forall total, forall (left right : t A),
+      size left + size right = total -> native_same_sound same -> wf left -> wf right ->
+      wf (union_left_native same left right) /\
+      forall key,
+        get key (union_left_native same left right) =
+        match get key left with Some value => Some value | None => get key right end).
+  { intro total. induction total using lt_wf_ind.
+    intros left right E Hsame Hwl Hwr.
+    destruct left as [|left_key left_value
+        |left_sample left_split left_left left_right];
+      destruct right as [|right_key right_value
+        |right_sample right_split right_left right_right].
+    - split; [constructor|]. intro key. reflexivity.
+    - split; [exact Hwr|]. intro key. reflexivity.
+    - split; [exact Hwr|]. intro key. reflexivity.
+    - split; [exact Hwl|]. intro key.
+      rewrite union_left_native_equation. cbn.
+      destruct (String.eqb key left_key); reflexivity.
+    - rewrite union_left_native_equation.
+      destruct (String.eqb left_key right_key) eqn:Ekey.
+      + apply String.eqb_eq in Ekey. subst right_key.
+        split; [constructor|]. intro key. cbn [get].
+        destruct (String.eqb key left_key); reflexivity.
+      + destruct (set_correct_wf A left_key left_value (Leaf right_key right_value) Hwr)
+          as [Hwf Hget].
+        split; [exact Hwf|]. intro key. rewrite Hget. cbn [get].
+        destruct (String.eqb key left_key); reflexivity.
+    - rewrite union_left_native_equation.
+      destruct (set_correct_wf A left_key left_value
+        (Branch right_sample right_split right_left right_right) Hwr) as [Hwf Hget].
+      split; [exact Hwf|]. intro key. rewrite Hget. cbn [get].
+      destruct (String.eqb key left_key); reflexivity.
+    - split; [exact Hwl|]. intro key.
+      rewrite union_left_native_equation. cbn.
+      destruct (bit_at key left_split) eqn:Ebit; cbn [get];
+        [destruct (get key left_right)|destruct (get key left_left)]; reflexivity.
+    - rewrite union_left_native_equation.
+      destruct (get right_key (Branch left_sample left_split left_left left_right))
+        as [found|] eqn:Efound.
+      + split; [exact Hwl|]. intro key.
+        change (get key (Branch left_sample left_split left_left left_right) =
+          match get key (Branch left_sample left_split left_left left_right) with
+          | Some current => Some current | None => get key (Leaf right_key right_value) end).
+        destruct (get key (Branch left_sample left_split left_left left_right))
+          as [current|] eqn:Equery; [reflexivity|].
+        destruct (String.eqb key right_key) eqn:Ekey.
+        * apply String.eqb_eq in Ekey. subst key. rewrite Efound in Equery. discriminate.
+        * cbn [get]. now rewrite Ekey.
+      + destruct (set_correct_wf A right_key right_value
+          (Branch left_sample left_split left_left left_right) Hwl) as [Hwf Hget].
+        split; [exact Hwf|]. intro key. rewrite Hget. cbn [get].
+        destruct (String.eqb key right_key) eqn:Ekey.
+        * apply String.eqb_eq in Ekey. subst key.
+          change (Some right_value =
+            match get right_key (Branch left_sample left_split left_left left_right) with
+            | Some current => Some current | None => Some right_value end).
+          now rewrite Efound.
+        * change (get key (Branch left_sample left_split left_left left_right) =
+            match get key (Branch left_sample left_split left_left left_right) with
+            | Some current => Some current | None => None end).
+          destruct (get key (Branch left_sample left_split left_left left_right)); reflexivity.
+    - inversion Hwl as
+        [| |? ? ? ? Hwll Hwlr _ _ Hall Halr _]; subst.
+      inversion Hwr as
+        [| |? ? ? ? Hwrl Hwrr _ _ Harl Harr _]; subst.
+      rewrite union_left_native_equation.
+      destruct (left_split =? right_split) eqn:Esplits.
+      + apply Nat.eqb_eq in Esplits. subst right_split.
+        destruct (agrees_before_bounded left_sample right_sample left_split)
+          eqn:Eagrees.
+        * destruct (H (size left_left + size right_left)
+            ltac:(cbn [size]; lia) left_left right_left eq_refl Hsame Hwll Hwrl)
+            as [Hwoutl Hgetoutl].
+          destruct (H (size left_right + size right_right)
+            ltac:(cbn [size]; lia) left_right right_right eq_refl Hsame Hwlr Hwrr)
+            as [Hwoutr Hgetoutr].
+          eapply native_reuse_same_branch_root_correct_wf; eauto.
+        * destruct (union_left_specialized_disjoint_branches_correct_wf A
+            left_sample left_split left_left left_right right_sample
+            left_split right_left right_right Hwl Hwr
+            ltac:(now rewrite Nat.min_id)) as [Hwj Hgetj].
+          exact (conj Hwj Hgetj).
+      + destruct (left_split <? right_split) eqn:Eorder.
+        * apply Nat.ltb_lt in Eorder.
+          destruct (agrees_before_bounded left_sample right_sample left_split)
+            eqn:Eagrees.
+          -- assert (Hoperand : all_keys (fun key =>
+                 same_prefix left_sample key left_split /\
+                 bit_at key left_split = bit_at right_sample left_split)
+                 (Branch right_sample right_split right_left right_right)).
+             { eapply union_left_specialized_left_outer_routing; eauto. }
+             destruct (bit_at right_sample left_split) eqn:Eside.
+             ++ destruct (H (size left_right +
+                   size (Branch right_sample right_split right_left right_right))
+                 ltac:(cbn [size]; lia) left_right
+                 (Branch right_sample right_split right_left right_right)
+                 eq_refl Hsame Hwlr Hwr) as [Hwout Hgetout].
+                eapply native_reuse_right_branch_root_correct_wf
+                  with (operand := Branch right_sample right_split right_left right_right);
+                  eauto.
+             ++ destruct (H (size left_left +
+                   size (Branch right_sample right_split right_left right_right))
+                 ltac:(cbn [size]; lia) left_left
+                 (Branch right_sample right_split right_left right_right)
+                 eq_refl Hsame Hwll Hwr) as [Hwout Hgetout].
+                eapply native_reuse_left_branch_root_correct_wf
+                  with (operand := Branch right_sample right_split right_left right_right);
+                  eauto.
+          -- destruct (union_left_specialized_disjoint_branches_correct_wf A
+               left_sample left_split left_left left_right right_sample
+               right_split right_left right_right Hwl Hwr
+               ltac:(rewrite Nat.min_l by lia; exact Eagrees)) as [Hwj Hgetj].
+             exact (conj Hwj Hgetj).
+        * apply Nat.ltb_ge in Eorder.
+          assert (Hreverse : right_split < left_split) by
+            (apply Nat.eqb_neq in Esplits; lia).
+          destruct (agrees_before_bounded left_sample right_sample right_split)
+            eqn:Eagrees.
+          -- assert (Hoperand : all_keys (fun key =>
+                 same_prefix right_sample key right_split /\
+                 bit_at key right_split = bit_at left_sample right_split)
+                 (Branch left_sample left_split left_left left_right)).
+             { eapply all_keys_contained_prefix with
+                 (inner_sample := left_sample) (inner_split := left_split).
+               - unfold same_prefix. intros n Hn.
+                 symmetry.
+                 apply (proj1 (agrees_before_bounded_spec
+                   left_sample right_sample right_split) Eagrees).
+                 exact Hn.
+               - exact Hreverse.
+               - now apply branch_all_prefix. }
+             destruct (bit_at left_sample right_split) eqn:Eside.
+             ++ destruct (H (size (Branch left_sample left_split left_left left_right) +
+                   size right_right) ltac:(cbn [size]; lia)
+                 (Branch left_sample left_split left_left left_right) right_right
+                 eq_refl Hsame Hwl Hwrr) as [Hwout Hgetout].
+                eapply native_reuse_right_outer_right_branch_root_correct_wf
+                  with (operand := Branch left_sample left_split left_left left_right);
+                  eauto.
+             ++ destruct (H (size (Branch left_sample left_split left_left left_right) +
+                   size right_left) ltac:(cbn [size]; lia)
+                 (Branch left_sample left_split left_left left_right) right_left
+                 eq_refl Hsame Hwl Hwrl) as [Hwout Hgetout].
+                eapply native_reuse_right_outer_left_branch_root_correct_wf
+                  with (operand := Branch left_sample left_split left_left left_right);
+                  eauto.
+          -- destruct (union_left_specialized_disjoint_branches_correct_wf A
+               left_sample left_split left_left left_right right_sample
+               right_split right_left right_right Hwl Hwr
+               ltac:(rewrite Nat.min_r by lia; exact Eagrees)) as [Hwj Hgetj].
+             exact (conj Hwj Hgetj).
+  }
+  intros left right Hsame Hwl Hwr.
+  eapply Hstrong with (total := size left + size right); eauto.
+Qed.
+
 (** The direct fuel worker is an extraction-shape variant of the proved
     changed worker.  Its counter is strictly larger than the combined source
     tree size, so every recursive pair has a remaining sufficient counter. *)

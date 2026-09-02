@@ -94,6 +94,12 @@ still allocates roughly 0.8M words for 100K half-overlap inputs and 1.6M for
 equal inputs, owing to generated helper/closure traffic; the 365/81 and 26/26
 word legacy integer/string results remain decisively lower. The public wrappers
 therefore retain the handwritten export while this candidate is improved.
+For the integer backend, `union_left_native_correct_wf` now assembles the
+per-branch reuse certificates into whole-worker well-formedness and left-biased
+lookup laws under the sole positive-direction `native_same_sound` premise.
+The direct-string theorem of the same name carries cached-sample residency
+through the same assembly. Neither source theorem establishes the OCaml `(==)`
+contract.
 The closure-free fuel-shaped native candidate was worse still (1,200,993 /
 1,200,634 words for half overlap and 2,400,919 / 2,400,891 for equality),
 because its generic physical-equality callback is invoked through the recursive

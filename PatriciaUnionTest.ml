@@ -43,6 +43,17 @@ let check_integer () =
   let subset = build (fun key -> key mod 2 = 0) (fun key -> -key) 64 I.empty in
   if IU.union_left_specialized_changed left subset <> I.Empty then
     failwith "integer changed worker missed unchanged certificate";
+  List.iter
+    (fun (name, union) ->
+      if union left I.empty != left then
+        failwith ("integer " ^ name ^ " lost empty-right root reuse");
+      if union left subset != left then
+        failwith ("integer " ^ name ^ " lost subset root reuse");
+      if union left left != left then
+        failwith ("integer " ^ name ^ " lost equal root reuse"))
+    [ "native-shaped", IU.union_left_native_default;
+      "native-shaped fuel", IU.union_left_native_fuel_default;
+      "inline native-shaped fuel", IU.union_left_native_fuel_inline_default ];
   if changed_left = I.Empty then
     failwith "integer changed worker missed fresh right bindings";
   let nested = I.set 3 30 (I.set 1 10 I.empty) in
@@ -145,6 +156,17 @@ let check_string () =
   let subset = add_selected 2 S.empty in
   if SU.union_left_specialized_changed left subset <> S.Empty then
     failwith "string changed worker missed unchanged certificate";
+  List.iter
+    (fun (name, union) ->
+      if union left S.empty != left then
+        failwith ("string " ^ name ^ " lost empty-right root reuse");
+      if union left subset != left then
+        failwith ("string " ^ name ^ " lost subset root reuse");
+      if union left left != left then
+        failwith ("string " ^ name ^ " lost equal root reuse"))
+    [ "native-shaped", SU.union_left_native_default;
+      "native-shaped fuel", SU.union_left_native_fuel_default;
+      "inline native-shaped fuel", SU.union_left_native_fuel_inline_default ];
   if changed_left = S.Empty then
     failwith "string changed worker missed fresh right bindings";
   let nested = S.set "ab" 2 (S.set "aa" 1 S.empty) in
@@ -201,7 +223,56 @@ let check_string () =
   if SU.union_left_specialized left S.empty != left then
     failwith "string empty-right certificate lost sharing"
 
+let check_native_payload_identity () =
+  let integer_workers =
+    [ "native-shaped", IU.union_left_native_default;
+      "native-shaped fuel", IU.union_left_native_fuel_default;
+      "inline native-shaped fuel", IU.union_left_native_fuel_inline_default ]
+  in
+  List.iter
+    (fun (name, union) ->
+      let preferred = ref 10 in
+      let one_sided = ref 20 in
+      let left = I.set 1 preferred I.empty in
+      let right = I.set 2 one_sided (I.set 1 (ref 30) I.empty) in
+      let result = union left right in
+      let selected = match I.get 1 result with Some value -> value | None ->
+        failwith ("integer " ^ name ^ " lost preferred binding") in
+      let retained = match I.get 2 result with Some value -> value | None ->
+        failwith ("integer " ^ name ^ " lost one-sided binding") in
+      if selected != preferred || retained != one_sided then
+        failwith ("integer " ^ name ^ " replaced mutable payloads");
+      selected := 11;
+      retained := 21;
+      if !preferred <> 11 || !one_sided <> 21 then
+        failwith ("integer " ^ name ^ " lost payload aliasing"))
+    integer_workers;
+  let string_workers =
+    [ "native-shaped", SU.union_left_native_default;
+      "native-shaped fuel", SU.union_left_native_fuel_default;
+      "inline native-shaped fuel", SU.union_left_native_fuel_inline_default ]
+  in
+  List.iter
+    (fun (name, union) ->
+      let preferred = ref 10 in
+      let one_sided = ref 20 in
+      let left = S.set "a" preferred S.empty in
+      let right = S.set "b" one_sided (S.set "a" (ref 30) S.empty) in
+      let result = union left right in
+      let selected = match S.get "a" result with Some value -> value | None ->
+        failwith ("string " ^ name ^ " lost preferred binding") in
+      let retained = match S.get "b" result with Some value -> value | None ->
+        failwith ("string " ^ name ^ " lost one-sided binding") in
+      if selected != preferred || retained != one_sided then
+        failwith ("string " ^ name ^ " replaced mutable payloads");
+      selected := 11;
+      retained := 21;
+      if !preferred <> 11 || !one_sided <> 21 then
+        failwith ("string " ^ name ^ " lost payload aliasing"))
+    string_workers
+
 let () =
   check_integer ();
   check_string ();
+  check_native_payload_identity ();
   print_endline "Patricia specialized-union oracle test: ok"

@@ -352,6 +352,16 @@ let check_string_keys () =
       !left_one_descent;
     check_string_table round "right one-descent updates" keys right_ref
       !right_one_descent;
+    if !left <> !left_one_descent then
+      failwith
+        (Printf.sprintf
+           "string round %d: native set differs structurally from one-descent worker"
+           round);
+    if !right <> !right_one_descent then
+      failwith
+        (Printf.sprintf
+           "string round %d: native set differs structurally from one-descent worker"
+           round);
     let rebuilt_left =
       List.fold_left
         (fun tree (key, value) -> S.set key value tree)

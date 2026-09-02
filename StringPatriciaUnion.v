@@ -213,6 +213,43 @@ Definition native_same {A : Type} (_ _ : t A) : bool := false.
 Definition union_left_native_default {A : Type} : t A -> t A -> t A :=
   union_left_native (@native_same A).
 
+(** Two-argument unfolding rule for the native-shaped worker. *)
+Lemma union_left_native_equation:
+  forall (A : Type) (same : t A -> t A -> bool) (a b : t A),
+    union_left_native same a b =
+    match a, b with
+    | Empty, tree => tree
+    | tree, Empty => tree
+    | Leaf ka va, Leaf kb _ => if String.eqb ka kb then a else set ka va b
+    | Leaf ka va, tree => set ka va tree
+    | tree, Leaf kb vb =>
+        match get kb tree with Some _ => tree | None => set kb vb tree end
+    | Branch sample_a split_a left_a right_a,
+      Branch sample_b split_b left_b right_b =>
+        if split_a =? split_b then
+          if agrees_before_bounded sample_a sample_b split_a then
+            native_reuse_same_branch_root same a sample_a split_a left_a right_a
+              (union_left_native same left_a left_b)
+              (union_left_native same right_a right_b)
+          else join a b
+        else if split_a <? split_b then
+          if agrees_before_bounded sample_a sample_b split_a then
+            if bit_at sample_b split_a then
+              native_reuse_right_branch_root same a sample_a split_a left_a right_a
+                (union_left_native same right_a b)
+            else native_reuse_left_branch_root same a sample_a split_a left_a right_a
+              (union_left_native same left_a b)
+          else join a b
+        else if agrees_before_bounded sample_a sample_b split_b then
+          if bit_at sample_a split_b then
+            native_reuse_right_branch_root same b sample_b split_b left_b right_b
+              (union_left_native same a right_b)
+          else native_reuse_left_branch_root same b sample_b split_b left_b right_b
+            (union_left_native same a left_b)
+        else join a b
+    end.
+Proof. intros A same a b. destruct a; destruct b; reflexivity. Qed.
+
 (** Single-recursion fuel form of the native-shaped worker. *)
 Fixpoint union_left_native_fuel {A : Type} (same : t A -> t A -> bool)
     (fuel : nat) (a b : t A) : t A :=

@@ -1762,6 +1762,209 @@ Proof.
   now apply union_left_specialized_correct_wf.
 Qed.
 
+(** The native-shaped worker has the same source-level finite-map semantics
+    under the sole positive-direction contract required of its equality test.
+    This is the whole-worker assembly of the local root/child certificates;
+    instantiating [same] with OCaml [(==)] remains the target-language
+    refinement obligation. *)
+Theorem union_left_native_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) (left right : t A),
+    native_same_sound same -> wf left -> wf right ->
+    wf (union_left_native same left right) /\
+    forall key,
+      get key (union_left_native same left right) =
+      match get key left with Some value => Some value | None => get key right end.
+Proof.
+  intros A same.
+  assert (Hstrong : forall total, forall (left right : t A),
+      size left + size right = total -> native_same_sound same -> wf left -> wf right ->
+      wf (union_left_native same left right) /\
+      forall key,
+        get key (union_left_native same left right) =
+        match get key left with Some value => Some value | None => get key right end).
+  { intro total. induction total using lt_wf_ind.
+    intros left right E Hsame Hwl Hwr.
+    destruct left as [|left_key left_value
+        |left_prefix left_mask left_left left_right];
+      destruct right as [|right_key right_value
+        |right_prefix right_mask right_left right_right].
+    - split; [constructor|]. intro key. reflexivity.
+    - split; [exact Hwr|]. intro key. reflexivity.
+    - split; [exact Hwr|]. intro key. reflexivity.
+    - split; [exact Hwl|]. intro key.
+      rewrite union_left_native_equation. cbn.
+      destruct (Pos.eqb key left_key); reflexivity.
+    - rewrite union_left_native_equation.
+      destruct (Pos.eqb left_key right_key) eqn:Ekey.
+      + apply Pos.eqb_eq in Ekey. subst right_key.
+        split; [constructor|]. intro key. cbn [get].
+        destruct (Pos.eqb key left_key); reflexivity.
+      + destruct (set_correct_wf left_key left_value Hwr) as [Hwf Hget].
+        split; [exact Hwf|]. intro key. rewrite Hget. cbn [get].
+        destruct (Pos.eqb key left_key); reflexivity.
+    - rewrite union_left_native_equation.
+      destruct (set_correct_wf left_key left_value Hwr) as [Hwf Hget].
+      split; [exact Hwf|]. intro key. rewrite Hget. cbn [get].
+      destruct (Pos.eqb key left_key); reflexivity.
+    - split; [exact Hwl|]. intro key.
+      rewrite union_left_native_equation.
+      change (get key (Branch left_prefix left_mask left_left left_right) =
+        match get key (Branch left_prefix left_mask left_left left_right) with
+        | Some value => Some value | None => None end).
+      destruct (get key (Branch left_prefix left_mask left_left left_right)); reflexivity.
+    - rewrite union_left_native_equation.
+      destruct (get right_key (Branch left_prefix left_mask left_left left_right))
+        as [found|] eqn:Efound.
+      + split; [exact Hwl|]. intro key.
+        change (get key (Branch left_prefix left_mask left_left left_right) =
+          match get key (Branch left_prefix left_mask left_left left_right) with
+          | Some current => Some current
+          | None => get key (Leaf right_key right_value)
+          end).
+        destruct (get key (Branch left_prefix left_mask left_left left_right))
+          as [current|] eqn:Equery; [reflexivity|].
+        destruct (Pos.eqb key right_key) eqn:Ekey.
+        * apply Pos.eqb_eq in Ekey. subst key. rewrite Efound in Equery. discriminate.
+        * cbn [get]. now rewrite Ekey.
+      + destruct (set_correct_wf right_key right_value Hwl) as [Hwf Hget].
+        split; [exact Hwf|]. intro key. rewrite Hget. cbn [get].
+        destruct (Pos.eqb key right_key) eqn:Ekey.
+        * apply Pos.eqb_eq in Ekey. subst key.
+          change (Some right_value =
+            match get right_key (Branch left_prefix left_mask left_left left_right) with
+            | Some current => Some current | None => Some right_value end).
+          now rewrite Efound.
+        * change (get key (Branch left_prefix left_mask left_left left_right) =
+            match get key (Branch left_prefix left_mask left_left left_right) with
+            | Some current => Some current | None => None end).
+          destruct (get key (Branch left_prefix left_mask left_left left_right)); reflexivity.
+    - inversion Hwl as
+        [| |? ? ? ? Hwall Hwarr Hnall Hnalr Hall Har]; subst.
+      inversion Hwr as
+        [| |? ? ? ? Hwbrl Hwbrr Hnbrl Hnbrr Hbl Hbr]; subst.
+      rewrite union_left_native_equation.
+      destruct (N.eqb left_mask right_mask && N.eqb left_prefix right_prefix)%bool
+        eqn:Same.
+      + apply Bool.andb_true_iff in Same. destruct Same as [Em Ep].
+        apply N.eqb_eq in Em. apply N.eqb_eq in Ep.
+        subst right_mask right_prefix.
+        destruct (H (size left_left + size right_left)
+          ltac:(cbn [size]; lia) left_left right_left eq_refl Hsame Hwall Hwbrl)
+          as [Hwoutl Hgetoutl].
+        destruct (H (size left_right + size right_right)
+          ltac:(cbn [size]; lia) left_right right_right eq_refl Hsame Hwarr Hwbrr)
+          as [Hwoutr Hgetoutr].
+        eapply native_reuse_same_branch_root_correct_wf; eauto.
+      + destruct (mask_above left_mask right_mask) eqn:Mab.
+        * apply mask_above_spec in Mab.
+          destruct (representative right_left) as [right_rep|] eqn:Rb.
+          -- assert (Hrepb : representative
+                (Branch right_prefix right_mask right_left right_right) = Some right_rep).
+             { cbn [representative]. now rewrite Rb. }
+             assert (Hbprefix : all_keys
+                 (fun key => matches_prefix key right_prefix right_mask = true)
+                 (Branch right_prefix right_mask right_left right_right)) by
+               (now apply branch_all_prefix).
+             destruct (representative_get_wf Hwr Hrepb) as [right_value Hgetrep].
+             assert (Hrepnot : get right_rep
+                 (Branch right_prefix right_mask right_left right_right) <> None) by
+               (rewrite Hgetrep; discriminate).
+             pose proof (@all_keys_uniform_above A
+               (Branch right_prefix right_mask right_left right_right)
+               right_prefix right_mask right_rep left_mask Hbprefix Mab Hrepnot)
+               as Houter0.
+             destruct (matches_prefix right_rep left_prefix left_mask) eqn:Eprefix.
+             ++ assert (Hoperand : all_keys (fun key =>
+                    matches_prefix key left_prefix left_mask = true /\
+                    zero_bit key left_mask = zero_bit right_rep left_mask)
+                    (Branch right_prefix right_mask right_left right_right)).
+                { intros key value Hget. specialize (Houter0 _ _ Hget) as [P Z].
+                  split; [|exact Z]. unfold matches_prefix in P, Eprefix |- *.
+                  apply N.eqb_eq in P. apply N.eqb_eq in Eprefix.
+                  apply N.eqb_eq. congruence. }
+                destruct (zero_bit right_rep left_mask) eqn:Eside.
+                ** destruct (H (size left_left +
+                      size (Branch right_prefix right_mask right_left right_right))
+                    ltac:(cbn [size]; lia) left_left
+                   (Branch right_prefix right_mask right_left right_right)
+                    eq_refl Hsame Hwall Hwr) as [Hwout Hgetout].
+                   rewrite Hrepb, Eprefix, Eside.
+                   eapply native_reuse_left_branch_root_correct_wf
+                     with (operand := Branch right_prefix right_mask right_left right_right);
+                     eauto.
+                ** destruct (H (size left_right +
+                      size (Branch right_prefix right_mask right_left right_right))
+                    ltac:(cbn [size]; lia) left_right
+                    (Branch right_prefix right_mask right_left right_right)
+                    eq_refl Hsame Hwarr Hwr) as [Hwout Hgetout].
+                   rewrite Hrepb, Eprefix, Eside.
+                   eapply native_reuse_right_branch_root_correct_wf
+                     with (operand := Branch right_prefix right_mask right_left right_right);
+                     eauto.
+             ++ rewrite Hrepb, Eprefix.
+                eapply union_left_specialized_left_outer_disjoint_correct_wf; eauto.
+          -- apply (representative_none_wf Hwbrl) in Rb. subst right_left.
+             destruct Hnbrl as [key [value Efound]]. discriminate.
+        * destruct (mask_above right_mask left_mask) eqn:Mba.
+          -- apply mask_above_spec in Mba.
+             destruct (representative left_left) as [left_rep|] eqn:Ra.
+             ++ assert (Hrepa : representative
+                   (Branch left_prefix left_mask left_left left_right) = Some left_rep).
+                { cbn [representative]. now rewrite Ra. }
+                assert (Haprefix : all_keys
+                    (fun key => matches_prefix key left_prefix left_mask = true)
+                    (Branch left_prefix left_mask left_left left_right)) by
+                  (now apply branch_all_prefix).
+                destruct (representative_get_wf Hwl Hrepa) as [left_value Hgetrep].
+                assert (Hrepnot : get left_rep
+                    (Branch left_prefix left_mask left_left left_right) <> None) by
+                  (rewrite Hgetrep; discriminate).
+                pose proof (@all_keys_uniform_above A
+                  (Branch left_prefix left_mask left_left left_right)
+                  left_prefix left_mask left_rep right_mask Haprefix Mba Hrepnot)
+                  as Houter0.
+                destruct (matches_prefix left_rep right_prefix right_mask) eqn:Eprefix.
+                ** assert (Hoperand : all_keys (fun key =>
+                       matches_prefix key right_prefix right_mask = true /\
+                       zero_bit key right_mask = zero_bit left_rep right_mask)
+                       (Branch left_prefix left_mask left_left left_right)).
+                   { intros key value Hget. specialize (Houter0 _ _ Hget) as [P Z].
+                     split; [|exact Z]. unfold matches_prefix in P, Eprefix |- *.
+                     apply N.eqb_eq in P. apply N.eqb_eq in Eprefix.
+                     apply N.eqb_eq. congruence. }
+                   destruct (zero_bit left_rep right_mask) eqn:Eside.
+                   --- destruct (H (size (Branch left_prefix left_mask left_left left_right) +
+                         size right_left) ltac:(cbn [size]; lia)
+                       (Branch left_prefix left_mask left_left left_right) right_left
+                       eq_refl Hsame Hwl Hwbrl) as [Hwout Hgetout].
+                       rewrite Hrepa, Eprefix, Eside.
+                       eapply native_reuse_right_outer_left_branch_root_correct_wf
+                         with (operand := Branch left_prefix left_mask left_left left_right);
+                         eauto.
+                   --- destruct (H (size (Branch left_prefix left_mask left_left left_right) +
+                         size right_right) ltac:(cbn [size]; lia)
+                       (Branch left_prefix left_mask left_left left_right) right_right
+                       eq_refl Hsame Hwl Hwbrr) as [Hwout Hgetout].
+                       rewrite Hrepa, Eprefix, Eside.
+                       eapply native_reuse_right_outer_right_branch_root_correct_wf
+                         with (operand := Branch left_prefix left_mask left_left left_right);
+                         eauto.
+                ** rewrite Hrepa, Eprefix.
+                   eapply union_left_specialized_right_outer_disjoint_correct_wf; eauto.
+             ++ apply (representative_none_wf Hwall) in Ra. subst left_left.
+                destruct Hnall as [key [value Efound]]. discriminate.
+          -- assert (Emasks : left_mask = right_mask) by
+               (apply N.le_antisymm; apply N.ltb_ge; assumption).
+             subst right_mask.
+             assert (Eprefix : left_prefix <> right_prefix).
+             { intro Eprefix. subst right_prefix.
+               now rewrite !N.eqb_refl in Same. }
+             eapply union_left_specialized_same_mask_disjoint_correct_wf; eauto.
+  }
+  intros left right Hsame Hwl Hwr.
+  eapply Hstrong with (total := size left + size right); eauto.
+Qed.
+
 (** The fuel worker uses an ordinary decreasing counter only to avoid the
     branch-local structural closure in extracted OCaml.  A counter strictly
     larger than the combined input size is sufficient to reproduce the proved

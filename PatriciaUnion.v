@@ -241,6 +241,52 @@ Definition native_same {A : Type} (_ _ : t A) : bool := false.
 Definition union_left_native_default {A : Type} : t A -> t A -> t A :=
   union_left_native (@native_same A).
 
+(** Two-argument unfolding rule for the native-shaped worker.  As with the
+    specialized worker's equation, this hides whether the recursive call is
+    made by the outer or locally nested structural fixpoint. *)
+Lemma union_left_native_equation:
+  forall (A : Type) (same : t A -> t A -> bool) (a b : t A),
+    union_left_native same a b =
+    match a, b with
+    | Empty, tree => tree
+    | tree, Empty => tree
+    | Leaf ka va, Leaf kb _ => if Pos.eqb ka kb then a else set ka va b
+    | Leaf ka va, tree => set ka va tree
+    | tree, Leaf kb vb =>
+        match get kb tree with Some _ => tree | None => set kb vb tree end
+    | Branch pa ma la ra, Branch pb mb lb rb =>
+        if (N.eqb ma mb && N.eqb pa pb)%bool then
+          native_reuse_same_branch_root same a pa ma la ra
+            (union_left_native same la lb)
+            (union_left_native same ra rb)
+        else if mask_above ma mb then
+          match representative b with
+          | Some kb =>
+              if matches_prefix kb pa ma then
+                if zero_bit kb ma then
+                  native_reuse_left_branch_root same a pa ma la ra
+                    (union_left_native same la b)
+                else native_reuse_right_branch_root same a pa ma la ra
+                  (union_left_native same ra b)
+              else join a b
+          | None => a
+          end
+        else if mask_above mb ma then
+          match representative a with
+          | Some ka =>
+              if matches_prefix ka pb mb then
+                if zero_bit ka mb then
+                  native_reuse_left_branch_root same b pb mb lb rb
+                    (union_left_native same a lb)
+                else native_reuse_right_branch_root same b pb mb lb rb
+                  (union_left_native same a rb)
+              else join a b
+          | None => b
+          end
+        else join a b
+    end.
+Proof. intros A same a b. destruct a; destruct b; reflexivity. Qed.
+
 (** Closure-free variant of [union_left_native].  Its single decreasing fuel
     argument avoids extracting the branch-local recursive closure introduced
     by the nested structural definition above.  A sufficient bound is supplied
