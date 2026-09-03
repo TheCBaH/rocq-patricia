@@ -3,6 +3,30 @@ module IU = PatriciaUnion
 module S = StringPatriciaInternal
 module SU = StringPatriciaUnion
 
+(* Exercise the exact positive-direction premise consumed by the native union
+   refinement. The callback is extensionally the OCaml physical test used by
+   the extracted default worker; whenever it succeeds, this finite oracle
+   checks every key in the active workload before allowing branch reuse. *)
+let checked_integer_same keys changed original =
+  let same = changed == original in
+  if same then
+    List.iter
+      (fun key ->
+         if I.get key changed <> I.get key original then
+           failwith "integer physical equality violated lookup equivalence")
+      keys;
+  same
+
+let checked_string_same keys changed original =
+  let same = changed == original in
+  if same then
+    List.iter
+      (fun key ->
+         if S.get key changed <> S.get key original then
+           failwith "string physical equality violated lookup equivalence")
+      keys;
+  same
+
 let check_integer () =
   let rec build select value key tree =
     if key = 0 then tree
@@ -22,10 +46,14 @@ let check_integer () =
   in
   let fuel_result = IU.union_left_specialized_changed_fuel_result left right in
   let native_result = IU.union_left_native_default left right in
+  let native_checked_result =
+    IU.union_left_native (checked_integer_same (List.init 127 (fun key -> key + 1)))
+      left right
+  in
   let native_fuel_result = IU.union_left_native_fuel_default left right in
   let native_inline_result = IU.union_left_native_fuel_inline_default left right in
   if native_result <> expected_left || native_fuel_result <> expected_left
-     || native_inline_result <> expected_left then
+     || native_inline_result <> expected_left || native_checked_result <> expected_left then
     failwith "integer native-shaped worker differs structurally from legacy union";
   for key = 1 to 64 do
     if I.get key actual_left <> I.get key expected_left then
@@ -38,6 +66,8 @@ let check_integer () =
       failwith "integer closure-free changed-worker union mismatch";
     if I.get key native_result <> I.get key expected_left then
       failwith "integer native-shaped worker union mismatch";
+    if I.get key native_checked_result <> I.get key expected_left then
+      failwith "integer checked native worker union mismatch";
     if I.get key native_fuel_result <> I.get key expected_left then
       failwith "integer native-shaped fuel-worker union mismatch";
     if I.get key native_inline_result <> I.get key expected_left then
@@ -89,6 +119,11 @@ let check_integer () =
       IU.union_left_specialized_changed_fuel_result random_left random_right
     in
     let random_native_result = IU.union_left_native_default random_left random_right in
+    let random_native_checked_result =
+      IU.union_left_native
+        (checked_integer_same (List.init 127 (fun key -> key + 1)))
+        random_left random_right
+    in
     let random_native_fuel_result =
       IU.union_left_native_fuel_default random_left random_right
     in
@@ -98,7 +133,8 @@ let check_integer () =
     let random_expected = I.union_left random_left random_right in
     if random_native_result <> random_expected
        || random_native_fuel_result <> random_expected
-       || random_native_inline_result <> random_expected then
+       || random_native_inline_result <> random_expected
+       || random_native_checked_result <> random_expected then
       failwith "integer randomized native-shaped worker differs structurally from legacy union";
     for key = 1 to 127 do
       if I.get key random_result <> I.get key random_expected then
@@ -107,6 +143,8 @@ let check_integer () =
         failwith "integer randomized closure-free changed-worker union mismatch";
       if I.get key random_native_result <> I.get key random_expected then
         failwith "integer randomized native-shaped worker union mismatch";
+      if I.get key random_native_checked_result <> I.get key random_expected then
+        failwith "integer randomized checked native worker union mismatch";
       if I.get key random_native_fuel_result <> I.get key random_expected then
         failwith "integer randomized native-shaped fuel-worker union mismatch";
       if I.get key random_native_inline_result <> I.get key random_expected then
@@ -141,10 +179,11 @@ let check_string () =
   in
   let fuel_result = SU.union_left_specialized_changed_fuel_result left right in
   let native_result = SU.union_left_native_default left right in
+  let native_checked_result = SU.union_left_native (checked_string_same keys) left right in
   let native_fuel_result = SU.union_left_native_fuel_default left right in
   let native_inline_result = SU.union_left_native_fuel_inline_default left right in
   if native_result <> expected_left || native_fuel_result <> expected_left
-     || native_inline_result <> expected_left then
+     || native_inline_result <> expected_left || native_checked_result <> expected_left then
     failwith "string native-shaped worker differs structurally from legacy union";
   List.iter
     (fun key ->
@@ -158,6 +197,8 @@ let check_string () =
         failwith "string closure-free changed-worker union mismatch";
       if S.get key native_result <> S.get key expected_left then
         failwith "string native-shaped worker union mismatch";
+      if S.get key native_checked_result <> S.get key expected_left then
+        failwith "string checked native worker union mismatch";
       if S.get key native_fuel_result <> S.get key expected_left then
         failwith "string native-shaped fuel-worker union mismatch";
       if S.get key native_inline_result <> S.get key expected_left then
@@ -209,6 +250,10 @@ let check_string () =
       SU.union_left_specialized_changed_fuel_result random_left random_right
     in
     let random_native_result = SU.union_left_native_default random_left random_right in
+    let random_keys = List.init 127 (fun key -> Printf.sprintf "%03d" key) in
+    let random_native_checked_result =
+      SU.union_left_native (checked_string_same random_keys) random_left random_right
+    in
     let random_native_fuel_result =
       SU.union_left_native_fuel_default random_left random_right
     in
@@ -218,7 +263,8 @@ let check_string () =
     let random_expected = S.union_left random_left random_right in
     if random_native_result <> random_expected
        || random_native_fuel_result <> random_expected
-       || random_native_inline_result <> random_expected then
+       || random_native_inline_result <> random_expected
+       || random_native_checked_result <> random_expected then
       failwith "string randomized native-shaped worker differs structurally from legacy union";
     for key = 0 to 126 do
       let key = Printf.sprintf "%03d" key in
@@ -228,6 +274,8 @@ let check_string () =
         failwith "string randomized closure-free changed-worker union mismatch";
       if S.get key random_native_result <> S.get key random_expected then
         failwith "string randomized native-shaped worker union mismatch";
+      if S.get key random_native_checked_result <> S.get key random_expected then
+        failwith "string randomized checked native worker union mismatch";
       if S.get key random_native_fuel_result <> S.get key random_expected then
         failwith "string randomized native-shaped fuel-worker union mismatch";
       if S.get key random_native_inline_result <> S.get key random_expected then
