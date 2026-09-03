@@ -7,22 +7,28 @@ module SU = StringPatriciaUnion
    refinement. The callback is extensionally the OCaml physical test used by
    the extracted default worker; whenever it succeeds, this finite oracle
    checks every key in the active workload before allowing branch reuse. *)
-let checked_integer_same keys changed original =
+let option_equal equal left right =
+  match left, right with
+  | None, None -> true
+  | Some left, Some right -> equal left right
+  | None, Some _ | Some _, None -> false
+
+let checked_integer_same_with keys equal changed original =
   let same = changed == original in
   if same then
     List.iter
       (fun key ->
-         if I.get key changed <> I.get key original then
+         if not (option_equal equal (I.get key changed) (I.get key original)) then
            failwith "integer physical equality violated lookup equivalence")
       keys;
   same
 
-let checked_string_same keys changed original =
+let checked_string_same_with keys equal changed original =
   let same = changed == original in
   if same then
     List.iter
       (fun key ->
-         if S.get key changed <> S.get key original then
+         if not (option_equal equal (S.get key changed) (S.get key original)) then
            failwith "string physical equality violated lookup equivalence")
       keys;
   same
@@ -47,7 +53,8 @@ let check_integer () =
   let fuel_result = IU.union_left_specialized_changed_fuel_result left right in
   let native_result = IU.union_left_native_default left right in
   let native_checked_result =
-    IU.union_left_native (checked_integer_same (List.init 127 (fun key -> key + 1)))
+    IU.union_left_native
+      (checked_integer_same_with (List.init 127 (fun key -> key + 1)) Int.equal)
       left right
   in
   let native_fuel_result = IU.union_left_native_fuel_default left right in
@@ -121,7 +128,7 @@ let check_integer () =
     let random_native_result = IU.union_left_native_default random_left random_right in
     let random_native_checked_result =
       IU.union_left_native
-        (checked_integer_same (List.init 127 (fun key -> key + 1)))
+        (checked_integer_same_with (List.init 127 (fun key -> key + 1)) Int.equal)
         random_left random_right
     in
     let random_native_fuel_result =
@@ -179,7 +186,9 @@ let check_string () =
   in
   let fuel_result = SU.union_left_specialized_changed_fuel_result left right in
   let native_result = SU.union_left_native_default left right in
-  let native_checked_result = SU.union_left_native (checked_string_same keys) left right in
+  let native_checked_result =
+    SU.union_left_native (checked_string_same_with keys Int.equal) left right
+  in
   let native_fuel_result = SU.union_left_native_fuel_default left right in
   let native_inline_result = SU.union_left_native_fuel_inline_default left right in
   if native_result <> expected_left || native_fuel_result <> expected_left
@@ -252,7 +261,8 @@ let check_string () =
     let random_native_result = SU.union_left_native_default random_left random_right in
     let random_keys = List.init 127 (fun key -> Printf.sprintf "%03d" key) in
     let random_native_checked_result =
-      SU.union_left_native (checked_string_same random_keys) random_left random_right
+      SU.union_left_native (checked_string_same_with random_keys Int.equal)
+        random_left random_right
     in
     let random_native_fuel_result =
       SU.union_left_native_fuel_default random_left random_right
@@ -289,7 +299,9 @@ let check_native_payload_identity () =
   let integer_workers =
     [ "native-shaped", IU.union_left_native_default;
       "native-shaped fuel", IU.union_left_native_fuel_default;
-      "inline native-shaped fuel", IU.union_left_native_fuel_inline_default ]
+      "inline native-shaped fuel", IU.union_left_native_fuel_inline_default;
+      "checked native-shaped",
+      IU.union_left_native (checked_integer_same_with [1; 2] ( == )) ]
   in
   List.iter
     (fun (name, union) ->
@@ -312,7 +324,9 @@ let check_native_payload_identity () =
   let string_workers =
     [ "native-shaped", SU.union_left_native_default;
       "native-shaped fuel", SU.union_left_native_fuel_default;
-      "inline native-shaped fuel", SU.union_left_native_fuel_inline_default ]
+      "inline native-shaped fuel", SU.union_left_native_fuel_inline_default;
+      "checked native-shaped",
+      SU.union_left_native (checked_string_same_with ["a"; "b"] ( == )) ]
   in
   List.iter
     (fun (name, union) ->
