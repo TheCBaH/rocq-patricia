@@ -121,8 +121,8 @@ less allocation for the overlapping workload.  This restores the intended
 operational behavior, but it is benchmark evidence rather than a complexity
 proof.
 
-The remaining native-refinement task is the exception-based string `set` and
-the target-level `==` contract for the specialized native unions.
+The remaining native-refinement task is the target-level `==` contract for the
+specialized native unions.
 `SPECIFICATION.md` states that contract precisely: a successful physical test
 denotes the same current immutable tree and therefore equal lookups. A cost
 semantics is additionally needed before making a formal asymptotic claim. This
@@ -225,7 +225,7 @@ does not inspect either kind of extraction directive.
 | Integer `word`, prefix, prefix match, routing bit, highest differing bit, and mask ordering | Boundary-key fuzzing and structural checks found no mismatch | `native_prefix_word_refines`, `native_matches_prefix_refines`, `native_zero_bit_refines`, `native_highest_differing_bit_refines`, and `native_mask_above_refines` identify the bounded source model with the pure operations. The 62-bit payload/mask closure lemmas cover shifted prefixes and XOR-derived split bits. The custom OCaml `lsr`/`land`/`lxor`/loop realization is still trusted until a target-language primitive contract proves it implements this model. |
 | Packed string split token `(byte << 4) | tag`, native `bit_at`, and bytewise `first_diff` | `first_diff` is checked for all 65,536 one-byte pairs plus prefix and long-prefix cases; direct checks cover all 16 tags at in-range and out-of-range byte indices, and structural tests check `bit_at` routing over NUL, non-ASCII, and randomized strings | `NativeRefinement.v` proves the logical `9*b+t` to packed `16*b+t` codec, valid-tag property, injectivity, ordering, and valid-token decode/encode round trips. Its native byte-code-array model proves byte length/access/bounds, the guard conditions for every `unsafe_get` site, and `native_packed_bit_at_refines_representation`; its safe structural bytewise scanner is proved equal to packed `first_diff`, and its mismatching-byte choice is equivalent to the Boolean-XOR leading-zeroes model. The remaining FFI contract is only that OCaml byte strings implement this array model, `String.length`/`Char.code` return the stated length/code, and short-circuit guards precede each unsafe access; OCaml execution itself is not kernel-verified. Logical position 9 remains token 16, so direct equality at the same extracted integer is intentionally false. |
 | A branch sample returned as its constant-time `representative` | `wf_branch` requires `resident sample (Branch ...)`, and every smart constructor and public-operation preservation theorem discharges that premise; structural tests independently check the property | Cached-sample residency is kernel-checked (`wf_cached_sample_resident`). The cached and pure representatives can differ, but `wf_cached_sample_same_prefix_representative` proves agreement below the branch split. `wf_cached_sample_agrees_before_representative` and `wf_cached_sample_bit_at_before_representative` therefore justify every bounded-prefix comparison and strictly-outer routing-bit use in native merge/union without requiring representative equality. |
-| Exception-based one-descent string `set` | Existing/fresh-key oracle tests and structural checks pass; its ordinarily extracted source worker is checked in the randomized oracle | The source-level `set_descend`/`set_one_descent` worker is proved equal to `set` on well-formed inputs. A 10K native trial allocated substantially more for the extracted worker (fixed-width build 993,458 vs. 726,896 words; updates 1,578,027 vs. 923,171), so the supported wrapper retains the exception realizer. Prove that exact realization in a target-language logic, or improve the extracted worker before replacing it. |
+| Direct-string `set` | The public setter is now ordinary extraction of the proved two-descent source definition. Full oracle, structural, and optimized-versus-reference differential tests pass; the extracted one-descent experiments are checked independently. | No Patricia-specific `Extract Constant` remains for string `set`. `set_two_descent_eq_set` is definitional, while the one-descent variants are proved equal to it on well-formed inputs. The remaining trust is ordinary extraction/compiler correctness plus the existing native string primitive mappings, not exception control flow. |
 | Fuel-free integer and string `combine` | The public source workers use nested structural fixpoints and are proved equal to every sufficient `combine_fuel` run; the optimized extraction now retains those definitions, and randomized native merges agree with the reference maps | No Patricia-specific `Extract Constant` remains for general `combine`; ordinary extraction/compiler correctness and the retained primitive mappings remain in the trusted base. |
 | Specialized biased unions and physical-identity (`==`) sharing | Disjoint and overlap results agree with `Stdlib.Map`; both public wrappers use the handwritten native realization. The closure-free fuel worker is proved equal to the established changed worker and is the source-level functional oracle; the isolated workers have invariant and pointwise union proofs plus a targeted extraction oracle. The checked `union-profile` reports the native realization's fixed allocation and left-root reuse for subset/equal/no-op inputs. Both `union_left_native_correct_wf` theorems assemble all reuse branches into a whole-worker invariant and pointwise union law conditional on `native_same_sound`; the direct-string theorem retains cached-sample residency. | The handwritten realization's `==` branch-reuse decisions are still trusted. A target-language/heap refinement must establish `native_same_sound` for OCaml `==`. Any physical-sharing/allocation claim additionally needs a cost or heap semantics. |
 
@@ -273,14 +273,15 @@ Yes for their functional behavior, but not by attaching a proof to the current
    an explicitly enumerated trusted boundary.
 
 The bounded prefix scanner, direct merge, specialized union, first-difference
-scanner, cached representative, and one-descent fused `set` worker now have
-the relevant source-level specifications or refinement proofs. Their packed,
-physical-sharing, and exception-based target realizations still depend on the
-documented foreign-interface contracts. Exact claims about OCaml
-exceptions, `String.unsafe_get`, physical equality, allocation, and generated
-machine code require an OCaml/Clight semantics and a verified compiler or a
-separate deductive verification of the target code. Testing can reduce risk but
-cannot turn those target constructs into kernel-checked theorems.
+scanner, cached representative, and one-descent experimental `set` workers now
+have the relevant source-level specifications or refinement proofs. The public
+setter is ordinary extraction of the proved two-descent definition. Packed and
+physical-sharing target realizations still depend on the documented
+foreign-interface contracts. Exact claims about `String.unsafe_get`, physical
+equality, allocation, and generated machine code require an OCaml/Clight
+semantics and a verified compiler or a separate deductive verification of the
+target code. Testing can reduce risk but cannot turn those target constructs
+into kernel-checked theorems.
 
 ### 5. Repository tests now exercise the extraction-refinement boundary
 

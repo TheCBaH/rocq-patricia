@@ -152,8 +152,7 @@ Executing the supported native library additionally trusts:
 - packed string positions, native `bit_at`, bytewise first difference,
   bounded prefix comparison, `Char.code`, integer XOR/leading-zeroes, and
   guarded `String.unsafe_get` calls;
-- cached string representatives, the exception-based one-descent string
-  `set`, and specialized string biased unions.
+- cached string representatives and specialized string biased unions.
 
 Both general `combine` definitions are extracted directly from the proved
 fuel-free structural workers; as usual, this still trusts ordinary extraction

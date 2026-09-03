@@ -19,11 +19,13 @@ PUBLIC_CMXS := PatriciaMap.cmx StringPatriciaMap.cmx
 REFERENCE_DIR := reference_extracted
 REFERENCE_PACK := PatriciaReference.cmo
 
-.PHONY: all proof core-proof union-proof assumptions extraction \
+.PHONY: all proof core-proof union-proof assumptions extraction extraction-boundary \
 	reference-extraction ocaml reference-ocaml test union-oracle differential \
 	benchmark benchmark-smoke union-profile reference-profile compiler-config clean
 
-all: proof assumptions extraction reference-extraction ocaml reference-ocaml \
+.PHONY: set-profile
+
+all: proof assumptions extraction extraction-boundary reference-extraction ocaml reference-ocaml \
 	test union-oracle differential
 
 proof: $(VOFILES)
@@ -37,6 +39,9 @@ union-proof: $(UNION_VOFILES)
 
 assumptions: proof check-assumptions.sh
 	sh ./check-assumptions.sh $(ROCQ) $(ROCQFLAGS)
+
+extraction-boundary: PatriciaExtract.v check-extraction-boundary.sh
+	sh ./check-extraction-boundary.sh PatriciaExtract.v
 
 extraction: proof
 	@mkdir -p extracted
@@ -116,6 +121,15 @@ union-profile: extraction PatriciaUnionProfile.ml
 	    ../PatriciaUnionProfile.ml
 	./patricia-union-profile
 
+# Compare the public source-extracted string setter with the one-descent
+# experiments and the separately named ordinary two-descent baseline.
+set-profile: extraction PatriciaSetProfile.ml
+	cd extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
+	cd extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../patricia-set-profile $$objects \
+	    ../PatriciaSetProfile.ml
+	./patricia-set-profile
+
 # The proof-aligned extraction has deliberately separate module names from the
 # optimized backend.  Keep its native performance profile in a separate binary
 # so the normal supported-wrapper benchmark stays focused on its public API.
@@ -177,4 +191,5 @@ clean:
 	  PatriciaUnionProfile.cmi PatriciaUnionProfile.cmx PatriciaUnionProfile.o \
 	  PatriciaReferenceProfile.cmi PatriciaReferenceProfile.cmx PatriciaReferenceProfile.o
 	rm -f patricia-test patricia-union-test patricia-differential-test \
-	  patricia-benchmark patricia-union-profile patricia-reference-profile
+	  patricia-benchmark patricia-union-profile patricia-set-profile \
+	  patricia-reference-profile

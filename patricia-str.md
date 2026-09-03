@@ -524,8 +524,10 @@ fully token-native scanner can avoid even that multiplication.
 
 ### 4. Fuse routing and persistent reconstruction in `set`
 
-**Status:** implemented by the native realizer. A proved source-level
-one-descent worker or target-language refinement remains open under N2.
+**Status:** the one-descent worker is proved and retained as an extracted
+experiment. The public setter now uses ordinary extraction of the proved
+two-descent definition, which avoids both handwritten exception control flow
+and the one-descent worker's per-level result allocation.
 
 **Expected impact:** high for update and useful for insertion; proof and
 implementation complexity are higher than the primitive optimizations.
@@ -787,7 +789,8 @@ empirically, not end-to-end formal refinement of the native realizers.
 Keep bit-level Patricia routing: it handles arbitrary byte strings correctly
 and retains a measured lookup advantage. The native implementation now uses a
 packed critical-byte token, bytewise-XOR first-difference discovery, a
-one-descent `set`, cached constant-time representatives, fuel-free generic
+source-extracted two-descent `set`, cached constant-time representatives,
+fuel-free generic
 combine, a bounded prefix scanner, and structurally sharing biased union. The
 direct-string biased-union and extensional-`beq` laws are now proved, as is
 strong sorting of `elements` by the prefix-free bit-stream lexicographic

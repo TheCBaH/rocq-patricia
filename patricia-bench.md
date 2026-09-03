@@ -358,27 +358,30 @@ and accept representative descent. Each choice trades memory against lookup,
 join, or merge work and requires new invariant proofs. Pursue it only if
 retained memory dominates the target workload.
 
-### 7. Proof-aligned one-descent `set` trial rejected for now
+### 7. Source-extracted string `set` replaces the exception realizer
 
-`StringPatricia.set_one_descent` is the source-level, one-pass counterpart of
-the exception-based native `set` realizer. It has a well-formedness and lookup
-refinement proof, and is now included in ordinary extraction and the randomized
-structural oracle. A checked 10,000-binding wrapper trial temporarily selected
-it in place of the realizer; functional checks passed, but allocation increased
-materially because extracted `Set_complete`/`Set_bubble` values are allocated
-along the routed path.
+The one-descent source worker remains useful as a proof and control-flow model,
+but ordinary extraction allocates a `Set_complete`/`Set_bubble` result at each
+routed branch. Threading its fresh leaf removes one avoidable allocation, but
+not the result wrappers. The original two-descent source definition avoids
+those wrappers entirely. It is now the public extracted `StringPatricia.set`;
+the handwritten exception realizer has been removed.
 
-| Fixed-width 4-character strings | Exception realizer | Extracted worker |
+`make set-profile` checks all outputs and reports allocation independently of
+the supported-wrapper benchmark. On the checked 10,000-binding fixed-width
+workload:
+
+| Worker | Build allocation | Existing-key update allocation |
 | --- | ---: | ---: |
-| Build allocation | 726,896 words | 993,458 words |
-| Existing-key update allocation | 923,171 words | 1,578,027 words |
+| Former exception realizer | 667,306 words | 911,607 words |
+| Ordinary one descent | 881,851 words | 1,553,493 words |
+| Shared-leaf one descent | 687,362 words | 1,133,381 words |
+| Public source two descent | 540,777 words | 819,662 words |
 
-The trial also raised variable-length build allocation from 1,083,549 to
-1,711,141 words and update allocation from 1,059,765 to 1,870,184 words.
-The wrapper therefore continues to use the exception realizer. This is a
-single-machine allocation comparison, not a formal cost result; the remaining
-N2 task is to prove the exact realizer in a target-language logic or develop a
-lower-allocation extracted source worker.
+This is machine-specific allocation evidence, not a formal cost theorem. The
+ordinary extracted public worker still relies on the usual extraction/compiler
+boundary and the separately audited native string primitives, but no longer on
+OCaml exception control flow.
 
 ### 8. Native `union_left` retained; extracted workers are the proof oracle
 

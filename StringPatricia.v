@@ -165,7 +165,62 @@ Definition set_one_descent {A : Type}
   | Set_bubble differing => branch_at key differing (Leaf key value) m
   end.
 
+(** This allocation-aware variant has the same control flow as
+    [set_descend], but receives the new leaf as an argument.  Ordinary OCaml
+    extraction consequently allocates that leaf once for the entire descent,
+    rather than once at every recursive call. *)
+Fixpoint set_descend_shared {A : Type}
+    (key : string) (fresh : t A) (m : t A) : set_descent_result A :=
+  match m with
+  | Empty => Set_complete fresh
+  | Leaf stored _ =>
+      match first_diff key stored with
+      | None => Set_complete fresh
+      | Some differing => Set_bubble differing
+      end
+  | Branch sample split ltree rtree =>
+      if bit_at key split then
+        match set_descend_shared key fresh rtree with
+        | Set_complete updated => Set_complete (Branch sample split ltree updated)
+        | Set_bubble differing =>
+            if differing <? split then Set_bubble differing
+            else Set_complete
+                   (Branch sample split ltree
+                      (branch_at key differing fresh rtree))
+        end
+      else
+        match set_descend_shared key fresh ltree with
+        | Set_complete updated => Set_complete (Branch sample split updated rtree)
+        | Set_bubble differing =>
+            if differing <? split then Set_bubble differing
+            else Set_complete
+                   (Branch sample split
+                      (branch_at key differing fresh ltree) rtree)
+        end
+  end.
+
+Definition set_one_descent_shared {A : Type}
+    (key : string) (value : A) (m : t A) : t A :=
+  let fresh := Leaf key value in
+  match set_descend_shared key fresh m with
+  | Set_complete updated => updated
+  | Set_bubble differing => branch_at key differing fresh m
+  end.
+
 Definition set {A : Type} (key : string) (value : A) (m : t A) : t A :=
+  match routed_key key m with
+  | None => Leaf key value
+  | Some routed =>
+      match first_diff key routed with
+      | None => replace key value m
+      | Some differing => insert_at key value differing m
+      end
+  end.
+
+(** A separately named copy of the public source update. It provides a
+    directly measurable ordinary-extraction baseline for the two-descent
+    algorithm. *)
+Definition set_two_descent {A : Type} (key : string) (value : A) (m : t A) : t A :=
   match routed_key key m with
   | None => Leaf key value
   | Some routed =>

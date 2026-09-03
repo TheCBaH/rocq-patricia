@@ -137,13 +137,13 @@ Required only for an end-to-end native-refinement claim.
   `wf_cached_sample_agrees_before_representative` and
   `wf_cached_sample_bit_at_before_representative` carry this to every
   prefix-comparison and strictly-outer routing-bit use in native merge/union.
-- [x] Define and prove a source-level one-descent string `set` worker, or verify
-  the exception-based native realization in a target-language logic.
-  `set_descend`/`set_one_descent` mirror the native exception-based `set`
-  realizer's single descend-then-bubble control flow exactly (matched against
-  `PatriciaExtract.v`'s `StringPatricia.set` realizer, which caught a real bug:
-  the original stub's bubble-caught-here case dropped the sibling subtree and
-  the branch's own sample/split, fixed to rebuild the full `Branch`).
+- [x] Define and prove source-level string `set` workers and extract a public
+  worker without a Patricia-specific realizer. `set_descend`/`set_one_descent`
+  model the former exception algorithm's single descend-then-bubble control
+  flow (and caught a dropped-sibling bug in its original stub). Their allocated
+  result wrapper is not public. The public `set` now extracts directly from
+  the proved two-descent source definition, while `set_two_descent` remains a
+  separately named ordinary-extraction baseline.
   `set_descend_matches_insert_at` proves the descent lands on the same split
   `insert_at` would from a separate top-down `routed_key` pass, using the
   branch-split ordering (`all_splits_after_of_all_keys`) to relate the two
@@ -177,7 +177,7 @@ Required only for an end-to-end native-refinement claim.
   recompiles the companion closure, while `make union-oracle` extracts and
   checks both workers against the established biased unions.
 - [x] Prove source-level models and functional refinements for the remaining
-  handwritten `set` and union paths. Both general `combine` realizers have been
+  handwritten union paths. Both general `combine` realizers have been
   removed: `Patricia.combine` and `StringPatricia.combine` now extract directly
   from the proved structural workers. The companion modules now define and
   extract source-level `union_left_specialized_changed` workers. Both workers
@@ -226,10 +226,12 @@ Required only for an end-to-end native-refinement claim.
   per-branch certificates into the whole-worker invariant and left-biased
   lookup law; the direct-string theorem of the same name does the same while
   retaining cached-sample residency.
-- [ ] Remove the remaining handwritten `set` and union realizers when proved
-  extracted workers meet the performance requirements, or link their OCaml
-  realizers to those source workers in a target-language refinement. The
-  remaining target-level step is to state the OCaml `==` soundness contract
+- [ ] Remove the remaining handwritten union realizers when proved extracted
+  workers meet the performance requirements, or link their OCaml realizers to
+  those source workers in a target-language refinement. The public string
+  `set` now extracts directly from the proved two-descent source definition;
+  its former exception realizer has been removed. The remaining target-level
+  step is to state the OCaml `==` soundness contract
   once for the
   extracted tree type and connect it to the source
   `native_same_sound` assumption. `SPECIFICATION.md` now names the required
@@ -260,10 +262,9 @@ Required only for an end-to-end native-refinement claim.
   available OCaml 4.14.3 compiler has `flambda: false`; routine compiler
   inlining is therefore not a viable elimination route for this allocation.
   The normally extracted `set_one_descent` worker is also exercised directly
-  by the randomized oracle, but a 10K wrapper trial allocated 993,458 versus
-  726,896 words for fixed-width-string construction and 1,578,027 versus
-  923,171 for updates; the exception realizer remains in the wrapper pending
-  a target-language refinement proof or a lower-allocation source worker.
+  by the randomized oracle, but its allocating result wrapper is retained only
+  as an experiment; the public source-extracted two-descent worker avoids that
+  overhead and needs no exception realizer.
 
 Exit gate: optimized public operations are linked by refinement theorems to the
 proved finite-map semantics. Physical sharing remains outside the claim unless
@@ -415,6 +416,8 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-09-03 | Audited the remaining high-level extraction boundary | `check-extraction-boundary.sh`, now in the normal `make` gate, rejects handwritten `set`/`combine` substitutions and requires exactly the four specialized integer/string biased-union overrides. It preserves the documented boundary after removing the string setter realizer; low-level mappings remain separately specified trusted primitives. `make` and `git diff --check` passed. |
+| 2026-09-03 | Removed the handwritten exception-based string `set` realizer | `StringPatricia.set` now extracts directly from its proved two-descent source definition; `set_two_descent_eq_set` records the identical diagnostic worker, while the shared-leaf one-descent candidate remains independently extracted and structurally tested. `PatriciaSetProfile.ml`/`make set-profile` measures the alternatives. At 10K fixed-width strings, ordinary source extraction allocated 540,777 words to build and 819,662 to update, versus the prior realizer's 667,306 and 911,607 in the same profile. Full `make`, `PATRICIA_SET_PROFILE_SIZE=10000 make set-profile`, and `git diff --check` passed. |
 | 2026-09-02 | Extended deterministic exception-set token coverage beyond byte zero | `PatriciaTest.ml` now repeats every byte-bit/continuation-token insertion-order and replacement differential check after common prefixes of 0, 1, 2, and 31 bytes. The structural comparison of the handwritten exception realizer with ordinary extraction of proved `set_one_descent` now covers packed split positions and bubbling at nonzero byte offsets; it remains finite runtime evidence, not an OCaml exception/control-flow proof. `make test` and `git diff --check` passed. |
 | 2026-09-02 | Added deterministic exception-set route differential coverage | `PatriciaTest.ml` now compares the handwritten exception-based `StringPatricia.set` and ordinarily extracted, proved `set_one_descent` structurally after every operation across every insertion order of four byte-string keys. It repeats this for all eight byte-bit split positions, includes a continuation-token split (`"\\000"` versus `"\\000\\255"`), and performs replacement after every intermediate prefix. This broadens checked target-realizer evidence, but is not an OCaml exception/control-flow proof. Full `make` and `git diff --check` passed. |
 | 2026-09-02 | Closed the source-level refinement subtask for handwritten paths | The tracker now separates the completed source models/proofs for native unions and one-descent string `set` from the still-open target-language OCaml realizer link. `union_left_native_correct_wf` closes whole-worker union semantics under `native_same_sound` in both backends; `set_one_descent_eq_set` closes source-level fused-set equivalence. Full `make` passed with 402 closed declarations; the structural differential tests remain in the normal gate. |

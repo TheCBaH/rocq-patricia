@@ -241,14 +241,15 @@ let check_string_bits () =
     ["", ""; "", "\000"; "a", "a\000"; "prefix", "prefix\255";
      Stdlib.String.make 192 'p', Stdlib.String.make 192 'p' ^ "\128"]
 
-(* The optimized [S.set] is the exception-based realizer from
-   [PatriciaExtract.v], whereas [S.set_one_descent] is ordinary extraction of
-   its proved source counterpart.  Random traces below exercise both, but this
-   compact deterministic suite makes every byte bit and the continuation token
-   a fresh-key split at byte zero and after several common-prefix lengths.
+(* The public [S.set] is ordinary extraction of the proved two-descent source
+   definition, whereas [S.set_one_descent] and
+   [S.set_one_descent_shared], and [S.set_two_descent] are ordinary extraction
+   of proved source counterparts. Random traces below exercise all four, but this compact
+   deterministic suite makes every byte bit and the continuation token a
+   fresh-key split at byte zero and after several common-prefix lengths.
    Every insertion order and every intermediate prefix is checked structurally,
-   so a misplaced exception catch or bubble rebuild is visible even when lookup
-   results happen to agree. *)
+   so a mistaken bubble reconstruction is visible even when lookup results
+   happen to agree. *)
 let check_string_set_realizer_routes () =
   let rec permutations = function
     | [] -> [ [] ]
@@ -282,30 +283,48 @@ let check_string_set_realizer_routes () =
          in
          List.iteri
            (fun order_index order ->
-              let native = ref S.empty and source = ref S.empty in
+              let public = ref S.empty and source = ref S.empty
+              and shared = ref S.empty in
               check_equal
                 (Printf.sprintf "prefix %d bit %d order %d empty"
                    prefix_length bit order_index)
-                !native !source;
+                !public !source;
+              check_equal
+                (Printf.sprintf "prefix %d bit %d order %d shared empty"
+                   prefix_length bit order_index)
+                !public !shared;
               List.iteri
                 (fun depth key ->
-                   native := S.set key ((depth * 100) + bit) !native;
+                   public := S.set key ((depth * 100) + bit) !public;
                    source := S.set_one_descent key ((depth * 100) + bit) !source;
+                   shared := S.set_one_descent_shared key ((depth * 100) + bit) !shared;
                    check_equal
                      (Printf.sprintf "prefix %d bit %d order %d depth %d"
                         prefix_length bit order_index depth)
-                     !native !source;
+                     !public !source;
+                   check_equal
+                     (Printf.sprintf "prefix %d bit %d order %d shared depth %d"
+                        prefix_length bit order_index depth)
+                     !public !shared;
                    List.iteri
                      (fun update_index update_key ->
-                        native := S.set update_key ((depth * 1000) + update_index) !native;
+                        public := S.set update_key ((depth * 1000) + update_index) !public;
                         source :=
                           S.set_one_descent update_key ((depth * 1000) + update_index)
                             !source;
+                        shared :=
+                          S.set_one_descent_shared update_key
+                            ((depth * 1000) + update_index) !shared;
                         check_equal
                           (Printf.sprintf
                              "prefix %d bit %d order %d depth %d update %d"
                              prefix_length bit order_index depth update_index)
-                          !native !source)
+                          !public !source;
+                        check_equal
+                          (Printf.sprintf
+                             "prefix %d bit %d order %d shared depth %d update %d"
+                             prefix_length bit order_index depth update_index)
+                          !public !shared)
                      keys)
                 order)
            (permutations keys)
@@ -395,27 +414,35 @@ let check_string_keys () =
     let right_ref = Hashtbl.create 128 in
     let left = ref S.empty in
     let right = ref S.empty in
-    (* [set_one_descent] is extracted without a Patricia-specific OCaml
-       realizer.  Keep a parallel random oracle here so its ordinary
-       extraction is checked independently of the optimized [set] path. *)
+    (* The three source workers are extracted without a Patricia-specific
+       OCaml realizer.  Keep parallel random oracles so their ordinary
+       extraction is checked independently of the public [set] path. *)
     let left_one_descent = ref S.empty in
     let right_one_descent = ref S.empty in
+    let left_shared = ref S.empty in
+    let right_shared = ref S.empty in
+    let left_two_descent = ref S.empty in
+    let right_two_descent = ref S.empty in
     for _ = 1 to 120 do
-      let update tree one_descent reference =
+      let update tree one_descent shared two_descent reference =
         let key = List.nth keys (Random.int (List.length keys)) in
         if Random.bool () then begin
           let value = Random.int 10_000 in
           Hashtbl.replace reference key value;
           tree := S.set key value !tree;
-          one_descent := S.set_one_descent key value !one_descent
+          one_descent := S.set_one_descent key value !one_descent;
+          shared := S.set_one_descent_shared key value !shared;
+          two_descent := S.set_two_descent key value !two_descent
         end else begin
           Hashtbl.remove reference key;
           tree := S.remove key !tree;
-          one_descent := S.remove key !one_descent
+          one_descent := S.remove key !one_descent;
+          shared := S.remove key !shared;
+          two_descent := S.remove key !two_descent
         end
       in
-      update left left_one_descent left_ref;
-      update right right_one_descent right_ref
+      update left left_one_descent left_shared left_two_descent left_ref;
+      update right right_one_descent right_shared right_two_descent right_ref
     done;
     check_string_table round "left updates" keys left_ref !left;
     check_string_table round "right updates" keys right_ref !right;
@@ -423,15 +450,43 @@ let check_string_keys () =
       !left_one_descent;
     check_string_table round "right one-descent updates" keys right_ref
       !right_one_descent;
+    check_string_table round "left shared one-descent updates" keys left_ref
+      !left_shared;
+    check_string_table round "right shared one-descent updates" keys right_ref
+      !right_shared;
+    check_string_table round "left two-descent updates" keys left_ref
+      !left_two_descent;
+    check_string_table round "right two-descent updates" keys right_ref
+      !right_two_descent;
     if !left <> !left_one_descent then
       failwith
         (Printf.sprintf
-           "string round %d: native set differs structurally from one-descent worker"
+           "string round %d: public set differs structurally from one-descent worker"
            round);
     if !right <> !right_one_descent then
       failwith
         (Printf.sprintf
-           "string round %d: native set differs structurally from one-descent worker"
+           "string round %d: public set differs structurally from one-descent worker"
+           round);
+    if !left <> !left_shared then
+      failwith
+        (Printf.sprintf
+           "string round %d: public set differs structurally from shared one-descent worker"
+           round);
+    if !right <> !right_shared then
+      failwith
+        (Printf.sprintf
+           "string round %d: public set differs structurally from shared one-descent worker"
+           round);
+    if !left <> !left_two_descent then
+      failwith
+        (Printf.sprintf
+           "string round %d: public set differs structurally from two-descent worker"
+           round);
+    if !right <> !right_two_descent then
+      failwith
+        (Printf.sprintf
+           "string round %d: public set differs structurally from two-descent worker"
            round);
     let rebuilt_left =
       List.fold_left

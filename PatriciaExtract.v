@@ -170,38 +170,6 @@ Extract Constant StringPatricia.representative =>
      | Leaf (key, _) -> Some key
      | Branch (sample, _, _, _) -> Some sample)".
 
-(** Fuse routed-leaf discovery with persistent reconstruction.  A local
-    exception carries a fresh key's discriminator up to the first ancestor
-    below which it belongs.  Existing-key replacement and fresh insertion
-    therefore each route through the input only once. *)
-Extract Constant StringPatricia.set =>
-  "(fun key value root ->
-     let fresh = Leaf (key, value) in
-     let exception Fresh_key of int in
-     let rec descend tree =
-       match tree with
-       | Empty -> fresh
-       | Leaf (stored, _) ->
-           (match first_diff key stored with
-            | None -> fresh
-            | Some differing -> raise (Fresh_key differing))
-       | Branch (sample, split, left, right) ->
-           if bit_at key split then
-             (try Branch (sample, split, left, descend right) with
-              | (Fresh_key differing as pending) ->
-                  if differing < split then raise pending
-                  else Branch (sample, split, left,
-                         branch_at key differing fresh right))
-           else
-             (try Branch (sample, split, descend left, right) with
-              | (Fresh_key differing as pending) ->
-                  if differing < split then raise pending
-                  else Branch (sample, split,
-                         branch_at key differing fresh left, right))
-     in
-     try descend root with
-     | Fresh_key differing -> branch_at key differing fresh root)".
-
 (** [StringPatricia.combine] is likewise the proved fuel-free structural
     worker, so extraction retains it instead of replacing it with native
     handwritten merge code. *)
@@ -284,6 +252,7 @@ Separate Extraction
   StringPatricia.map_right StringPatricia.replace_binding
   StringPatricia.combine_leaf_left StringPatricia.combine_leaf_right
   StringPatricia.get StringPatricia.mem StringPatricia.set_one_descent
+  StringPatricia.set_one_descent_shared StringPatricia.set_two_descent
   StringPatricia.set StringPatricia.remove StringPatricia.of_list
   StringPatricia.combine StringPatricia.union_left StringPatricia.union_right
   StringPatriciaUnion.union_left_specialized

@@ -1960,6 +1960,33 @@ Lemma set_descend_branch_false:
       end.
 Proof. intros A key value sample split ltree rtree Ekey. cbn [set_descend]. now rewrite Ekey. Qed.
 
+(** Threading the fresh leaf as an explicit invariant parameter changes only
+    allocation behavior after extraction, not the source result. *)
+Lemma set_descend_shared_eq_set_descend:
+  forall (A : Type) key (value : A) (m : t A),
+    set_descend_shared key (Leaf key value) m = set_descend key value m.
+Proof.
+  intros A key value m.
+  induction m as [|stored stored_value|sample split ltree IHl rtree IHr]; cbn.
+  - reflexivity.
+  - destruct (first_diff key stored); reflexivity.
+  - destruct (bit_at key split); now rewrite ?IHl, ?IHr.
+Qed.
+
+Corollary set_one_descent_shared_eq_set_one_descent:
+  forall (A : Type) key (value : A) (m : t A),
+    set_one_descent_shared key value m = set_one_descent key value m.
+Proof.
+  intros A key value m.
+  unfold set_one_descent_shared, set_one_descent.
+  now rewrite set_descend_shared_eq_set_descend.
+Qed.
+
+Corollary set_two_descent_eq_set:
+  forall (A : Type) key (value : A) (m : t A),
+    set_two_descent key value m = set key value m.
+Proof. reflexivity. Qed.
+
 Theorem set_descend_matches_insert_at:
   forall (A : Type) key value (m : t A),
     wf m ->
