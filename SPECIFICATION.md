@@ -149,6 +149,13 @@ Executing the supported native library additionally trusts:
   representation contract, not a portable consequence of OCaml `==`: for
   non-mutable values the documented language guarantee is only `compare = 0`,
   which is too weak for arbitrary (potentially mutable) map payloads;
+  `NativeHeapRefinement.v` now models the required bridge with abstract heap
+  locations and proves that a successful same-location test discharges both
+  source `native_same_sound` premises. The remaining external obligation is to
+  relate each current OCaml tree object and `(==)` result to that model; the
+  [OCaml 4.14 library reference](https://ocaml.org/releases/4.14/ocaml-4.14-refman.pdf)
+  specifies physical equality but does not supply this compiler/heap
+  refinement theorem;
 - packed string positions, native `bit_at`, bytewise first difference,
   bounded prefix comparison, `Char.code`, integer XOR/leading-zeroes, and
   guarded `String.unsafe_get` calls;

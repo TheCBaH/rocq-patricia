@@ -7,7 +7,7 @@ ROCQFLAGS := -q -Q . ''
 CORE_VFILES := PatriciaBits.v Patricia.v PatriciaProof.v \
 	StringBits.v NativeRefinement.v StringPatricia.v StringPatriciaProof.v
 UNION_VFILES := PatriciaUnion.v PatriciaUnionProof.v \
-	StringPatriciaUnion.v StringPatriciaUnionProof.v
+	StringPatriciaUnion.v StringPatriciaUnionProof.v NativeHeapRefinement.v
 VFILES := $(CORE_VFILES) $(UNION_VFILES)
 VOFILES := $(VFILES:.v=.vo)
 CORE_VOFILES := $(CORE_VFILES:.v=.vo)
@@ -173,6 +173,7 @@ PatriciaUnion.vo: PatriciaBits.vo Patricia.vo
 PatriciaUnionProof.vo: PatriciaProof.vo PatriciaUnion.vo
 StringPatriciaUnion.vo: StringBits.vo StringPatricia.vo
 StringPatriciaUnionProof.vo: StringPatriciaProof.vo StringPatriciaUnion.vo
+NativeHeapRefinement.vo: PatriciaUnionProof.vo StringPatriciaUnionProof.vo
 
 %.vo: %.v
 	$(ROCQ) compile $(ROCQFLAGS) $<
