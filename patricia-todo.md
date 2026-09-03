@@ -240,10 +240,12 @@ Required only for an end-to-end native-refinement claim.
   property requires an OCaml heap/compiler semantics; it remains trusted here.
   `NativeHeapRefinement.v` now separates that external link into a concrete
   FFI contract: roots have current heap locations, a location denotes one
-  source tree, and a successful `(==)` denotes equal locations. Its two
-  kernel-checked bridge theorems derive the integer and direct-string
-  `native_same_sound` premises from that contract. Proving OCaml implements
-  the contract remains the outstanding target-language task.
+  source tree, and a successful `(==)` denotes equal locations. Its object
+  layer makes this a per-call adequacy obligation rather than assigning a
+  canonical location to each pure source tree; its two kernel-checked bridge
+  theorems derive the integer and direct-string `native_same_sound` premises
+  from that contract. Proving OCaml implements the contract remains the
+  outstanding target-language task.
   A native-shaped Rocq worker now mirrors the handwritten recursion and extracts
   with only `native_same` mapped to `(==)`, but it is not public: at 100K it
   allocates 800,904/800,628 integer/string words for half overlap and
@@ -422,6 +424,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-09-03 | Refined the external OCaml heap boundary for union `(==)` | `NativeHeapRefinement.v` now introduces allocated heap states and runtime tree objects that pair a current root with its source-tree interpretation. `native_same_call_adequate` states the extraction obligation at each dynamic callback, so equal source trees may still reside at distinct locations; successful physical equality alone yields source-tree equality. `patricia_ocaml_heap_same_sound` and `string_patricia_ocaml_heap_same_sound` derive the exact native-union premises. The remaining task is an OCaml heap/compiler semantics proving that the extracted `(==)` calls meet this adequacy statement. `make NativeHeapRefinement.vo`, `make assumptions`, and `git diff --check` passed. |
 | 2026-09-03 | Audited the selected OCaml physical-equality lowering | `check-ocaml-physical-equality.sh` and `make ocaml-physical-equality-audit` inspect the installed OCaml 4.14.3 source tree: `Stdlib.(==)` is `%eq`, `%eq` translates to `Pintcomp Ceq`, `cmmgen` dispatches it to `int_comp_caml`, and that lowering uses `Ccmpi`. This supports the runtime-root bridge for the pinned toolchain, but does not prove the compiler binary, garbage collector, or generated executable satisfies it; it remains outside the normal correctness gate. `make ocaml-physical-equality-audit`, `make`, and `git diff --check` passed. |
 | 2026-09-03 | Checked the runtime-root model against the extracted OCaml representation | `PatriciaUnionTest.ml` now uses `Obj` only in the internal oracle to require that both extracted `Empty` constructors are immediate, while constructed leaves and branches are allocated roots with physical self identity. This directly exercises the two `NativeHeapRefinement.runtime_root` cases on the selected OCaml 4.14.3 runtime; it is finite implementation evidence, not a portable heap/compiler theorem. `make union-oracle` and `git diff --check` passed. |
 | 2026-09-03 | Formalized the heap-location bridge for native union sharing | `NativeHeapRefinement.v` defines abstract runtime roots (immediate `Empty` or allocated locations), physical equality, current heap views, and the positive-direction `(==)` realization contract. `patricia_runtime_same_sound` and `string_patricia_runtime_same_sound` kernel-check that either successful runtime-root equality case implies the exact `native_same_sound` premise consumed by the two whole-worker union refinements. It does not prove OCaml’s runtime satisfies the contract; that remaining FFI/compiler link is now explicit and narrow. `make NativeHeapRefinement.vo` and `git diff --check` passed. |

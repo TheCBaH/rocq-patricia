@@ -150,8 +150,10 @@ Executing the supported native library additionally trusts:
   non-mutable values the documented language guarantee is only `compare = 0`,
   which is too weak for arbitrary (potentially mutable) map payloads;
   `NativeHeapRefinement.v` now models the required bridge with immediate empty
-  values, allocated heap roots, and abstract current heap locations; it proves
-  that either successful runtime-root equality case discharges both source
+  values, allocated heap roots, and abstract current heap locations. Its
+  object layer pairs each current OCaml root with its source-tree
+  interpretation, permits distinct locations for equal source trees, and
+  proves that a per-call `(==)` adequacy theorem discharges both source
   `native_same_sound` premises. The remaining external obligation is to relate
   each current OCaml tree object and `(==)` result to that model; the
   [OCaml 4.14 library reference](https://ocaml.org/releases/4.14/ocaml-4.14-refman.pdf)
