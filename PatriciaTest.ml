@@ -245,9 +245,10 @@ let check_string_bits () =
    [PatriciaExtract.v], whereas [S.set_one_descent] is ordinary extraction of
    its proved source counterpart.  Random traces below exercise both, but this
    compact deterministic suite makes every byte bit and the continuation token
-   a fresh-key split.  Every insertion order and every intermediate prefix is
-   checked structurally, so a misplaced exception catch or bubble rebuild is
-   visible even when lookup results happen to agree. *)
+   a fresh-key split at byte zero and after several common-prefix lengths.
+   Every insertion order and every intermediate prefix is checked structurally,
+   so a misplaced exception catch or bubble rebuild is visible even when lookup
+   results happen to agree. *)
 let check_string_set_realizer_routes () =
   let rec permutations = function
     | [] -> [ [] ]
@@ -267,39 +268,49 @@ let check_string_set_realizer_routes () =
     if native <> source then
       failwith ("string set realizer differs structurally: " ^ label)
   in
-  for bit = 0 to 7 do
-    let byte = Stdlib.String.make 1 (Char.chr (1 lsl bit)) in
-    (* ["\\000"] and [byte] differ at this exact byte bit.  The extension of
-       NUL differs at its continuation marker; the final byte makes the fresh
-       split bubble above an already-built inner branch in several orders. *)
-    let keys = ["\000"; byte; "\000\255"; "\255"] in
-    List.iteri
-      (fun order_index order ->
-         let native = ref S.empty and source = ref S.empty in
-         check_equal (Printf.sprintf "bit %d order %d empty" bit order_index)
-           !native !source;
+  List.iter
+    (fun prefix_length ->
+       let prefix = Stdlib.String.make prefix_length '\001' in
+       for bit = 0 to 7 do
+         let byte = Stdlib.String.make 1 (Char.chr (1 lsl bit)) in
+         (* [prefix ^ "\\000"] and [prefix ^ byte] differ at this exact byte
+            bit.  The extension of NUL differs at its continuation marker; the
+            final byte makes the fresh split bubble above an already-built
+            inner branch in several orders. *)
+         let keys =
+           [prefix ^ "\000"; prefix ^ byte; prefix ^ "\000\255"; prefix ^ "\255"]
+         in
          List.iteri
-           (fun depth key ->
-              native := S.set key ((depth * 100) + bit) !native;
-              source := S.set_one_descent key ((depth * 100) + bit) !source;
+           (fun order_index order ->
+              let native = ref S.empty and source = ref S.empty in
               check_equal
-                (Printf.sprintf "bit %d order %d depth %d" bit order_index depth)
+                (Printf.sprintf "prefix %d bit %d order %d empty"
+                   prefix_length bit order_index)
                 !native !source;
               List.iteri
-                (fun update_index update_key ->
-                   native := S.set update_key ((depth * 1000) + update_index) !native;
-                   source :=
-                     S.set_one_descent update_key ((depth * 1000) + update_index)
-                       !source;
+                (fun depth key ->
+                   native := S.set key ((depth * 100) + bit) !native;
+                   source := S.set_one_descent key ((depth * 100) + bit) !source;
                    check_equal
-                     (Printf.sprintf
-                        "bit %d order %d depth %d update %d"
-                        bit order_index depth update_index)
-                     !native !source)
-                keys)
-           order)
-      (permutations keys)
-  done
+                     (Printf.sprintf "prefix %d bit %d order %d depth %d"
+                        prefix_length bit order_index depth)
+                     !native !source;
+                   List.iteri
+                     (fun update_index update_key ->
+                        native := S.set update_key ((depth * 1000) + update_index) !native;
+                        source :=
+                          S.set_one_descent update_key ((depth * 1000) + update_index)
+                            !source;
+                        check_equal
+                          (Printf.sprintf
+                             "prefix %d bit %d order %d depth %d update %d"
+                             prefix_length bit order_index depth update_index)
+                          !native !source)
+                     keys)
+                order)
+           (permutations keys)
+       done)
+    [0; 1; 2; 31]
 
 let check_string_structure round tree =
   let next_token token =
