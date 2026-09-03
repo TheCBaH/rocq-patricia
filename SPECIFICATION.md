@@ -156,7 +156,11 @@ Executing the supported native library additionally trusts:
   each current OCaml tree object and `(==)` result to that model; the
   [OCaml 4.14 library reference](https://ocaml.org/releases/4.14/ocaml-4.14-refman.pdf)
   specifies physical equality but does not supply this compiler/heap
-  refinement theorem;
+  refinement theorem. `make ocaml-physical-equality-audit` additionally
+  source-checks the selected 4.14.3 implementation path from `Stdlib.(==)`
+  through `%eq`, `Pintcomp Ceq`, `cmmgen`, and `Ccmpi` to native word
+  comparison; this is pinned implementation evidence, not a proof about the
+  compiler binary or runtime;
 - packed string positions, native `bit_at`, bytewise first difference,
   bounded prefix comparison, `Char.code`, integer XOR/leading-zeroes, and
   guarded `String.unsafe_get` calls;

@@ -20,6 +20,7 @@ REFERENCE_DIR := reference_extracted
 REFERENCE_PACK := PatriciaReference.cmo
 
 .PHONY: all proof core-proof union-proof assumptions extraction extraction-boundary \
+	ocaml-physical-equality-audit \
 	reference-extraction ocaml reference-ocaml test union-oracle differential \
 	benchmark benchmark-smoke union-profile reference-profile compiler-config clean
 
@@ -42,6 +43,14 @@ assumptions: proof check-assumptions.sh
 
 extraction-boundary: PatriciaExtract.v check-extraction-boundary.sh
 	sh ./check-extraction-boundary.sh PatriciaExtract.v
+
+# Optional implementation audit for the selected OCaml compiler sources. It
+# intentionally stays outside the normal proof/correctness gate: a source scan
+# is evidence about one toolchain, not a compiler-correctness theorem.
+OCAML_SOURCE_ROOT ?= /opt/opam/4.14.3/.opam-switch/sources/ocaml-base-compiler.4.14.3
+
+ocaml-physical-equality-audit: check-ocaml-physical-equality.sh
+	sh ./check-ocaml-physical-equality.sh $(OCAML_SOURCE_ROOT)
 
 extraction: proof
 	@mkdir -p extracted

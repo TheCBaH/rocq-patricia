@@ -1,6 +1,6 @@
 # Patricia plan and tracker
 
-Last updated: 2026-09-02
+Last updated: 2026-09-03
 
 This document is the single source of truth for Patricia planning and progress.
 The public contracts and trusted boundary are fixed in
@@ -422,6 +422,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-09-03 | Audited the selected OCaml physical-equality lowering | `check-ocaml-physical-equality.sh` and `make ocaml-physical-equality-audit` inspect the installed OCaml 4.14.3 source tree: `Stdlib.(==)` is `%eq`, `%eq` translates to `Pintcomp Ceq`, `cmmgen` dispatches it to `int_comp_caml`, and that lowering uses `Ccmpi`. This supports the runtime-root bridge for the pinned toolchain, but does not prove the compiler binary, garbage collector, or generated executable satisfies it; it remains outside the normal correctness gate. `make ocaml-physical-equality-audit`, `make`, and `git diff --check` passed. |
 | 2026-09-03 | Checked the runtime-root model against the extracted OCaml representation | `PatriciaUnionTest.ml` now uses `Obj` only in the internal oracle to require that both extracted `Empty` constructors are immediate, while constructed leaves and branches are allocated roots with physical self identity. This directly exercises the two `NativeHeapRefinement.runtime_root` cases on the selected OCaml 4.14.3 runtime; it is finite implementation evidence, not a portable heap/compiler theorem. `make union-oracle` and `git diff --check` passed. |
 | 2026-09-03 | Formalized the heap-location bridge for native union sharing | `NativeHeapRefinement.v` defines abstract runtime roots (immediate `Empty` or allocated locations), physical equality, current heap views, and the positive-direction `(==)` realization contract. `patricia_runtime_same_sound` and `string_patricia_runtime_same_sound` kernel-check that either successful runtime-root equality case implies the exact `native_same_sound` premise consumed by the two whole-worker union refinements. It does not prove OCaml’s runtime satisfies the contract; that remaining FFI/compiler link is now explicit and narrow. `make NativeHeapRefinement.vo` and `git diff --check` passed. |
 | 2026-09-03 | Exercised the `native_same_sound` premise at every observed reuse decision | `PatriciaUnionTest.ml` now runs the generic extracted `union_left_native` workers with callbacks that behave exactly as OCaml `(==)` but, on every successful comparison, verify lookup equality at every key in the active deterministic or randomized integer/string workload. The same checked worker is included in the mutable-payload regressions, using physical equality for selected values; this covers the API’s payload-identity requirement without invoking polymorphic equality on references. The checked runs retain structural equality with the legacy unions. This is targeted finite evidence for the positive-direction physical-equality contract, not an OCaml heap/compiler proof. `make union-oracle` and `git diff --check` passed. |
