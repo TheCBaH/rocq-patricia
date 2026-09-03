@@ -33,6 +33,27 @@ let checked_string_same_with keys equal changed original =
       keys;
   same
 
+(* Runtime evidence for the two [runtime_root] forms in
+   [NativeHeapRefinement.v].  This deliberately uses [Obj] only in the
+   internal oracle: public maps remain abstract and never expose heap shape. *)
+let check_runtime_root_representation () =
+  let check label empty leaf branch =
+    if not (Obj.is_int (Obj.repr empty)) then
+      failwith (label ^ ": Empty is not immediate");
+    if Obj.is_int (Obj.repr leaf) then
+      failwith (label ^ ": Leaf is not an allocated root");
+    if Obj.is_int (Obj.repr branch) then
+      failwith (label ^ ": Branch is not an allocated root");
+    if not (leaf == leaf && branch == branch) then
+      failwith (label ^ ": allocated root lost physical self identity")
+  in
+  let integer_leaf = I.set 1 10 I.empty in
+  let integer_branch = I.set 2 20 integer_leaf in
+  check "integer" I.empty integer_leaf integer_branch;
+  let string_leaf = S.set "a" 10 S.empty in
+  let string_branch = S.set "b" 20 string_leaf in
+  check "string" S.empty string_leaf string_branch
+
 let check_integer () =
   let rec build select value key tree =
     if key = 0 then tree
@@ -348,6 +369,7 @@ let check_native_payload_identity () =
     string_workers
 
 let () =
+  check_runtime_root_representation ();
   check_integer ();
   check_string ();
   check_native_payload_identity ();
