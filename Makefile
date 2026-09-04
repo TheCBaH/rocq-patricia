@@ -20,13 +20,14 @@ REFERENCE_DIR := reference_extracted
 REFERENCE_PACK := PatriciaReference.cmo
 
 .PHONY: all proof core-proof union-proof assumptions extraction extraction-boundary \
-	ocaml-physical-equality-audit \
+	native-union-realizer-audit ocaml-physical-equality-audit \
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile reference-profile compiler-config clean
 
 .PHONY: set-profile
 
-all: proof assumptions extraction extraction-boundary reference-extraction ocaml reference-ocaml \
+all: proof assumptions extraction extraction-boundary native-union-realizer-audit \
+	reference-extraction ocaml reference-ocaml \
 	test union-oracle differential
 
 proof: $(VOFILES)
@@ -43,6 +44,13 @@ assumptions: proof check-assumptions.sh
 
 extraction-boundary: PatriciaExtract.v check-extraction-boundary.sh
 	sh ./check-extraction-boundary.sh PatriciaExtract.v
+
+# The four specialized union overrides are the remaining handwritten
+# high-level realizers.  Check the generated bodies as well as their source
+# count: every physical test must remain a recursive tree-child reuse test.
+native-union-realizer-audit: extraction check-native-union-realizers.sh
+	sh ./check-native-union-realizers.sh extracted/PatriciaInternal.ml \
+	  extracted/StringPatriciaInternal.ml
 
 # Optional implementation audit for the selected OCaml compiler sources. It
 # intentionally stays outside the normal proof/correctness gate: a source scan

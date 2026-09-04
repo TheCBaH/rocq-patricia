@@ -162,7 +162,11 @@ Executing the supported native library additionally trusts:
   source-checks the selected 4.14.3 implementation path from `Stdlib.(==)`
   through `%eq`, `Pintcomp Ceq`, `cmmgen`, and `Ccmpi` to native word
   comparison; this is pinned implementation evidence, not a proof about the
-  compiler binary or runtime;
+  compiler binary or runtime. `make native-union-realizer-audit` also checks
+  the generated handwritten bodies and permits physical equality only between
+  a recursive tree result and the original tree child whose branch may be
+  reused; this guards the stated boundary against accidental key or payload
+  comparisons, but remains a syntactic audit rather than a refinement proof;
 - packed string positions, native `bit_at`, bytewise first difference,
   bounded prefix comparison, `Char.code`, integer XOR/leading-zeroes, and
   guarded `String.unsafe_get` calls;
