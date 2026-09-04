@@ -740,10 +740,10 @@ let check_mutable_union_payloads () =
   | Some cell when !cell = 51 -> ()
   | _ -> failwith "string union_right lost mutable payload identity"
 
-(* The public native unions intentionally retain the first argument's root
-   whenever the second input adds no binding.  Keep this allocation/sharing
-   behavior under the ordinary deterministic test gate, separately from the
-   semantic tests above. *)
+(* The public native unions intentionally retain their preferred argument's
+   root whenever the other input adds no binding. Keep this
+   allocation/sharing behavior under the ordinary deterministic test gate,
+   separately from the semantic tests above. *)
 let check_union_root_reuse () =
   let integer_tree = empty |> set 1 10 |> set 3 30 in
   let integer_subset = empty |> set 1 99 in
@@ -751,12 +751,20 @@ let check_union_root_reuse () =
     failwith "integer union_left did not reuse its empty-right root";
   if union_left integer_tree integer_subset != integer_tree then
     failwith "integer union_left did not reuse its subset root";
+  if union_right empty integer_tree != integer_tree then
+    failwith "integer union_right did not reuse its empty-left root";
+  if union_right integer_subset integer_tree != integer_tree then
+    failwith "integer union_right did not reuse its subset root";
   let string_tree = S.empty |> S.set "a" 10 |> S.set "c" 30 in
   let string_subset = S.empty |> S.set "a" 99 in
   if S.union_left string_tree S.empty != string_tree then
     failwith "string union_left did not reuse its empty-right root";
   if S.union_left string_tree string_subset != string_tree then
-    failwith "string union_left did not reuse its subset root"
+    failwith "string union_left did not reuse its subset root";
+  if S.union_right S.empty string_tree != string_tree then
+    failwith "string union_right did not reuse its empty-left root";
+  if S.union_right string_subset string_tree != string_tree then
+    failwith "string union_right did not reuse its subset root"
 
 let () =
   Random.init 0x504154;
