@@ -21,7 +21,7 @@ REFERENCE_PACK := PatriciaReference.cmo
 
 .PHONY: all proof core-proof union-proof assumptions extraction extraction-boundary \
 	ocaml-physical-equality-audit \
-	reference-extraction ocaml reference-ocaml test union-oracle differential \
+	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile reference-profile compiler-config clean
 
 .PHONY: set-profile
@@ -103,6 +103,18 @@ union-oracle: ocaml PatriciaUnionTest.ml
 	  $(OCAMLC) -I . -I .. -o ../patricia-union-test $$objects \
 	    ../PatriciaUnionTest.ml
 	./patricia-union-test
+
+# The default union oracle uses bytecode for speed.  This companion target
+# exercises the same structural, semantic, mutable-payload, and physical-root
+# checks through the native code path used by the public performance backend.
+# It is finite runtime evidence for the [(==)] refinement boundary, not a
+# compiler or heap-correctness proof.
+union-oracle-native: extraction PatriciaUnionTest.ml
+	cd extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
+	cd extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. -o ../patricia-union-native-test $$objects \
+	    ../PatriciaUnionTest.ml
+	./patricia-union-native-test
 
 differential: ocaml reference-ocaml PatriciaDifferentialTest.ml
 	cd extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
@@ -201,5 +213,6 @@ clean:
 	  PatriciaUnionProfile.cmi PatriciaUnionProfile.cmx PatriciaUnionProfile.o \
 	  PatriciaReferenceProfile.cmi PatriciaReferenceProfile.cmx PatriciaReferenceProfile.o
 	rm -f patricia-test patricia-union-test patricia-differential-test \
+	  patricia-union-native-test \
 	  patricia-benchmark patricia-union-profile patricia-set-profile \
 	  patricia-reference-profile

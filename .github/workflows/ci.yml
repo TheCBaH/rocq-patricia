@@ -27,6 +27,11 @@ jobs:
           opam exec -- make
           ROCQ=rocq OCAMLC=ocamlc OCAMLOPT=ocamlopt OCAMLDEP=ocamldep
 
+      - name: Native specialized-union oracle
+        run: >-
+          opam exec -- make union-oracle-native
+          ROCQ=rocq OCAMLC=ocamlc OCAMLOPT=ocamlopt OCAMLDEP=ocamldep
+
       - name: Checked benchmark smoke test
         run: >-
           opam exec -- make benchmark-smoke

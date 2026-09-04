@@ -410,6 +410,7 @@ From this directory:
 make
 make union-proof
 make union-oracle
+make union-oracle-native
 make benchmark
 make union-profile
 make reference-profile
@@ -424,6 +425,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-09-03 | Added native-code specialized-union oracle coverage | `make union-oracle-native` compiles the same deterministic/randomized structural oracle with `ocamlopt`, covering its physical-root, checked-`(==)`, and mutable-payload regressions on the native code path. GitHub Actions runs it as a separate gate after the ordinary proof/extraction test. This is finite runtime evidence for the target `(==)` boundary, not a compiler or heap semantics proof. `make union-oracle-native` and `git diff --check` passed. |
 | 2026-09-03 | Refined the external OCaml heap boundary for union `(==)` | `NativeHeapRefinement.v` now introduces allocated heap states and runtime tree objects that pair a current root with its source-tree interpretation. `native_same_call_adequate` states the extraction obligation at each dynamic callback, so equal source trees may still reside at distinct locations; successful physical equality alone yields source-tree equality. `patricia_ocaml_heap_same_sound` and `string_patricia_ocaml_heap_same_sound` derive the exact native-union premises. The remaining task is an OCaml heap/compiler semantics proving that the extracted `(==)` calls meet this adequacy statement. `make NativeHeapRefinement.vo`, `make assumptions`, and `git diff --check` passed. |
 | 2026-09-03 | Audited the selected OCaml physical-equality lowering | `check-ocaml-physical-equality.sh` and `make ocaml-physical-equality-audit` inspect the installed OCaml 4.14.3 source tree: `Stdlib.(==)` is `%eq`, `%eq` translates to `Pintcomp Ceq`, `cmmgen` dispatches it to `int_comp_caml`, and that lowering uses `Ccmpi`. This supports the runtime-root bridge for the pinned toolchain, but does not prove the compiler binary, garbage collector, or generated executable satisfies it; it remains outside the normal correctness gate. `make ocaml-physical-equality-audit`, `make`, and `git diff --check` passed. |
 | 2026-09-03 | Checked the runtime-root model against the extracted OCaml representation | `PatriciaUnionTest.ml` now uses `Obj` only in the internal oracle to require that both extracted `Empty` constructors are immediate, while constructed leaves and branches are allocated roots with physical self identity. This directly exercises the two `NativeHeapRefinement.runtime_root` cases on the selected OCaml 4.14.3 runtime; it is finite implementation evidence, not a portable heap/compiler theorem. `make union-oracle` and `git diff --check` passed. |
