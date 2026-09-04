@@ -52,7 +52,29 @@ let check_runtime_root_representation () =
   check "integer" I.empty integer_leaf integer_branch;
   let string_leaf = S.set "a" 10 S.empty in
   let string_branch = S.set "b" 20 string_leaf in
-  check "string" S.empty string_leaf string_branch
+  check "string" S.empty string_leaf string_branch;
+  (* The source contract needs a successful [(==)] call to identify the same
+     current tree object, not merely two trees whose immutable structure has
+     equal contents.  Give otherwise equal trees distinct mutable payloads so
+     this finite pinned-runtime check would expose a structural comparison. *)
+  let check_distinct label make_leaf make_branch =
+    let first_leaf, first_payload = make_leaf () in
+    let second_leaf, second_payload = make_leaf () in
+    if first_payload == second_payload then
+      failwith (label ^ ": distinct-payload setup collapsed");
+    if first_leaf == second_leaf then
+      failwith (label ^ ": distinct equal leaf roots compare physically equal");
+    let first_branch = make_branch first_leaf in
+    let second_branch = make_branch second_leaf in
+    if first_branch == second_branch then
+      failwith (label ^ ": distinct equal branch roots compare physically equal")
+  in
+  check_distinct "integer"
+    (fun () -> let payload = ref 10 in I.set 1 payload I.empty, payload)
+    (fun tree -> I.set 2 (ref 20) tree);
+  check_distinct "string"
+    (fun () -> let payload = ref 10 in S.set "a" payload S.empty, payload)
+    (fun tree -> S.set "b" (ref 20) tree)
 
 let check_integer () =
   let rec build select value key tree =

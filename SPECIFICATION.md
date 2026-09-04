@@ -166,7 +166,11 @@ Executing the supported native library additionally trusts:
   the generated handwritten bodies and permits physical equality only between
   a recursive tree result and the original tree child whose branch may be
   reused; this guards the stated boundary against accidental key or payload
-  comparisons, but remains a syntactic audit rather than a refinement proof;
+  comparisons, but remains a syntactic audit rather than a refinement proof.
+  The bytecode and native union oracles additionally require distinct
+  allocated leaf and branch roots containing distinct mutable payload objects
+  to fail `(==)` under the pinned runtime; this is targeted finite evidence
+  against a structural-equality lowering, not a portable heap theorem;
 - packed string positions, native `bit_at`, bytewise first difference,
   bounded prefix comparison, `Char.code`, integer XOR/leading-zeroes, and
   guarded `String.unsafe_get` calls;
