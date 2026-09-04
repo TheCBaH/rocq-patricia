@@ -224,8 +224,9 @@ Required only for an end-to-end native-refinement claim.
   reconstructions now close; the latter preserve cached-sample residency in
   every route. `union_left_native_correct_wf` now assembles the integer
   per-branch certificates into the whole-worker invariant and left-biased
-  lookup law; the direct-string theorem of the same name does the same while
-  retaining cached-sample residency.
+  lookup law; `union_right_native_correct_wf` derives the symmetric
+  right-biased law for the exact swapped-argument target shape. The
+  direct-string theorems do the same while retaining cached-sample residency.
 - [ ] Remove the remaining handwritten union realizers when proved extracted
   workers meet the performance requirements, or link their OCaml realizers to
   those source workers in a target-language refinement. The public string
@@ -425,6 +426,7 @@ run, not a deterministic performance threshold.
 
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-09-04 | Closed the source model for handwritten right-biased union | Both companion modules now define `union_right_native` as the exact swapped-argument shape used by the handwritten `union_right` extractor. `union_right_native_correct_wf` derives its invariant and right-biased lookup law from the existing full native-left theorem under the same `native_same_sound` premise. The extraction oracle checks deterministic and randomized structure, contents, and root reuse against each legacy right-biased export; the normal realizer audit also pins the swapped target body. This closes source semantics for both public biases, but the OCaml heap/compiler proof for `(==)` remains external. `make union-proof`, `make union-oracle`, `make native-union-realizer-audit`, and `git diff --check` passed. |
 | 2026-09-04 | Audited the handwritten union `(==)` call sites after extraction | `check-native-union-realizers.sh` now checks both generated handwritten union bodies in the normal `make` gate. It requires the exact six physical comparisons in each backend: the equal-header pair and the four containment-child cases. Every comparison is therefore a recursive tree result against the original tree child eligible for reuse; keys and payloads are excluded. This guards the narrow `native_same_sound` boundary against extraction-directive drift, but is a syntactic audit, not an OCaml heap/compiler refinement theorem. `make`, `make union-oracle-native`, and `git diff --check` passed. |
 | 2026-09-03 | Added native-code specialized-union oracle coverage | `make union-oracle-native` compiles the same deterministic/randomized structural oracle with `ocamlopt`, covering its physical-root, checked-`(==)`, and mutable-payload regressions on the native code path. GitHub Actions runs it as a separate gate after the ordinary proof/extraction test. This is finite runtime evidence for the target `(==)` boundary, not a compiler or heap semantics proof. `make union-oracle-native` and `git diff --check` passed. |
 | 2026-09-03 | Refined the external OCaml heap boundary for union `(==)` | `NativeHeapRefinement.v` now introduces allocated heap states and runtime tree objects that pair a current root with its source-tree interpretation. `native_same_call_adequate` states the extraction obligation at each dynamic callback, so equal source trees may still reside at distinct locations; successful physical equality alone yields source-tree equality. `patricia_ocaml_heap_same_sound` and `string_patricia_ocaml_heap_same_sound` derive the exact native-union premises. The remaining task is an OCaml heap/compiler semantics proving that the extracted `(==)` calls meet this adequacy statement. `make NativeHeapRefinement.vo`, `make assumptions`, and `git diff --check` passed. |

@@ -213,6 +213,17 @@ Definition native_same {A : Type} (_ _ : t A) : bool := false.
 Definition union_left_native_default {A : Type} : t A -> t A -> t A :=
   union_left_native (@native_same A).
 
+(** The handwritten right-biased realizer is exactly the left-biased native
+    worker with its arguments swapped.  Keep that target-level shape visible
+    in the source model so its functional refinement is not merely inferred
+    from the uninstrumented OCaml directive. *)
+Definition union_right_native {A : Type} (same : t A -> t A -> bool)
+    (a b : t A) : t A :=
+  union_left_native same b a.
+
+Definition union_right_native_default {A : Type} : t A -> t A -> t A :=
+  union_right_native (@native_same A).
+
 (** Two-argument unfolding rule for the native-shaped worker. *)
 Lemma union_left_native_equation:
   forall (A : Type) (same : t A -> t A -> bool) (a b : t A),

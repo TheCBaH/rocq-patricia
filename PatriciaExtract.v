@@ -239,6 +239,7 @@ Separate Extraction
   PatriciaUnion.union_left_specialized_changed_fuel
   PatriciaUnion.union_left_specialized_changed_fuel_result
   PatriciaUnion.union_left_native_default
+  PatriciaUnion.union_right_native_default
   PatriciaUnion.union_left_native_fuel_default
   PatriciaUnion.union_left_native_fuel_inline_default
   PatriciaUnion.union_right_specialized_changed
@@ -262,6 +263,7 @@ Separate Extraction
   StringPatriciaUnion.union_left_specialized_changed_fuel
   StringPatriciaUnion.union_left_specialized_changed_fuel_result
   StringPatriciaUnion.union_left_native_default
+  StringPatriciaUnion.union_right_native_default
   StringPatriciaUnion.union_left_native_fuel_default
   StringPatriciaUnion.union_left_native_fuel_inline_default
   StringPatriciaUnion.union_right_specialized_changed

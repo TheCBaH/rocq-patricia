@@ -2114,6 +2114,23 @@ Proof.
   eapply Hstrong with (total := size left + size right); eauto.
 Qed.
 
+(** The target [union_right] directive delegates to [union_left] with swapped
+    arguments.  This closes the same source-level native refinement for its
+    right-biased public result under precisely the existing positive-direction
+    physical-equality premise. *)
+Theorem union_right_native_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) (left right : t A),
+    native_same_sound same -> wf left -> wf right ->
+    wf (union_right_native same left right) /\
+    forall key,
+      get key (union_right_native same left right) =
+      match get key right with Some value => Some value | None => get key left end.
+Proof.
+  intros A same left right Hsame Hleft Hright.
+  unfold union_right_native.
+  now apply union_left_native_correct_wf.
+Qed.
+
 (** The direct fuel worker is an extraction-shape variant of the proved
     changed worker.  Its counter is strictly larger than the combined source
     tree size, so every recursive pair has a remaining sufficient counter. *)
