@@ -74,7 +74,27 @@ let check_runtime_root_representation () =
     (fun tree -> I.set 2 (ref 20) tree);
   check_distinct "string"
     (fun () -> let payload = ref 10 in S.set "a" payload S.empty, payload)
-    (fun tree -> S.set "b" (ref 20) tree)
+    (fun tree -> S.set "b" (ref 20) tree);
+  (* [NativeHeapRefinement] speaks about current roots.  OCaml's moving GC is
+     outside that model, so exercise the selected runtime's preservation of
+     aliases and the handwritten reuse path across a major collection and
+     compaction. *)
+  let check_gc_aliases label union_left union_right make_tree =
+    let tree = make_tree () in
+    let alias = tree in
+    Gc.full_major ();
+    Gc.compact ();
+    if tree != alias then
+      failwith (label ^ ": collection changed physical aliasing");
+    if union_left tree tree != tree then
+      failwith (label ^ ": union_left lost root reuse after collection");
+    if union_right tree tree != tree then
+      failwith (label ^ ": union_right lost root reuse after collection")
+  in
+  check_gc_aliases "integer" I.union_left I.union_right
+    (fun () -> I.set 2 (ref 20) (I.set 1 (ref 10) I.empty));
+  check_gc_aliases "string" S.union_left S.union_right
+    (fun () -> S.set "b" (ref 20) (S.set "a" (ref 10) S.empty))
 
 let check_integer () =
   let rec build select value key tree =
