@@ -94,7 +94,55 @@ let check_runtime_root_representation () =
   check_gc_aliases "integer" I.union_left I.union_right
     (fun () -> I.set 2 (ref 20) (I.set 1 (ref 10) I.empty));
   check_gc_aliases "string" S.union_left S.union_right
-    (fun () -> S.set "b" (ref 20) (S.set "a" (ref 10) S.empty))
+    (fun () -> S.set "b" (ref 20) (S.set "a" (ref 10) S.empty));
+  (* Exercise every successful physical-reuse decision in the handwritten
+     [union_left] body after compaction.  The equal-root case takes the
+     equal-header pair of child tests; passing an existing child as the other
+     argument takes each of the four containment-child tests.  These inputs
+     retain aliases into a moved branch, rather than merely comparing a root
+     with itself. *)
+  let check_compacted_reuse label union expected left right =
+    Gc.full_major ();
+    Gc.compact ();
+    if union left right != expected then
+      failwith (label ^ ": compacted union lost expected root reuse")
+  in
+  let integer_root =
+    I.set 6 (ref 60) (I.set 5 (ref 50) (I.set 2 (ref 20)
+      (I.set 1 (ref 10) I.empty)))
+  in
+  (match integer_root with
+   | I.Branch (_, _, left_child, right_child) ->
+       check_compacted_reuse "integer equal-header" I.union_left integer_root
+         integer_root integer_root;
+       check_compacted_reuse "integer left-outer left-child" I.union_left
+         integer_root integer_root left_child;
+       check_compacted_reuse "integer left-outer right-child" I.union_left
+         integer_root integer_root right_child;
+       check_compacted_reuse "integer right-outer left-child" I.union_left
+         integer_root left_child integer_root;
+       check_compacted_reuse "integer right-outer right-child" I.union_left
+         integer_root right_child integer_root
+   | I.Empty | I.Leaf _ -> failwith "integer reuse fixture is not a branch");
+  let string_root =
+    (* Each outer child must itself be a branch: leaf/tree union follows the
+       insertion path and does not reach a containment physical test. *)
+    S.set "bb" (ref 40) (S.set "ba" (ref 30) (S.set "ab" (ref 20)
+      (S.set "aa" (ref 10) S.empty)))
+  in
+  match string_root with
+  | S.Branch (_, _, left_child, right_child) ->
+      check_compacted_reuse "string equal-header" S.union_left string_root
+        string_root string_root;
+      check_compacted_reuse "string left-outer left-child" S.union_left
+        string_root string_root left_child;
+      check_compacted_reuse "string left-outer right-child" S.union_left
+        string_root string_root right_child;
+      check_compacted_reuse "string right-outer left-child" S.union_left
+        string_root left_child string_root;
+      check_compacted_reuse "string right-outer right-child" S.union_left
+        string_root right_child string_root
+  | S.Empty | S.Leaf _ -> failwith "string reuse fixture is not a branch"
 
 let check_integer () =
   let rec build select value key tree =

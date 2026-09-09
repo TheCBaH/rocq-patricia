@@ -172,8 +172,11 @@ Executing the supported native library additionally trusts:
   to fail `(==)` under the pinned runtime; this is targeted finite evidence
   against a structural-equality lowering, not a portable heap theorem. They
   also retain aliased branch roots across a major collection and compaction,
-  then require both no-op biased unions to reuse that root; this is finite
-  evidence for the selected moving-GC runtime, not a heap theorem;
+  then require both no-op biased unions to reuse that root.  In addition, the
+  left-biased oracle compacts four-binding integer and direct-string roots
+  before exercising its equal-header and all four containment-child reuse
+  routes. This is finite evidence for the selected moving-GC runtime, not a
+  heap theorem;
 - packed string positions, native `bit_at`, bytewise first difference,
   bounded prefix comparison, `Char.code`, integer XOR/leading-zeroes, and
   guarded `String.unsafe_get` calls;
