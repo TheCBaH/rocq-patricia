@@ -266,10 +266,11 @@ No implementation strategy below has yet passed its replacement gate.
   complete: `map_filter_cached_wf` and `get_map_filter_cached_wf` prove the
   cache-aware traversal, extraction shows direct recursion through
   `branch_cached`, and `StringPatriciaMap.map_filter` selects it. The
-  `map_left`/`map_right` helpers now delegate to that traversal as well, so
-  their existing contracts support cache-aware one-sided combine cases.
-  Removal, general combine's remaining branch/join paths, and the other update
-  paths still need migration before I5's total-reader override can be removed.
+  `map_left`/`map_right` helpers and both fused leaf-combine workers now
+  delegate to that traversal as well, so their existing contracts cover the
+  cache-aware one-sided combine cases. Removal, general combine's remaining
+  branch/join paths, and the other update paths still need migration before
+  I5's total-reader override can be removed.
 - [ ] V2.2 Prove an executable indexed bounded-prefix scan for I4, including
   valid tags, marker cases, partial masks, short-circuit guards and termination.
 - [ ] V2.3 Prove indexed first difference and its shifting-mask/identity paths

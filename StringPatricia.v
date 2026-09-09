@@ -379,7 +379,7 @@ Definition combine_leaf_left {A B C : Type}
     (key : string) (value : A) (m : t B) : t C :=
   match get key m with
   | Some _ =>
-      map_filter (fun stored right =>
+      map_filter_cached (fun stored right =>
         if String.eqb stored key
         then f (Some value) (Some right)
         else f None (Some right)) m
@@ -392,7 +392,7 @@ Definition combine_leaf_right {A B C : Type}
     (m : t A) (key : string) (value : B) : t C :=
   match get key m with
   | Some _ =>
-      map_filter (fun stored left =>
+      map_filter_cached (fun stored left =>
         if String.eqb stored key
         then f (Some left) (Some value)
         else f (Some left) None) m

@@ -2374,8 +2374,8 @@ Proof.
   intros A B C f key value m Hnone Hwf.
   unfold combine_leaf_left. destruct (get key m) as [old|] eqn:Ekey.
   - split.
-    + now apply map_filter_wf.
-    + intro query. rewrite get_map_filter_wf by exact Hwf.
+    + now apply map_filter_cached_wf.
+    + intro query. rewrite get_map_filter_cached_wf by exact Hwf.
       destruct (get query m) as [found|] eqn:Equery; cbn.
       * now destruct (String.eqb query key).
       * destruct (String.eqb query key) eqn:Eequal.
@@ -2405,8 +2405,8 @@ Proof.
   intros A B C f m key value Hnone Hwf.
   unfold combine_leaf_right. destruct (get key m) as [old|] eqn:Ekey.
   - split.
-    + now apply map_filter_wf.
-    + intro query. rewrite get_map_filter_wf by exact Hwf.
+    + now apply map_filter_cached_wf.
+    + intro query. rewrite get_map_filter_cached_wf by exact Hwf.
       destruct (get query m) as [found|] eqn:Equery; cbn.
       * now destruct (String.eqb query key).
       * destruct (String.eqb query key) eqn:Eequal.
