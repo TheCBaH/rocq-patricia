@@ -45,12 +45,11 @@ assumptions: proof check-assumptions.sh
 extraction-boundary: PatriciaExtract.v check-extraction-boundary.sh
 	sh ./check-extraction-boundary.sh PatriciaExtract.v
 
-# The four specialized union overrides are the remaining handwritten
-# high-level realizers.  Check the generated bodies as well as their source
-# count: every physical test must remain a recursive tree-child reuse test.
+# Check the source-extracted proof-guided workers remain direct recursion with
+# no operational size/fuel argument or nested recursive closure.
 native-union-realizer-audit: extraction check-native-union-realizers.sh
-	sh ./check-native-union-realizers.sh extracted/PatriciaInternal.ml \
-	  extracted/StringPatriciaInternal.ml
+	sh ./check-native-union-realizers.sh extracted/PatriciaUnion.ml \
+	  extracted/StringPatriciaUnion.ml
 
 # Optional implementation audit for the selected OCaml compiler sources. It
 # intentionally stays outside the normal proof/correctness gate: a source scan

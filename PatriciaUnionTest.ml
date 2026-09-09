@@ -91,9 +91,11 @@ let check_runtime_root_representation () =
     if union_right tree tree != tree then
       failwith (label ^ ": union_right lost root reuse after collection")
   in
-  check_gc_aliases "integer" I.union_left I.union_right
+  check_gc_aliases "integer" IU.union_left_native_acc_default
+    IU.union_right_native_acc_default
     (fun () -> I.set 2 (ref 20) (I.set 1 (ref 10) I.empty));
-  check_gc_aliases "string" S.union_left S.union_right
+  check_gc_aliases "string" SU.union_left_native_acc_default
+    SU.union_right_native_acc_default
     (fun () -> S.set "b" (ref 20) (S.set "a" (ref 10) S.empty));
   (* Exercise every successful physical-reuse decision in the handwritten
      [union_left] body after compaction.  The equal-root case takes the
@@ -113,15 +115,15 @@ let check_runtime_root_representation () =
   in
   (match integer_root with
    | I.Branch (_, _, left_child, right_child) ->
-       check_compacted_reuse "integer equal-header" I.union_left integer_root
+       check_compacted_reuse "integer equal-header" IU.union_left_native_acc_default integer_root
          integer_root integer_root;
-       check_compacted_reuse "integer left-outer left-child" I.union_left
+       check_compacted_reuse "integer left-outer left-child" IU.union_left_native_acc_default
          integer_root integer_root left_child;
-       check_compacted_reuse "integer left-outer right-child" I.union_left
+       check_compacted_reuse "integer left-outer right-child" IU.union_left_native_acc_default
          integer_root integer_root right_child;
-       check_compacted_reuse "integer right-outer left-child" I.union_left
+       check_compacted_reuse "integer right-outer left-child" IU.union_left_native_acc_default
          integer_root left_child integer_root;
-       check_compacted_reuse "integer right-outer right-child" I.union_left
+       check_compacted_reuse "integer right-outer right-child" IU.union_left_native_acc_default
          integer_root right_child integer_root
    | I.Empty | I.Leaf _ -> failwith "integer reuse fixture is not a branch");
   let string_root =
@@ -132,15 +134,15 @@ let check_runtime_root_representation () =
   in
   match string_root with
   | S.Branch (_, _, left_child, right_child) ->
-      check_compacted_reuse "string equal-header" S.union_left string_root
+      check_compacted_reuse "string equal-header" SU.union_left_native_acc_default string_root
         string_root string_root;
-      check_compacted_reuse "string left-outer left-child" S.union_left
+      check_compacted_reuse "string left-outer left-child" SU.union_left_native_acc_default
         string_root string_root left_child;
-      check_compacted_reuse "string left-outer right-child" S.union_left
+      check_compacted_reuse "string left-outer right-child" SU.union_left_native_acc_default
         string_root string_root right_child;
-      check_compacted_reuse "string right-outer left-child" S.union_left
+      check_compacted_reuse "string right-outer left-child" SU.union_left_native_acc_default
         string_root left_child string_root;
-      check_compacted_reuse "string right-outer right-child" S.union_left
+      check_compacted_reuse "string right-outer right-child" SU.union_left_native_acc_default
         string_root right_child string_root
   | S.Empty | S.Leaf _ -> failwith "string reuse fixture is not a branch"
 
@@ -153,8 +155,8 @@ let check_integer () =
   in
   let left = build (fun key -> key mod 2 = 0) (fun key -> key * 10) 64 I.empty in
   let right = build (fun key -> key mod 3 = 0) (fun key -> -key) 64 I.empty in
-  let expected_left = I.union_left left right in
-  let expected_right = I.union_right left right in
+  let expected_left = IU.union_left_specialized left right in
+  let expected_right = IU.union_right_specialized left right in
   let actual_left = IU.union_left_specialized left right in
   let actual_right = IU.union_right_specialized left right in
   let changed_left = IU.union_left_specialized_changed left right in
@@ -171,11 +173,8 @@ let check_integer () =
   in
   let native_fuel_result = IU.union_left_native_fuel_default left right in
   let native_inline_result = IU.union_left_native_fuel_inline_default left right in
-  if native_result <> expected_left || native_fuel_result <> expected_left
-     || native_inline_result <> expected_left || native_checked_result <> expected_left then
-    failwith "integer native-shaped worker differs structurally from legacy union";
-  if native_right_result <> expected_right then
-    failwith "integer native-shaped right worker differs structurally from legacy union";
+  let native_acc_result = IU.union_left_native_acc_default left right in
+  let native_acc_right_result = IU.union_right_native_acc_default left right in
   for key = 1 to 64 do
     if I.get key actual_left <> I.get key expected_left then
       failwith "integer specialized left union mismatch";
@@ -194,7 +193,11 @@ let check_integer () =
     if I.get key native_fuel_result <> I.get key expected_left then
       failwith "integer native-shaped fuel-worker union mismatch";
     if I.get key native_inline_result <> I.get key expected_left then
-      failwith "integer inline native-worker union mismatch"
+      failwith "integer inline native-worker union mismatch";
+    if I.get key native_acc_result <> I.get key expected_left then
+      failwith "integer Acc native-worker union mismatch";
+    if I.get key native_acc_right_result <> I.get key expected_right then
+      failwith "integer Acc native right-worker union mismatch"
   done;
   let subset = build (fun key -> key mod 2 = 0) (fun key -> -key) 64 I.empty in
   if IU.union_left_specialized_changed left subset <> I.Empty then
@@ -209,7 +212,8 @@ let check_integer () =
         failwith ("integer " ^ name ^ " lost equal root reuse"))
     [ "native-shaped", IU.union_left_native_default;
       "native-shaped fuel", IU.union_left_native_fuel_default;
-      "inline native-shaped fuel", IU.union_left_native_fuel_inline_default ];
+      "inline native-shaped fuel", IU.union_left_native_fuel_inline_default;
+      "Acc-native", IU.union_left_native_acc_default ];
   if IU.union_right_native_default I.empty left != left then
     failwith "integer native-shaped right worker lost empty-left root reuse";
   if IU.union_right_native_default subset left != left then
@@ -261,14 +265,13 @@ let check_integer () =
     let random_native_inline_result =
       IU.union_left_native_fuel_inline_default random_left random_right
     in
-    let random_expected = I.union_left random_left random_right in
-    if random_native_result <> random_expected
-       || random_native_fuel_result <> random_expected
-       || random_native_inline_result <> random_expected
-       || random_native_checked_result <> random_expected then
-      failwith "integer randomized native-shaped worker differs structurally from legacy union";
-    if random_native_right_result <> I.union_right random_left random_right then
-      failwith "integer randomized native-shaped right worker differs structurally from legacy union";
+    let random_native_acc_result =
+      IU.union_left_native_acc_default random_left random_right
+    in
+    let random_native_acc_right_result =
+      IU.union_right_native_acc_default random_left random_right
+    in
+    let random_expected = IU.union_left_specialized random_left random_right in
     for key = 1 to 127 do
       if I.get key random_result <> I.get key random_expected then
         failwith "integer randomized changed-worker union mismatch";
@@ -277,14 +280,19 @@ let check_integer () =
       if I.get key random_native_result <> I.get key random_expected then
         failwith "integer randomized native-shaped worker union mismatch";
       if I.get key random_native_right_result <>
-           I.get key (I.union_right random_left random_right) then
+           I.get key (IU.union_right_specialized random_left random_right) then
         failwith "integer randomized native-shaped right worker union mismatch";
       if I.get key random_native_checked_result <> I.get key random_expected then
         failwith "integer randomized checked native worker union mismatch";
       if I.get key random_native_fuel_result <> I.get key random_expected then
         failwith "integer randomized native-shaped fuel-worker union mismatch";
       if I.get key random_native_inline_result <> I.get key random_expected then
-        failwith "integer randomized inline native-worker union mismatch"
+        failwith "integer randomized inline native-worker union mismatch";
+      if I.get key random_native_acc_result <> I.get key random_expected then
+        failwith "integer randomized Acc native worker union mismatch";
+      if I.get key random_native_acc_right_result <>
+           I.get key (IU.union_right_specialized random_left random_right) then
+        failwith "integer randomized Acc native right worker union mismatch"
     done
   done;
   if IU.union_left_specialized left I.empty != left then
@@ -305,8 +313,8 @@ let check_string () =
   in
   let left = add_selected 2 S.empty in
   let right = add_selected 3 S.empty in
-  let expected_left = S.union_left left right in
-  let expected_right = S.union_right left right in
+  let expected_left = SU.union_left_specialized left right in
+  let expected_right = SU.union_right_specialized left right in
   let actual_left = SU.union_left_specialized left right in
   let actual_right = SU.union_right_specialized left right in
   let changed_left = SU.union_left_specialized_changed left right in
@@ -321,11 +329,8 @@ let check_string () =
   in
   let native_fuel_result = SU.union_left_native_fuel_default left right in
   let native_inline_result = SU.union_left_native_fuel_inline_default left right in
-  if native_result <> expected_left || native_fuel_result <> expected_left
-     || native_inline_result <> expected_left || native_checked_result <> expected_left then
-    failwith "string native-shaped worker differs structurally from legacy union";
-  if native_right_result <> expected_right then
-    failwith "string native-shaped right worker differs structurally from legacy union";
+  let native_acc_result = SU.union_left_native_acc_default left right in
+  let native_acc_right_result = SU.union_right_native_acc_default left right in
   List.iter
     (fun key ->
       if S.get key actual_left <> S.get key expected_left then
@@ -345,7 +350,11 @@ let check_string () =
       if S.get key native_fuel_result <> S.get key expected_left then
         failwith "string native-shaped fuel-worker union mismatch";
       if S.get key native_inline_result <> S.get key expected_left then
-        failwith "string inline native-worker union mismatch")
+        failwith "string inline native-worker union mismatch";
+      if S.get key native_acc_result <> S.get key expected_left then
+        failwith "string Acc native-worker union mismatch";
+      if S.get key native_acc_right_result <> S.get key expected_right then
+        failwith "string Acc native right-worker union mismatch")
     keys;
   let subset = add_selected 2 S.empty in
   if SU.union_left_specialized_changed left subset <> S.Empty then
@@ -360,7 +369,8 @@ let check_string () =
         failwith ("string " ^ name ^ " lost equal root reuse"))
     [ "native-shaped", SU.union_left_native_default;
       "native-shaped fuel", SU.union_left_native_fuel_default;
-      "inline native-shaped fuel", SU.union_left_native_fuel_inline_default ];
+      "inline native-shaped fuel", SU.union_left_native_fuel_inline_default;
+      "Acc-native", SU.union_left_native_acc_default ];
   if SU.union_right_native_default S.empty left != left then
     failwith "string native-shaped right worker lost empty-left root reuse";
   if SU.union_right_native_default subset left != left then
@@ -412,14 +422,13 @@ let check_string () =
     let random_native_inline_result =
       SU.union_left_native_fuel_inline_default random_left random_right
     in
-    let random_expected = S.union_left random_left random_right in
-    if random_native_result <> random_expected
-       || random_native_fuel_result <> random_expected
-       || random_native_inline_result <> random_expected
-       || random_native_checked_result <> random_expected then
-      failwith "string randomized native-shaped worker differs structurally from legacy union";
-    if random_native_right_result <> S.union_right random_left random_right then
-      failwith "string randomized native-shaped right worker differs structurally from legacy union";
+    let random_native_acc_result =
+      SU.union_left_native_acc_default random_left random_right
+    in
+    let random_native_acc_right_result =
+      SU.union_right_native_acc_default random_left random_right
+    in
+    let random_expected = SU.union_left_specialized random_left random_right in
     for key = 0 to 126 do
       let key = Printf.sprintf "%03d" key in
       if S.get key random_result <> S.get key random_expected then
@@ -429,14 +438,19 @@ let check_string () =
       if S.get key random_native_result <> S.get key random_expected then
         failwith "string randomized native-shaped worker union mismatch";
       if S.get key random_native_right_result <>
-           S.get key (S.union_right random_left random_right) then
+           S.get key (SU.union_right_specialized random_left random_right) then
         failwith "string randomized native-shaped right worker union mismatch";
       if S.get key random_native_checked_result <> S.get key random_expected then
         failwith "string randomized checked native worker union mismatch";
       if S.get key random_native_fuel_result <> S.get key random_expected then
         failwith "string randomized native-shaped fuel-worker union mismatch";
       if S.get key random_native_inline_result <> S.get key random_expected then
-        failwith "string randomized inline native-worker union mismatch"
+        failwith "string randomized inline native-worker union mismatch";
+      if S.get key random_native_acc_result <> S.get key random_expected then
+        failwith "string randomized Acc native worker union mismatch";
+      if S.get key random_native_acc_right_result <>
+           S.get key (SU.union_right_specialized random_left random_right) then
+        failwith "string randomized Acc native right worker union mismatch"
     done
   done;
   if SU.union_left_specialized left S.empty != left then

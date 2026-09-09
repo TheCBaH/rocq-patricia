@@ -43,10 +43,10 @@ let combine combiner =
            combiner.both left_value right_value
        | None, None -> None)
 
-(* The generated native-shaped worker remains a refinement candidate, but its
-   closure/helper allocation currently loses to this fully inlined worker. *)
-let union_left = PatriciaInternal.union_left
-let union_right = PatriciaInternal.union_right
+(* The direct [Acc]-recursive source worker extracts without a fuel prepass or
+   branch-local closure; its proof-only termination arguments are erased. *)
+let union_left = PatriciaUnion.union_left_native_acc_default
+let union_right = PatriciaUnion.union_right_native_acc_default
 let elements = PatriciaInternal.elements
 let fold = PatriciaInternal.fold
 let beq = PatriciaInternal.beq

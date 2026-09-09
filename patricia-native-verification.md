@@ -40,11 +40,11 @@ Distinguish three milestones:
 
 ## Inventory of unverified code
 
-The 2026-09-09 audit found 19 explicit replacement directives in
+The 2026-09-09 post-union audit found 15 explicit replacement directives in
 [PatriciaExtract.v](PatriciaExtract.v). This is a source inventory, not a count
 of distinct algorithms or a measurement of reachable machine code. Two
-directives supply physical equality only to experimental union workers; the
-public wrappers select the handwritten unions.
+directives supply physical equality only to the source-defined direct union
+workers; the public wrappers select those extracted workers.
 
 | ID | Component and amount | Function and performance purpose | Existing proof support | Remaining obligation |
 | --- | --- | --- | --- | --- |
@@ -53,8 +53,8 @@ public wrappers select the handwritten unions.
 | I3 | `StringBits.first_diff` | Scan bytes by index, use XOR and a mask loop for the first differing bit; identical string objects return immediately. | Safe structural bytewise scanner and `native_string_first_diff_refines`; per-byte XOR/leading-zeroes laws. | Prove the indexed loop, counter progression, mask progression, early return and string-identity shortcut implement that specification. |
 | I4 | `StringBits.agrees_before_bounded` | Scan only the bytes/high bits before the split; return a Boolean without allocating a first-difference option. | `StringBits.agrees_before_bounded_spec` and `agrees_before_bounded_eq` specify the logical bit scanner. | Prove the packed byte loop itself, including continuation markers, partial-byte mask and early termination. No corresponding native-loop theorem was found in `NativeRefinement.v`. |
 | I5 | `StringPatricia.representative` | Read a cached sample in constant time instead of descending to a leaf. | Cached-sample residency and representative-independence lemmas in `StringPatriciaProof.v`. | Integrate a proved cached reader into an executable implementation and compose consumer refinements. It need not return the same key as the pure reader. |
-| I6 | Four union directives: two recursive `union_left` bodies and two argument-swapping `union_right` aliases | Join disjoint prefixes immediately; reuse one-sided subtrees; use `==` to retain unchanged enclosing branches. | Both companion proof files establish native-shaped worker lookup/well-formedness laws conditional on `native_same_sound`. | Extract an equivalent worker that meets the performance gate, or prove execution of the actual OCaml bodies, including their dependencies and equality decisions. |
-| I7 | Two experimental `native_same => (==)` directives | Connect source-defined native-shaped workers to physical equality. | `NativeHeapRefinement.v` derives source soundness from a per-call object/heap adequacy contract. | Establish that target execution supplies this contract. These directives are separate from `==` written inside I6 and I3. |
+| I6 | Resolved 2026-09-09: former four handwritten union directives | Public wrappers call extracted `union_*_native_acc_default` workers; direct `Acc` recursion replaces fuel and nested closures while retaining reuse decisions. | `union_left_native_acc_exact` and left/right well-formedness/lookup theorems in both companion proof files. | No handwritten high-level union body remains. I7's `(==)` adequacy, primitive contracts, extraction/compiler/runtime and allocation semantics remain separate obligations. |
+| I7 | Two selected `native_same => (==)` directives | Connect source-defined native-shaped workers to physical equality. | `NativeHeapRefinement.v` derives source soundness from a per-call object/heap adequacy contract. | Establish that target execution supplies this contract. These directives are separate from the native string identity shortcut in I3. |
 | I8 | Standard `ExtrOcamlZInt`, `ExtrOcamlNatInt`, `ExtrOcamlNativeString`/`ExtrOcamlChar` mappings | Represent numbers and byte strings natively. | Source domain/codec models and the mapping audit in `SPECIFICATION.md`. | Finite-range and primitive implementation contracts, including all reachable intermediates. The reference backend shares these mappings. |
 | I9 | `PatriciaMap.ml` and `StringPatriciaMap.ml`: 89 lines in total at audit time | Abstract map/key interfaces, positive-key validation, aliases, and the restricted combine adapter. | Pure operation laws; wrapper tests enforce the intended boundary. | Prove/extract the adapter and relate key validation to the native key domain, or verify the small wrappers directly. Abstract signatures and build visibility still need auditing. |
 | I10 | Extraction, module renaming/packing/linking, OCaml compiler/runtime and host platform | Produce and execute the library, including GC and native primitive operations. | Build checks, generated-body audits and a pinned compiler-source equality audit. | Explicitly retain these assumptions, or connect the appropriate verified extraction/compiler/runtime results. A syntactic audit is not a simulation proof. |
@@ -232,10 +232,21 @@ No implementation strategy below has yet passed its replacement gate.
   192-byte-common-prefix 10K workloads. Its refinement reuses the established
   packed-position and cached-sample source contracts; it does not claim to
   discharge their native OCaml primitive obligations.
-- [ ] V1.4 Evaluate the changed-result alternative, including right-operand
+- [x] V1.4 Evaluate the changed-result alternative, including right-operand
   containment/reuse; document whether eliminating `==` is actually competitive.
-- [ ] V1.5 Complete the correctness/performance gate below before selecting a
-  public worker and removing either backend's two union directives.
+  The proved changed-result worker is not competitive: at 10K, its
+  integer/string half-overlap allocations were 70,283/70,146 words versus
+  243/86 for `Acc`; equal trees were 140,017/140,017 versus 26/26. It cannot
+  retain enclosing roots when its data sentinel distinguishes no-change from a
+  real branch result, so it does not replace I7.
+- [x] V1.5 Select the proved public worker and remove both backends' two union
+  directives. `PatriciaMap.ml` and `StringPatriciaMap.ml` select the `Acc`
+  defaults; the extraction-boundary audit requires zero high-level union
+  overrides, and the native-worker audit verifies direct recursion with no
+  runtime size/fuel argument or nested recursive closure. Correctness,
+  native-oracle, differential, public-wrapper, and 10K/100K allocation/share
+  checks are recorded below. Timing/GC cost theorems remain N4, not evidence
+  silently claimed by this selection.
 
 ### V2 — Native primitives and cached representatives (S2; parent N1/N2)
 
@@ -315,7 +326,8 @@ connections in milestone 3. Empirical replacement acceptance does not close N4.
 | Date | Completed work | Evidence and limits |
 | --- | --- | --- |
 | 2026-09-09 | Published the separate tracker and synchronized existing documents; organized local papers | Checked 64 local Markdown links/anchors across the eight documentation files; verified all four indexed PDF headers/end markers and SHA-256 digests; `git diff --check` passed. The Okasaki–Gill PDF was moved without changing its bytes; its origin is now identified as the 2015-04-17 Internet Archive capture of Andy Gill's ITTC author path, with the local checksum retained. These are documentation/artifact checks, not a rerun of the functional proof gate. |
-| 2026-09-09 | V0.1–V0.3: source/extraction/proof audit, literature investigation and baseline profile | `rg -n '^Extract' PatriciaExtract.v`; inspection of native refinement and companion proofs, wrappers and generated OCaml; `sh check-extraction-boundary.sh`; `sh check-native-union-realizers.sh extracted/PatriciaInternal.ml extracted/StringPatriciaInternal.ml`; `sh check-ocaml-physical-equality.sh /opt/opam/4.14.3/.opam-switch/sources/ocaml-base-compiler.4.14.3`; `PATRICIA_UNION_PROFILE_SIZE=10000 make union-profile` passed. The latter rebuilt extraction/native profiling and checked results/sharing; it was not a fresh full proof/test run or a timing comparison. |
+| 2026-09-09 | V0.1–V0.3: source/extraction/proof audit, literature investigation and baseline profile | `rg -n '^Extract' PatriciaExtract.v`; inspection of native refinement and companion proofs, wrappers and generated OCaml; `sh check-ocaml-physical-equality.sh /opt/opam/4.14.3/.opam-switch/sources/ocaml-base-compiler.4.14.3`; `PATRICIA_UNION_PROFILE_SIZE=10000 make union-profile` passed. The latter rebuilt extraction/native profiling and checked results/sharing; it was not a fresh full proof/test run or a timing comparison. |
+| 2026-09-09 | V1.1–V1.5: selected source-extracted direct union workers | `make union-proof`, `make extraction-boundary native-union-realizer-audit test union-oracle-native differential`, and `PATRICIA_UNION_PROFILE_SIZE=10000/100000 make union-profile` passed. The generated workers are direct recursive functions with erased `Acc`/equality evidence; at 100K, integer `Acc` allocation was 379/365/176/26/26 and string 100/81/26/26/26 words for disjoint/half-overlap/subset/equal/empty-right. These are allocation/sharing measurements on this toolchain, not timing, GC, compiler, or heap-refinement proofs. |
 
 ## Publications
 

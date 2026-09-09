@@ -28,10 +28,11 @@ let combine combiner =
            combiner.both left_value right_value
        | None, None -> None)
 
-(* The generated native-shaped worker remains a refinement candidate, but its
-   closure/helper allocation currently loses to this fully inlined worker. *)
-let union_left = StringPatriciaInternal.union_left
-let union_right = StringPatriciaInternal.union_right
+(* The direct [Acc]-recursive source worker extracts without a fuel prepass or
+   branch-local closure; packed routing and cached-sample obligations remain
+   explicitly tracked at the primitive boundary. *)
+let union_left = StringPatriciaUnion.union_left_native_acc_default
+let union_right = StringPatriciaUnion.union_right_native_acc_default
 let elements = StringPatriciaInternal.elements
 let fold = StringPatriciaInternal.fold
 let beq = StringPatriciaInternal.beq

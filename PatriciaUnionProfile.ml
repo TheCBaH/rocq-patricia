@@ -201,7 +201,7 @@ let profile_int_case name keys expected_cardinal left right =
       failwith "integer union-profile sharing count mismatch";
     print_row name worker left result worker_measurement sharing
   in
-  run "legacy" (fun () -> I.union_left left right);
+  run "reference" (fun () -> I.union_left left right);
   run "generated" (fun () -> IU.union_left_native_default left right);
   run "native fuel" (fun () -> IU.union_left_native_fuel_default left right);
   run "inline fuel" (fun () -> IU.union_left_native_fuel_inline_default left right);
@@ -219,7 +219,7 @@ let profile_string_case name keys expected_cardinal left right =
       failwith "string union-profile sharing count mismatch";
     print_row name worker left result worker_measurement sharing
   in
-  run "legacy" (fun () -> S.union_left left right);
+  run "reference" (fun () -> S.union_left left right);
   run "generated" (fun () -> SU.union_left_native_default left right);
   run "native fuel" (fun () -> SU.union_left_native_fuel_default left right);
   run "inline fuel" (fun () -> SU.union_left_native_fuel_inline_default left right);
@@ -269,7 +269,7 @@ let profile_strings title prefix =
 
 let () =
   Printf.printf
-    "Patricia union-worker allocation profile (words; legacy public worker selected)\n";
+    "Patricia union-worker allocation profile (words; Acc worker selected publicly)\n";
   profile_int ();
   profile_strings "Eight-character string keys" "";
   profile_strings "String keys with a 192-byte common prefix"

@@ -193,15 +193,17 @@ domain `1 .. max_int`; the finite-width refinement itself remains trusted rather
 than proved. The string tree uses native OCaml strings and proof-side
 logical bit positions; native extraction represents positions as packed
 byte/tag integer tokens. General `combine` extracts directly from proved
-structural recursion; the public biased unions still use handwritten
-realizers. These native refinements form an explicit performance/correctness
-boundary. For the source models of those unions, Rocq now
+structural recursion; public biased unions select source-defined direct
+`Acc`-recursive workers, so no handwritten high-level union realizer remains.
+These native refinements form an explicit performance/correctness boundary.
+For the source models of those unions, Rocq now
 checks every equal-header and containment reconstruction under the sole
 positive-direction contract that OCaml `changed == original` implies identical
 current lookups. This is deliberately stronger than the portable documented
 `==` guarantee for non-mutable values (`compare = 0`), so connecting it to the
-runtime/compiler remains an external obligation. Refinement of the actual
-handwritten recursive bodies and their dependencies is also open. The source
+runtime/compiler remains an external obligation. Refinement of target `(==)`,
+native primitives, extraction/compiler/runtime, and allocation/sharing
+behavior is still open. The source
 proofs and abstract heap bridge do not establish target execution, allocation
 or sharing guarantees; the separate native-verification tracker records these
 remaining steps.

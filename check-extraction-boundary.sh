@@ -13,10 +13,11 @@ fi
 
 union_count=$(rg -c '^Extract Constant (Patricia|StringPatricia)\.union_(left|right) =>' \
   "$source_file" || true)
+union_count=${union_count:-0}
 
-if [ "$union_count" -ne 4 ]; then
-  echo "expected exactly four specialized high-level union realizers, found $union_count" >&2
+if [ "$union_count" -ne 0 ]; then
+  echo "expected no handwritten high-level union realizers, found $union_count" >&2
   exit 1
 fi
 
-echo "Patricia extraction-boundary audit: only specialized unions remain handwritten"
+echo "Patricia extraction-boundary audit: no handwritten high-level union realizer"

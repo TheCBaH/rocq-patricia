@@ -140,11 +140,7 @@ Executing the supported native library additionally trusts:
   keys, and the restricted combine callback;
 - integer realizer code for equality/order tests, shifts, masks, prefixes,
   routing bits, and highest-differing-bit selection;
-- the handwritten biased-union bodies and their composition with native
-  primitives. The companion source workers have conditional correctness
-  proofs, but those are not simulations of the actual OCaml bodies; their
-  `Empty` change certificates also do not establish native allocation bounds;
-- the specialized handwritten union realizers' physical-equality contract:
+- the source-extracted biased-union workers' target physical-equality contract:
   when `changed == original` succeeds, both references denote the same
   current tree object and hence have identical `get` results at every key.
   This is exactly the positive-direction `native_same_sound` premise used by
@@ -167,11 +163,10 @@ Executing the supported native library additionally trusts:
   source-checks the selected 4.14.3 implementation path from `Stdlib.(==)`
   through `%eq`, `Pintcomp Ceq`, `cmmgen`, and `Ccmpi` to native word
   comparison; this is pinned implementation evidence, not a proof about the
-  compiler binary or runtime. `make native-union-realizer-audit` also checks
-  the generated handwritten bodies and permits physical equality only between
-  a recursive tree result and the original tree child whose branch may be
-  reused; this guards the stated boundary against accidental key or payload
-  comparisons, but remains a syntactic audit rather than a refinement proof.
+  compiler binary or runtime. `make native-union-realizer-audit` checks that
+  the generated source workers remain direct `Acc` recursion with no runtime
+  size/fuel argument or nested recursive closure; it remains a syntactic
+  audit rather than a refinement proof.
   The bytecode and native union oracles additionally require distinct
   allocated leaf and branch roots containing distinct mutable payload objects
   to fail `(==)` under the pinned runtime; this is targeted finite evidence

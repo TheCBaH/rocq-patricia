@@ -747,30 +747,55 @@ let check_mutable_union_payloads () =
 let check_union_root_reuse () =
   let integer_tree = empty |> set 1 10 |> set 3 30 in
   let integer_subset = empty |> set 1 99 in
-  if union_left integer_tree empty != integer_tree then
+  if PatriciaUnion.union_left_native_acc_default integer_tree empty != integer_tree then
     failwith "integer union_left did not reuse its empty-right root";
-  if union_left integer_tree integer_subset != integer_tree then
+  if PatriciaUnion.union_left_native_acc_default integer_tree integer_subset != integer_tree then
     failwith "integer union_left did not reuse its subset root";
-  if union_right empty integer_tree != integer_tree then
+  if PatriciaUnion.union_right_native_acc_default empty integer_tree != integer_tree then
     failwith "integer union_right did not reuse its empty-left root";
-  if union_right integer_subset integer_tree != integer_tree then
+  if PatriciaUnion.union_right_native_acc_default integer_subset integer_tree != integer_tree then
     failwith "integer union_right did not reuse its subset root";
   let string_tree = S.empty |> S.set "a" 10 |> S.set "c" 30 in
   let string_subset = S.empty |> S.set "a" 99 in
-  if S.union_left string_tree S.empty != string_tree then
+  if SU.union_left_native_acc_default string_tree S.empty != string_tree then
     failwith "string union_left did not reuse its empty-right root";
-  if S.union_left string_tree string_subset != string_tree then
+  if SU.union_left_native_acc_default string_tree string_subset != string_tree then
     failwith "string union_left did not reuse its subset root";
-  if S.union_right S.empty string_tree != string_tree then
+  if SU.union_right_native_acc_default S.empty string_tree != string_tree then
     failwith "string union_right did not reuse its empty-left root";
-  if S.union_right string_subset string_tree != string_tree then
+  if SU.union_right_native_acc_default string_subset string_tree != string_tree then
     failwith "string union_right did not reuse its subset root"
+
+(* The exported wrappers select the separately extracted proof-guided worker,
+   rather than the ordinary source [union_left] still available internally for
+   reference comparison. Exercise their lookup, bias, and root-reuse contract
+   directly. *)
+let check_public_union_wrappers () =
+  let module P = PatriciaMap in
+  let one = P.Key.of_int_exn 1 in
+  let two = P.Key.of_int_exn 2 in
+  let left = P.set one 10 P.empty in
+  let right = P.set one 20 (P.set two 30 P.empty) in
+  let merged = P.union_left left right in
+  if P.get one merged <> Some 10 || P.get two merged <> Some 30 then
+    failwith "public integer union_left lost left bias";
+  if P.union_left left (P.set one 99 P.empty) != left then
+    failwith "public integer union_left did not reuse a subset root";
+  let module SP = StringPatriciaMap in
+  let sleft = SP.set "a" 10 SP.empty in
+  let sright = SP.set "a" 20 (SP.set "b" 30 SP.empty) in
+  let smerged = SP.union_right sleft sright in
+  if SP.get "a" smerged <> Some 20 || SP.get "b" smerged <> Some 30 then
+    failwith "public string union_right lost right bias";
+  if SP.union_right (SP.set "a" 99 SP.empty) sright != sright then
+    failwith "public string union_right did not reuse a subset root"
 
 let () =
   Random.init 0x504154;
   check_abstract_interfaces ();
   check_mutable_union_payloads ();
   check_union_root_reuse ();
+  check_public_union_wrappers ();
   check_string_bits ();
   check_string_set_realizer_routes ();
   for round = 1 to 250 do

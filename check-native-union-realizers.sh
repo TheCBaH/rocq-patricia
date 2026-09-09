@@ -1,10 +1,8 @@
 #!/bin/sh
-# Check the generated high-level union overrides after extraction.  These
-# overrides are intentionally handwritten, so keep their sole physical-
-# equality use narrow and reviewable: every [(==)] test must compare a
-# recursively produced tree with the original child whose enclosing branch may
-# be reused.  This is a source-level boundary audit, not a proof of OCaml heap
-# or compiler semantics.
+# Check the generated source-defined closure-free union workers.  This is a
+# shape audit, not a proof of OCaml heap or compiler semantics: the one
+# remaining [(==)] primitive still has the explicit refinement contract in
+# [NativeHeapRefinement.v].
 set -eu
 
 integer_file=${1:?usage: check-native-union-realizers.sh INTEGER_ML STRING_ML}
@@ -17,52 +15,27 @@ for file in "$integer_file" "$string_file"; do
   fi
 done
 
-check_realizer () {
+check_worker () {
   label=$1
   file=$2
-  shift 2
-
-  # The four one-child containment paths and the two-child equal-header path
-  # give exactly six tests.  A changed count requires reviewing the proof
-  # bridge and this audit together.
-  physical_count=$(rg -F -o '==' "$file" | wc -l)
-  if [ "$physical_count" -ne 6 ]; then
-    echo "$label union audit: expected six physical child tests, found $physical_count" >&2
+  if ! rg -F 'let rec union_left_native_acc same original_a original_b a b =' \
+      "$file" >/dev/null; then
+    echo "$label union audit: missing direct Acc-recursive worker" >&2
     exit 1
   fi
-
-  for expression in "$@"; do
-    if ! rg -F "$expression" "$file" >/dev/null; then
-      echo "$label union audit: missing tree-child physical test: $expression" >&2
-      exit 1
-    fi
-  done
+  if ! rg -F 'union_left_native_acc (==) a b a b' "$file" >/dev/null; then
+    echo "$label union audit: default worker does not expose the sole physical primitive" >&2
+    exit 1
+  fi
+  worker=$(sed -n '/let rec union_left_native_acc /,/let union_left_native_acc_default/p' "$file")
+  if printf '%s\n' "$worker" | rg -F '(size ' >/dev/null ||
+     printf '%s\n' "$worker" | rg -F 'let rec ' | wc -l | grep -qv '^1$'; then
+    echo "$label union audit: worker retained a size prepass or nested recursion" >&2
+    exit 1
+  fi
 }
 
-check_realizer integer "$integer_file" \
-  'merged_left == left_left && merged_right == right_left' \
-  'merged == left_left' \
-  'merged == right_left' \
-  'merged == left_right' \
-  'merged == right_right'
+check_worker integer "$integer_file"
+check_worker string "$string_file"
 
-if ! rg -F 'let union_right = (fun first second -> union_left second first)' \
-    "$integer_file" >/dev/null; then
-  echo "integer union audit: union_right no longer delegates by argument swap" >&2
-  exit 1
-fi
-
-check_realizer string "$string_file" \
-  'merged_left == left_left && merged_right == right_left' \
-  'merged == left_left' \
-  'merged == right_left' \
-  'merged == left_right' \
-  'merged == right_right'
-
-if ! rg -F 'let union_right = (fun first second -> union_left second first)' \
-    "$string_file" >/dev/null; then
-  echo "string union audit: union_right no longer delegates by argument swap" >&2
-  exit 1
-fi
-
-echo "Patricia native-union audit: child-only physical equality and swapped right bias"
+echo "Patricia native-union audit: direct source-extracted Acc workers"
