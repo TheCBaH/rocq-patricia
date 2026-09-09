@@ -887,6 +887,20 @@ Proof.
        end; cbn; tauto.
 Qed.
 
+Lemma all_keys_branch_cached:
+  forall (A : Type) (P : string -> Prop) sample split
+      (ltree rtree : t A),
+    all_keys P ltree -> all_keys P rtree ->
+    all_keys P (branch_cached sample split ltree rtree).
+Proof.
+  intros A P sample split ltree rtree Hleft Hright.
+  unfold branch_cached. destruct ltree; destruct rtree; cbn in *; try tauto.
+  all: repeat match goal with
+       | |- context [match representative_cached ?m with _ => _ end] =>
+           destruct (representative_cached m)
+       end; cbn; tauto.
+Qed.
+
 Lemma all_keys_get:
   forall (A : Type) (P : string -> Prop) (m : t A) key value,
     all_keys P m -> get key m = Some value -> P key.
@@ -1348,6 +1362,176 @@ Proof.
     apply String.eqb_eq in Equery. now subst query.
 Qed.
 
+(** Cache-aware deletion refines the same public lookup contract while
+    retaining [None] as the no-change certificate. *)
+Lemma remove_changed_cached_some_reference:
+  forall (A : Type) key (m changed : t A),
+    remove_changed_cached key m = Some changed ->
+    remove_reference_cached key m = changed.
+Proof.
+  intros A key m.
+  induction m as [|stored value|sample split ltree IHl rtree IHr];
+    intros changed Hchanged.
+  - discriminate.
+  - cbn [remove_changed_cached remove_reference_cached] in *.
+    destruct (String.eqb key stored); inversion Hchanged. reflexivity.
+  - cbn [remove_changed_cached remove_reference_cached] in *.
+    destruct (bit_at key split).
+    + destruct (remove_changed_cached key rtree) as [rtree'|] eqn:E;
+        inversion Hchanged; subst.
+      now rewrite (IHr rtree' eq_refl).
+    + destruct (remove_changed_cached key ltree) as [ltree'|] eqn:E;
+        inversion Hchanged; subst.
+      now rewrite (IHl ltree' eq_refl).
+Qed.
+
+Lemma remove_changed_cached_none_get:
+  forall (A : Type) key (m : t A),
+    remove_changed_cached key m = None -> get key m = None.
+Proof.
+  intros A key m.
+  induction m as [|stored value|sample split ltree IHl rtree IHr]; intro Hchanged.
+  - reflexivity.
+  - cbn [remove_changed_cached get] in *.
+    now destruct (String.eqb key stored).
+  - cbn [remove_changed_cached get] in *.
+    destruct (bit_at key split).
+    + destruct (remove_changed_cached key rtree) eqn:E; [discriminate|].
+      now apply IHr.
+    + destruct (remove_changed_cached key ltree) eqn:E; [discriminate|].
+      now apply IHl.
+Qed.
+
+Lemma remove_changed_cached_none_of_get_none:
+  forall (A : Type) key (m : t A),
+    get key m = None -> remove_changed_cached key m = None.
+Proof.
+  intros A key m.
+  induction m as [|stored value|sample split ltree IHl rtree IHr]; intro Hget.
+  - reflexivity.
+  - cbn [get remove_changed_cached] in *.
+    now destruct (String.eqb key stored).
+  - cbn [get remove_changed_cached] in *.
+    destruct (bit_at key split); [now rewrite IHr|now rewrite IHl].
+Qed.
+
+Theorem remove_cached_absent_identity:
+  forall (A : Type) key (m : t A),
+    get key m = None -> remove_cached key m = m.
+Proof.
+  intros A key m Hget. unfold remove_cached.
+  now rewrite (@remove_changed_cached_none_of_get_none A key m Hget).
+Qed.
+
+Lemma all_keys_remove_reference_cached:
+  forall (A : Type) (P : string -> Prop) (m : t A) key,
+    all_keys P m -> all_keys P (remove_reference_cached key m).
+Proof.
+  intros A P m. induction m as [|stored value|sample split ltree IHl rtree IHr];
+    intros key Hall; cbn [remove_reference_cached] in *.
+  - exact I.
+  - destruct (String.eqb key stored); cbn; [exact I|exact Hall].
+  - destruct Hall as [Hl Hr]. destruct (bit_at key split).
+    + apply all_keys_branch_cached; [exact Hl|now apply IHr].
+    + apply all_keys_branch_cached; [now apply IHl|exact Hr].
+Qed.
+
+Theorem remove_reference_cached_wf:
+  forall (A : Type) key (m : t A), wf m -> wf (remove_reference_cached key m).
+Proof.
+  intros A key m Hwf. induction Hwf as
+      [|stored value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr Hresident]; cbn [remove_reference_cached].
+  - constructor.
+  - destruct (String.eqb key stored); constructor.
+  - destruct (bit_at key split).
+    + apply branch_cached_wf_general.
+      * exact Hwl.
+      * exact IHr.
+      * exact Hl.
+      * now apply all_keys_remove_reference_cached.
+    + apply branch_cached_wf_general.
+      * exact IHl.
+      * exact Hwr.
+      * now apply all_keys_remove_reference_cached.
+      * exact Hr.
+Qed.
+
+Theorem remove_cached_wf:
+  forall (A : Type) key (m : t A), wf m -> wf (remove_cached key m).
+Proof.
+  intros A key m Hwf. unfold remove_cached.
+  destruct (remove_changed_cached key m) as [changed|] eqn:E; [|exact Hwf].
+  rewrite <- (@remove_changed_cached_some_reference A key m changed E).
+  now apply remove_reference_cached_wf.
+Qed.
+
+Theorem get_remove_reference_cached:
+  forall (A : Type) key query (m : t A),
+    wf m ->
+    get query (remove_reference_cached key m) =
+      if String.eqb query key then None else get query m.
+Proof.
+  intros A key query m Hwf. induction Hwf as
+      [|stored value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr Hresident].
+  - cbn. destruct (String.eqb query key); reflexivity.
+  - cbn [remove_reference_cached get]. destruct (String.string_dec query key) as [->|Hqk].
+    + rewrite String.eqb_refl. destruct (String.eqb key stored) eqn:Eks;
+        cbn [get]; rewrite ?Eks; reflexivity.
+    + assert (Eqk : String.eqb query key = false) by
+        (apply String.eqb_neq; exact Hqk).
+      rewrite Eqk. destruct (String.eqb key stored) eqn:Eks.
+      * apply String.eqb_eq in Eks. subst stored.
+        assert (Eqs : String.eqb query key = false) by
+          (apply String.eqb_neq; exact Hqk).
+        now rewrite Eqs.
+      * reflexivity.
+  - cbn [remove_reference_cached].
+    assert (Hlbit : all_keys (fun stored => bit_at stored split = false) ltree).
+    { eapply all_keys_impl; [exact Hl|]. intros stored H. exact (proj2 H). }
+    assert (Hrbit : all_keys (fun stored => bit_at stored split = true) rtree).
+    { eapply all_keys_impl; [exact Hr|]. intros stored H. exact (proj2 H). }
+    destruct (bit_at key split) eqn:Ekey.
+    + rewrite (get_branch_cached A sample split ltree
+        (remove_reference_cached key rtree) query).
+      * destruct (bit_at query split) eqn:Equery.
+        -- rewrite IHr. cbn [get]. now rewrite Equery.
+        -- assert (Hneq : query <> key).
+           { intros ->. rewrite Ekey in Equery. discriminate. }
+           assert (Eneq : String.eqb query key = false) by
+             (apply String.eqb_neq; exact Hneq).
+           cbn [get]. now rewrite Equery, Eneq.
+      * exact Hlbit.
+      * now apply all_keys_remove_reference_cached.
+    + rewrite (get_branch_cached A sample split
+        (remove_reference_cached key ltree) rtree query).
+      * destruct (bit_at query split) eqn:Equery.
+        -- assert (Hneq : query <> key).
+           { intros ->. rewrite Ekey in Equery. discriminate. }
+           assert (Eneq : String.eqb query key = false) by
+             (apply String.eqb_neq; exact Hneq).
+           cbn [get]. now rewrite Equery, Eneq.
+        -- rewrite IHl. cbn [get]. now rewrite Equery.
+      * now apply all_keys_remove_reference_cached.
+      * exact Hrbit.
+Qed.
+
+Theorem get_remove_cached:
+  forall (A : Type) key query (m : t A),
+    wf m ->
+    get query (remove_cached key m) =
+      if String.eqb query key then None else get query m.
+Proof.
+  intros A key query m Hwf. unfold remove_cached.
+  destruct (remove_changed_cached key m) as [changed|] eqn:E.
+  - rewrite <- (@remove_changed_cached_some_reference A key m changed E).
+    now apply get_remove_reference_cached.
+  - pose proof (@remove_changed_cached_none_get A key m E) as Hnone.
+    destruct (String.eqb query key) eqn:Equery; [|reflexivity].
+    apply String.eqb_eq in Equery. now subst query.
+Qed.
+
 Corollary get_remove_same:
   forall (A : Type) key (m : t A),
     wf m -> get key (remove key m) = None.
@@ -1495,20 +1679,6 @@ Qed.
 
 (** The executable cache-aware traversal has the same lookup contract as
     [map_filter] on the public well-formed representation invariant. *)
-Lemma all_keys_branch_cached:
-  forall (A : Type) (P : string -> Prop) sample split
-      (ltree rtree : t A),
-    all_keys P ltree -> all_keys P rtree ->
-    all_keys P (branch_cached sample split ltree rtree).
-Proof.
-  intros A P sample split ltree rtree Hleft Hright.
-  unfold branch_cached. destruct ltree; destruct rtree; cbn in *; try tauto.
-  all: repeat match goal with
-       | |- context [match representative_cached ?m with _ => _ end] =>
-           destruct (representative_cached m)
-       end; cbn; tauto.
-Qed.
-
 Lemma all_keys_map_filter_cached:
   forall (A B : Type) (P : string -> Prop)
       (f : string -> A -> option B) (m : t A),

@@ -168,7 +168,8 @@ Separate Extraction
   StringPatricia.combine_leaf_left StringPatricia.combine_leaf_right
   StringPatricia.get StringPatricia.mem StringPatricia.set_one_descent
   StringPatricia.set_one_descent_shared StringPatricia.set_two_descent
-  StringPatricia.set StringPatricia.remove StringPatricia.of_list
+  StringPatricia.set StringPatricia.remove StringPatricia.remove_cached
+  StringPatricia.of_list
   StringPatricia.combine StringPatricia.union_left StringPatricia.union_right
   StringPatriciaUnion.union_left_specialized
   StringPatriciaUnion.union_right_specialized

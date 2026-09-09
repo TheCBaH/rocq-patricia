@@ -326,6 +326,43 @@ Definition remove {A : Type} (key : string) (m : t A) : t A :=
   | Some changed => changed
   end.
 
+(** Cache-aware deletion for the public well-formed representation.  The
+    [None] result preserves the routed-path no-op sharing contract; changed
+    branches use the resident cached sample rather than a structural reader. *)
+Fixpoint remove_reference_cached {A : Type} (key : string) (m : t A) : t A :=
+  match m with
+  | Empty => Empty
+  | Leaf stored _ => if String.eqb key stored then Empty else m
+  | Branch sample split ltree rtree =>
+      if bit_at key split
+      then branch_cached sample split ltree (remove_reference_cached key rtree)
+      else branch_cached sample split (remove_reference_cached key ltree) rtree
+  end.
+
+Fixpoint remove_changed_cached {A : Type} (key : string) (m : t A)
+    : option (t A) :=
+  match m with
+  | Empty => None
+  | Leaf stored _ => if String.eqb key stored then Some Empty else None
+  | Branch sample split ltree rtree =>
+      if bit_at key split then
+        match remove_changed_cached key rtree with
+        | None => None
+        | Some rtree' => Some (branch_cached sample split ltree rtree')
+        end
+      else
+        match remove_changed_cached key ltree with
+        | None => None
+        | Some ltree' => Some (branch_cached sample split ltree' rtree)
+        end
+  end.
+
+Definition remove_cached {A : Type} (key : string) (m : t A) : t A :=
+  match remove_changed_cached key m with
+  | None => m
+  | Some changed => changed
+  end.
+
 Fixpoint map {A B : Type} (f : string -> A -> B) (m : t A) : t B :=
   match m with
   | Empty => Empty

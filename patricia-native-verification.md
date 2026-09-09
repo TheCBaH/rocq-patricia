@@ -268,12 +268,15 @@ No implementation strategy below has yet passed its replacement gate.
   `branch_cached`, and `StringPatriciaMap.map_filter` selects it. The
   `map_left`/`map_right` helpers and both fused leaf-combine workers now
   delegate to that traversal as well, so their existing contracts cover the
-  cache-aware one-sided combine cases. `make map-filter-profile` validates the
+  cache-aware one-sided combine cases. `remove_cached_wf` and
+  `get_remove_cached` establish the same deletion contract, and the public
+  wrapper now selects its direct extracted changed-result worker; the public
+  test checks absent-key root reuse. `make map-filter-profile` validates the
   legacy override, extracted cached worker, and public wrapper against their
   bindings: on the pinned compiler, their allocations match at 10K and 100K
-  for keep-all, keep-even, and drop-all workloads. Removal, general combine's
-  remaining branch/join paths, and the other update paths still need migration
-  before I5's total-reader override can be removed.
+  for keep-all, keep-even, and drop-all workloads. General combine's remaining
+  branch/join paths and the other update paths still need migration before I5's
+  total-reader override can be removed.
 - [ ] V2.2 Prove an executable indexed bounded-prefix scan for I4, including
   valid tags, marker cases, partial masks, short-circuit guards and termination.
 - [ ] V2.3 Prove indexed first difference and its shifting-mask/identity paths

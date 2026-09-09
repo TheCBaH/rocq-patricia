@@ -7,7 +7,9 @@ let singleton = StringPatriciaInternal.singleton
 let get = StringPatriciaInternal.get
 let mem = StringPatriciaInternal.mem
 let set = StringPatriciaInternal.set
-let remove = StringPatriciaInternal.remove
+(* Like public [map_filter], deletion uses the source-extracted cached-sample
+   worker while retaining the exact no-op root when the key is absent. *)
+let remove = StringPatriciaInternal.remove_cached
 let of_list = StringPatriciaInternal.of_list
 let map = StringPatriciaInternal.map
 (* This source-extracted variant uses the resident branch sample instead of

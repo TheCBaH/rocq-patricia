@@ -681,6 +681,8 @@ let check_abstract_interfaces () =
   if S.is_empty strings || not (S.mem "" strings)
      || S.get "a\000b" strings <> Some 3 then
     failwith "abstract string interface update failed";
+  if not (S.remove "missing" strings == strings) then
+    failwith "cached public string removal lost absent-key root reuse";
   let bulk = S.of_list ["a\000b", 10; "", 0; "a\000b", 11] in
   if S.get "a\000b" bulk <> Some 10 || S.get "" bulk <> Some 0
      || S.get "missing" bulk <> None then

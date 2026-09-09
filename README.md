@@ -143,8 +143,9 @@ The direct-string proof files currently establish, without axioms:
 - two-way agreement between `get` and `elements` on well-formed trees,
   completeness of lookup, unique element keys, unique bindings, and strong
   sorting by the prefix-free bit-stream lexicographic order;
-- the general lookup specification for `remove`, structural identity for an
-  absent key, plus the corresponding `elements` filtering specification;
+- the general lookup specification for `remove`, its source-extracted
+  cache-aware public implementation, structural identity for an absent key,
+  plus the corresponding `elements` filtering specification;
 - the unconditional `set` lookup law and well-formedness preservation,
   including fresh and existing keys, plus the corresponding first-binding-wins
   `of_list` law;

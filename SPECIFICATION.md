@@ -189,6 +189,9 @@ Public string `set` likewise extracts the proved two-descent worker.
 Public string `map_filter` selects the separately proved cache-aware traversal:
 on well-formed inputs its smart branches read a resident cached sample rather
 than structurally descending after a child filter has collapsed.
+Public string `remove` likewise selects a separately proved cache-aware worker;
+an absent key returns the exact input root, while changed branches use resident
+cached samples.
 
 The native bounded-prefix byte loop has no corresponding target refinement
 theorem: `agrees_before_bounded_eq` concerns its logical bit-scanning
