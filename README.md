@@ -36,6 +36,11 @@ run `make reference-profile`. It checks every measured result against
 `Stdlib.Map`; use the same `PATRICIA_REFERENCE_PROFILE_SIZE` and compiler
 configuration when comparing its output with the optimized benchmark.
 
+To compare the legacy string filter with the source-extracted cached-sample
+filter and the public wrapper, run `make map-filter-profile` (set
+`PATRICIA_MAP_FILTER_PROFILE_SIZE` for a larger input). It checks every
+result's bindings before reporting allocated and retained words.
+
 The comparison verifies each measured Patricia and `Stdlib.Hashtbl` result
 against `Stdlib.Map`. It reports build, lookup, membership, traversal
 (`elements`), add, update, and present/absent remove time, retained heap words

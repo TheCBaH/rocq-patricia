@@ -268,9 +268,12 @@ No implementation strategy below has yet passed its replacement gate.
   `branch_cached`, and `StringPatriciaMap.map_filter` selects it. The
   `map_left`/`map_right` helpers and both fused leaf-combine workers now
   delegate to that traversal as well, so their existing contracts cover the
-  cache-aware one-sided combine cases. Removal, general combine's remaining
-  branch/join paths, and the other update paths still need migration before
-  I5's total-reader override can be removed.
+  cache-aware one-sided combine cases. `make map-filter-profile` validates the
+  legacy override, extracted cached worker, and public wrapper against their
+  bindings: on the pinned compiler, their allocations match at 10K and 100K
+  for keep-all, keep-even, and drop-all workloads. Removal, general combine's
+  remaining branch/join paths, and the other update paths still need migration
+  before I5's total-reader override can be removed.
 - [ ] V2.2 Prove an executable indexed bounded-prefix scan for I4, including
   valid tags, marker cases, partial masks, short-circuit guards and termination.
 - [ ] V2.3 Prove indexed first difference and its shifting-mask/identity paths
@@ -364,6 +367,7 @@ connections in milestone 3. Empirical replacement acceptance does not close N4.
 | 2026-09-09 | Published the separate tracker and synchronized existing documents; organized local papers | Checked 64 local Markdown links/anchors across the eight documentation files; verified all four indexed PDF headers/end markers and SHA-256 digests; `git diff --check` passed. The Okasaki–Gill PDF was moved without changing its bytes; its origin is now identified as the 2015-04-17 Internet Archive capture of Andy Gill's ITTC author path, with the local checksum retained. These are documentation/artifact checks, not a rerun of the functional proof gate. |
 | 2026-09-09 | V0.1–V0.3: source/extraction/proof audit, literature investigation and baseline profile | `rg -n '^Extract' PatriciaExtract.v`; inspection of native refinement and companion proofs, wrappers and generated OCaml; `sh check-ocaml-physical-equality.sh /opt/opam/4.14.3/.opam-switch/sources/ocaml-base-compiler.4.14.3`; `PATRICIA_UNION_PROFILE_SIZE=10000 make union-profile` passed. The latter rebuilt extraction/native profiling and checked results/sharing; it was not a fresh full proof/test run or a timing comparison. |
 | 2026-09-09 | V1.1–V1.5: selected source-extracted direct union workers | `make union-proof`, `make extraction-boundary native-union-realizer-audit test union-oracle-native differential`, and `PATRICIA_UNION_PROFILE_SIZE=10000/100000 make union-profile` passed. The generated workers are direct recursive functions with erased `Acc`/equality evidence; at 100K, integer `Acc` allocation was 379/365/176/26/26 and string 100/81/26/26/26 words for disjoint/half-overlap/subset/equal/empty-right. These are allocation/sharing measurements on this toolchain, not timing, GC, compiler, or heap-refinement proofs. |
+| 2026-09-09 | V2.1 cache-aware filtering gate | `make map-filter-profile` and `PATRICIA_MAP_FILTER_PROFILE_SIZE=100000 make map-filter-profile` passed after checking every result. Legacy, cached, and public paths respectively allocated 120,024/120,024/120,024 words for 10K keep-all, 60,024/60,024/60,024 for keep-even, and 31/31/31 for drop-all; at 100K they were 1,899,042/1,899,042/1,899,042, 949,514/949,514/949,514, and 31/31/31. Retained-word deltas differed only by small measurement noise. This is allocation evidence on OCaml 4.14.3 arm64/Linux, not a timing or cost proof. |
 
 ## Publications
 
