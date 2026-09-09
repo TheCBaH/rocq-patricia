@@ -41,6 +41,10 @@ filter and the public wrapper, run `make map-filter-profile` (set
 `PATRICIA_MAP_FILTER_PROFILE_SIZE` for a larger input). It checks every
 result's bindings before reporting allocated and retained words.
 
+For the corresponding deletion comparison, run `make remove-profile` (set
+`PATRICIA_REMOVE_PROFILE_SIZE`). It covers absent-key root reuse and a present
+key, again checking every binding before reporting allocation.
+
 The comparison verifies each measured Patricia and `Stdlib.Hashtbl` result
 against `Stdlib.Map`. It reports build, lookup, membership, traversal
 (`elements`), add, update, and present/absent remove time, retained heap words

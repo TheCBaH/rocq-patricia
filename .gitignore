@@ -12,6 +12,7 @@
 /patricia-union-test
 /patricia-union-native-test
 /patricia-map-filter-profile
+/patricia-remove-profile
 /patricia-differential-test
 /patricia-benchmark
 /patricia-union-profile

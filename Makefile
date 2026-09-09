@@ -22,11 +22,13 @@ REFERENCE_PACK := PatriciaReference.cmo
 .PHONY: all proof core-proof union-proof assumptions extraction extraction-boundary \
 	native-union-realizer-audit ocaml-physical-equality-audit \
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
-	benchmark benchmark-smoke union-profile map-filter-profile reference-profile compiler-config clean
+	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
 .PHONY: set-profile
 
 .PHONY: map-filter-profile
+
+.PHONY: remove-profile
 
 all: proof assumptions extraction extraction-boundary native-union-realizer-audit \
 	reference-extraction ocaml reference-ocaml \
@@ -171,6 +173,17 @@ map-filter-profile: extraction PatriciaMapFilterProfile.ml StringPatriciaMap.ml
 	  ../StringPatriciaMap.cmx ../PatriciaMapFilterProfile.cmx
 	./patricia-map-filter-profile
 
+remove-profile: extraction PatriciaRemoveProfile.ml StringPatriciaMap.ml
+	cd extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
+	rm -f StringPatriciaMap.cmi StringPatriciaMap.cmx StringPatriciaMap.o \
+	  PatriciaRemoveProfile.cmi PatriciaRemoveProfile.cmx PatriciaRemoveProfile.o
+	$(OCAMLOPT) -I extracted -c StringPatriciaMap.mli StringPatriciaMap.ml \
+	  PatriciaRemoveProfile.ml
+	cd extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../patricia-remove-profile $$objects \
+	  ../StringPatriciaMap.cmx ../PatriciaRemoveProfile.cmx
+	./patricia-remove-profile
+
 # The proof-aligned extraction has deliberately separate module names from the
 # optimized backend.  Keep its native performance profile in a separate binary
 # so the normal supported-wrapper benchmark stays focused on its public API.
@@ -232,8 +245,9 @@ clean:
 	  PatriciaBenchmark.cmi PatriciaBenchmark.cmx PatriciaBenchmark.o \
 	  PatriciaUnionProfile.cmi PatriciaUnionProfile.cmx PatriciaUnionProfile.o \
 	  PatriciaReferenceProfile.cmi PatriciaReferenceProfile.cmx PatriciaReferenceProfile.o \
-	  PatriciaMapFilterProfile.cmi PatriciaMapFilterProfile.cmx PatriciaMapFilterProfile.o
+	  PatriciaMapFilterProfile.cmi PatriciaMapFilterProfile.cmx PatriciaMapFilterProfile.o \
+	  PatriciaRemoveProfile.cmi PatriciaRemoveProfile.cmx PatriciaRemoveProfile.o
 	rm -f patricia-test patricia-union-test patricia-differential-test \
 	  patricia-union-native-test \
-	  patricia-benchmark patricia-union-profile patricia-set-profile patricia-map-filter-profile \
+	  patricia-benchmark patricia-union-profile patricia-set-profile patricia-map-filter-profile patricia-remove-profile \
 	  patricia-reference-profile
