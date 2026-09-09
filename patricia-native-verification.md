@@ -279,9 +279,12 @@ No implementation strategy below has yet passed its replacement gate.
   `combine_fuel` and `combine_structural` now use `branch_cached` for every
   recursive branch construction and `join_cached` for every separated fallback;
   their original pointwise and `wf` contracts are re-proved through
-  `combine_join_cached_separated_correct_wf`. The remaining executable regular
-  representative consumers are the specialized union workers; raw-tree proof
-  references deliberately retain the total reader until their role is removed.
+  `combine_join_cached_separated_correct_wf`. The extraction gate
+  `make cached-representative-audit` verifies generated direct cached calls in
+  removal, filtering, and both generic combine workers. The remaining
+  executable regular representative consumers are the specialized union
+  workers; raw-tree proof references deliberately retain the total reader until
+  their role is removed.
 - [ ] V2.2 Prove an executable indexed bounded-prefix scan for I4, including
   valid tags, marker cases, partial masks, short-circuit guards and termination.
 - [ ] V2.3 Prove indexed first difference and its shifting-mask/identity paths
@@ -377,6 +380,7 @@ connections in milestone 3. Empirical replacement acceptance does not close N4.
 | 2026-09-09 | V1.1–V1.5: selected source-extracted direct union workers | `make union-proof`, `make extraction-boundary native-union-realizer-audit test union-oracle-native differential`, and `PATRICIA_UNION_PROFILE_SIZE=10000/100000 make union-profile` passed. The generated workers are direct recursive functions with erased `Acc`/equality evidence; at 100K, integer `Acc` allocation was 379/365/176/26/26 and string 100/81/26/26/26 words for disjoint/half-overlap/subset/equal/empty-right. These are allocation/sharing measurements on this toolchain, not timing, GC, compiler, or heap-refinement proofs. |
 | 2026-09-09 | V2.1 cache-aware filtering gate | `make map-filter-profile` and `PATRICIA_MAP_FILTER_PROFILE_SIZE=100000 make map-filter-profile` passed after checking every result. Legacy, cached, and public paths respectively allocated 120,024/120,024/120,024 words for 10K keep-all, 60,024/60,024/60,024 for keep-even, and 31/31/31 for drop-all; at 100K they were 1,899,042/1,899,042/1,899,042, 949,514/949,514/949,514, and 31/31/31. Retained-word deltas differed only by small measurement noise. This is allocation evidence on OCaml 4.14.3 arm64/Linux, not a timing or cost proof. |
 | 2026-09-09 | V2.1 cache-aware deletion gate | `make remove-profile` and `PATRICIA_REMOVE_PROFILE_SIZE=100000 make remove-profile` passed after checking every result and the wrapper test checked absent-key root reuse. Legacy, cached, and public paths allocated 26/26/26 words for an absent key and 136/136/136 for the selected present key at 10K; at 100K they were 26/26/26 and 199/199/199. Retained-word deltas differed only by small measurement noise. This is allocation evidence on OCaml 4.14.3 arm64/Linux, not a timing or cost proof. |
+| 2026-09-09 | V2.1 generated cached-consumer guard | `make cached-representative-audit` passed. It inspects extracted `remove_changed_cached`, `map_filter_cached`, `combine_fuel`, and `combine_structural`, requiring a cached constructor call and forbidding direct regular `branch`/`join` calls. This is a regression guard over generated syntax, not a semantic refinement proof. |
 
 ## Publications
 

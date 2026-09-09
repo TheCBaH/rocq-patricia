@@ -45,6 +45,10 @@ For the corresponding deletion comparison, run `make remove-profile` (set
 `PATRICIA_REMOVE_PROFILE_SIZE`). It covers absent-key root reuse and a present
 key, again checking every binding before reporting allocation.
 
+`make cached-representative-audit` checks the generated removal, filtering,
+and generic-combine workers retain their source-defined cached branch/join
+calls.
+
 The comparison verifies each measured Patricia and `Stdlib.Hashtbl` result
 against `Stdlib.Map`. It reports build, lookup, membership, traversal
 (`elements`), add, update, and present/absent remove time, retained heap words

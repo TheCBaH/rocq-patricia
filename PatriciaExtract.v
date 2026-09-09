@@ -170,7 +170,8 @@ Separate Extraction
   StringPatricia.set_one_descent_shared StringPatricia.set_two_descent
   StringPatricia.set StringPatricia.remove StringPatricia.remove_cached
   StringPatricia.of_list
-  StringPatricia.combine StringPatricia.union_left StringPatricia.union_right
+  StringPatricia.combine_fuel StringPatricia.combine StringPatricia.union_left
+  StringPatricia.union_right
   StringPatriciaUnion.union_left_specialized
   StringPatriciaUnion.union_right_specialized
   StringPatriciaUnion.union_left_specialized_changed

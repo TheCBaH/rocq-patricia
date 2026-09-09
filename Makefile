@@ -21,6 +21,7 @@ REFERENCE_PACK := PatriciaReference.cmo
 
 .PHONY: all proof core-proof union-proof assumptions extraction extraction-boundary \
 	native-union-realizer-audit ocaml-physical-equality-audit \
+	cached-representative-audit \
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
@@ -31,6 +32,7 @@ REFERENCE_PACK := PatriciaReference.cmo
 .PHONY: remove-profile
 
 all: proof assumptions extraction extraction-boundary native-union-realizer-audit \
+	cached-representative-audit \
 	reference-extraction ocaml reference-ocaml \
 	test union-oracle differential
 
@@ -54,6 +56,9 @@ extraction-boundary: PatriciaExtract.v check-extraction-boundary.sh
 native-union-realizer-audit: extraction check-native-union-realizers.sh
 	sh ./check-native-union-realizers.sh extracted/PatriciaUnion.ml \
 	  extracted/StringPatriciaUnion.ml
+
+cached-representative-audit: extraction check-cached-representative-consumers.sh
+	sh ./check-cached-representative-consumers.sh extracted/StringPatriciaInternal.ml
 
 # Optional implementation audit for the selected OCaml compiler sources. It
 # intentionally stays outside the normal proof/correctness gate: a source scan
