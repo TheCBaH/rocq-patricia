@@ -1,6 +1,7 @@
 # Patricia-tree verification review
 
-Review date: 2026-08-30
+Native-boundary review updated: 2026-09-09. Historical validation dates below
+refer to the runs actually performed.
 
 The supported public contracts, theorem checklist, and trusted computing base
 are fixed in [`SPECIFICATION.md`](SPECIFICATION.md). The active implementation
@@ -8,6 +9,9 @@ plan and status tracker are maintained separately in
 [`patricia-todo.md`](patricia-todo.md). Performance analysis is in
 [`patricia-str.md`](patricia-str.md), and measured results are in
 [`patricia-bench.md`](patricia-bench.md).
+The detailed unverified-code inventory, publication references and separate
+forward tracker are in
+[`patricia-native-verification.md`](patricia-native-verification.md).
 
 ## Scope and verdict
 
@@ -101,20 +105,25 @@ lookup laws under the sole positive-direction `native_same_sound` premise;
 right-biased target shape. The direct-string theorems carry cached-sample
 residency through the same assembly. Neither source theorem establishes the
 OCaml `(==)` contract.
-The closure-free fuel-shaped native candidate was worse still (1,200,993 /
+The single-recursive-function fuel-shaped native candidate was worse still (1,200,993 /
 1,200,634 words for half overlap and 2,400,919 / 2,400,891 for equality),
-because its generic physical-equality callback is invoked through the recursive
-worker. Inlining that callback and the root/child reconstruction checks in the
+with a generic physical-equality callback passed through the recursive worker.
+Generated code also contains capturing callbacks for the native-`nat`
+eliminator; removing nested recursion did not remove all closures. Inlining
+the equality callback and the root/child reconstruction checks in the
 single fuel worker improves the corresponding results to 1,100,853 / 1,100,598
 and 2,200,677 / 2,200,707 words, respectively, but remains far above both the
-nested candidate and the legacy implementation. This rules out direct source
-inlining as the relevant generated-code improvement; changing the recursion
-measure alone is not useful either.
+nested candidate and the legacy implementation. These particular inlining and
+runtime-fuel experiments do not rule out direct recursion on an accessibility
+proof in `Prop`, with the measure entirely erased. That route is the first
+experiment in the separate tracker, following
+[Leroy's CoqPL 2024 paper](papers/leroy-well-founded-recursion.pdf).
 Making `(==)` extraction-inline and compiling the diagnostic with
 `ocamlopt -inline 1000` made no material difference; this OCaml 4.14.3 build
-does not include Flambda. The practical next boundary is consequently a small
-handwritten recursive skeleton (with source-verified called primitives), or a
-separately verified target-language implementation.
+does not include Flambda. A genuine Flambda build is a distinct experiment.
+Direct target-language verification of the existing workers is the main
+alternative to improved source extraction; retaining a handwritten skeleton
+with proved callees still leaves that skeleton's control flow unverified.
 
 The 10,000- and 100,000-binding benchmark checks in `patricia-bench.md`
 confirm constant-sized allocation for disjoint native unions and substantially
@@ -122,8 +131,10 @@ less allocation for the overlapping workload.  This restores the intended
 operational behavior, but it is benchmark evidence rather than a complexity
 proof.
 
-The remaining native-refinement task is the target-level `==` contract for the
-specialized native unions.
+The remaining native-refinement tasks include execution of the handwritten
+recursive bodies and their called primitives, as well as the target-level `==`
+contract for the specialized native unions. The abstract heap bridge proves
+the sufficiency of the contract, not execution of those bodies or moving GC.
 `SPECIFICATION.md` states that contract precisely: a successful physical test
 denotes the same current immutable tree and therefore equal lookups. A cost
 semantics is additionally needed before making a formal asymptotic claim. This
@@ -131,7 +142,7 @@ is intentionally a runtime/compiler contract rather than a portable OCaml
 theorem: documented `==` behavior on non-mutable values guarantees only
 `compare = 0`, which is insufficient for arbitrary map payloads.
 
-### 2. The direct-string biased unions are verified
+### 2. The pure direct-string biased unions are verified
 
 The string proofs cover the bit view, first-difference scan, lookup/elements
 agreement, removal, mapping, general `set`, generic `combine`, and both biased
@@ -201,10 +212,10 @@ differential and structural validation.
 
 The Rocq model uses unbounded `positive`, `N`, and `nat`, while the optimized
 OCaml implementation uses bounded `int`, native shifts, and native strings.
-`bit_at`, `first_diff`, prefix matching, routing bits, highest-differing-bit
-selection, cached representatives, and fused string insertion are replaced
-with handwritten OCaml realizers. Both general `combine` definitions and both
-public biased unions are now extracted from proved structural source workers.
+`bit_at`, `first_diff`, bounded prefix scanning, integer prefix matching,
+routing bits, highest-differing-bit selection, cached representatives and
+public biased unions use handwritten OCaml realizers. Both general `combine`
+definitions and public string `set` extract directly from proved source workers.
 Rocq does not prove the equivalence of the remaining replacements.
 
 This is not merely a general warning about extraction. The
@@ -224,11 +235,12 @@ does not inspect either kind of extraction directive.
 | --- | --- | --- |
 | `positive`, `N`, and `nat` represented by OCaml `int`; Rocq strings represented by OCaml strings | Wrapper tests reject `min_int`, negative values, and zero; accept and round-trip one and `max_int`; and the oracle covers positive keys through `max_int`, byte strings, and valid split positions used by the map | `NativeRefinement.v` fixes the supported 64-bit non-negative `int` payload domain at 62 bits and names the positive-key relation. Its integer routing model now has kernel-checked correspondence and closure laws. The link from that model to OCaml arithmetic and the bounded string representation remains a foreign-interface refinement obligation. |
 | Integer `word`, prefix, prefix match, routing bit, highest differing bit, and mask ordering | Boundary-key fuzzing and structural checks found no mismatch | `native_prefix_word_refines`, `native_matches_prefix_refines`, `native_zero_bit_refines`, `native_highest_differing_bit_refines`, and `native_mask_above_refines` identify the bounded source model with the pure operations. The 62-bit payload/mask closure lemmas cover shifted prefixes and XOR-derived split bits. The custom OCaml `lsr`/`land`/`lxor`/loop realization is still trusted until a target-language primitive contract proves it implements this model. |
-| Packed string split token `(byte << 4) | tag`, native `bit_at`, and bytewise `first_diff` | `first_diff` is checked for all 65,536 one-byte pairs plus prefix and long-prefix cases; direct checks cover all 16 tags at in-range and out-of-range byte indices, and structural tests check `bit_at` routing over NUL, non-ASCII, and randomized strings | `NativeRefinement.v` proves the logical `9*b+t` to packed `16*b+t` codec, valid-tag property, injectivity, ordering, and valid-token decode/encode round trips. Its native byte-code-array model proves byte length/access/bounds, the guard conditions for every `unsafe_get` site, and `native_packed_bit_at_refines_representation`; its safe structural bytewise scanner is proved equal to packed `first_diff`, and its mismatching-byte choice is equivalent to the Boolean-XOR leading-zeroes model. The remaining FFI contract is only that OCaml byte strings implement this array model, `String.length`/`Char.code` return the stated length/code, and short-circuit guards precede each unsafe access; OCaml execution itself is not kernel-verified. Logical position 9 remains token 16, so direct equality at the same extracted integer is intentionally false. |
+| Packed string split token `(byte << 4) \| tag`, native `bit_at`, and bytewise `first_diff` | `first_diff` is checked for all 65,536 one-byte pairs plus prefix and long-prefix cases; direct checks cover all 16 tags at in-range and out-of-range byte indices, and structural tests check routing over NUL, non-ASCII and randomized strings | `NativeRefinement.v` proves the logical-to-packed codec, validity/order/round trips, byte-array length/access/bounds and guarded packed-bit refinement. Its structural bytewise scanner and mathematical XOR/leading-zeroes calculation refine logical first difference. The actual indexed OCaml loop, shifting-mask progression and string-identity shortcut still require refinement, in addition to contracts for native bytes, arithmetic and guarded access. Logical position 9 is token 16; equality at the same extracted integer is intentionally false. |
+| Packed bounded prefix comparison | The native scanner avoids a `first_diff` option and is exercised by the structural/differential suites and overlap profiles | `StringBits.agrees_before_bounded_spec` and `agrees_before_bounded_eq` prove the logical bit scanner. The packed byte loop in `PatriciaExtract.v`, including end markers, partial-byte masks and bounds, still needs an executable-model or target-language proof (I4/V2 in the separate tracker). |
 | A branch sample returned as its constant-time `representative` | `wf_branch` requires `resident sample (Branch ...)`, and every smart constructor and public-operation preservation theorem discharges that premise; structural tests independently check the property | Cached-sample residency is kernel-checked (`wf_cached_sample_resident`). The cached and pure representatives can differ, but `wf_cached_sample_same_prefix_representative` proves agreement below the branch split. `wf_cached_sample_agrees_before_representative` and `wf_cached_sample_bit_at_before_representative` therefore justify every bounded-prefix comparison and strictly-outer routing-bit use in native merge/union without requiring representative equality. |
 | Direct-string `set` | The public setter is now ordinary extraction of the proved two-descent source definition. Full oracle, structural, and optimized-versus-reference differential tests pass; the extracted one-descent experiments are checked independently. | No Patricia-specific `Extract Constant` remains for string `set`. `set_two_descent_eq_set` is definitional, while the one-descent variants are proved equal to it on well-formed inputs. The remaining trust is ordinary extraction/compiler correctness plus the existing native string primitive mappings, not exception control flow. |
 | Fuel-free integer and string `combine` | The public source workers use nested structural fixpoints and are proved equal to every sufficient `combine_fuel` run; the optimized extraction now retains those definitions, and randomized native merges agree with the reference maps | No Patricia-specific `Extract Constant` remains for general `combine`; ordinary extraction/compiler correctness and the retained primitive mappings remain in the trusted base. |
-| Specialized biased unions and physical-identity (`==`) sharing | Disjoint and overlap results agree with `Stdlib.Map`; both public wrappers use the handwritten native realization. The closure-free fuel worker is proved equal to the established changed worker and is the source-level functional oracle; the isolated workers have invariant and pointwise union proofs plus a targeted extraction oracle. The checked `union-profile` reports the native realization's fixed allocation and left-root reuse for subset/equal/no-op inputs. `union_left_native_correct_wf` assembles every reuse branch into a whole-worker invariant and left-biased pointwise law conditional on `native_same_sound`; `union_right_native_correct_wf` proves the exact swapped-argument right-biased shape used by the handwritten export. The direct-string theorems retain cached-sample residency. `NativeHeapRefinement.v` now models allocated runtime objects separately from their source-tree interpretations and proves that local `(==)` adequacy at each dynamic call discharges that premise for both backends. | The handwritten realization's `==` branch-reuse decisions are still trusted. The remaining external refinement is narrowly stated: relate OCaml tree objects to the current heap state and prove the extraction’s `(==)` call result is the model’s same-root test. Any physical-sharing/allocation claim additionally needs a cost or heap semantics. |
+| Specialized biased unions and physical-identity (`==`) sharing | Public wrappers use handwritten unions. Companion proofs establish whole-worker source lookup/well-formedness laws under `native_same_sound`, including swapped right bias and string cached residency. Allocation/sharing profiles and target oracles exercise the native bodies. `NativeHeapRefinement.v` proves that adequate runtime objects and successful root equality imply source soundness. | Refinement of the actual recursive OCaml bodies and their dependencies remains open, as does their per-call physical-equality adequacy. The abstract heap bridge discharges a source premise conditionally; it does not simulate worker execution or GC. Allocation/sharing claims additionally require the appropriate cost/heap semantics. |
 
 The packed-token and cached-representative rows are the most important subtle
 cases. They are representation refinements, not pointwise replacements of the
@@ -236,19 +248,26 @@ same source values. A differential test of public maps can validate their
 composition while still missing a bad direct call to the separately exported
 `StringBits.bit_at` or `StringPatricia.representative`.
 
-The current documentation states this honestly, and the extra fuzzing found no
-mismatch. Nevertheless, an implementation using unproved `Extract Constant`
+The 2026-09-09 audit additionally identifies the bounded packed byte scanner
+as a separate algorithmic gap: `agrees_before_bounded_eq` proves the logical
+bit scanner, not the handwritten indexed loop. Likewise, the source
+first-difference model and abstract heap bridge leave actual loop/worker
+execution to be connected. The precise inventory and closure strategies are
+in the separate native-verification document. An implementation using unproved `Extract Constant`
 refinements cannot be described as end-to-end formally verified.
 
-There are three defensible completion choices:
+The following are architectural choices; their performance and remaining trust
+must be evaluated separately. The prioritized strategies are now maintained in
+[`patricia-native-verification.md`](patricia-native-verification.md#strategies-and-order-of-investigation).
 
 1. **Proof-aligned baseline:** retain ordinary extraction of the pure Rocq
    definitions. This removes the handwritten algorithm substitutions and is a
    useful differential oracle, but ordinary extraction and `ocamlopt` still
    remain in the trusted computing base.
-2. **Source-level native model:** use Rocq's specified 63-bit integers and
-   primitive byte strings, prove the optimized algorithms over those types, and
-   extract the proved definitions. Rocq documents these primitives and their
+2. **Source-level native model:** preserve the pure public model and add an
+   executable implementation over specified words and byte-access interfaces;
+   prove the optimized algorithms and their representation refinements, then
+   extract them. Rocq documents primitive integers and their
    OCaml mappings, although their primitive implementations remain explicit
    trusted axioms in `Print Assumptions`; see the
    [primitive-object documentation](https://rocq-prover.org/doc/V9.2.0/refman/language/core/primitive.html).
@@ -275,14 +294,11 @@ Yes for their functional behavior, but not by attaching a proof to the current
 
 The bounded prefix scanner, direct merge, specialized union, first-difference
 scanner, cached representative, and one-descent experimental `set` workers now
-have the relevant source-level specifications or refinement proofs. The public
-setter is ordinary extraction of the proved two-descent definition. Packed and
-physical-sharing target realizations still depend on the documented
-foreign-interface contracts. Exact claims about `String.unsafe_get`, physical
-equality, allocation, and generated machine code require an OCaml/Clight
-semantics and a verified compiler or a separate deductive verification of the
-target code. Testing can reduce risk but cannot turn those target constructs
-into kernel-checked theorems.
+have source-level specifications or refinement support. That support does not
+uniformly cover their native control flow. The public setter is ordinary
+extraction of the proved two-descent definition. Target algorithm verification
+can use an OCaml semantics; a claim about compiled machine code additionally
+needs the relevant compiler/runtime connection. Testing does not supply it.
 
 ### 5. Repository tests now exercise the extraction-refinement boundary
 

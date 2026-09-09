@@ -12,7 +12,11 @@ Patricia-tree sketches:
 The supported contracts, theorem checklist, and trusted computing base are in
 [`SPECIFICATION.md`](SPECIFICATION.md). The verification review and active
 tracker are in [`patricia.md`](patricia.md) and
-[`patricia-todo.md`](patricia-todo.md).
+[`patricia-todo.md`](patricia-todo.md). The detailed unverified-code inventory,
+strategies and separate native-verification tracker are in
+[`patricia-native-verification.md`](patricia-native-verification.md).
+Publication citations and local PDF provenance are indexed in
+[`papers/README.md`](papers/README.md).
 
 Run:
 
@@ -58,11 +62,11 @@ per byte and an end marker), so empty strings, embedded zero bytes, and prefix
 keys are distinct. `NativeRefinement.v` records the supported 62-bit native
 key domain and the codec between logical string-bit positions and the packed
 native tokens. It includes a native byte-code-array model for OCaml strings,
-proves byte length/access/bounds and every `unsafe_get` guard used by the
-string realizers, and proves the packed `bit_at` dispatcher correct. The final
-connection from that model to OCaml's string, `Char.code`, and integer
-primitives remains an explicit foreign-interface contract, not a kernel proof
-of OCaml execution.
+proves byte length/access/bounds and guarded-access laws, and proves the packed
+`bit_at` model correct. Connecting those laws to each actual indexed OCaml loop
+and its guards remains a target-level obligation. In particular, the packed
+bounded-prefix loop still needs its own refinement proof. OCaml's string,
+`Char.code`, and integer primitives also retain explicit foreign contracts.
 `PatriciaExtract.v` generates implementation backends under
 `patricia/extracted/`; the build names the map modules `PatriciaInternal` and
 `StringPatriciaInternal`. `PatriciaReferenceExtract.v` separately generates
@@ -85,8 +89,9 @@ keys absent from both inputs, making the proof condition
 Native extraction maps integer keys, prefixes, masks,
 and routing operations to OCaml `int`. String branch discriminators are packed
 as a byte index and four-bit tag, first differences are found in one bytewise
-pass, bounded prefix checks scan only through their split, updates route only
-once, branch samples provide constant-time representatives, and biased unions
+pass, bounded prefix checks scan only through their split, public string updates
+use the proved two-descent worker, branch samples provide constant-time
+representatives, and biased unions
 share one-sided and disjoint subtrees.
 
 The positive-key proof file currently establishes, without axioms:
@@ -187,14 +192,16 @@ positive keys, while extraction uses bounded OCaml `int`.
 domain `1 .. max_int`; the finite-width refinement itself remains trusted rather
 than proved. The string tree uses native OCaml strings and proof-side
 logical bit positions; native extraction represents positions as packed
-byte/tag integer tokens. Native extraction also replaces proof-side fuelled
-`combine` with direct structural recursion and gives both Patricia variants a
-sharing biased union. These custom extraction refinements form an explicit
-performance/correctness boundary. For the handwritten biased unions, Rocq now
+byte/tag integer tokens. General `combine` extracts directly from proved
+structural recursion; the public biased unions still use handwritten
+realizers. These native refinements form an explicit performance/correctness
+boundary. For the source models of those unions, Rocq now
 checks every equal-header and containment reconstruction under the sole
 positive-direction contract that OCaml `changed == original` implies identical
 current lookups. This is deliberately stronger than the portable documented
 `==` guarantee for non-mutable values (`compare = 0`), so connecting it to the
-runtime/compiler (and proving any allocation or sharing claim) remains
-trusted; the source tree reasoning is no longer an unproved part of that
-boundary.
+runtime/compiler remains an external obligation. Refinement of the actual
+handwritten recursive bodies and their dependencies is also open. The source
+proofs and abstract heap bridge do not establish target execution, allocation
+or sharing guarantees; the separate native-verification tracker records these
+remaining steps.

@@ -1,8 +1,13 @@
 # Patricia plan and tracker
 
-Last updated: 2026-09-03
+Last updated: 2026-09-09
 
-This document is the single source of truth for Patricia planning and progress.
+This document owns project-wide scope decisions, milestones and their history.
+Detailed forward tasks for reducing the native verification gap are owned by
+the separate tracker in
+[`patricia-native-verification.md`](patricia-native-verification.md#separate-tracker).
+N1/N2 below retain the completed foundations and parent exit gates; update
+individual new native tasks in that document instead of duplicating checkboxes.
 The public contracts and trusted boundary are fixed in
 [`SPECIFICATION.md`](SPECIFICATION.md), the supporting evidence is reviewed in
 [`patricia.md`](patricia.md), and performance analysis and measurements are
@@ -84,6 +89,10 @@ current custom API, and the documentation names everything outside that claim.
 ### N1 — Refine native primitives and representations
 
 Required only for an end-to-end native-refinement claim.
+The completed source-model work below does not verify the actual OCaml loops.
+Open implementation/refinement work is tracked under V2 in
+[`patricia-native-verification.md`](patricia-native-verification.md#separate-tracker),
+including the packed bounded-prefix scanner and indexed first-difference loop.
 
 - [x] Specify the 62-bit positive-key domain and logical-to-packed string split
   codec in `NativeRefinement.v`.
@@ -97,22 +106,25 @@ Required only for an end-to-end native-refinement claim.
   the 62-bit domain.  The link from these mathematical operations to OCaml
   `int` primitives remains a narrowly specified trusted foreign-interface
   obligation, recorded by the mapping audit below.
-- [x] Connect OCaml byte length/access and `Char.code` to the source byte model,
-  including the guards around `String.unsafe_get`. `NativeRefinement.v` now
+- [x] Define the source byte-array representation and prove length/access,
+  code and guarded-access laws. `NativeRefinement.v` now
   models an OCaml byte string as the `Ascii.N_of_ascii` code array, proves
   length, safe access, guarded unsafe access, and byte bounds, and proves
   `native_packed_bit_at_refines_representation`. The remaining FFI contract is
   narrow and explicit: `String.length` returns the byte-array length,
   `Char.code (String.unsafe_get s i)` returns that array's code whenever
   `i < String.length s`, and short-circuit evaluation preserves the proved
-  guards at each access site.
+  guards at each access site. Instantiating these laws for the executing loops
+  is open; this completed item records source-model lemmas only.
 - [x] Prove the native XOR/leading-zeroes first-difference calculation refines
   the source model. `NativeRefinement.v`'s `native_byte_first_diff_correct` and
   `native_string_first_diff_refines` model the realizer's `lxor`/mask-shift
-  loop directly (`N.lxor`, `N.land` against `2 ^ (7 - offset)`) and prove it
+  calculation mathematically (`N.lxor`, `N.land` against
+  `2 ^ (7 - offset)`) and prove it
   finds the same split as the safe `ascii_xor`/`ascii_leading_zeroes` source
   model, hence (via the existing `bytewise_first_diff_correct`) the same split
-  as `StringBits.first_diff` itself.
+  as `StringBits.first_diff` itself. The source string traversal is structural;
+  relating the indexed OCaml scan and shifting-mask loop to it remains open.
 - [x] Audit the remaining standard `positive`, `N`, `nat`, and string extraction
   mappings and record which pieces remain axiomatic or foreign.  The public
   specification now names `ExtrOcamlZInt`, `ExtrOcamlNatInt`,
@@ -232,10 +244,9 @@ Required only for an end-to-end native-refinement claim.
   those source workers in a target-language refinement. The public string
   `set` now extracts directly from the proved two-descent source definition;
   its former exception realizer has been removed. The remaining target-level
-  step is to state the OCaml `==` soundness contract
-  once for the
-  extracted tree type and connect it to the source
-  `native_same_sound` assumption. `SPECIFICATION.md` now names the required
+  work includes refining the actual recursive bodies and their dependencies,
+  and connecting the OCaml `==` contract for the extracted tree type to the
+  source `native_same_sound` assumption. `SPECIFICATION.md` names the required
   positive-direction contract explicitly. The portable OCaml guarantee for
   non-mutable values is only `compare = 0`, so proving the stronger tree-object
   property requires an OCaml heap/compiler semantics; it remains trusted here.
@@ -245,8 +256,8 @@ Required only for an end-to-end native-refinement claim.
   layer makes this a per-call adequacy obligation rather than assigning a
   canonical location to each pure source tree; its two kernel-checked bridge
   theorems derive the integer and direct-string `native_same_sound` premises
-  from that contract. Proving OCaml implements the contract remains the
-  outstanding target-language task.
+  from that contract. Proving OCaml implements the contract is one part of
+  the outstanding whole-worker target simulation, not its replacement.
   A native-shaped Rocq worker now mirrors the handwritten recursion and extracts
   with only `native_same` mapped to `(==)`, but it is not public: at 100K it
   allocates 800,904/800,628 integer/string words for half overlap and
@@ -260,16 +271,18 @@ Required only for an end-to-end native-refinement claim.
   equality. Directly inlining `native_same` and the root/child reconstruction
   checks in that single worker improves the 100K half-overlap allocation to
   1,100,853/1,100,598 words and equality to 2,200,677/2,200,707 words, but is
-  still diagnostic-only and remains worse than the nested candidate. The
-  remaining routes are (1) retain the fully inlined legacy worker, (2) apply
-  an explicit extraction/postprocessing inlining pass, accepting that as a
-  small custom build boundary, or (3) keep only the OCaml recursive skeleton
-  handwritten and prove/refine its called primitives. None removes the need
-  for the target-level `==` contract.
+  still diagnostic-only and remains worse than the nested candidate.
+  The 2026-09-09 investigation adds explicit recursion on an erased `Acc` proof
+  as the first source-extraction experiment. The fuel eliminator still passes
+  capturing callbacks, so the fuel experiments do not rule out that route.
+  Target-language verification and compiler/extraction alternatives are
+  assessed separately in the new native-verification tracker (V1, V3, V4).
+  Keeping a handwritten skeleton with proved callees does not itself prove
+  the skeleton. An unchecked postprocessor introduces another trusted step.
   Mapping `native_same` as an extraction-inline `(==)` primitive and compiling
   with `ocamlopt -inline 1000` did not materially change the profiles. The
-  available OCaml 4.14.3 compiler has `flambda: false`; routine compiler
-  inlining is therefore not a viable elimination route for this allocation.
+  available OCaml 4.14.3 compiler has `flambda: false`; that flag experiment
+  does not test a genuine Flambda build or its recursive specialization.
   The normally extracted `set_one_descent` worker is also exercised directly
   by the randomized oracle, but its allocating result wrapper is retained only
   as an experiment; the public source-extracted two-descent worker avoids that
@@ -424,8 +437,14 @@ run, not a deterministic performance threshold.
 
 ## Tracking log
 
+Entries preserve the state and interpretation at their recorded dates. The
+2026-09-09 inventory supersedes older wording that described the target `==`
+contract as the only remaining native obligation; it also identifies actual
+worker/loop simulation and shared primitive contracts.
+
 | Date | Item | Evidence |
 | --- | --- | --- |
+| 2026-09-09 | Established a separate native-verification inventory and forward tracker | `patricia-native-verification.md` owns V0–V4, publication references and replacement gates. Source inspection distinguishes packed byte-loop and whole-worker target obligations from existing source/heap lemmas. The checked 10K union-profile rerun and three source/extraction audits passed; details and limitations are recorded in the new evidence log and `patricia-bench.md`. No implementation or public verification claim changed. |
 | 2026-09-09 | Exercised all native union reuse routes after GC compaction | `PatriciaUnionTest.ml` now compacts integer and direct-string branch roots before requiring left-biased root reuse for the equal-header pair and each left-/right-outer child-containment route. These fixtures retain aliases to actual branch children, so all six handwritten `(==)` success paths are exercised on moved roots in both bytecode and native oracle runs. This remains finite pinned-runtime evidence for the current-root contract, not a GC or compiler correctness theorem. `make union-oracle`, an `ocamlopt`-equivalent native oracle built under `/tmp` (preserving the pre-existing untracked executable), and `git diff --check` passed. |
 | 2026-09-04 | Exercised native union sharing across GC compaction | `PatriciaUnionTest.ml` now retains aliased integer and direct-string branch roots across `Gc.full_major` and `Gc.compact`, then requires the aliases and both no-op biased-union result roots to remain physically identical. Bytecode and `ocamlopt` union oracles therefore exercise the selected moving-GC path as well as static root identity. This is finite pinned-runtime evidence for the `NativeHeapRefinement.v` current-root model, not a GC or compiler correctness theorem. `make union-oracle`, `make union-oracle-native`, and `git diff --check` passed. |
 | 2026-09-04 | Checked distinct mutable-payload tree roots at the `(==)` boundary | `PatriciaUnionTest.ml` now builds separately allocated but otherwise equal leaf and branch trees with distinct `ref` payload objects, and requires their roots to fail physical equality in both integer and direct-string backends. The same check runs in bytecode and through `ocamlopt` under `make union-oracle-native`, complementing the compiler-source audit with finite pinned-runtime evidence that `(==)` is not behaving as structural equality at the native-union call boundary. It is not an OCaml heap/compiler semantics proof. `make union-oracle`, `make union-oracle-native`, and `git diff --check` passed. |

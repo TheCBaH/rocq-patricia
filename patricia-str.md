@@ -1,14 +1,17 @@
 # Direct-string Patricia map performance analysis
 
-Last reviewed: 2026-08-30
+Current-status clarification: 2026-09-09. Historical analyses and measurements
+below retain their original context.
 
 ## Scope and conclusion
 
 This note records the performance analysis and design rationale for the direct
 byte-string map in `StringPatricia.v`, using the implementation, extraction
 directives, proof invariants, and measurements recorded in
-[`patricia-bench.md`](patricia-bench.md). Current and proposed work is tracked
-only in [`patricia-todo.md`](patricia-todo.md).
+[`patricia-bench.md`](patricia-bench.md). Project-wide work is tracked in
+[`patricia-todo.md`](patricia-todo.md); native-verification details and their
+own tracker are in
+[`patricia-native-verification.md`](patricia-native-verification.md).
 
 The string map already routed at bit granularity. The original question was
 how to implement its critical-bit operations without paying repeated division,
@@ -32,7 +35,8 @@ The following sequence was completed in the native extraction:
 2. replace bit-by-bit `first_diff` with one bytewise pass;
 3. encode each branch discriminator as a packed byte index and bit tag, while
    preserving the existing one-word branch field;
-4. fuse the two traversals performed by `set`;
+4. evaluate fused `set` traversals (the public implementation subsequently
+   returned to ordinary extraction of the proved two-descent worker);
 5. make representative selection constant-time or avoid it on unchanged
    branches;
 6. optimize generic `combine` independently, because its arbitrary one-sided
@@ -40,10 +44,11 @@ The following sequence was completed in the native extraction:
 
 ## Implementation status
 
-The recommendations are implemented for native OCaml execution in
-`PatriciaExtract.v`. The pure Rocq functions and their existing proofs remain
-the semantic specification; the optimized realizers extend the explicit
-trusted extraction boundary already used for native string access.
+Native primitives and biased unions retain custom realizers in
+`PatriciaExtract.v`; general `combine` and public string `set` now use ordinary
+extraction of proved source workers. The historical one-descent setter is no
+longer public. The pure models remain the semantic specification, while
+algorithmic and primitive native-refinement obligations are tracked separately.
 
 The original implementation stages and their decision gates are closed. The
 follow-up merge-prefix hotspot is now removed: combine and biased union use a
@@ -59,7 +64,7 @@ The extracted implementation now:
 - performs specialized left- and right-biased union with structural sharing;
 - scans `first_diff` bytewise and computes a differing byte bit from its XOR;
 - stores branch discriminators as `(byte_index << 4) | tag` tokens;
-- performs `set` routing and persistent reconstruction in one descent;
+- performs public string `set` through the proved two-descent worker;
 - reads branch samples as constant-time representatives for trees produced by
   the public operations;
 - executes generic `combine` without computing or carrying runtime fuel;
@@ -310,18 +315,18 @@ sets can still contain many distinct critical positions along one route.
 
 ### Existing-key `set`
 
-The proof-side specification's original `set` performs:
+The current public source-extracted `set` performs:
 
 1. `routed_key key m`, which traverses from root to leaf;
 2. `first_diff key routed`, which scans the query and leaf key;
 3. when the strings are equal, `replace key value m`, which traverses the same
    route again and allocates the persistent replacement path.
 
-The extracted native `set` instead descends once, using `Fresh_key` to carry a
-fresh discriminator back up the visited path. Existing updates rebuild that
-one path, and insertions are spliced while unwinding. This removes the
-two-traversal behavior while leaving the proof-side function as the semantic
-specification.
+The former handwritten native `set` descended once, using `Fresh_key` to carry
+a fresh discriminator back up the visited path. That override has been removed.
+The proved one-descent variants remain experiments; their allocating result
+representations did not justify replacing the public two-descent worker.
+See the dated setter comparison in `patricia-bench.md`.
 
 ### Fresh-key `set`
 
@@ -332,9 +337,10 @@ Fresh insertion in the proof-side baseline also routes twice:
 3. `insert_at` starts again at the root, descends to the correct insertion
    position, and allocates the persistent path.
 
-The second descent was an artifact of that organization, not of the data
-structure. The native implementation retains the path on the call stack and
-unwinds after discovering the first difference.
+The former exception realizer retained the path on the call stack and unwound
+after discovering the first difference. The current public implementation uses
+the two-descent source worker; the verified one-descent experiments preserve
+the alternative algorithm for further measurement.
 
 ### Removal
 
@@ -560,7 +566,9 @@ A sensible development path is:
 ### 5. Make representative access constant-time
 
 **Status:** implemented natively, and cached-sample residency is proved.
-Representative independence for native consumers remains open under N2.
+The source representative-independence lemmas are also proved. Integrating a
+source-defined cached reader and closing native consumer refinement are tracked
+under V2 in the separate native-verification document.
 
 **Expected impact:** likely useful for removal, join, and union; magnitude is
 not yet measured.
@@ -582,9 +590,10 @@ There are three implementation choices:
 
 The first choice is now implemented. It gives the simplest runtime read and
 does not increase the node size because the sample field already exists. The
-remaining refinement obligation is subtler than residency: the pure
-representative descent and cached read may choose different resident keys, so
-native consumers must be shown independent of that choice.
+source proof obligation was subtler than residency: the pure representative
+descent and cached read may choose different resident keys. The prefix and
+outer-routing independence lemmas now supply that reasoning; their composition
+with the actual target implementation remains to be established.
 
 An alternative is to remove the sample field and find representatives by
 descent. That would reduce tree nodes toward seven words per binding, but it
@@ -594,31 +603,36 @@ important than merge and mutation latency.
 
 ### 6. Remove runtime fuel from generic `combine`
 
-**Status:** implemented by the native realizer. A well-founded source worker
-and equivalence with `combine_fuel` remain open under N2.
+**Status:** implemented by ordinary extraction of nested structural source
+workers. `combine_structural_eq_combine_fuel` is proved in both backends;
+no custom general-`combine` realizer remains.
 
 **Expected impact:** high for all generic combines, but insufficient by itself
 for fast biased union.
 
-Move termination to a well-founded recursion whose accessibility evidence is
-in `Prop` and erased by extraction. This removes the unconditional `size a +
-size b` traversal.
+The source implementation removes the unconditional size traversal using
+nested structural recursion. For the separate biased-union allocation problem,
+explicit accessibility-proof recursion in `Prop` is still worth investigating:
+it can produce a single recursive worker with erased termination evidence.
+This is V1 in the separate tracker, motivated by
+[Leroy's CoqPL 2024 paper](papers/leroy-well-founded-recursion.pdf).
 
 Generic combine may still have to transform all bindings that occur on only one
 side. For example, `f (Some v) None` may change `v` or return `None`. Therefore,
 generic combine cannot generally reuse those subtrees. This is why specialized
 biased union remains necessary even after fuel removal.
 
-String combine also repeatedly invokes `agrees_before`, which computes a first
-difference between branch samples. The bytewise scanner improves this directly.
+String combine now invokes `agrees_before_bounded`, whose native byte scanner
+stops at the relevant split without allocating a first-difference result.
 A later optimization could return richer prefix-comparison information once
 per branch pair, rather than separately asking agreement and then routing a
 sample, but its value should be measured after the larger changes.
 
 ### 7. Use unchecked native byte access only as a final micro-optimization
 
-**Status:** implemented behind explicit length/index guards. Its correspondence
-to the safe source byte model remains open under N1.
+**Status:** implemented behind explicit length/index guards. The source model
+has guarded byte-access laws; connecting those laws to the actual native loops
+remains open under V2 of the native-verification tracker (parent N1).
 
 **Expected impact:** small to moderate after packed routing; increases the
 trusted native boundary.

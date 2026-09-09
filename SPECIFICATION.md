@@ -1,12 +1,15 @@
 # Patricia public specification
 
-Status: current custom API, 2026-08-30
+Status: current custom API; native-boundary clarification updated 2026-09-09.
 
 This document fixes the verified claim for the abstract OCaml interfaces
 [`PatriciaMap.mli`](PatriciaMap.mli) and
 [`StringPatriciaMap.mli`](StringPatriciaMap.mli). The kernel-checked results
 apply to the corresponding pure Rocq definitions. Extraction and the optimized
 OCaml backend have the separate trust status stated below.
+The implementation inventory and separate gap-closing tracker are in
+[`patricia-native-verification.md`](patricia-native-verification.md). Proposed
+strategies do not change the contracts or proof claims in this specification.
 
 ## Claim and domains
 
@@ -137,9 +140,10 @@ Executing the supported native library additionally trusts:
   keys, and the restricted combine callback;
 - integer realizer code for equality/order tests, shifts, masks, prefixes,
   routing bits, and highest-differing-bit selection;
-- the source-level biased-union workers and ordinary extraction/compiler
-  boundary; their `Empty` change certificates do not establish physical
-  identity or allocation bounds;
+- the handwritten biased-union bodies and their composition with native
+  primitives. The companion source workers have conditional correctness
+  proofs, but those are not simulations of the actual OCaml bodies; their
+  `Empty` change certificates also do not establish native allocation bounds;
 - the specialized handwritten union realizers' physical-equality contract:
   when `changed == original` succeeds, both references denote the same
   current tree object and hence have identical `get` results at every key.
@@ -154,8 +158,9 @@ Executing the supported native library additionally trusts:
   object layer pairs each current OCaml root with its source-tree
   interpretation, permits distinct locations for equal source trees, and
   proves that a per-call `(==)` adequacy theorem discharges both source
-  `native_same_sound` premises. The remaining external obligation is to relate
-  each current OCaml tree object and `(==)` result to that model; the
+  `native_same_sound` premises. A whole-worker target simulation must relate
+  actual recursive execution, each current tree object and each `(==)` result
+  to that model; the abstract bridge alone does not provide it. The
   [OCaml 4.14 library reference](https://ocaml.org/releases/4.14/ocaml-4.14-refman.pdf)
   specifies physical equality but does not supply this compiler/heap
   refinement theorem. `make ocaml-physical-equality-audit` additionally
@@ -185,6 +190,15 @@ Executing the supported native library additionally trusts:
 Both general `combine` definitions are extracted directly from the proved
 fuel-free structural workers; as usual, this still trusts ordinary extraction
 and the OCaml compiler rather than proving compilation correctness.
+Public string `set` likewise extracts the proved two-descent worker.
+
+The native bounded-prefix byte loop has no corresponding target refinement
+theorem: `agrees_before_bounded_eq` concerns its logical bit-scanning
+specification. The structural first-difference model likewise leaves the
+indexed OCaml scan, shifting-mask loop and identity shortcut to be connected.
+Source byte-access lemmas supply guard obligations; they do not prove that
+each executing loop maintains and checks them. These algorithmic obligations
+are separate from the standard primitive contracts in the audit below.
 
 `NativeRefinement.v` proves part of the representation-level source model,
 including the packed-position codec and safe first-difference model. It does

@@ -1,7 +1,7 @@
 # Patricia benchmark results
 
 - Run date: 2026-08-29
-- Last reviewed: 2026-09-01
+- Last reviewed: 2026-09-09 (dated native-verification profile added below)
 - Command: `make -C patricia benchmark`
 - Platform: aarch64 Linux 7.0.0-28-generic; OCaml 4.14.3 native code
 - Compiler configuration: `architecture: arm64`, `model: default`,
@@ -10,8 +10,10 @@
   -D_FILE_OFFSET_BITS=64`
 
 This document is the measurement record and reproduction guide. Performance
-analysis is in [`patricia-str.md`](patricia-str.md), and all current or proposed
-work is tracked in [`patricia-todo.md`](patricia-todo.md).
+analysis is in [`patricia-str.md`](patricia-str.md). Project-wide work is tracked
+in [`patricia-todo.md`](patricia-todo.md); detailed native-verification work has
+its separate tracker in
+[`patricia-native-verification.md`](patricia-native-verification.md).
 
 ## Result
 
@@ -350,7 +352,7 @@ incremental insertion because it answers a different API question.
 Both Patricia variants retain eight words per binding versus six for
 `Stdlib.Map`. The classic four-field branch layout is the same basic layout
 presented by Okasaki and Gill in
-[Fast Mergeable Integer Maps](<Okasaki and Gill - 1998 - Fast Mergeable Integer Maps.pdf>).
+[Fast Mergeable Integer Maps](papers/okasaki-gill-1998-fast-mergeable-integer-maps.pdf).
 Reducing it requires a representation change, not a local expression rewrite:
 for example, omit the integer prefix and route to a final leaf comparison, pack
 the prefix/discriminator in a fixed-width backend, or remove the string sample
@@ -416,6 +418,36 @@ tree. The fuel worker reduces this transient cost from about 14 to about 12
 words per left binding, but remains orders of magnitude above the native
 physical-sharing realization. Its `size` prepass has no observed linear
 allocation cost. No timing or heap theorem is claimed.
+
+### Native verification investigation (2026-09-09)
+
+Rebuilt extraction and the native profile with
+`PATRICIA_UNION_PROFILE_SIZE=10000 make union-profile` from this directory.
+The run used Rocq 9.2, OCaml 4.14.3, arm64/Linux, 64-bit,
+`flambda: false`, `safe_string: true`, and completed with
+`Patricia union-worker allocation profile: ok`.
+
+| 10K workload | Public handwritten | Generated native-shaped | Native fuel | Inlined native fuel |
+| --- | ---: | ---: | ---: | ---: |
+| Integer half overlap | 243 | 80,287 | 120,351 | 110,342 |
+| Eight-byte string half overlap | 86 | 80,126 | 120,230 | 110,218 |
+| Integer equal inputs | 26 | 160,016 | 240,014 | 220,015 |
+| String equal inputs | 26 | 160,016 | 240,014 | 220,015 |
+
+All numbers are allocated words. Equal-input rows pass the same input root
+twice, not independently constructed equal maps. The profiled workers retained
+the same input-node sharing in these cases. Adding a 192-byte common prefix
+gave the same string allocation figures. This supports the existing diagnosis
+of temporary allocation despite retained sharing; it is not an elapsed-time
+comparison or a universal constant-allocation result.
+
+Generated nested recursion returns capturing functions; the fuel worker still
+passes capturing callbacks through the native-`nat` eliminator. The fuel
+wrapper also computes input sizes, regardless of the allocation cost of that
+prepass. Removing the runtime measure entirely by recursion on an erased
+accessibility proof is therefore a distinct, unmeasured experiment, as is a
+genuine Flambda build. See the separate native-verification tracker and
+[Leroy's paper](papers/leroy-well-founded-recursion.pdf).
 
 ## Further benchmark coverage
 
