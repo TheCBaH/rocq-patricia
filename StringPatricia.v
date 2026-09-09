@@ -74,6 +74,21 @@ Definition branch {A : Type}
       end
   end.
 
+(** Cached-sample counterpart of [branch].  It has the same lookup intent on
+    well-formed inputs, but is kept separately until its conditional
+    refinement is established and callers are migrated deliberately. *)
+Definition branch_cached {A : Type}
+    (sample : string) (split : nat) (ltree rtree : t A) : t A :=
+  match ltree, rtree with
+  | Empty, _ => rtree
+  | _, Empty => ltree
+  | _, _ =>
+      match representative_cached ltree with
+      | Some key => Branch key split ltree rtree
+      | None => Branch sample split ltree rtree
+      end
+  end.
+
 Definition branch_at {A : Type}
     (sample : string) (split : nat) (fresh old : t A) : t A :=
   if bit_at sample split

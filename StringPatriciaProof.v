@@ -1167,6 +1167,93 @@ Proof.
     unfold branch. exact Hwr.
 Qed.
 
+(** The cached branch constructor preserves [wf] whenever its cached sample is
+    known resident.  This is the consumer-side refinement needed before the
+    executable path can stop overriding the total structural reader. *)
+Lemma branch_cached_nonempty_wf:
+  forall (A : Type) sample split (ltree rtree : t A) cached,
+    wf ltree -> wf rtree -> ltree <> Empty -> rtree <> Empty ->
+    representative_cached ltree = Some cached ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) ltree ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) rtree ->
+    wf (Branch cached split ltree rtree).
+Proof.
+  intros A sample split ltree rtree cached Hleft Hright Hleft_ne Hright_ne
+    Hcached Hleft_keys Hright_keys.
+  destruct (representative_cached_resident_wf A ltree cached Hleft Hcached)
+    as [cached_value Hcached_get].
+  assert (Hcached_keys :
+    same_prefix sample cached split /\ bit_at cached split = false).
+  { eapply (all_keys_get A (fun key =>
+        same_prefix sample key split /\ bit_at key split = false)
+      ltree cached cached_value);
+      [exact Hleft_keys|exact Hcached_get]. }
+  assert (Hleft_rep : representative ltree <> None).
+  { intro Hnone. apply wf_representative_none in Hnone; [|exact Hleft].
+    apply Hleft_ne. now subst ltree. }
+  assert (Hright_rep : representative rtree <> None).
+  { intro Hnone. apply wf_representative_none in Hnone; [|exact Hright].
+    apply Hright_ne. now subst rtree. }
+  apply wf_branch.
+  - exact Hleft.
+  - exact Hright.
+  - exact Hleft_rep.
+  - exact Hright_rep.
+  - eapply all_keys_impl; [exact Hleft_keys|].
+    intros key [Hprefix Hbit]. split; [|exact Hbit].
+    eapply same_prefix_rebase;
+      [exact (proj1 Hcached_keys)|exact Hprefix].
+  - eapply all_keys_impl; [exact Hright_keys|].
+    intros key [Hprefix Hbit]. split; [|exact Hbit].
+    eapply same_prefix_rebase;
+      [exact (proj1 Hcached_keys)|exact Hprefix].
+  - exists cached_value. cbn [get].
+    rewrite (proj2 Hcached_keys). exact Hcached_get.
+Qed.
+
+Lemma branch_cached_wf_general:
+  forall (A : Type) sample split (ltree rtree : t A),
+    wf ltree -> wf rtree ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = false) ltree ->
+    all_keys (fun key =>
+      same_prefix sample key split /\ bit_at key split = true) rtree ->
+    wf (branch_cached sample split ltree rtree).
+Proof.
+  intros A sample split ltree rtree Hleft Hright Hleft_keys Hright_keys.
+  destruct ltree as [|left_key left_value|left_sample left_split left_left left_right];
+    destruct rtree as [|right_key right_value|right_sample right_split right_left right_right];
+    cbn [branch_cached representative_cached] in *; try assumption.
+  all: eapply branch_cached_nonempty_wf; try eassumption; try discriminate;
+    reflexivity.
+Qed.
+
+Lemma get_branch_cached:
+  forall (A : Type) sample split (ltree rtree : t A) key,
+    all_keys (fun stored => bit_at stored split = false) ltree ->
+    all_keys (fun stored => bit_at stored split = true) rtree ->
+    get key (branch_cached sample split ltree rtree) =
+      if bit_at key split then get key rtree else get key ltree.
+Proof.
+  intros A sample split ltree rtree key Hleft Hright.
+  assert (Hleft_wrong : bit_at key split = true -> get key ltree = None).
+  { intros Hbit. eapply get_none_if_all_keys; [exact Hleft|].
+    intros Hfalse. congruence. }
+  assert (Hright_wrong : bit_at key split = false -> get key rtree = None).
+  { intros Hbit. eapply get_none_if_all_keys; [exact Hright|].
+    intros Htrue. congruence. }
+  unfold branch_cached.
+  destruct (bit_at key split) eqn:Ebit.
+  - pose proof (Hleft_wrong eq_refl) as Hleft_none.
+    destruct ltree; destruct rtree; cbn [representative_cached get] in *;
+      try rewrite Ebit; try reflexivity; try congruence.
+  - pose proof (Hright_wrong eq_refl) as Hright_none.
+    destruct ltree; destruct rtree; cbn [representative_cached get] in *;
+      try rewrite Ebit; try reflexivity; try congruence.
+Qed.
+
 Theorem remove_reference_wf:
   forall (A : Type) key (m : t A), wf m -> wf (remove_reference key m).
 Proof.
