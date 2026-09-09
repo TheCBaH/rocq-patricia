@@ -3096,6 +3096,49 @@ Proof.
   - now rewrite Hnone.
 Qed.
 
+Lemma combine_join_cached_separated_correct_wf:
+  forall (A B C : Type) (f : option A -> option B -> option C)
+      sample split (left : t A) (right : t B),
+    f None None = None -> wf left -> wf right ->
+    all_keys (fun key =>
+      same_prefix sample key split /\
+      bit_at key split = bit_at sample split) left ->
+    all_keys (fun key =>
+      same_prefix sample key split /\
+      bit_at key split = negb (bit_at sample split)) right ->
+    wf (join_cached (map_left f left) (map_right f right)) /\
+    forall key,
+      get key (join_cached (map_left f left) (map_right f right)) =
+      f (get key left) (get key right).
+Proof.
+  intros A B C f sample split left right Hnone Hwl Hwr Hleft Hright.
+  destruct (@map_left_correct_wf A B C f left Hnone Hwl) as [Hwml Hml].
+  destruct (@map_right_correct_wf A B C f right Hnone Hwr) as [Hwmr Hmr].
+  assert (Hmapped_left : all_keys (fun key =>
+      same_prefix sample key split /\
+      bit_at key split = bit_at sample split) (map_left f left)).
+  { eapply all_keys_map_left. exact Hleft. }
+  assert (Hmapped_right : all_keys (fun key =>
+      same_prefix sample key split /\
+      bit_at key split = negb (bit_at sample split)) (map_right f right)).
+  { eapply all_keys_map_right. exact Hright. }
+  destruct (join_cached_separated_correct_wf C sample split
+    (map_left f left) (map_right f right)
+    Hwml Hwmr Hmapped_left Hmapped_right) as [Hwj Hjoin].
+  split; [exact Hwj|]. intro key. rewrite Hjoin, Hml, Hmr.
+  destruct (get key left) as [left_value|] eqn:Eleft;
+    destruct (get key right) as [right_value|] eqn:Eright.
+  - pose proof (all_keys_get A _ left key left_value Hleft Eleft)
+      as [_ Hleft_bit].
+    pose proof (all_keys_get B _ right key right_value Hright Eright)
+      as [_ Hright_bit].
+    exfalso. rewrite Hleft_bit in Hright_bit.
+    now destruct (bit_at sample split) in Hright_bit.
+  - now destruct (f (Some left_value) None).
+  - now rewrite Hnone.
+  - now rewrite Hnone.
+Qed.
+
 Theorem combine_fuel_correct_wf:
   forall (A B C : Type) fuel
       (f : option A -> option B -> option C) (left : t A) (right : t B),
@@ -3158,9 +3201,9 @@ Proof.
             (combine_fuel fuel f left_right right_right)).
         { eapply all_keys_of_combine_lookup; eauto. }
         split.
-        -- now apply branch_wf_general.
+        -- now apply branch_cached_wf_general.
         -- intro key.
-           rewrite get_branch.
+           rewrite get_branch_cached.
            ++ cbn [get]. destruct (bit_at key left_split);
                 [apply Hgetoutr|apply Hgetoutl].
            ++ eapply all_keys_impl; [exact Houtl|].
@@ -3178,7 +3221,7 @@ Proof.
           (branch_all_prefix B right_sample left_split right_left right_right
             Harl Harr)) as [differing [Hdiff [Hleft Hright]]].
         -- now rewrite Emin.
-        -- eapply combine_join_separated_correct_wf; eauto.
+        -- eapply combine_join_cached_separated_correct_wf; eauto.
     + destruct (left_split <? right_split) eqn:Eorder.
       * apply Nat.ltb_lt in Eorder.
         destruct (agrees_before_bounded left_sample right_sample left_split)
@@ -3211,8 +3254,8 @@ Proof.
                     (Branch right_sample right_split right_left right_right))).
               { eapply all_keys_of_combine_lookup; eauto. }
               split.
-              ** now apply branch_wf_general.
-              ** intro key. rewrite get_branch.
+              ** now apply branch_cached_wf_general.
+              ** intro key. rewrite get_branch_cached.
                  --- change
                        ((if bit_at key left_split
                          then get key (combine_fuel fuel f left_right
@@ -3253,8 +3296,8 @@ Proof.
                   bit_at key left_split = true) (map_left f left_right)).
               { eapply all_keys_map_left. exact Halr. }
               split.
-              ** now apply branch_wf_general.
-              ** intro key. rewrite get_branch.
+              ** now apply branch_cached_wf_general.
+              ** intro key. rewrite get_branch_cached.
                  --- change
                        ((if bit_at key left_split
                          then get key (map_left f left_right)
@@ -3290,7 +3333,7 @@ Proof.
              (branch_all_prefix B right_sample right_split right_left right_right
                Harl Harr)) as [differing [Hdiff [Hleft Hright]]].
            ++ now rewrite Emin.
-           ++ eapply combine_join_separated_correct_wf; eauto.
+           ++ eapply combine_join_cached_separated_correct_wf; eauto.
       * apply Nat.ltb_ge in Eorder.
         assert (Hreverse : right_split < left_split) by
           (apply Nat.eqb_neq in Esplits; lia).
@@ -3327,8 +3370,8 @@ Proof.
                     right_right)).
               { eapply all_keys_of_combine_lookup; eauto. }
               split.
-              ** now apply branch_wf_general.
-              ** intro key. rewrite get_branch.
+              ** now apply branch_cached_wf_general.
+              ** intro key. rewrite get_branch_cached.
                  --- change
                        ((if bit_at key right_split
                          then get key (combine_fuel fuel f
@@ -3370,8 +3413,8 @@ Proof.
                   bit_at key right_split = true) (map_right f right_right)).
               { eapply all_keys_map_right. exact Harr. }
               split.
-              ** now apply branch_wf_general.
-              ** intro key. rewrite get_branch.
+              ** now apply branch_cached_wf_general.
+              ** intro key. rewrite get_branch_cached.
                  --- change
                        ((if bit_at key right_split
                          then get key (map_right f right_right)
@@ -3407,7 +3450,7 @@ Proof.
              (branch_all_prefix B right_sample right_split right_left right_right
                Harl Harr)) as [differing [Hdiff [Hleft Hright]]].
            ++ now rewrite Emin.
-           ++ eapply combine_join_separated_correct_wf; eauto.
+           ++ eapply combine_join_cached_separated_correct_wf; eauto.
 Qed.
 
 Theorem combine_correct_wf:

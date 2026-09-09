@@ -160,8 +160,8 @@ The direct-string proof files currently establish, without axioms:
 - well-formedness and lookup laws for fused left- and right-leaf
   generic-combine workers under `f None None = None`.
 - sufficiency of the public combine fuel bound for every recursive-call shape.
-- simultaneous lookup correctness and well-formedness for `combine_fuel` and
-  public `combine` under `f None None = None`.
+- simultaneous lookup correctness and well-formedness for the cache-aware
+  `combine_fuel` and public `combine` under `f None None = None`.
 - pointwise and lookup-extensional correctness of string `beq` on `wf` trees.
 - lookup-based finite-map equivalence, its equivalence-relation laws, its
   exact correspondence with binding membership, and equivalence with an

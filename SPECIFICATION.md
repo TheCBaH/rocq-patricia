@@ -192,6 +192,9 @@ than structurally descending after a child filter has collapsed.
 Public string `remove` likewise selects a separately proved cache-aware worker;
 an absent key returns the exact input root, while changed branches use resident
 cached samples.
+The public string `combine` uses cached smart branches and cached joins; their
+conditional refinements preserve its existing lookup and well-formedness
+contract.
 
 The native bounded-prefix byte loop has no corresponding target refinement
 theorem: `agrees_before_bounded_eq` concerns its logical bit-scanning

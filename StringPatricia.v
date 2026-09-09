@@ -459,26 +459,26 @@ Fixpoint combine_fuel {A B C : Type}
         Branch sample_b split_b left_b right_b =>
           if split_a =? split_b then
             if agrees_before_bounded sample_a sample_b split_a then
-              branch sample_a split_a
+              branch_cached sample_a split_a
                 (combine_fuel fuel' f left_a left_b)
                 (combine_fuel fuel' f right_a right_b)
-            else join (map_left f a) (map_right f b)
+            else join_cached (map_left f a) (map_right f b)
           else if split_a <? split_b then
             if agrees_before_bounded sample_a sample_b split_a then
               if bit_at sample_b split_a
-              then branch sample_a split_a (map_left f left_a)
+              then branch_cached sample_a split_a (map_left f left_a)
                      (combine_fuel fuel' f right_a b)
-              else branch sample_a split_a
+              else branch_cached sample_a split_a
                      (combine_fuel fuel' f left_a b) (map_left f right_a)
-            else join (map_left f a) (map_right f b)
+            else join_cached (map_left f a) (map_right f b)
           else
             if agrees_before_bounded sample_a sample_b split_b then
               if bit_at sample_a split_b
-              then branch sample_b split_b (map_right f left_b)
+              then branch_cached sample_b split_b (map_right f left_b)
                      (combine_fuel fuel' f a right_b)
-              else branch sample_b split_b
+              else branch_cached sample_b split_b
                      (combine_fuel fuel' f a left_b) (map_right f right_b)
-            else join (map_left f a) (map_right f b)
+            else join_cached (map_left f a) (map_right f b)
       end
   end.
 
@@ -501,26 +501,26 @@ Fixpoint combine_structural {A B C : Type}
         | Branch sample_b split_b left_b right_b =>
             if split_a =? split_b then
               if agrees_before_bounded sample_a sample_b split_a then
-                branch sample_a split_a
+                branch_cached sample_a split_a
                   (combine_structural f left_a left_b)
                   (combine_structural f right_a right_b)
-              else join (map_left f a) (map_right f b)
+              else join_cached (map_left f a) (map_right f b)
             else if split_a <? split_b then
               if agrees_before_bounded sample_a sample_b split_a then
                 if bit_at sample_b split_a
-                then branch sample_a split_a (map_left f left_a)
+                then branch_cached sample_a split_a (map_left f left_a)
                        (combine_structural f right_a b)
-                else branch sample_a split_a
+                else branch_cached sample_a split_a
                        (combine_structural f left_a b) (map_left f right_a)
-              else join (map_left f a) (map_right f b)
+              else join_cached (map_left f a) (map_right f b)
             else
               if agrees_before_bounded sample_a sample_b split_b then
                 if bit_at sample_a split_b
-                then branch sample_b split_b (map_right f left_b)
+                then branch_cached sample_b split_b (map_right f left_b)
                        (combine_right right_b)
-                else branch sample_b split_b
+                else branch_cached sample_b split_b
                        (combine_right left_b) (map_right f right_b)
-              else join (map_left f a) (map_right f b)
+              else join_cached (map_left f a) (map_right f b)
         end
   end.
 
@@ -539,26 +539,26 @@ Lemma combine_structural_equation:
       Branch sample_b split_b left_b right_b =>
         if split_a =? split_b then
           if agrees_before_bounded sample_a sample_b split_a then
-            branch sample_a split_a
+            branch_cached sample_a split_a
               (combine_structural f left_a left_b)
               (combine_structural f right_a right_b)
-          else join (map_left f a) (map_right f b)
+          else join_cached (map_left f a) (map_right f b)
         else if split_a <? split_b then
           if agrees_before_bounded sample_a sample_b split_a then
             if bit_at sample_b split_a
-            then branch sample_a split_a (map_left f left_a)
+            then branch_cached sample_a split_a (map_left f left_a)
                    (combine_structural f right_a b)
-            else branch sample_a split_a
+            else branch_cached sample_a split_a
                    (combine_structural f left_a b) (map_left f right_a)
-          else join (map_left f a) (map_right f b)
+          else join_cached (map_left f a) (map_right f b)
         else
           if agrees_before_bounded sample_a sample_b split_b then
             if bit_at sample_a split_b
-            then branch sample_b split_b (map_right f left_b)
+            then branch_cached sample_b split_b (map_right f left_b)
                    (combine_structural f a right_b)
-            else branch sample_b split_b
+            else branch_cached sample_b split_b
                    (combine_structural f a left_b) (map_right f right_b)
-          else join (map_left f a) (map_right f b)
+          else join_cached (map_left f a) (map_right f b)
     end.
 Proof. intros A B C f a b. destruct a; destruct b; reflexivity. Qed.
 

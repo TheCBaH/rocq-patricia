@@ -275,9 +275,13 @@ No implementation strategy below has yet passed its replacement gate.
   `make remove-profile` validate the legacy override, extracted cached worker,
   and public wrapper against their bindings: on the pinned compiler, all three
   allocations match at 10K and 100K for the filter's keep-all, keep-even, and
-  drop-all workloads and removal's absent/present workloads. General combine's
-  remaining branch/join paths and the other update paths still need migration
-  before I5's total-reader override can be removed.
+  drop-all workloads and removal's absent/present workloads. Generic
+  `combine_fuel` and `combine_structural` now use `branch_cached` for every
+  recursive branch construction and `join_cached` for every separated fallback;
+  their original pointwise and `wf` contracts are re-proved through
+  `combine_join_cached_separated_correct_wf`. The remaining executable regular
+  representative consumers are the specialized union workers; raw-tree proof
+  references deliberately retain the total reader until their role is removed.
 - [ ] V2.2 Prove an executable indexed bounded-prefix scan for I4, including
   valid tags, marker cases, partial masks, short-circuit guards and termination.
 - [ ] V2.3 Prove indexed first difference and its shifting-mask/identity paths
