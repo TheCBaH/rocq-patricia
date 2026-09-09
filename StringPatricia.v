@@ -34,6 +34,18 @@ Fixpoint representative {A : Type} (m : t A) : option string :=
       end
   end.
 
+(** Constant-time representative for the executable, well-formed-map path.
+    Unlike [representative], this reads the branch cache and therefore needs
+    the [wf] residency invariant before it can be used as a semantic
+    representative. Keeping the total structural reader above preserves the
+    unconditioned metatheory for arbitrary raw trees. *)
+Definition representative_cached {A : Type} (m : t A) : option string :=
+  match m with
+  | Empty => None
+  | Leaf key _ => Some key
+  | Branch sample _ _ _ => Some sample
+  end.
+
 Fixpoint get {A : Type} (key : string) (m : t A) : option A :=
   match m with
   | Empty => None

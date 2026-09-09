@@ -117,6 +117,11 @@ Extract Constant StringBits.agrees_before_bounded =>
     native code rather than walking to a leaf.  The pure [representative] may
     select a different resident key, so full native refinement must rely on
     representative-choice independence rather than definitional equality. *)
+(** Every well-formed branch caches a resident key in its sample field;
+    [StringPatriciaProof.wf_cached_sample_resident] exposes that invariant, and
+    all public-operation preservation theorems maintain it.  This remains the
+    selected realization until all source consumers migrate to the explicit
+    [representative_cached] refinement. *)
 Extract Constant StringPatricia.representative =>
   "(function
      | Empty -> None
@@ -154,7 +159,8 @@ Separate Extraction
   StringBits.bit_at StringBits.first_diff StringBits.agrees_before
   StringBits.agrees_before_bounded
   StringPatricia.empty StringPatricia.is_empty StringPatricia.singleton
-  StringPatricia.representative StringPatricia.branch StringPatricia.branch_at
+  StringPatricia.representative StringPatricia.representative_cached
+  StringPatricia.branch StringPatricia.branch_at
   StringPatricia.join StringPatricia.map_filter StringPatricia.map_left
   StringPatricia.map_right StringPatricia.replace_binding
   StringPatricia.combine_leaf_left StringPatricia.combine_leaf_right

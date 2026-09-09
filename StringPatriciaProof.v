@@ -178,6 +178,31 @@ Proof.
   inversion Hwf. assumption.
 Qed.
 
+(** The source-defined cached reader is a valid representative on the public
+    well-formed-map domain. It deliberately makes no claim for arbitrary raw
+    branches, whose sample field need not be resident. *)
+Theorem representative_cached_resident_wf:
+  forall (A : Type) (m : t A) key,
+    wf m -> representative_cached m = Some key -> resident key m.
+Proof.
+  intros A m key Hwf Hcached.
+  destruct Hwf as [|stored value|sample split ltree rtree
+    Hleft Hright Hleft_nonempty Hright_nonempty Hleft_keys Hright_keys Hresident].
+  - discriminate.
+  - cbn [representative_cached] in Hcached. inversion Hcached; subst.
+    exists value. cbn [get]. now rewrite String.eqb_refl.
+  - cbn [representative_cached] in Hcached. inversion Hcached; subst.
+    exact Hresident.
+Qed.
+
+Theorem representative_cached_none_wf:
+  forall (A : Type) (m : t A),
+    wf m -> representative_cached m = None -> m = Empty.
+Proof.
+  intros A m Hwf Hcached. destruct Hwf; cbn [representative_cached] in Hcached;
+    try discriminate; reflexivity.
+Qed.
+
 (** Finite-map equality is observational equality of lookup, not structural
     equality of Patricia trees. *)
 Definition equiv {A : Type} (left right : t A) : Prop :=
