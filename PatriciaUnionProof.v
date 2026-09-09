@@ -2078,3 +2078,173 @@ Proof.
   rewrite union_left_specialized_changed_fuel_exact by lia.
   reflexivity.
 Qed.
+
+(** The proof-guided closure-free worker is extensionally the existing native
+    source model.  Accessibility and equality transports are proof-only, so
+    this also connects the extracted worker to the established heap-refinement
+    contract without adding a target-level realizer. *)
+Theorem union_left_native_acc_exact:
+  forall (A : Type) (same : t A -> t A -> bool) (left right : t A)
+    (termination : Acc lt (size left + size right)),
+    union_left_native_acc same left right left right eq_refl eq_refl termination =
+    union_left_native same left right.
+Proof.
+  intros A same.
+  assert (Hstrong : forall total, forall (left right : t A),
+      size left + size right = total ->
+      forall termination,
+        union_left_native_acc same left right left right eq_refl eq_refl
+          termination = union_left_native same left right).
+  { intro total. induction total using lt_wf_ind.
+    intros left right Esize termination.
+    destruct left as [|left_key left_value
+        |left_prefix left_mask left_left left_right];
+      destruct right as [|right_key right_value
+        |right_prefix right_mask right_left right_right];
+      destruct termination as [smaller]; try reflexivity.
+    cbn [union_left_native_acc].
+    rewrite union_left_native_equation.
+    destruct (N.eqb left_mask right_mask &&
+      N.eqb left_prefix right_prefix)%bool eqn:Hsame.
+    - assert (Ell : union_left_native_acc same left_left right_left left_left
+          right_left eq_refl eq_refl
+          (smaller _ (proj1 (union_left_native_acc_branch_calls_smaller A
+            left_prefix left_mask left_left left_right right_prefix right_mask
+            right_left right_right))) =
+          union_left_native same left_left right_left).
+      { eapply H with (m := size left_left + size right_left);
+          [cbn [size] in Esize |- *; lia|reflexivity]. }
+      assert (Err : union_left_native_acc same left_right right_right left_right
+          right_right eq_refl eq_refl
+          (smaller _ (proj1 (proj2
+            (union_left_native_acc_branch_calls_smaller A left_prefix left_mask
+              left_left left_right right_prefix right_mask right_left
+              right_right)))) =
+          union_left_native same left_right right_right).
+      { eapply H with (m := size left_right + size right_right);
+          [cbn [size] in Esize |- *; lia|reflexivity]. }
+      now rewrite Ell, Err.
+    - destruct (mask_above left_mask right_mask) eqn:Habove.
+      + destruct (representative
+          (Branch right_prefix right_mask right_left right_right)) as [key|]
+          eqn:Hrepresentative; [|reflexivity].
+        destruct (matches_prefix key left_prefix left_mask) eqn:Hprefix;
+          [|reflexivity].
+        destruct (zero_bit key left_mask) eqn:Hbit.
+        * assert (Eleft : union_left_native_acc same left_left
+            (Branch right_prefix right_mask right_left right_right) left_left
+            (Branch right_prefix right_mask right_left right_right)
+            eq_refl eq_refl
+            (smaller _ (union_left_native_acc_smaller_right A
+              (size left_left) (Branch right_prefix right_mask right_left
+                right_right) (Branch right_prefix right_mask right_left
+                right_right) _ eq_refl
+              (proj1 (proj2 (proj2
+                (union_left_native_acc_branch_calls_smaller A left_prefix left_mask
+                  left_left left_right right_prefix right_mask right_left
+                  right_right)))))) =
+            union_left_native same left_left
+              (Branch right_prefix right_mask right_left right_right)).
+          { eapply H with (m := size left_left +
+              size (Branch right_prefix right_mask right_left right_right));
+              [cbn [size] in Esize |- *; lia|reflexivity]. }
+          now rewrite Eleft.
+        * assert (Eright : union_left_native_acc same left_right
+            (Branch right_prefix right_mask right_left right_right) left_right
+            (Branch right_prefix right_mask right_left right_right)
+            eq_refl eq_refl
+            (smaller _ (union_left_native_acc_smaller_right A
+              (size left_right) (Branch right_prefix right_mask right_left
+                right_right) (Branch right_prefix right_mask right_left
+                right_right) _ eq_refl
+              (proj1 (proj2 (proj2 (proj2
+                (union_left_native_acc_branch_calls_smaller A left_prefix left_mask
+                  left_left left_right right_prefix right_mask right_left
+                  right_right))))))) =
+            union_left_native same left_right
+              (Branch right_prefix right_mask right_left right_right)).
+          { eapply H with (m := size left_right +
+              size (Branch right_prefix right_mask right_left right_right));
+              [cbn [size] in Esize |- *; lia|reflexivity]. }
+          now rewrite Eright.
+      + destruct (mask_above right_mask left_mask) eqn:Habove'.
+        * destruct (representative
+            (Branch left_prefix left_mask left_left left_right)) as [key|]
+            eqn:Hrepresentative; [|reflexivity].
+          destruct (matches_prefix key right_prefix right_mask) eqn:Hprefix;
+            [|reflexivity].
+          destruct (zero_bit key right_mask) eqn:Hbit.
+          -- assert (Eleft : union_left_native_acc same
+              (Branch left_prefix left_mask left_left left_right) right_left
+              (Branch left_prefix left_mask left_left left_right) right_left
+              eq_refl eq_refl
+              (smaller _ (union_left_native_acc_smaller_left A
+                (Branch left_prefix left_mask left_left left_right)
+                (Branch left_prefix left_mask left_left left_right)
+                (size right_left) _ eq_refl
+                (proj1 (proj2 (proj2 (proj2 (proj2
+                  (union_left_native_acc_branch_calls_smaller A left_prefix left_mask
+                    left_left left_right right_prefix right_mask right_left
+                    right_right)))))))) =
+              union_left_native same
+                (Branch left_prefix left_mask left_left left_right) right_left).
+            { eapply H with (m :=
+                size (Branch left_prefix left_mask left_left left_right) +
+                size right_left); [cbn [size] in Esize |- *; lia|reflexivity]. }
+            now rewrite Eleft.
+          -- assert (Eright : union_left_native_acc same
+              (Branch left_prefix left_mask left_left left_right) right_right
+              (Branch left_prefix left_mask left_left left_right) right_right
+              eq_refl eq_refl
+              (smaller _ (union_left_native_acc_smaller_left A
+                (Branch left_prefix left_mask left_left left_right)
+                (Branch left_prefix left_mask left_left left_right)
+                (size right_right) _ eq_refl
+                (proj2 (proj2 (proj2 (proj2 (proj2
+                  (union_left_native_acc_branch_calls_smaller A left_prefix left_mask
+                    left_left left_right right_prefix right_mask right_left
+                    right_right)))))))) =
+              union_left_native same
+                (Branch left_prefix left_mask left_left left_right) right_right).
+            { eapply H with (m :=
+                size (Branch left_prefix left_mask left_left left_right) +
+                size right_right); [cbn [size] in Esize |- *; lia|reflexivity]. }
+            now rewrite Eright.
+        * reflexivity.
+  }
+  intros left right termination.
+  eapply Hstrong with (total := size left + size right); eauto.
+Qed.
+
+Theorem union_left_native_acc_correct_wf:
+  forall (A : Type) (same : t A -> t A -> bool) (left right : t A)
+    (termination : Acc lt (size left + size right)),
+    native_same_sound same -> wf left -> wf right ->
+    wf (union_left_native_acc same left right left right eq_refl eq_refl
+      termination) /\
+    forall key,
+      get key (union_left_native_acc same left right left right eq_refl eq_refl
+        termination) =
+      match get key left with Some value => Some value | None => get key right end.
+Proof.
+  intros A same left right termination Hsame Hleft Hright.
+  rewrite union_left_native_acc_exact.
+  now apply union_left_native_correct_wf.
+Qed.
+
+Theorem union_right_native_acc_default_correct_wf:
+  forall (A : Type) (left right : t A),
+    wf left -> wf right ->
+    wf (union_right_native_acc_default left right) /\
+    forall key,
+      get key (union_right_native_acc_default left right) =
+      match get key right with Some value => Some value | None => get key left end.
+Proof.
+  intros A left right Hleft Hright.
+  unfold union_right_native_acc_default, union_left_native_acc_default.
+  rewrite union_left_native_acc_exact.
+  apply union_left_native_correct_wf.
+  - intros changed original Hsame. discriminate Hsame.
+  - exact Hright.
+  - exact Hleft.
+Qed.

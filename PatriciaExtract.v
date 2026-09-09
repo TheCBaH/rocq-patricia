@@ -242,6 +242,8 @@ Separate Extraction
   PatriciaUnion.union_right_native_default
   PatriciaUnion.union_left_native_fuel_default
   PatriciaUnion.union_left_native_fuel_inline_default
+  PatriciaUnion.union_left_native_acc_default
+  PatriciaUnion.union_right_native_acc_default
   PatriciaUnion.union_right_specialized_changed
   PatriciaUnion.union_right_specialized_changed_result
   Patricia.map Patricia.fold Patricia.elements Patricia.beq

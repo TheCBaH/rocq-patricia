@@ -205,6 +205,7 @@ let profile_int_case name keys expected_cardinal left right =
   run "generated" (fun () -> IU.union_left_native_default left right);
   run "native fuel" (fun () -> IU.union_left_native_fuel_default left right);
   run "inline fuel" (fun () -> IU.union_left_native_fuel_inline_default left right);
+  run "acc" (fun () -> IU.union_left_native_acc_default left right);
   run "proved" (fun () -> IU.union_left_specialized_changed_result left right);
   run "fuel" (fun () ->
       IU.union_left_specialized_changed_fuel_result left right)

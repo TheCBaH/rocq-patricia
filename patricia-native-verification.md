@@ -217,10 +217,15 @@ No implementation strategy below has yet passed its replacement gate.
 
 ### V1 — Union replacement experiment (S1; parent N2)
 
-- [ ] V1.1 Extract an integer `Acc`-recursive candidate; verify no operational
+- [x] V1.1 Extract an integer `Acc`-recursive candidate; verify no operational
   size prepass, fuel eliminator, termination tuple or per-node recursive closure.
-- [ ] V1.2 Prove its equation and left/right lookup and well-formedness laws
-  under the explicit primitive/equality premises; audit assumptions.
+  `union_left_native_acc` extracts to one direct recursive OCaml function; the
+  2026-09-09 10K profile exactly matched the legacy worker's allocation and
+  root-reuse figures on the integer workloads.
+- [x] V1.2 Prove its equation and left/right lookup and well-formedness laws
+  under the explicit primitive/equality premises; audit assumptions. The exact
+  refinement and both biased laws are in `PatriciaUnionProof.v`; the only
+  non-source premise remains `native_same_sound` for target `(==)`.
 - [ ] V1.3 Repeat for strings, carrying packed positions and cached residency.
 - [ ] V1.4 Evaluate the changed-result alternative, including right-operand
   containment/reuse; document whether eliminating `==` is actually competitive.

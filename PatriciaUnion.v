@@ -2,7 +2,7 @@
     This companion module deliberately keeps worker iteration out of the
     established [Patricia.v]/[PatriciaProof.v] closure. *)
 
-From Stdlib Require Import Bool NArith PArith.
+From Stdlib Require Import Bool Lia NArith PArith Wf_nat.
 Require Import PatriciaBits Patricia.
 
 Fixpoint union_left_specialized {A : Type} (a : t A) {struct a}
@@ -409,6 +409,121 @@ Fixpoint union_left_native_fuel_inline {A : Type}
 
 Definition union_left_native_fuel_inline_default {A : Type} (a b : t A) : t A :=
   union_left_native_fuel_inline (S (size a + size b)) a b.
+
+(** The six recursive branch/branch pairs all decrease the combined tree
+    size.  Keeping this elementary fact beside the worker lets its termination
+    argument live entirely in [Prop], where extraction can erase it. *)
+Lemma union_left_native_acc_branch_calls_smaller:
+  forall (A : Type) pa ma (la ra : t A) pb mb (lb rb : t A),
+    size la + size lb < size (Branch pa ma la ra) + size (Branch pb mb lb rb) /\
+    size ra + size rb < size (Branch pa ma la ra) + size (Branch pb mb lb rb) /\
+    size la + size (Branch pb mb lb rb) <
+      size (Branch pa ma la ra) + size (Branch pb mb lb rb) /\
+    size ra + size (Branch pb mb lb rb) <
+      size (Branch pa ma la ra) + size (Branch pb mb lb rb) /\
+    size (Branch pa ma la ra) + size lb <
+      size (Branch pa ma la ra) + size (Branch pb mb lb rb) /\
+    size (Branch pa ma la ra) + size rb <
+      size (Branch pa ma la ra) + size (Branch pb mb lb rb).
+Proof. intros. cbn [size]. lia. Qed.
+
+(** Rewriting a child-measure argument through an erased tree equality. *)
+Lemma union_left_native_acc_smaller_right:
+  forall (A : Type) (x : nat) (current original : t A) total,
+    original = current -> x + size current < total -> x + size original < total.
+Proof. intros A x current original total H; subst original; exact (fun H' => H'). Qed.
+
+Lemma union_left_native_acc_smaller_left:
+  forall (A : Type) (current original : t A) (x total : nat),
+    original = current -> size current + x < total -> size original + x < total.
+Proof. intros A current original x total H; subst original; exact (fun H' => H'). Qed.
+
+(** Closure-free native-shaped worker.  Its proof-only accessibility witness
+    governs recursion, while explicit original-root aliases preserve physical
+    root identity through the dependent tree match after extraction. *)
+Fixpoint union_left_native_acc {A : Type}
+    (same : t A -> t A -> bool) (original_a original_b a b : t A)
+    (original_a_is_a : original_a = a) (original_b_is_b : original_b = b)
+    (termination : Acc lt (size a + size b))
+    {struct termination} : t A :=
+  match a as a0, b as b0
+      return original_a = a0 -> original_b = b0 ->
+        Acc lt (size a0 + size b0) -> t A with
+  | Empty, _ => fun _ _ _ => original_b
+  | _, Empty => fun _ _ _ => original_a
+  | Leaf ka va, Leaf kb _ => fun _ _ _ =>
+      if Pos.eqb ka kb then original_a else set ka va original_b
+  | Leaf ka va, Branch _ _ _ _ => fun _ _ _ => set ka va original_b
+  | Branch _ _ _ _, Leaf kb vb => fun _ _ _ =>
+      match get kb original_a with
+      | Some _ => original_a
+      | None => set kb vb original_a
+      end
+  | Branch pa ma la ra, Branch pb mb lb rb => fun H_a H_b termination0 =>
+      match termination0 with
+      | Acc_intro _ smaller =>
+          if (N.eqb ma mb && N.eqb pa pb)%bool then
+            let decreases := union_left_native_acc_branch_calls_smaller
+              A pa ma la ra pb mb lb rb in
+            native_reuse_same_branch_root same original_a pa ma la ra
+              (union_left_native_acc same la lb la lb eq_refl eq_refl
+                (smaller _ (proj1 decreases)))
+              (union_left_native_acc same ra rb ra rb eq_refl eq_refl
+                (smaller _ (proj1 (proj2 decreases))))
+          else if mask_above ma mb then
+            match representative original_b with
+            | Some kb =>
+                if matches_prefix kb pa ma then
+                  let decreases := union_left_native_acc_branch_calls_smaller
+                    A pa ma la ra pb mb lb rb in
+                  if zero_bit kb ma then
+                    native_reuse_left_branch_root same original_a pa ma la ra
+                      (union_left_native_acc same la original_b la original_b
+                        eq_refl eq_refl
+                        (smaller _ (union_left_native_acc_smaller_right A
+                          (size la) (Branch pb mb lb rb) original_b _ H_b
+                          (proj1 (proj2 (proj2 decreases))))))
+                  else native_reuse_right_branch_root same original_a pa ma la ra
+                    (union_left_native_acc same ra original_b ra original_b
+                      eq_refl eq_refl
+                      (smaller _ (union_left_native_acc_smaller_right A
+                        (size ra) (Branch pb mb lb rb) original_b _ H_b
+                        (proj1 (proj2 (proj2 (proj2 decreases)))))))
+                else join original_a original_b
+            | None => original_a
+            end
+          else if mask_above mb ma then
+            match representative original_a with
+            | Some ka =>
+                if matches_prefix ka pb mb then
+                  let decreases := union_left_native_acc_branch_calls_smaller
+                    A pa ma la ra pb mb lb rb in
+                  if zero_bit ka mb then
+                    native_reuse_left_branch_root same original_b pb mb lb rb
+                      (union_left_native_acc same original_a lb original_a lb
+                        eq_refl eq_refl
+                        (smaller _ (union_left_native_acc_smaller_left A
+                          (Branch pa ma la ra) original_a (size lb) _ H_a
+                          (proj1 (proj2 (proj2 (proj2 (proj2 decreases))))))))
+                  else native_reuse_right_branch_root same original_b pb mb lb rb
+                    (union_left_native_acc same original_a rb original_a rb
+                      eq_refl eq_refl
+                      (smaller _ (union_left_native_acc_smaller_left A
+                        (Branch pa ma la ra) original_a (size rb) _ H_a
+                        (proj2 (proj2 (proj2 (proj2 (proj2 decreases))))))))
+                else join original_a original_b
+            | None => original_b
+            end
+          else join original_a original_b
+      end
+  end original_a_is_a original_b_is_b termination.
+
+Definition union_left_native_acc_default {A : Type} (a b : t A) : t A :=
+  union_left_native_acc (@native_same A) a b a b eq_refl eq_refl
+    (lt_wf (size a + size b)).
+
+Definition union_right_native_acc_default {A : Type} (a b : t A) : t A :=
+  union_left_native_acc_default b a.
 
 (** One-step equation for changed-result refinement proofs. *)
 Lemma union_left_specialized_changed_equation:
