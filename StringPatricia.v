@@ -361,11 +361,11 @@ Fixpoint map_filter_cached {A B : Type}
 
 Definition map_left {A B C : Type}
     (f : option A -> option B -> option C) (m : t A) : t C :=
-  map_filter (fun _ value => f (Some value) None) m.
+  map_filter_cached (fun _ value => f (Some value) None) m.
 
 Definition map_right {A B C : Type}
     (f : option A -> option B -> option C) (m : t B) : t C :=
-  map_filter (fun _ value => f None (Some value)) m.
+  map_filter_cached (fun _ value => f None (Some value)) m.
 
 Definition replace_binding {A : Type}
     (key : string) (value : option A) (m : t A) : t A :=

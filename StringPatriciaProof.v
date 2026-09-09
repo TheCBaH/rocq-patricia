@@ -1580,8 +1580,8 @@ Theorem map_left_correct_wf:
     forall key, get key (map_left f m) = f (get key m) None.
 Proof.
   intros A B C f m Hnone Hwf. unfold map_left. split.
-  - now apply map_filter_wf.
-  - intro key. rewrite get_map_filter_wf by exact Hwf.
+  - now apply map_filter_cached_wf.
+  - intro key. rewrite get_map_filter_cached_wf by exact Hwf.
     destruct (get key m); [reflexivity|symmetry; exact Hnone].
 Qed.
 
@@ -1591,8 +1591,8 @@ Theorem map_right_correct_wf:
     forall key, get key (map_right f m) = f None (get key m).
 Proof.
   intros A B C f m Hnone Hwf. unfold map_right. split.
-  - now apply map_filter_wf.
-  - intro key. rewrite get_map_filter_wf by exact Hwf.
+  - now apply map_filter_cached_wf.
+  - intro key. rewrite get_map_filter_cached_wf by exact Hwf.
     destruct (get key m); [reflexivity|symmetry; exact Hnone].
 Qed.
 
@@ -2868,7 +2868,7 @@ Lemma all_keys_map_left:
       (f : option A -> option B -> option C) (m : t A),
     all_keys P m -> all_keys P (map_left f m).
 Proof.
-  intros. unfold map_left. now apply all_keys_map_filter.
+  intros. unfold map_left. now apply all_keys_map_filter_cached.
 Qed.
 
 Lemma all_keys_map_right:
@@ -2876,7 +2876,7 @@ Lemma all_keys_map_right:
       (f : option A -> option B -> option C) (m : t B),
     all_keys P m -> all_keys P (map_right f m).
 Proof.
-  intros. unfold map_right. now apply all_keys_map_filter.
+  intros. unfold map_right. now apply all_keys_map_filter_cached.
 Qed.
 
 (** Once two inputs are separated at one bit, their one-sided maps remain
