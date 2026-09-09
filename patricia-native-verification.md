@@ -252,6 +252,10 @@ No implementation strategy below has yet passed its replacement gate.
 
 - [ ] V2.1 Integrate a source-defined cached representative with proved
   consumer refinement, then remove I5's override after performance validation.
+  Groundwork completed in `8fc60a6`: `representative_cached` and its
+  `wf`-resident/nonempty refinement theorems are source-defined. The override
+  intentionally remains because migrating all consumers (notably `join` and
+  public update paths) is required before comparing performance safely.
 - [ ] V2.2 Prove an executable indexed bounded-prefix scan for I4, including
   valid tags, marker cases, partial masks, short-circuit guards and termination.
 - [ ] V2.3 Prove indexed first difference and its shifting-mask/identity paths
@@ -277,6 +281,8 @@ No implementation strategy below has yet passed its replacement gate.
 
 - [ ] V4.1 Benchmark a genuine Flambda build with the same source/workloads;
   record allocation, timings and specialization reports (S4).
+  The pinned OCaml 4.14.3 toolchain reports `flambda: false` on arm64 Linux;
+  no non-Flambda run is labelled as satisfying this item.
 - [ ] V4.2 Assess verified extraction with a small integer-map entry point and
   explicit primitives; audit options and interoperability before expansion (S5).
 - [ ] V4.3 Extract/prove the combine adapter and key-validation relation, or
