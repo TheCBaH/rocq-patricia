@@ -255,7 +255,11 @@ No implementation strategy below has yet passed its replacement gate.
   Groundwork completed in `8fc60a6`: `representative_cached` and its
   `wf`-resident/nonempty refinement theorems are source-defined. The override
   intentionally remains because migrating all consumers (notably `join` and
-  public update paths) is required before comparing performance safely.
+  public update paths) is required before comparing performance safely. The
+  migration sequence is: retain total `representative` for raw-tree lemmas;
+  add cached `branch`/`join` counterparts; prove their `wf` lookup and
+  well-formedness refinements; migrate each public operation and benchmark it;
+  only then remove I5's override.
 - [ ] V2.2 Prove an executable indexed bounded-prefix scan for I4, including
   valid tags, marker cases, partial masks, short-circuit guards and termination.
 - [ ] V2.3 Prove indexed first difference and its shifting-mask/identity paths
@@ -275,11 +279,17 @@ No implementation strategy below has yet passed its replacement gate.
 
 - [ ] V3.1 Compare CFML/Zoo or a small target semantics using one actual union
   containment/reuse case; record supported syntax and exact remaining TCB.
+  Environment audit on 2026-09-09 found no installed CFML, Zoo, Malfunction,
+  or verified-extraction package; CFML's documented Coq 8.20 compatibility
+  also remains distinct from this Rocq 9.2 checkout. No unavailable tool is
+  represented as target-level evidence.
 - [ ] V3.2 Define the target-tree/payload representation relation and prove
   the physical-equality adequacy used by each recursive reuse decision.
-- [ ] V3.3 Prove the complete selected OCaml worker, its dependencies and
-  swapped right bias against the source laws. This is required if I6 is kept
-  handwritten; an abstract `==` lemma alone does not close it.
+- [-] V3.3 Prove the complete selected OCaml worker, its dependencies and
+  swapped right bias against the source laws. This became inapplicable to I6
+  when V1.5 removed the handwritten worker bodies. A target-level proof is
+  still relevant only for I7's physical-equality adequacy and the remaining
+  primitive/compiler boundary, covered by V3.2/V3.4.
 - [ ] V3.4 Compose operation-level target refinements and record remaining
   compiler/runtime assumptions before revising any public verification claim.
 
@@ -291,6 +301,9 @@ No implementation strategy below has yet passed its replacement gate.
   no non-Flambda run is labelled as satisfying this item.
 - [ ] V4.2 Assess verified extraction with a small integer-map entry point and
   explicit primitives; audit options and interoperability before expansion (S5).
+  No verified-extraction toolchain is installed in the pinned environment;
+  this remains a separately provisioned experiment, not an alternative label
+  for ordinary Rocq extraction.
 - [ ] V4.3 Extract/prove the combine adapter and key-validation relation, or
   verify the wrappers directly; preserve abstract interfaces (S6).
 - [-] V4.4 Develop a custom extraction postprocessor only if simpler routes
