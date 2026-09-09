@@ -259,9 +259,11 @@ No implementation strategy below has yet passed its replacement gate.
   migration sequence is: retain total `representative` for raw-tree lemmas;
   add cached `branch`/`join` counterparts; prove their `wf` lookup and
   well-formedness refinements; migrate each public operation and benchmark it;
-  only then remove I5's override. `branch_cached` is now complete with
+  only then remove I5's override. `branch_cached` is complete with
   `branch_cached_nonempty_wf`, `branch_cached_wf_general`, and
-  `get_branch_cached`; extraction inspection confirms a direct cache read.
+  `get_branch_cached`; `join_cached` is complete for separated inputs with
+  `join_cached_separated_correct_wf`. Extraction inspection confirms direct
+  cache reads in both; callers have not yet migrated.
 - [ ] V2.2 Prove an executable indexed bounded-prefix scan for I4, including
   valid tags, marker cases, partial masks, short-circuit guards and termination.
 - [ ] V2.3 Prove indexed first difference and its shifting-mask/identity paths

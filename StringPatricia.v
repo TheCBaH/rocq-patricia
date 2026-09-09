@@ -106,6 +106,19 @@ Definition join {A : Type} (fresh old : t A) : t A :=
       end
   end.
 
+(** Cached-sample counterpart of [join], intended for callers that have
+    already established their two inputs are well-formed and separated. *)
+Definition join_cached {A : Type} (fresh old : t A) : t A :=
+  match representative_cached fresh, representative_cached old with
+  | None, _ => old
+  | _, None => fresh
+  | Some fresh_key, Some old_key =>
+      match first_diff fresh_key old_key with
+      | None => fresh
+      | Some split => branch_at fresh_key split fresh old
+      end
+  end.
+
 Fixpoint replace {A : Type}
     (key : string) (value : A) (m : t A) : t A :=
   match m with

@@ -161,7 +161,8 @@ Separate Extraction
   StringPatricia.empty StringPatricia.is_empty StringPatricia.singleton
   StringPatricia.representative StringPatricia.representative_cached
   StringPatricia.branch StringPatricia.branch_cached StringPatricia.branch_at
-  StringPatricia.join StringPatricia.map_filter StringPatricia.map_left
+  StringPatricia.join StringPatricia.join_cached StringPatricia.map_filter
+  StringPatricia.map_left
   StringPatricia.map_right StringPatricia.replace_binding
   StringPatricia.combine_leaf_left StringPatricia.combine_leaf_right
   StringPatricia.get StringPatricia.mem StringPatricia.set_one_descent

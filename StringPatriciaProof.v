@@ -2674,6 +2674,91 @@ Proof.
     cbn [join]. split; [exact Hold|reflexivity].
 Qed.
 
+(** Cached representatives are interchangeable with structural ones for a
+    separated, well-formed join: their identities may differ, but residency
+    and the separation predicates determine the same split and lookup law. *)
+Theorem join_cached_separated_correct_wf:
+  forall (A : Type) sample split (fresh old : t A),
+    wf fresh -> wf old ->
+    all_keys (fun stored =>
+      same_prefix sample stored split /\
+      bit_at stored split = bit_at sample split) fresh ->
+    all_keys (fun stored =>
+      same_prefix sample stored split /\
+      bit_at stored split = negb (bit_at sample split)) old ->
+    wf (join_cached fresh old) /\
+    forall query,
+      get query (join_cached fresh old) =
+        match get query fresh with Some value => Some value | None => get query old end.
+Proof.
+  intros A sample split fresh old Hfresh Hold Hfresh_keys Hold_keys.
+  destruct (representative_cached fresh) as [fresh_key|] eqn:Efresh;
+    destruct (representative_cached old) as [old_key|] eqn:Eold.
+  - destruct (representative_cached_resident_wf A fresh fresh_key Hfresh Efresh)
+      as [fresh_value Hfresh_get].
+    destruct (representative_cached_resident_wf A old old_key Hold Eold)
+      as [old_value Hold_get].
+    assert (Hfresh_properties :
+      same_prefix sample fresh_key split /\
+      bit_at fresh_key split = bit_at sample split).
+    { eapply (all_keys_get A (fun stored =>
+          same_prefix sample stored split /\
+          bit_at stored split = bit_at sample split)
+        fresh fresh_key fresh_value);
+        [exact Hfresh_keys|exact Hfresh_get]. }
+    assert (Hold_properties :
+      same_prefix sample old_key split /\
+      bit_at old_key split = negb (bit_at sample split)).
+    { eapply (all_keys_get A (fun stored =>
+          same_prefix sample stored split /\
+          bit_at stored split = negb (bit_at sample split))
+        old old_key old_value);
+        [exact Hold_keys|exact Hold_get]. }
+    assert (Hfirst : first_diff fresh_key old_key = Some split).
+    { apply first_diff_at.
+      - eapply same_prefix_rebase;
+          [exact (proj1 Hfresh_properties)|exact (proj1 Hold_properties)].
+      - rewrite (proj2 Hfresh_properties), (proj2 Hold_properties).
+        destruct (bit_at sample split); discriminate. }
+    assert (Hfresh_separated : all_keys (fun stored =>
+      same_prefix fresh_key stored split /\
+      bit_at stored split = bit_at fresh_key split) fresh).
+    { eapply all_keys_impl; [exact Hfresh_keys|]. intros stored [Hprefix Hbit].
+      split.
+      - eapply same_prefix_rebase;
+          [exact (proj1 Hfresh_properties)|exact Hprefix].
+      - now rewrite Hbit, (proj2 Hfresh_properties). }
+    assert (Hold_separated : all_keys (fun stored =>
+      same_prefix fresh_key stored split /\
+      bit_at stored split = negb (bit_at fresh_key split)) old).
+    { eapply all_keys_impl; [exact Hold_keys|]. intros stored [Hprefix Hbit].
+      split.
+      - eapply same_prefix_rebase;
+          [exact (proj1 Hfresh_properties)|exact Hprefix].
+      - now rewrite Hbit, (proj2 Hfresh_properties). }
+    unfold join_cached. rewrite Efresh, Eold, Hfirst. split.
+    + eapply branch_at_wf; try eassumption.
+      * intro Hnone.
+        pose proof (wf_representative_none A fresh Hfresh Hnone) as Eempty.
+        subst fresh. discriminate Hfresh_get.
+      * intro Hnone.
+        pose proof (wf_representative_none A old Hold Hnone) as Eempty.
+        subst old. discriminate Hold_get.
+      * exists fresh_value. exact Hfresh_get.
+    + intro query. apply get_branch_at.
+      * eapply all_keys_impl; [exact Hfresh_separated|].
+        intros stored H. exact (proj2 H).
+      * eapply all_keys_impl; [exact Hold_separated|].
+        intros stored H. exact (proj2 H).
+  - pose proof (representative_cached_none_wf A old Hold Eold) as Eempty.
+    subst old. unfold join_cached. rewrite Efresh. cbn. split; [exact Hfresh|].
+    intro query. now destruct (get query fresh).
+  - pose proof (representative_cached_none_wf A fresh Hfresh Efresh) as Eempty.
+    subst fresh. cbn [join_cached]. split; [exact Hold|reflexivity].
+  - pose proof (representative_cached_none_wf A fresh Hfresh Efresh) as Eempty.
+    subst fresh. cbn [join_cached]. split; [exact Hold|reflexivity].
+Qed.
+
 (** Functional merge laws preserve any key predicate already satisfied by
     both inputs.  The target tree's [wf] proof bridges routed lookup back to
     its structural [all_keys] invariant. *)
