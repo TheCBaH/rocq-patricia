@@ -223,6 +223,7 @@ let profile_string_case name keys expected_cardinal left right =
   run "generated" (fun () -> SU.union_left_native_default left right);
   run "native fuel" (fun () -> SU.union_left_native_fuel_default left right);
   run "inline fuel" (fun () -> SU.union_left_native_fuel_inline_default left right);
+  run "acc" (fun () -> SU.union_left_native_acc_default left right);
   run "proved" (fun () -> SU.union_left_specialized_changed_result left right);
   run "fuel" (fun () ->
       SU.union_left_specialized_changed_fuel_result left right)

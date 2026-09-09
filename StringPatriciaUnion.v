@@ -1,7 +1,7 @@
 (** Experimental source counterpart of the optimized direct-string biased
     union, isolated from the established string-map proof closure. *)
 
-From Stdlib Require Import Bool PeanoNat Strings.String.
+From Stdlib Require Import Bool Lia PeanoNat Strings.String Wf_nat.
 Require Import StringBits StringPatricia.
 
 Fixpoint union_left_specialized {A : Type} (a : t A) {struct a}
@@ -361,6 +361,128 @@ Fixpoint union_left_native_fuel_inline {A : Type}
 
 Definition union_left_native_fuel_inline_default {A : Type} (a b : t A) : t A :=
   union_left_native_fuel_inline (S (size a + size b)) a b.
+
+(** The branch/branch worker calls are all smaller in combined structural
+    size; the fact is kept beside the implementation so [Acc] can govern
+    recursion without leaving a runtime fuel counter after extraction. *)
+Lemma union_left_native_acc_branch_calls_smaller:
+  forall (A : Type) sample_a split_a (left_a right_a : t A)
+      sample_b split_b (left_b right_b : t A),
+    size left_a + size left_b <
+      size (Branch sample_a split_a left_a right_a) +
+      size (Branch sample_b split_b left_b right_b) /\
+    size right_a + size right_b <
+      size (Branch sample_a split_a left_a right_a) +
+      size (Branch sample_b split_b left_b right_b) /\
+    size left_a + size (Branch sample_b split_b left_b right_b) <
+      size (Branch sample_a split_a left_a right_a) +
+      size (Branch sample_b split_b left_b right_b) /\
+    size right_a + size (Branch sample_b split_b left_b right_b) <
+      size (Branch sample_a split_a left_a right_a) +
+      size (Branch sample_b split_b left_b right_b) /\
+    size (Branch sample_a split_a left_a right_a) + size left_b <
+      size (Branch sample_a split_a left_a right_a) +
+      size (Branch sample_b split_b left_b right_b) /\
+    size (Branch sample_a split_a left_a right_a) + size right_b <
+      size (Branch sample_a split_a left_a right_a) +
+      size (Branch sample_b split_b left_b right_b).
+Proof. intros. cbn [size]. lia. Qed.
+
+Lemma union_left_native_acc_smaller_right:
+  forall (A : Type) (x : nat) (current original : t A) total,
+    original = current -> x + size current < total -> x + size original < total.
+Proof. intros A x current original total H; subst original; exact (fun H' => H'). Qed.
+
+Lemma union_left_native_acc_smaller_left:
+  forall (A : Type) (current original : t A) (x total : nat),
+    original = current -> size current + x < total -> size original + x < total.
+Proof. intros A current original x total H; subst original; exact (fun H' => H'). Qed.
+
+(** A direct, closure-free native-shaped worker.  The equality and [Acc]
+    arguments are in [Prop]; aliases keep original runtime roots available for
+    physical-reuse decisions through the dependent match. *)
+Fixpoint union_left_native_acc {A : Type}
+    (same : t A -> t A -> bool) (original_a original_b a b : t A)
+    (original_a_is_a : original_a = a) (original_b_is_b : original_b = b)
+    (termination : Acc lt (size a + size b)) {struct termination} : t A :=
+  match a as a0, b as b0
+      return original_a = a0 -> original_b = b0 ->
+        Acc lt (size a0 + size b0) -> t A with
+  | Empty, _ => fun _ _ _ => original_b
+  | _, Empty => fun _ _ _ => original_a
+  | Leaf ka va, Leaf kb _ => fun _ _ _ =>
+      if String.eqb ka kb then original_a else set ka va original_b
+  | Leaf ka va, Branch _ _ _ _ => fun _ _ _ => set ka va original_b
+  | Branch _ _ _ _, Leaf kb vb => fun _ _ _ =>
+      match get kb original_a with
+      | Some _ => original_a
+      | None => set kb vb original_a
+      end
+  | Branch sample_a split_a left_a right_a,
+    Branch sample_b split_b left_b right_b => fun H_a H_b termination0 =>
+      match termination0 with
+      | Acc_intro _ smaller =>
+          if split_a =? split_b then
+            if agrees_before_bounded sample_a sample_b split_a then
+              let decreases := union_left_native_acc_branch_calls_smaller A
+                sample_a split_a left_a right_a sample_b split_b left_b right_b in
+              native_reuse_same_branch_root same original_a sample_a split_a
+                left_a right_a
+                (union_left_native_acc same left_a left_b left_a left_b
+                  eq_refl eq_refl (smaller _ (proj1 decreases)))
+                (union_left_native_acc same right_a right_b right_a right_b
+                  eq_refl eq_refl (smaller _ (proj1 (proj2 decreases))))
+            else join original_a original_b
+          else if split_a <? split_b then
+            if agrees_before_bounded sample_a sample_b split_a then
+              let decreases := union_left_native_acc_branch_calls_smaller A
+                sample_a split_a left_a right_a sample_b split_b left_b right_b in
+              if bit_at sample_b split_a then
+                native_reuse_right_branch_root same original_a sample_a split_a
+                  left_a right_a
+                  (union_left_native_acc same right_a original_b right_a original_b
+                    eq_refl eq_refl
+                    (smaller _ (union_left_native_acc_smaller_right A
+                      (size right_a) (Branch sample_b split_b left_b right_b)
+                      original_b _ H_b (proj1 (proj2 (proj2 (proj2 decreases)))))))
+              else native_reuse_left_branch_root same original_a sample_a split_a
+                left_a right_a
+                (union_left_native_acc same left_a original_b left_a original_b
+                  eq_refl eq_refl
+                  (smaller _ (union_left_native_acc_smaller_right A
+                    (size left_a) (Branch sample_b split_b left_b right_b)
+                    original_b _ H_b (proj1 (proj2 (proj2 decreases))))))
+            else join original_a original_b
+          else if agrees_before_bounded sample_a sample_b split_b then
+            let decreases := union_left_native_acc_branch_calls_smaller A
+              sample_a split_a left_a right_a sample_b split_b left_b right_b in
+            if bit_at sample_a split_b then
+              native_reuse_right_branch_root same original_b sample_b split_b
+                left_b right_b
+                (union_left_native_acc same original_a right_b original_a right_b
+                  eq_refl eq_refl
+                  (smaller _ (union_left_native_acc_smaller_left A
+                    (Branch sample_a split_a left_a right_a) original_a
+                    (size right_b) _ H_a
+                    (proj2 (proj2 (proj2 (proj2 (proj2 decreases))))))))
+            else native_reuse_left_branch_root same original_b sample_b split_b
+              left_b right_b
+              (union_left_native_acc same original_a left_b original_a left_b
+                eq_refl eq_refl
+                (smaller _ (union_left_native_acc_smaller_left A
+                  (Branch sample_a split_a left_a right_a) original_a
+                  (size left_b) _ H_a
+                  (proj1 (proj2 (proj2 (proj2 (proj2 decreases))))))))
+          else join original_a original_b
+      end
+  end original_a_is_a original_b_is_b termination.
+
+Definition union_left_native_acc_default {A : Type} (a b : t A) : t A :=
+  union_left_native_acc (@native_same A) a b a b eq_refl eq_refl
+    (lt_wf (size a + size b)).
+
+Definition union_right_native_acc_default {A : Type} (a b : t A) : t A :=
+  union_left_native_acc_default b a.
 
 (** Compact unfolding rule for the changed worker.  Proofs use this instead
     of reducing the nested fixpoint, which would duplicate its local recursion

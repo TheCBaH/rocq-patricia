@@ -268,6 +268,8 @@ Separate Extraction
   StringPatriciaUnion.union_right_native_default
   StringPatriciaUnion.union_left_native_fuel_default
   StringPatriciaUnion.union_left_native_fuel_inline_default
+  StringPatriciaUnion.union_left_native_acc_default
+  StringPatriciaUnion.union_right_native_acc_default
   StringPatriciaUnion.union_right_specialized_changed
   StringPatriciaUnion.union_right_specialized_changed_result
   StringPatricia.map StringPatricia.fold StringPatricia.elements

@@ -226,7 +226,12 @@ No implementation strategy below has yet passed its replacement gate.
   under the explicit primitive/equality premises; audit assumptions. The exact
   refinement and both biased laws are in `PatriciaUnionProof.v`; the only
   non-source premise remains `native_same_sound` for target `(==)`.
-- [ ] V1.3 Repeat for strings, carrying packed positions and cached residency.
+- [x] V1.3 Repeat for strings, carrying packed positions and cached residency.
+  `StringPatriciaUnion.union_left_native_acc` has the same direct extracted
+  shape and matched legacy allocation/root reuse on both ordinary and
+  192-byte-common-prefix 10K workloads. Its refinement reuses the established
+  packed-position and cached-sample source contracts; it does not claim to
+  discharge their native OCaml primitive obligations.
 - [ ] V1.4 Evaluate the changed-result alternative, including right-operand
   containment/reuse; document whether eliminating `==` is actually competitive.
 - [ ] V1.5 Complete the correctness/performance gate below before selecting a
