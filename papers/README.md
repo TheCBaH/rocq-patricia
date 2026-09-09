@@ -16,16 +16,20 @@ BibTeX key: `OkasakiGill1998`.
 
 Citation source: the [University of Kansas Functional Programming Group's
 publication record](https://ku-fpg.github.io/papers/Okasaki-98-IntMap/).
-That record links a historical PDF at
-`http://www.ittc.ku.edu/csdl/fpg/files/Okasaki-98-IntMap.pdf`; its HTTPS equivalent
-returned HTTP 404 when checked on 2026-09-09.
+That record links the historical ITTC file
+`http://www.ittc.ku.edu/csdl/fpg/files/Okasaki-98-IntMap.pdf`. The related
+author path `http://ittc.ku.edu/~andygill/papers/IntMap98.pdf` is preserved by
+the [Internet Archive capture from 2015-04-17](https://web.archive.org/web/20150417234429/https://ittc.ku.edu/~andygill/papers/IntMap98.pdf).
+The live HTTP and HTTPS endpoints returned 404 on 2026-09-09.
 
 Local-file provenance: already present in the workspace as
 `Okasaki and Gill - 1998 - Fast Mergeable Integer Maps.pdf` before this
-investigation. Moved here and renamed on 2026-09-09. Its original download URL,
-acquisition date and version were not recorded, so the publication record is
-a bibliographic authority, not a verified download origin for these bytes.
-No publisher DOI has been established here.
+investigation. Moved here and renamed on 2026-09-09. Its 385,183-byte size
+matches the Internet Archive's reported archived payload exactly, and the
+archive capture is the identified origin for this PDF copy. A fresh payload
+download was rate-limited during the 2026-09-09 check, so the local SHA-256 is
+recorded for reproducibility rather than claimed as an independently downloaded
+byte comparison. No publisher DOI has been established here.
 
 Relevance: the integer Patricia-tree algorithms and merge performance that
 motivate the project; not a verification of the current native realizers.
@@ -87,7 +91,8 @@ foreign-interface and interoperability boundaries.
 ## File identity
 
 SHA-256 digests recorded on 2026-09-09 identify the stored copies. They do not
-certify the publication content or establish an unknown acquisition origin.
+certify the publication content; the provenance statements above identify the
+reported source or archive capture separately from cryptographic file identity.
 
 | PDF | SHA-256 |
 | --- | --- |

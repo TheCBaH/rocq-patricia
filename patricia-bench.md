@@ -352,7 +352,9 @@ incremental insertion because it answers a different API question.
 Both Patricia variants retain eight words per binding versus six for
 `Stdlib.Map`. The classic four-field branch layout is the same basic layout
 presented by Okasaki and Gill in
-[Fast Mergeable Integer Maps](papers/okasaki-gill-1998-fast-mergeable-integer-maps.pdf).
+[Fast Mergeable Integer Maps](papers/okasaki-gill-1998-fast-mergeable-integer-maps.pdf),
+whose archived author-path origin is documented in
+[`papers/README.md`](papers/README.md#okasaki-and-gill--fast-mergeable-integer-maps).
 Reducing it requires a representation change, not a local expression rewrite:
 for example, omit the integer prefix and route to a final leaf comparison, pack
 the prefix/discriminator in a fixed-width backend, or remove the string sample

@@ -304,7 +304,7 @@ connections in milestone 3. Empirical replacement acceptance does not close N4.
 
 | Date | Completed work | Evidence and limits |
 | --- | --- | --- |
-| 2026-09-09 | Published the separate tracker and synchronized existing documents; organized local papers | Checked 64 local Markdown links/anchors across the eight documentation files; verified all four indexed PDF headers/end markers and SHA-256 digests; `git diff --check` passed. The Okasaki–Gill PDF was moved without changing its bytes; its unknown original acquisition source is distinguished from its verified bibliographic record. These are documentation/artifact checks, not a rerun of the functional proof gate. |
+| 2026-09-09 | Published the separate tracker and synchronized existing documents; organized local papers | Checked 64 local Markdown links/anchors across the eight documentation files; verified all four indexed PDF headers/end markers and SHA-256 digests; `git diff --check` passed. The Okasaki–Gill PDF was moved without changing its bytes; its origin is now identified as the 2015-04-17 Internet Archive capture of Andy Gill's ITTC author path, with the local checksum retained. These are documentation/artifact checks, not a rerun of the functional proof gate. |
 | 2026-09-09 | V0.1–V0.3: source/extraction/proof audit, literature investigation and baseline profile | `rg -n '^Extract' PatriciaExtract.v`; inspection of native refinement and companion proofs, wrappers and generated OCaml; `sh check-extraction-boundary.sh`; `sh check-native-union-realizers.sh extracted/PatriciaInternal.ml extracted/StringPatriciaInternal.ml`; `sh check-ocaml-physical-equality.sh /opt/opam/4.14.3/.opam-switch/sources/ocaml-base-compiler.4.14.3`; `PATRICIA_UNION_PROFILE_SIZE=10000 make union-profile` passed. The latter rebuilt extraction/native profiling and checked results/sharing; it was not a fresh full proof/test run or a timing comparison. |
 
 ## Publications
@@ -354,5 +354,6 @@ The [download index](papers/README.md) records provenance of the local PDFs.
 Chris Okasaki and Andy Gill, *Fast Mergeable Integer Maps*, ACM SIGPLAN Workshop
 on ML, pp. 77–86, September 1998:
 [local PDF](papers/okasaki-gill-1998-fast-mergeable-integer-maps.pdf),
-[publication record](https://ku-fpg.github.io/papers/Okasaki-98-IntMap/).
+[publication record](https://ku-fpg.github.io/papers/Okasaki-98-IntMap/),
+[archived author-path PDF](https://web.archive.org/web/20150417234429/https://ittc.ku.edu/~andygill/papers/IntMap98.pdf).
 This provides algorithmic background, not verification of the present realizers.
