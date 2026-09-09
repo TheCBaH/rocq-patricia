@@ -144,8 +144,9 @@ The direct-string proof files currently establish, without axioms:
   including fresh and existing keys, plus the corresponding first-binding-wins
   `of_list` law;
 - `fold` agreement with `elements`, the key-aware `map` lookup law, and
-  well-formedness/lookup laws for `map_filter`, `map_left`, and `map_right`
-  (the latter two under `f None None = None`).
+  well-formedness/lookup laws for `map_filter`, its source-extracted
+  cache-aware public implementation, `map_left`, and `map_right` (the latter
+  two under `f None None = None`).
 - well-formedness and lookup laws for fused left- and right-leaf
   generic-combine workers under `f None None = None`.
 - sufficiency of the public combine fuel bound for every recursive-call shape.

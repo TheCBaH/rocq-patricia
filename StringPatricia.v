@@ -344,6 +344,21 @@ Fixpoint map_filter {A B : Type}
       branch sample split (map_filter f ltree) (map_filter f rtree)
   end.
 
+(** Cache-aware counterpart of [map_filter].  On well-formed inputs the
+    cached branch constructor obtains its sample in constant time; keeping the
+    original definition above preserves the total, representation-agnostic
+    function used by the unconditioned structural theory. *)
+Fixpoint map_filter_cached {A B : Type}
+    (f : string -> A -> option B) (m : t A) : t B :=
+  match m with
+  | Empty => Empty
+  | Leaf key value =>
+      match f key value with Some result => Leaf key result | None => Empty end
+  | Branch sample split ltree rtree =>
+      branch_cached sample split
+        (map_filter_cached f ltree) (map_filter_cached f rtree)
+  end.
+
 Definition map_left {A B C : Type}
     (f : option A -> option B -> option C) (m : t A) : t C :=
   map_filter (fun _ value => f (Some value) None) m.

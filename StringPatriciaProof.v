@@ -1493,6 +1493,87 @@ Proof.
     cbn [get]. destruct (bit_at query split); [apply IHr|apply IHl].
 Qed.
 
+(** The executable cache-aware traversal has the same lookup contract as
+    [map_filter] on the public well-formed representation invariant. *)
+Lemma all_keys_branch_cached:
+  forall (A : Type) (P : string -> Prop) sample split
+      (ltree rtree : t A),
+    all_keys P ltree -> all_keys P rtree ->
+    all_keys P (branch_cached sample split ltree rtree).
+Proof.
+  intros A P sample split ltree rtree Hleft Hright.
+  unfold branch_cached. destruct ltree; destruct rtree; cbn in *; try tauto.
+  all: repeat match goal with
+       | |- context [match representative_cached ?m with _ => _ end] =>
+           destruct (representative_cached m)
+       end; cbn; tauto.
+Qed.
+
+Lemma all_keys_map_filter_cached:
+  forall (A B : Type) (P : string -> Prop)
+      (f : string -> A -> option B) (m : t A),
+    all_keys P m -> all_keys P (map_filter_cached f m).
+Proof.
+  intros A B P f m. induction m as
+      [|key value|sample split ltree IHl rtree IHr]; intros Hall;
+    cbn [map_filter_cached] in *.
+  - exact I.
+  - destruct (f key value); cbn; [exact Hall|exact I].
+  - destruct Hall as [Hl Hr]. apply all_keys_branch_cached.
+    + now apply IHl.
+    + now apply IHr.
+Qed.
+
+Theorem map_filter_cached_wf:
+  forall (A B : Type) (f : string -> A -> option B) (m : t A),
+    wf m -> wf (map_filter_cached f m).
+Proof.
+  intros A B f m Hwf. induction Hwf as
+      [|key value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr Hresident]; cbn [map_filter_cached].
+  - constructor.
+  - destruct (f key value); constructor.
+  - apply branch_cached_wf_general.
+    + exact IHl.
+    + exact IHr.
+    + now apply all_keys_map_filter_cached.
+    + now apply all_keys_map_filter_cached.
+Qed.
+
+Theorem get_map_filter_cached_wf:
+  forall (A B : Type) (f : string -> A -> option B) (m : t A),
+    wf m -> forall query,
+    get query (map_filter_cached f m) =
+      match get query m with None => None | Some value => f query value end.
+Proof.
+  intros A B f m Hwf. induction Hwf as
+      [|key value|sample split ltree rtree Hwl IHl Hwr IHr
+       Hnel Hner Hl Hr Hresident]; intros query.
+  - reflexivity.
+  - cbn [map_filter_cached get]. destruct (f key value) as [result|] eqn:Eresult;
+      destruct (String.eqb query key) eqn:Equery; cbn.
+    + apply String.eqb_eq in Equery. subst query.
+      now rewrite String.eqb_refl, Eresult.
+    + now rewrite Equery.
+    + apply String.eqb_eq in Equery. subst query.
+      now rewrite Eresult.
+    + reflexivity.
+  - assert (Hlbit : all_keys (fun stored => bit_at stored split = false) ltree).
+    { eapply all_keys_impl; [exact Hl|]. intros stored H. exact (proj2 H). }
+    assert (Hrbit : all_keys (fun stored => bit_at stored split = true) rtree).
+    { eapply all_keys_impl; [exact Hr|]. intros stored H. exact (proj2 H). }
+    assert (Hlfiltered : all_keys
+      (fun stored => bit_at stored split = false) (map_filter_cached f ltree)).
+    { now apply all_keys_map_filter_cached. }
+    assert (Hrfiltered : all_keys
+      (fun stored => bit_at stored split = true) (map_filter_cached f rtree)).
+    { now apply all_keys_map_filter_cached. }
+    cbn [map_filter_cached]. rewrite (get_branch_cached B sample split
+      (map_filter_cached f ltree) (map_filter_cached f rtree) query
+      Hlfiltered Hrfiltered).
+    cbn [get]. destruct (bit_at query split); [apply IHr|apply IHl].
+Qed.
+
 Theorem map_left_correct_wf:
   forall (A B C : Type) (f : option A -> option B -> option C) (m : t A),
     f None None = None -> wf m -> wf (map_left f m) /\

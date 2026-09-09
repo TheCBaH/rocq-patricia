@@ -52,7 +52,7 @@ workers; the public wrappers select those extracted workers.
 | I2 | `StringBits.bit_at` | Decode packed byte/tag positions and inspect a byte directly. | Codec validity, ordering, round trips, byte-array access laws and `native_packed_bit_at_refines_representation`. | Prove or retain explicit contracts for native strings, integer token decoding and guarded byte access. |
 | I3 | `StringBits.first_diff` | Scan bytes by index, use XOR and a mask loop for the first differing bit; identical string objects return immediately. | Safe structural bytewise scanner and `native_string_first_diff_refines`; per-byte XOR/leading-zeroes laws. | Prove the indexed loop, counter progression, mask progression, early return and string-identity shortcut implement that specification. |
 | I4 | `StringBits.agrees_before_bounded` | Scan only the bytes/high bits before the split; return a Boolean without allocating a first-difference option. | `StringBits.agrees_before_bounded_spec` and `agrees_before_bounded_eq` specify the logical bit scanner. | Prove the packed byte loop itself, including continuation markers, partial-byte mask and early termination. No corresponding native-loop theorem was found in `NativeRefinement.v`. |
-| I5 | `StringPatricia.representative` | Read a cached sample in constant time instead of descending to a leaf. | Cached-sample residency and representative-independence lemmas in `StringPatriciaProof.v`. | Integrate a proved cached reader into an executable implementation and compose consumer refinements. It need not return the same key as the pure reader. |
+| I5 | `StringPatricia.representative` | Read a cached sample in constant time instead of descending to a leaf. | Cached-sample residency and representative-independence lemmas in `StringPatriciaProof.v`; public `map_filter` now selects the proved `map_filter_cached` consumer. | Migrate the remaining public consumers, validate each performance-sensitive path, then remove the total-reader override. It need not return the same key as the pure reader. |
 | I6 | Resolved 2026-09-09: former four handwritten union directives | Public wrappers call extracted `union_*_native_acc_default` workers; direct `Acc` recursion replaces fuel and nested closures while retaining reuse decisions. | `union_left_native_acc_exact` and left/right well-formedness/lookup theorems in both companion proof files. | No handwritten high-level union body remains. I7's `(==)` adequacy, primitive contracts, extraction/compiler/runtime and allocation semantics remain separate obligations. |
 | I7 | Two selected `native_same => (==)` directives | Connect source-defined native-shaped workers to physical equality. | `NativeHeapRefinement.v` derives source soundness from a per-call object/heap adequacy contract. | Establish that target execution supplies this contract. These directives are separate from the native string identity shortcut in I3. |
 | I8 | Standard `ExtrOcamlZInt`, `ExtrOcamlNatInt`, `ExtrOcamlNativeString`/`ExtrOcamlChar` mappings | Represent numbers and byte strings natively. | Source domain/codec models and the mapping audit in `SPECIFICATION.md`. | Finite-range and primitive implementation contracts, including all reachable intermediates. The reference backend shares these mappings. |
@@ -262,8 +262,13 @@ No implementation strategy below has yet passed its replacement gate.
   only then remove I5's override. `branch_cached` is complete with
   `branch_cached_nonempty_wf`, `branch_cached_wf_general`, and
   `get_branch_cached`; `join_cached` is complete for separated inputs with
-  `join_cached_separated_correct_wf`. Extraction inspection confirms direct
-  cache reads in both; callers have not yet migrated.
+  `join_cached_separated_correct_wf`. The first public migration is now
+  complete: `map_filter_cached_wf` and `get_map_filter_cached_wf` prove the
+  cache-aware traversal, extraction shows direct recursion through
+  `branch_cached`, and `StringPatriciaMap.map_filter` selects it. This leaves
+  `map_left`/`map_right` (which still call the total traversal internally),
+  removal, combine, and the remaining join/update paths before I5's total
+  reader override can be removed.
 - [ ] V2.2 Prove an executable indexed bounded-prefix scan for I4, including
   valid tags, marker cases, partial masks, short-circuit guards and termination.
 - [ ] V2.3 Prove indexed first difference and its shifting-mask/identity paths

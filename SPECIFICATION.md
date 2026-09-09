@@ -186,6 +186,9 @@ Both general `combine` definitions are extracted directly from the proved
 fuel-free structural workers; as usual, this still trusts ordinary extraction
 and the OCaml compiler rather than proving compilation correctness.
 Public string `set` likewise extracts the proved two-descent worker.
+Public string `map_filter` selects the separately proved cache-aware traversal:
+on well-formed inputs its smart branches read a resident cached sample rather
+than structurally descending after a child filter has collapsed.
 
 The native bounded-prefix byte loop has no corresponding target refinement
 theorem: `agrees_before_bounded_eq` concerns its logical bit-scanning

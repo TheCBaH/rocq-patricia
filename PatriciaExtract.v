@@ -162,6 +162,7 @@ Separate Extraction
   StringPatricia.representative StringPatricia.representative_cached
   StringPatricia.branch StringPatricia.branch_cached StringPatricia.branch_at
   StringPatricia.join StringPatricia.join_cached StringPatricia.map_filter
+  StringPatricia.map_filter_cached
   StringPatricia.map_left
   StringPatricia.map_right StringPatricia.replace_binding
   StringPatricia.combine_leaf_left StringPatricia.combine_leaf_right

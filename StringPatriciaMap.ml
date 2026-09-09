@@ -10,7 +10,10 @@ let set = StringPatriciaInternal.set
 let remove = StringPatriciaInternal.remove
 let of_list = StringPatriciaInternal.of_list
 let map = StringPatriciaInternal.map
-let map_filter = StringPatriciaInternal.map_filter
+(* This source-extracted variant uses the resident branch sample instead of
+   rescanning the left subtree after filtering.  Its well-formed lookup
+   refinement is proved in [get_map_filter_cached_wf]. *)
+let map_filter = StringPatriciaInternal.map_filter_cached
 
 type ('a, 'b, 'c) combiner = {
   left_only : 'a -> 'c option;
