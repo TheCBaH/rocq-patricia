@@ -406,7 +406,7 @@ Definition map_right {A B C : Type}
 
 Definition replace_binding {A : Type}
     (key : string) (value : option A) (m : t A) : t A :=
-  match value with Some result => set key result m | None => remove key m end.
+  match value with Some result => set key result m | None => remove_cached key m end.
 
 (** Fuse the replacement of an overlapping leaf into the whole-tree
     transformation.  An absent leaf still uses the ordinary mapped-tree

@@ -270,8 +270,8 @@ No implementation strategy below has yet passed its replacement gate.
   delegate to that traversal as well, so their existing contracts cover the
   cache-aware one-sided combine cases. `remove_cached_wf` and
   `get_remove_cached` establish the same deletion contract, and the public
-  wrapper now selects its direct extracted changed-result worker; the public
-  test checks absent-key root reuse. `make map-filter-profile` and
+  wrapper plus `replace_binding` select its direct extracted changed-result
+  worker; the public test checks absent-key root reuse. `make map-filter-profile` and
   `make remove-profile` validate the legacy override, extracted cached worker,
   and public wrapper against their bindings: on the pinned compiler, all three
   allocations match at 10K and 100K for the filter's keep-all, keep-even, and

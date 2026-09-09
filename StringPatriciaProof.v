@@ -2528,8 +2528,8 @@ Theorem replace_binding_correct_wf:
 Proof.
   intros A key [result|] m Hwf; cbn [replace_binding].
   - now apply (set_correct_wf A key result m).
-  - split; [now apply remove_wf|].
-    intro query. now apply (get_remove A key query m).
+  - split; [now apply remove_cached_wf|].
+    intro query. now apply (get_remove_cached A key query m).
 Qed.
 
 Theorem combine_leaf_left_correct_wf:
