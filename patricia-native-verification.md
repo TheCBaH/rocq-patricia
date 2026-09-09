@@ -260,6 +260,12 @@ No implementation strategy below has yet passed its replacement gate.
   valid tags, marker cases, partial masks, short-circuit guards and termination.
 - [ ] V2.3 Prove indexed first difference and its shifting-mask/identity paths
   for I3; compose with the existing logical first-difference theorem.
+  The source-model portion is already closed by
+  `native_byte_first_diff_correct`, `native_string_first_diff_correct`, and
+  `native_string_first_diff_refines` in `NativeRefinement.v`: byte XOR,
+  leading-zero mask shifts, and packed-position composition are proved. Still
+  open is a target-execution refinement of the indexed OCaml scan, including
+  its `left == right` shortcut and native string/int range contracts.
 - [ ] V2.4 Audit reachable integer/string intermediates and prove range closure;
   give each retained native operator/byte access an explicit foreign contract.
 - [ ] V2.5 Extract the proved control flow and remove corresponding overrides
