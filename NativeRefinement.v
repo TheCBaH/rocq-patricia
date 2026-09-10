@@ -2023,3 +2023,27 @@ Proof.
   intros left right. rewrite native_string_first_diff_correct.
   apply bytewise_first_diff_correct.
 Qed.
+
+(** The handwritten first-difference realizer returns immediately when OCaml
+    string physical equality succeeds.  Its source-level meaning needs only
+    this positive-direction contract; no converse identity claim is used. *)
+Definition native_string_same_sound (same : string -> string -> bool) : Prop :=
+  forall left right, same left right = true -> left = right.
+
+Definition native_string_first_diff_with_identity
+    (same : string -> string -> bool) (left right : string) : option nat :=
+  if same left right then None else native_string_first_diff left right.
+
+Theorem native_string_first_diff_with_identity_refines:
+  forall same left right,
+    native_string_same_sound same ->
+    native_string_first_diff_with_identity same left right =
+      packed_first_diff left right.
+Proof.
+  intros same left right Hsound.
+  unfold native_string_first_diff_with_identity.
+  destruct (same left right) eqn:Hsame.
+  - apply Hsound in Hsame. subst right.
+    unfold packed_first_diff. now rewrite StringBits.first_diff_same.
+  - apply native_string_first_diff_refines.
+Qed.

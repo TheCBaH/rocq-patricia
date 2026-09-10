@@ -50,7 +50,7 @@ workers; the public wrappers select those extracted workers.
 | --- | --- | --- | --- | --- |
 | I1 | Nine integer directives: `Pos.eqb`, `N.eqb`, `N.ltb`, `word`, `prefix`, `matches_prefix`, `zero_bit`, `highest_differing_bit`, `mask_above` | Native comparisons, shifts, masks and XOR implement routing and split selection without recursive arithmetic on inductive numbers. | `NativeRefinement.v` proves bounded mathematical routing correspondence and 62-bit key/mask closure. | Relate actual native operators and the right-shifting `log2` loop to that model, with all intermediate values and shift counts in range. |
 | I2 | `StringBits.bit_at` | Decode packed byte/tag positions and inspect a byte directly. | Codec validity, ordering, round trips, byte-array access laws and `native_packed_bit_at_refines_representation`. | Prove or retain explicit contracts for native strings, integer token decoding and guarded byte access. |
-| I3 | `StringBits.first_diff` | Scan bytes by index, use XOR and a mask loop for the first differing bit; identical string objects return immediately. | Safe structural bytewise scanner and `native_string_first_diff_refines`; per-byte XOR/leading-zeroes laws. | Prove the indexed loop, counter progression, mask progression, early return and string-identity shortcut implement that specification. |
+| I3 | `StringBits.first_diff` | Scan bytes by index, use XOR and a mask loop for the first differing bit; identical string objects return immediately. | Safe structural bytewise scanner and `native_string_first_diff_refines`; per-byte XOR/leading-zeroes laws; `native_string_first_diff_with_identity_refines` proves the identity shortcut under `native_string_same_sound`. | Prove the indexed loop, counter progression and mask progression implement the model; establish the OCaml-string physical-equality contract and primitive execution correspondence. |
 | I4 | `StringBits.agrees_before_bounded` | Scan only the bytes/high bits before the split; return a Boolean without allocating a first-difference option. | `native_bounded_prefix_scan_correct` (2026-09-10) refines the indexed source byte scan to `agrees_before_bounded`; its proof covers complete bytes, continuation markers, terminal partial tags, the shorter-length sentinel, short-circuiting and byte-count termination. `native_terminal_mask_equal_correct` proves the emitted terminal `lxor`/left-shift/`land` expression equal to the high-bit iterator for every valid tag 1–8. | Connect the extracted OCaml loop's integer/string primitives and execution—including guarded unsafe access—to these source models. |
 | I5 | Resolved 2026-09-09: former `StringPatricia.representative` directive | Read a cached sample in constant time instead of descending to a leaf. | Cached-sample residency/independence lemmas; proved cached filtering, deletion, generic combine, and selected `Acc` union refinements. | The override is removed. `cached-representative-audit` forbids its reintroduction; the total structural source definition remains for raw-tree proofs. |
 | I6 | Resolved 2026-09-09: former four handwritten union directives | Public wrappers call extracted `union_*_native_acc_default` workers; direct `Acc` recursion replaces fuel and nested closures while retaining reuse decisions. | `union_left_native_acc_exact` and left/right well-formedness/lookup theorems in both companion proof files. | No handwritten high-level union body remains. I7's `(==)` adequacy, primitive contracts, extraction/compiler/runtime and allocation semantics remain separate obligations. |
@@ -305,14 +305,17 @@ No implementation strategy below has yet passed its replacement gate.
   bridge rather than enumerating tag/byte-pair combinations. Remaining:
   connect OCaml primitives, guarded unsafe access and execution to these
   models.
-- [ ] V2.3 Prove indexed first difference and its shifting-mask/identity paths
+- [-] V2.3 Prove indexed first difference and its shifting-mask/identity paths
   for I3; compose with the existing logical first-difference theorem.
   The source-model portion is already closed by
   `native_byte_first_diff_correct`, `native_string_first_diff_correct`, and
   `native_string_first_diff_refines` in `NativeRefinement.v`: byte XOR,
   leading-zero mask shifts, and packed-position composition are proved. Still
-  open is a target-execution refinement of the indexed OCaml scan, including
-  its `left == right` shortcut and native string/int range contracts.
+  `native_string_first_diff_with_identity_refines` now verifies the
+  source-level early-return path under the explicit positive-direction
+  `native_string_same_sound` contract. Still open is a target-execution
+  refinement of the indexed OCaml scan and the physical-equality/native
+  string/int contracts.
 - [ ] V2.4 Audit reachable integer/string intermediates and prove range closure;
   give each retained native operator/byte access an explicit foreign contract.
 - [ ] V2.5 Extract the proved control flow and remove corresponding overrides
@@ -405,6 +408,7 @@ connections in milestone 3. Empirical replacement acceptance does not close N4.
 | 2026-09-09 | V2.1 generated cached-consumer guard | `make cached-representative-audit` passed. It inspects extracted `remove_changed_cached`, `map_filter_cached`, `combine_fuel`, and `combine_structural`, requiring a cached constructor call and forbidding direct regular `branch`/`join` calls. This is a regression guard over generated syntax, not a semantic refinement proof. |
 | 2026-09-09 | V2.1 closure of I5 | Removed the `StringPatricia.representative` extraction directive after migrating selected `Acc` union's three fallback joins to `join_cached`; `union_left_native_cached_disjoint_branches_correct_wf` supplies their source contract. `make all`, `make cached-representative-audit`, and 10K/100K `make union-profile` passed. At 100K the selected integer/string `Acc` allocation remains 379/365/176/26/26 and 100/81/26/26/26 words for disjoint/half/subset/equal/empty-right, with the same reported input sharing. The audit now rejects a representative directive. Allocation/sharing evidence is not a timing or cost proof. |
 | 2026-09-10 | I9 public-wrapper inventory refresh | Counted 52 integer-wrapper and 43 string-wrapper implementation lines. Inspected both `.mli` files and `check_abstract_interfaces`, which tests key rejection/conversion, aliases, combine’s three callback cases and binary string keys through the public API. This establishes current scope and test coverage, not a semantic proof of the wrappers or the native-domain relation. |
+| 2026-09-10 | V2.3 identity-shortcut source refinement | Added `native_string_same_sound`, `native_string_first_diff_with_identity`, and `native_string_first_diff_with_identity_refines`. The theorem proves the extracted first-difference worker’s successful `left == right` early return is semantically safe whenever a true physical test denotes equal source strings. `make all` passed with 481 declarations closed, extraction-boundary/native-union/cached-consumer audits, and all randomized/specialized/differential OCaml tests. This does not establish the OCaml physical-equality, string or indexed-loop semantics. |
 
 ## Publications
 

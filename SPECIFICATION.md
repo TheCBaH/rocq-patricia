@@ -208,8 +208,9 @@ shorter-length-sentinel theorems compose in
 specification. `native_terminal_mask_equal_correct` proves the terminal
 byte-domain XOR/mask arithmetic equal to the high-bit iterator for all valid
 tags. OCaml primitive correspondence and execution remain open. The structural
-first-difference model likewise leaves the indexed
-OCaml scan, shifting-mask loop and identity shortcut to be connected. These
+first-difference model proves its identity shortcut under an explicit
+positive-direction string-identity contract, but still leaves the indexed
+OCaml scan, shifting-mask loop and target `(==)` semantics to be connected. These
 algorithmic obligations
 are separate from the standard primitive contracts in the audit below.
 

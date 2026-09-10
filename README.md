@@ -84,6 +84,9 @@ the logical bounded-prefix specification is kernel-checked, including a proof
 that every valid terminal XOR/mask expression equals the high-bit iterator.
 OCaml primitive correspondence and execution remain open. OCaml's string,
 `Char.code`, and integer primitives also retain explicit foreign contracts.
+The first-difference model likewise makes its physical-identity early return
+conditional on a positive-direction string-identity contract; actual OCaml
+`(==)` semantics remain outside the kernel proof.
 `PatriciaExtract.v` generates implementation backends under
 `patricia/extracted/`; the build names the map modules `PatriciaInternal` and
 `StringPatriciaInternal`. `PatriciaReferenceExtract.v` separately generates
