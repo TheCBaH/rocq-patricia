@@ -199,12 +199,15 @@ The former extraction-only string representative is gone: the total structural
 source definition remains only for raw-tree proofs, while executable public
 paths use proved cached consumers.
 
-The native bounded-prefix byte loop has no corresponding target refinement
-theorem: `agrees_before_bounded_eq` concerns its logical bit-scanning
-specification. The structural first-difference model likewise leaves the
-indexed OCaml scan, shifting-mask loop and identity shortcut to be connected.
-Source byte-access lemmas supply guard obligations; they do not prove that
-each executing loop maintains and checks them. These algorithmic obligations
+The native bounded-prefix byte loop has a source-level byte-scan model:
+`native_bounded_prefix_scan` follows its complete-byte, shorter-length
+sentinel and terminal partial-code branches, while its guarded-access lemmas
+make the model's unsafe reads explicit. `agrees_before_bounded_eq` still
+concerns only the logical bit-scanning specification: a theorem connecting the
+byte scan to it, its minimum-length invariant, and the target XOR/mask loop
+remain open. The structural first-difference model likewise leaves the indexed
+OCaml scan, shifting-mask loop and identity shortcut to be connected. These
+algorithmic obligations
 are separate from the standard primitive contracts in the audit below.
 
 `NativeRefinement.v` proves part of the representation-level source model,

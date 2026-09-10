@@ -77,8 +77,11 @@ key domain and the codec between logical string-bit positions and the packed
 native tokens. It includes a native byte-code-array model for OCaml strings,
 proves byte length/access/bounds and guarded-access laws, and proves the packed
 `bit_at` model correct. Connecting those laws to each actual indexed OCaml loop
-and its guards remains a target-level obligation. In particular, the packed
-bounded-prefix loop still needs its own refinement proof. OCaml's string,
+and its guards remains a target-level obligation. The packed bounded-prefix
+loop now has a source byte-scan model with explicit complete-byte, sentinel,
+terminal-partial-code and guarded-read branches, but its refinement to the
+logical bounded-prefix specification and its target XOR/mask realization are
+still open. OCaml's string,
 `Char.code`, and integer primitives also retain explicit foreign contracts.
 `PatriciaExtract.v` generates implementation backends under
 `patricia/extracted/`; the build names the map modules `PatriciaInternal` and

@@ -1161,6 +1161,149 @@ Proof.
   subst bytes. apply native_packed_bit_at_refines.
 Qed.
 
+(** ** Bounded-prefix byte scan model
+
+    The extracted [agrees_before_bounded] worker does not inspect logical
+    positions one at a time.  It advances over complete bytes, uses the
+    shorter input length as a sentinel, and at the terminal byte compares
+    only the character bits strictly preceding the packed split tag.  The
+    definitions below expose that control flow in the source proof model.
+
+    [native_prefix_code_equal] is the source counterpart of the terminal
+    [xor]/[land] mask.  A tag [S count] has [count - 1] preceding character
+    bits: tag 1 denotes only the (always equal) continuation marker. *)
+Fixpoint native_prefix_code_equal
+    (fuel offset : nat) (left right : N) : bool :=
+  match fuel with
+  | 0 => true
+  | S fuel' =>
+      if Bool.eqb (native_code_bit left offset) (native_code_bit right offset)
+      then native_prefix_code_equal fuel' (S offset) left right
+      else false
+  end.
+
+Definition native_prefix_tag_equal
+    (bytes_left bytes_right : list N) (byte tag : nat) : bool :=
+  match tag with
+  | 0 => true
+  | S count =>
+      if byte <? native_byte_length bytes_left then
+        if byte <? native_byte_length bytes_right then
+          native_prefix_code_equal count 0
+            (native_unsafe_byte_code bytes_left byte)
+            (native_unsafe_byte_code bytes_right byte)
+        else false
+      else negb (byte <? native_byte_length bytes_right)
+  end.
+
+Definition native_complete_byte_equal
+    (bytes_left bytes_right : list N) (byte : nat) : bool :=
+  if byte <? native_byte_length bytes_left then
+    if byte <? native_byte_length bytes_right then
+      N.eqb (native_unsafe_byte_code bytes_left byte)
+        (native_unsafe_byte_code bytes_right byte)
+    else false
+  else negb (byte <? native_byte_length bytes_right).
+
+(** This is deliberately fuelled by bytes rather than logical positions.
+    [common] is the byte where one input first ends; it is a sentinel in the
+    generated loop, so no unsafe access is performed in that branch. *)
+Fixpoint native_bounded_prefix_scan
+    (fuel byte split_byte split_tag common : nat)
+    (bytes_left bytes_right : list N) : bool :=
+  match fuel with
+  | 0 => true
+  | S fuel' =>
+      if Nat.eqb byte split_byte then
+        native_prefix_tag_equal bytes_left bytes_right byte split_tag
+      else if Nat.eqb byte common then
+        Nat.eqb (native_byte_length bytes_left) (native_byte_length bytes_right)
+      else if native_complete_byte_equal bytes_left bytes_right byte then
+        native_bounded_prefix_scan fuel' (S byte) split_byte split_tag common
+          bytes_left bytes_right
+      else false
+  end.
+
+Lemma native_complete_byte_equal_guarded:
+  forall bytes_left bytes_right byte,
+    byte < native_byte_length bytes_left ->
+    byte < native_byte_length bytes_right ->
+    native_complete_byte_equal bytes_left bytes_right byte =
+      N.eqb (native_unsafe_byte_code bytes_left byte)
+        (native_unsafe_byte_code bytes_right byte).
+Proof.
+  intros bytes_left bytes_right byte Hleft Hright.
+  unfold native_complete_byte_equal.
+  assert (Eleft : (byte <? native_byte_length bytes_left) = true)
+    by now apply Nat.ltb_lt.
+  assert (Eright : (byte <? native_byte_length bytes_right) = true)
+    by now apply Nat.ltb_lt.
+  rewrite Eleft, Eright.
+  reflexivity.
+Qed.
+
+Lemma native_prefix_tag_equal_guarded:
+  forall bytes_left bytes_right byte count,
+    byte < native_byte_length bytes_left ->
+    byte < native_byte_length bytes_right ->
+    native_prefix_tag_equal bytes_left bytes_right byte (S count) =
+      native_prefix_code_equal count 0
+        (native_unsafe_byte_code bytes_left byte)
+        (native_unsafe_byte_code bytes_right byte).
+Proof.
+  intros bytes_left bytes_right byte count Hleft Hright.
+  unfold native_prefix_tag_equal.
+  assert (Eleft : (byte <? native_byte_length bytes_left) = true)
+    by now apply Nat.ltb_lt.
+  assert (Eright : (byte <? native_byte_length bytes_right) = true)
+    by now apply Nat.ltb_lt.
+  rewrite Eleft, Eright.
+  reflexivity.
+Qed.
+
+Lemma native_prefix_code_equal_spec:
+  forall fuel offset left right,
+    offset + fuel <= 8 ->
+    native_prefix_code_equal fuel offset left right = true <->
+    forall n, offset <= n < offset + fuel ->
+      native_code_bit left n = native_code_bit right n.
+Proof.
+  induction fuel as [|fuel IH]; intros offset left right Hbound; cbn.
+  - split; intros; [lia | reflexivity].
+  - destruct (Bool.eqb (native_code_bit left offset)
+      (native_code_bit right offset)) eqn:E.
+    + apply Bool.eqb_prop in E. rewrite IH by lia. split.
+      * intros H n Hrange. destruct (Nat.eq_dec n offset) as [->|Hneq].
+        -- exact E.
+        -- apply H. lia.
+      * intros H n Hrange. apply H. lia.
+    + split.
+      * discriminate.
+      * intros H. exfalso. apply (proj1 (Bool.eqb_false_iff _ _) E).
+        apply H. lia.
+Qed.
+
+Lemma native_bounded_prefix_scan_terminal:
+  forall fuel byte split_byte split_tag common bytes_left bytes_right,
+    Nat.eqb byte split_byte = true ->
+    native_bounded_prefix_scan (S fuel) byte split_byte split_tag common
+      bytes_left bytes_right =
+      native_prefix_tag_equal bytes_left bytes_right byte split_tag.
+Proof.
+  intros. cbn. now rewrite H.
+Qed.
+
+Lemma native_bounded_prefix_scan_common_sentinel:
+  forall fuel byte split_byte split_tag common bytes_left bytes_right,
+    Nat.eqb byte split_byte = false ->
+    Nat.eqb byte common = true ->
+    native_bounded_prefix_scan (S fuel) byte split_byte split_tag common
+      bytes_left bytes_right =
+      Nat.eqb (native_byte_length bytes_left) (native_byte_length bytes_right).
+Proof.
+  intros. cbn. now rewrite H, H0.
+Qed.
+
 (** The native loop itself: increment [offset] while the mask check misses,
     stop and report [offset] once it hits.  Structurally identical to
     [ascii_leading_zeroes_from], modulo the boolean test used at each step. *)
