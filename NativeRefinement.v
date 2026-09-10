@@ -61,6 +61,55 @@ Definition native_zero_bit (key mask : N) : bool :=
 Definition native_highest_differing_bit (left right : N) : N :=
   N.log2 (N.lxor left right).
 
+(** Source model of the small [log2] loop in the extraction realizer.  The
+    extracted accumulator starts at zero; exposing it here makes the loop
+    invariant and its finite fuel requirement explicit. *)
+Fixpoint native_log2_loop (fuel : nat) (value accumulator : N) : N :=
+  match fuel with
+  | 0 => accumulator
+  | S fuel' =>
+      if N.eqb (N.shiftr value 1) 0%N then accumulator
+      else native_log2_loop fuel' (N.shiftr value 1) (N.succ accumulator)
+  end.
+
+Lemma native_log2_loop_correct:
+  forall fuel value accumulator,
+    (N.log2 value < N.of_nat fuel)%N ->
+    native_log2_loop fuel value accumulator = (accumulator + N.log2 value)%N.
+Proof.
+  induction fuel as [|fuel IH]; intros value accumulator Hfuel.
+  - change (N.log2 value < 0)%N in Hfuel. lia.
+  - cbn [native_log2_loop].
+    destruct (N.eqb (N.shiftr value 1) 0%N) eqn:Eshift.
+    + apply N.eqb_eq in Eshift.
+      destruct (proj1 (N.shiftr_eq_0_iff value 1) Eshift)
+        as [Hzero | [Hpositive Hlog]].
+      * subst value. cbn. rewrite N.add_0_r. reflexivity.
+      * assert (N.log2 value = 0%N)
+          by (apply (proj1 (N.lt_1_r _)); exact Hlog).
+        rewrite H, N.add_0_r. reflexivity.
+    + apply N.eqb_neq in Eshift.
+      assert (Hlogone : (1 <= N.log2 value)%N).
+      { destruct (N.lt_ge_cases (N.log2 value) 1%N) as [Hsmall | Hlarge].
+        - exfalso. apply Eshift.
+          apply (proj2 (N.shiftr_eq_0_iff value 1)). right.
+          split.
+          + apply (proj1 (N.neq_0_lt_0 _)). intro Hzero.
+            subst value. cbn in Eshift. contradiction.
+          + exact Hsmall.
+        - exact Hlarge. }
+      rewrite (IH (N.shiftr value 1) (N.succ accumulator)).
+      * rewrite N.log2_shiftr.
+        rewrite <- N.add_1_r.
+        rewrite <- N.add_assoc.
+        rewrite (N.add_comm 1 (N.log2 value - 1)).
+        rewrite N.sub_add by exact Hlogone.
+        reflexivity.
+      * rewrite N.log2_shiftr.
+        rewrite Nat2N.inj_succ in Hfuel.
+        lia.
+Qed.
+
 Definition native_mask_above (left right : N) : bool := N.ltb right left.
 
 Lemma native_prefix_word_refines:
