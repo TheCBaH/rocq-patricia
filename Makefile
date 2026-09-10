@@ -58,7 +58,8 @@ native-union-realizer-audit: extraction check-native-union-realizers.sh
 	  extracted/StringPatriciaUnion.ml
 
 cached-representative-audit: extraction check-cached-representative-consumers.sh
-	sh ./check-cached-representative-consumers.sh extracted/StringPatriciaInternal.ml PatriciaExtract.v
+	sh ./check-cached-representative-consumers.sh extracted/StringPatriciaInternal.ml \
+	  extracted/StringPatriciaUnion.ml PatriciaExtract.v
 
 # Optional implementation audit for the selected OCaml compiler sources. It
 # intentionally stays outside the normal proof/correctness gate: a source scan

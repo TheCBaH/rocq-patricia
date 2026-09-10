@@ -284,8 +284,8 @@ No implementation strategy below has yet passed its replacement gate.
   theorem and cached disjoint-branch refinement preserve the biased contract.
   The extraction gate
   `make cached-representative-audit` verifies generated direct cached calls in
-  removal, filtering, and both generic combine workers. The remaining
-  manifest forbids reintroducing the former representative directive. Raw-tree
+  removal, filtering, both generic combine workers, and selected `Acc` union.
+  The manifest audit forbids reintroducing the former representative directive. Raw-tree
   proof references deliberately retain the total source reader.
 - [ ] V2.2 Prove an executable indexed bounded-prefix scan for I4, including
   valid tags, marker cases, partial masks, short-circuit guards and termination.
