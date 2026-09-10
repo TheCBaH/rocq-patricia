@@ -327,8 +327,13 @@ No implementation strategy below has yet passed its replacement gate.
   `native_scan_successor_fits_string_capacity` cover guarded byte indices and
   the scan increment. OCaml's `String.length`, allocation limits and native
   `nat` arithmetic have not yet been connected to that contract.
-- [ ] V2.5 Extract the proved control flow and remove corresponding overrides
-  only after checking native code shape and the full performance gate.
+- [-] V2.5 Extract the proved control flow and remove corresponding overrides
+  only after checking native code shape and the full performance gate. A
+  2026-09-10 candidate extraction of `native_string_first_diff` was rejected:
+  generated native-string elimination recursively called
+  `String.sub s 1 (l - 1)`, copying a suffix per byte, and emitted an empty
+  `String` unit that shadowed `Stdlib.String`. It was not selected or retained;
+  a viable candidate must preserve indexed constant-time byte access.
 
 ### V3 — Target-language refinement (S3; parent N2)
 
@@ -419,6 +424,7 @@ connections in milestone 3. Empirical replacement acceptance does not close N4.
 | 2026-09-10 | I9 public-wrapper inventory refresh | Counted 52 integer-wrapper and 43 string-wrapper implementation lines. Inspected both `.mli` files and `check_abstract_interfaces`, which tests key rejection/conversion, aliases, combine’s three callback cases and binary string keys through the public API. This establishes current scope and test coverage, not a semantic proof of the wrappers or the native-domain relation. |
 | 2026-09-10 | V2.3 identity-shortcut source refinement | Added `native_string_same_sound`, `native_string_first_diff_with_identity`, and `native_string_first_diff_with_identity_refines`. The theorem proves the extracted first-difference worker’s successful `left == right` early return is semantically safe whenever a true physical test denotes equal source strings. `make all` passed with 481 declarations closed, extraction-boundary/native-union/cached-consumer audits, and all randomized/specialized/differential OCaml tests. This does not establish the OCaml physical-equality, string or indexed-loop semantics. |
 | 2026-09-10 | V2.4 native-range inventory | Rechecked the 62-bit integer-routing closure, packed-token codec and standard mapping boundary. The end-marker at byte `length` with tag 8 makes `16 * length + 8 < 2^62` the exact retained string-capacity precondition; `native_packed_position_fits_string_capacity`, `native_byte_index_fits_string_capacity`, and `native_scan_successor_fits_string_capacity` prove conditional closure for valid tokens and scan counters. `make all` passed with 486 declarations closed, extraction-boundary/native-union/cached-consumer audits, and all randomized/specialized/differential OCaml tests. This is not proof that OCaml allocation, `String.length`, or `int` operations enforce the condition. |
+| 2026-09-10 | V2.5 first-difference extraction experiment | Separately extracted the proved `native_string_first_diff` and added a temporary public-oracle comparison. Its generated worker destructed each native string through `String.sub s 1 (l - 1)`, implying repeated suffix copies; it also emitted an empty `String` unit that shadowed `Stdlib.String` during optimized compilation. The candidate edits and generated artifacts were removed/moved out of the backend; `make all` then passed again with the normal realizer. This rejects that extraction path on code shape before any performance claim. |
 
 ## Publications
 
