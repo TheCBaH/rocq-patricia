@@ -1215,6 +1215,22 @@ Definition native_complete_byte_equal
     else false
   else negb (byte <? native_byte_length bytes_right).
 
+(** The generated worker names this the common byte and reaches it before
+    attempting an out-of-range complete-byte read. *)
+Definition native_common_byte (bytes_left bytes_right : list N) : nat :=
+  if native_byte_length bytes_left <? native_byte_length bytes_right
+  then native_byte_length bytes_left else native_byte_length bytes_right.
+
+Lemma native_common_byte_eq_min:
+  forall bytes_left bytes_right,
+    native_common_byte bytes_left bytes_right =
+      Nat.min (native_byte_length bytes_left) (native_byte_length bytes_right).
+Proof.
+  intros bytes_left bytes_right. unfold native_common_byte.
+  destruct (native_byte_length bytes_left <? native_byte_length bytes_right)
+    eqn:E; apply Nat.ltb_lt in E || apply Nat.ltb_ge in E; simpl; lia.
+Qed.
+
 (** This is deliberately fuelled by bytes rather than logical positions.
     [common] is the byte where one input first ends; it is a sentinel in the
     generated loop, so no unsafe access is performed in that branch. *)
@@ -1472,6 +1488,58 @@ Proof.
     + intros _ tag Htag.
       rewrite !bit_at_logical_position by lia. now rewrite Hleft, Hright.
     + intros _. reflexivity.
+Qed.
+
+Lemma native_common_sentinel_spec:
+  forall left right,
+    Nat.eqb (String.length left) (String.length right) = true <->
+    forall tag, tag < 9 ->
+      StringBits.bit_at left
+        (logical_position (native_common_byte (native_bytes left)
+          (native_bytes right)) tag) =
+      StringBits.bit_at right
+        (logical_position (native_common_byte (native_bytes left)
+          (native_bytes right)) tag).
+Proof.
+  intros left right. split.
+  - intro Hlength. apply Nat.eqb_eq in Hlength.
+    assert (Hcommon : native_common_byte (native_bytes left) (native_bytes right) =
+      String.length left).
+    { unfold native_common_byte. rewrite !native_bytes_length, Hlength.
+      now rewrite Nat.ltb_irrefl. }
+    intros tag Htag. rewrite Hcommon.
+    rewrite !bit_at_logical_position by exact Htag.
+    rewrite !string_get_past_end by lia. reflexivity.
+  - intro Hall.
+    destruct (Nat.eqb (String.length left) (String.length right)) eqn:E;
+      [reflexivity|].
+    apply Nat.eqb_neq in E.
+    destruct (Nat.lt_trichotomy (String.length left) (String.length right))
+      as [Hlt|[Heq|Hgt]]; [|contradiction|].
+    + specialize (Hall 0 ltac:(lia)).
+      assert (Hcommon : native_common_byte (native_bytes left) (native_bytes right) =
+        String.length left).
+      { unfold native_common_byte. rewrite !native_bytes_length.
+        replace (String.length left <? String.length right) with true
+          by (symmetry; apply Nat.ltb_lt; exact Hlt). reflexivity. }
+      rewrite Hcommon in Hall.
+      rewrite !bit_at_logical_position in Hall by lia.
+      rewrite (string_get_past_end left (String.length left) ltac:(lia)) in Hall.
+      destruct (string_get_in_bounds right (String.length left) ltac:(lia))
+        as [right_ch Hright].
+      rewrite Hright in Hall. discriminate.
+    + specialize (Hall 0 ltac:(lia)).
+      assert (Hcommon : native_common_byte (native_bytes left) (native_bytes right) =
+        String.length right).
+      { unfold native_common_byte. rewrite !native_bytes_length.
+        replace (String.length left <? String.length right) with false
+          by (symmetry; apply Nat.ltb_ge; lia). reflexivity. }
+      rewrite Hcommon in Hall.
+      rewrite !bit_at_logical_position in Hall by lia.
+      rewrite (string_get_past_end right (String.length right) ltac:(lia)) in Hall.
+      destruct (string_get_in_bounds left (String.length right) ltac:(lia))
+        as [left_ch Hleft].
+      rewrite Hleft in Hall. discriminate.
 Qed.
 
 Lemma native_bounded_prefix_scan_terminal:
