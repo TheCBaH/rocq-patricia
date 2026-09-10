@@ -88,8 +88,9 @@ The first-difference model likewise makes its physical-identity early return
 conditional on a positive-direction string-identity contract; actual OCaml
 `(==)` semantics remain outside the kernel proof.
 The native integer model also proves the fuelled right-shift accumulator
-invariant used by the handwritten `log2` loop; connection to OCaml `int`
-operations and loop execution remains explicit.
+invariant used by the handwritten `log2` loop, with 62 steps sufficient in its
+native-word domain; connection to OCaml `int` operations and loop execution
+remains explicit.
 `PatriciaExtract.v` generates implementation backends under
 `patricia/extracted/`; the build names the map modules `PatriciaInternal` and
 `StringPatriciaInternal`. `PatriciaReferenceExtract.v` separately generates

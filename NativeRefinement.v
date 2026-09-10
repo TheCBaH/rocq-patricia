@@ -174,6 +174,22 @@ Proof.
   exact Hfits.
 Qed.
 
+(** The fixed fuel used by the 62-bit native-word realizer is sufficient for
+    every value in its stated source domain. *)
+Lemma native_log2_loop_native_word_correct:
+  forall value accumulator,
+    fits_native_word value ->
+    native_log2_loop 62 value accumulator =
+      (accumulator + N.log2 value)%N.
+Proof.
+  intros value accumulator Hfits.
+  apply native_log2_loop_correct.
+  destruct (N.eq_dec value 0%N) as [Hzero | Hnonzero].
+  - subst value. cbn. lia.
+  - change (N.log2 value < native_word_bits)%N.
+    apply native_log2_fits_mask; assumption.
+Qed.
+
 Lemma native_highest_differing_bit_fits_mask:
   forall left right,
     fits_native_word left -> fits_native_word right ->
