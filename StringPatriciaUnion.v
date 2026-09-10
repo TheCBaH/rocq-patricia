@@ -187,23 +187,23 @@ Fixpoint union_left_native {A : Type} (same : t A -> t A -> bool) (a : t A)
                 native_reuse_same_branch_root same a sample_a split_a left_a right_a
                   (union_left_native same left_a left_b)
                   (union_left_native same right_a right_b)
-              else join a b
+              else join_cached a b
             else if split_a <? split_b then
               if agrees_before_bounded sample_a sample_b split_a then
                 if bit_at sample_b split_a then
                   native_reuse_right_branch_root same a sample_a split_a left_a right_a
                     (union_left_native same right_a b)
                 else native_reuse_left_branch_root same a sample_a split_a left_a right_a
-                    (union_left_native same left_a b)
-              else join a b
+                  (union_left_native same left_a b)
+              else join_cached a b
             else
               if agrees_before_bounded sample_a sample_b split_b then
                 if bit_at sample_a split_b then
                   native_reuse_right_branch_root same b sample_b split_b left_b right_b
                     (union_right_tree right_b)
                 else native_reuse_left_branch_root same b sample_b split_b left_b right_b
-                    (union_right_tree left_b)
-              else join a b
+                  (union_right_tree left_b)
+              else join_cached a b
         end
   end.
 
@@ -242,7 +242,7 @@ Lemma union_left_native_equation:
             native_reuse_same_branch_root same a sample_a split_a left_a right_a
               (union_left_native same left_a left_b)
               (union_left_native same right_a right_b)
-          else join a b
+          else join_cached a b
         else if split_a <? split_b then
           if agrees_before_bounded sample_a sample_b split_a then
             if bit_at sample_b split_a then
@@ -250,14 +250,14 @@ Lemma union_left_native_equation:
                 (union_left_native same right_a b)
             else native_reuse_left_branch_root same a sample_a split_a left_a right_a
               (union_left_native same left_a b)
-          else join a b
+          else join_cached a b
         else if agrees_before_bounded sample_a sample_b split_b then
           if bit_at sample_a split_b then
             native_reuse_right_branch_root same b sample_b split_b left_b right_b
               (union_left_native same a right_b)
           else native_reuse_left_branch_root same b sample_b split_b left_b right_b
             (union_left_native same a left_b)
-        else join a b
+        else join_cached a b
     end.
 Proof. intros A same a b. destruct a; destruct b; reflexivity. Qed.
 
@@ -432,7 +432,7 @@ Fixpoint union_left_native_acc {A : Type}
                   eq_refl eq_refl (smaller _ (proj1 decreases)))
                 (union_left_native_acc same right_a right_b right_a right_b
                   eq_refl eq_refl (smaller _ (proj1 (proj2 decreases))))
-            else join original_a original_b
+            else join_cached original_a original_b
           else if split_a <? split_b then
             if agrees_before_bounded sample_a sample_b split_a then
               let decreases := union_left_native_acc_branch_calls_smaller A
@@ -452,7 +452,7 @@ Fixpoint union_left_native_acc {A : Type}
                   (smaller _ (union_left_native_acc_smaller_right A
                     (size left_a) (Branch sample_b split_b left_b right_b)
                     original_b _ H_b (proj1 (proj2 (proj2 decreases))))))
-            else join original_a original_b
+            else join_cached original_a original_b
           else if agrees_before_bounded sample_a sample_b split_b then
             let decreases := union_left_native_acc_branch_calls_smaller A
               sample_a split_a left_a right_a sample_b split_b left_b right_b in
@@ -473,7 +473,7 @@ Fixpoint union_left_native_acc {A : Type}
                   (Branch sample_a split_a left_a right_a) original_a
                   (size left_b) _ H_a
                   (proj1 (proj2 (proj2 (proj2 (proj2 decreases))))))))
-          else join original_a original_b
+          else join_cached original_a original_b
       end
   end original_a_is_a original_b_is_b termination.
 

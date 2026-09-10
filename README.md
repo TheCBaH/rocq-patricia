@@ -47,7 +47,7 @@ key, again checking every binding before reporting allocation.
 
 `make cached-representative-audit` checks the generated removal, filtering,
 and generic-combine workers retain their source-defined cached branch/join
-calls.
+calls, and rejects reintroduction of the former representative override.
 
 The comparison verifies each measured Patricia and `Stdlib.Hashtbl` result
 against `Stdlib.Map`. It reports build, lookup, membership, traversal

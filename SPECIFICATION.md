@@ -195,6 +195,9 @@ cached samples.
 The public string `combine` uses cached smart branches and cached joins; their
 conditional refinements preserve its existing lookup and well-formedness
 contract.
+The former extraction-only string representative is gone: the total structural
+source definition remains only for raw-tree proofs, while executable public
+paths use proved cached consumers.
 
 The native bounded-prefix byte loop has no corresponding target refinement
 theorem: `agrees_before_bounded_eq` concerns its logical bit-scanning

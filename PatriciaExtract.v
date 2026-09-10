@@ -111,22 +111,10 @@ Extract Constant StringBits.agrees_before_bounded =>
                  split_byte split_tag (byte + 1)
      in scan left right left_length right_length common split_byte split_tag 0)".
 
-(** Every well-formed branch caches a resident key in its sample field;
-    [StringPatriciaProof.wf_cached_sample_resident] exposes that invariant, and
-    all public-operation preservation theorems maintain it.  Use the cache in
-    native code rather than walking to a leaf.  The pure [representative] may
-    select a different resident key, so full native refinement must rely on
-    representative-choice independence rather than definitional equality. *)
-(** Every well-formed branch caches a resident key in its sample field;
-    [StringPatriciaProof.wf_cached_sample_resident] exposes that invariant, and
-    all public-operation preservation theorems maintain it.  This remains the
-    selected realization until all source consumers migrate to the explicit
-    [representative_cached] refinement. *)
-Extract Constant StringPatricia.representative =>
-  "(function
-     | Empty -> None
-     | Leaf (key, _) -> Some key
-     | Branch (sample, _, _, _) -> Some sample)".
+(** The total structural [representative] now extracts normally.  Public
+    executable consumers use the separately proved [representative_cached]
+    refinements; keeping the total definition source-defined preserves the
+    raw-tree proof theory without an extraction-only implementation. *)
 
 (** [StringPatricia.combine] is likewise the proved fuel-free structural
     worker, so extraction retains it instead of replacing it with native

@@ -1606,6 +1606,39 @@ Proof.
   - eapply join_separated_correct_wf; eauto.
 Qed.
 
+(** The selected native worker uses the cache-aware join in exactly the same
+    failed-prefix cases.  Separation supplies the conditional cached-join
+    invariant, so it has the ordinary left-biased union lookup contract. *)
+Lemma union_left_native_cached_disjoint_branches_correct_wf:
+  forall (A : Type) sample_a split_a (left_a right_a : t A)
+      sample_b split_b (left_b right_b : t A),
+    wf (Branch sample_a split_a left_a right_a) ->
+    wf (Branch sample_b split_b left_b right_b) ->
+    agrees_before_bounded sample_a sample_b (Nat.min split_a split_b) = false ->
+    wf (join_cached (Branch sample_a split_a left_a right_a)
+             (Branch sample_b split_b left_b right_b)) /\
+    forall key,
+      get key (join_cached (Branch sample_a split_a left_a right_a)
+                    (Branch sample_b split_b left_b right_b)) =
+      match get key (Branch sample_a split_a left_a right_a) with
+      | Some value => Some value
+      | None => get key (Branch sample_b split_b left_b right_b)
+      end.
+Proof.
+  intros A sample_a split_a left_a right_a sample_b split_b left_b right_b
+    Hwa Hwb Hdisagree.
+  inversion Hwa as [| |? ? ? ? _ _ _ _ Hla Hra _]; subst.
+  inversion Hwb as [| |? ? ? ? _ _ _ _ Hlb Hrb _]; subst.
+  destruct (branches_disjoint_prefix A A sample_a split_a
+    (Branch sample_a split_a left_a right_a) sample_b split_b
+    (Branch sample_b split_b left_b right_b)) as [differing
+      [Hdiff [Hleft Hright]]].
+  - now apply branch_all_prefix.
+  - now apply branch_all_prefix.
+  - exact Hdisagree.
+  - eapply join_cached_separated_correct_wf; eauto.
+Qed.
+
 (** The specialized worker has the same invariant and left-biased lookup
     contract as the established union.  The induction measure is the combined
     number of constructors; the six possible recursive calls are covered by
@@ -2035,7 +2068,7 @@ Proof.
             ltac:(cbn [size]; lia) left_right right_right eq_refl Hsame Hwlr Hwrr)
             as [Hwoutr Hgetoutr].
           eapply native_reuse_same_branch_root_correct_wf; eauto.
-        * destruct (union_left_specialized_disjoint_branches_correct_wf A
+        * destruct (union_left_native_cached_disjoint_branches_correct_wf A
             left_sample left_split left_left left_right right_sample
             left_split right_left right_right Hwl Hwr
             ltac:(now rewrite Nat.min_id)) as [Hwj Hgetj].
@@ -2066,7 +2099,7 @@ Proof.
                 eapply native_reuse_left_branch_root_correct_wf
                   with (operand := Branch right_sample right_split right_left right_right);
                   eauto.
-          -- destruct (union_left_specialized_disjoint_branches_correct_wf A
+          -- destruct (union_left_native_cached_disjoint_branches_correct_wf A
                left_sample left_split left_left left_right right_sample
                right_split right_left right_right Hwl Hwr
                ltac:(rewrite Nat.min_l by lia; exact Eagrees)) as [Hwj Hgetj].
@@ -2104,7 +2137,7 @@ Proof.
                 eapply native_reuse_right_outer_left_branch_root_correct_wf
                   with (operand := Branch left_sample left_split left_left left_right);
                   eauto.
-          -- destruct (union_left_specialized_disjoint_branches_correct_wf A
+          -- destruct (union_left_native_cached_disjoint_branches_correct_wf A
                left_sample left_split left_left left_right right_sample
                right_split right_left right_right Hwl Hwr
                ltac:(rewrite Nat.min_r by lia; exact Eagrees)) as [Hwj Hgetj].

@@ -5,7 +5,13 @@
 # structural representative after extraction.
 set -eu
 
-generated=${1:?usage: $0 extracted/StringPatriciaInternal.ml}
+generated=${1:?usage: $0 extracted/StringPatriciaInternal.ml PatriciaExtract.v}
+manifest=${2:?usage: $0 extracted/StringPatriciaInternal.ml PatriciaExtract.v}
+
+if grep -Eq '^[[:space:]]*Extract Constant StringPatricia\.representative' "$manifest"; then
+  echo "Patricia cached-consumer audit: representative override is present" >&2
+  exit 1
+fi
 
 worker_body () {
   worker=$1

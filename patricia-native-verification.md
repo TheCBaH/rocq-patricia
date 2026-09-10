@@ -40,7 +40,7 @@ Distinguish three milestones:
 
 ## Inventory of unverified code
 
-The 2026-09-09 post-union audit found 15 explicit replacement directives in
+The 2026-09-09 post-union audit now finds 14 explicit replacement directives in
 [PatriciaExtract.v](PatriciaExtract.v). This is a source inventory, not a count
 of distinct algorithms or a measurement of reachable machine code. Two
 directives supply physical equality only to the source-defined direct union
@@ -52,7 +52,7 @@ workers; the public wrappers select those extracted workers.
 | I2 | `StringBits.bit_at` | Decode packed byte/tag positions and inspect a byte directly. | Codec validity, ordering, round trips, byte-array access laws and `native_packed_bit_at_refines_representation`. | Prove or retain explicit contracts for native strings, integer token decoding and guarded byte access. |
 | I3 | `StringBits.first_diff` | Scan bytes by index, use XOR and a mask loop for the first differing bit; identical string objects return immediately. | Safe structural bytewise scanner and `native_string_first_diff_refines`; per-byte XOR/leading-zeroes laws. | Prove the indexed loop, counter progression, mask progression, early return and string-identity shortcut implement that specification. |
 | I4 | `StringBits.agrees_before_bounded` | Scan only the bytes/high bits before the split; return a Boolean without allocating a first-difference option. | `StringBits.agrees_before_bounded_spec` and `agrees_before_bounded_eq` specify the logical bit scanner. | Prove the packed byte loop itself, including continuation markers, partial-byte mask and early termination. No corresponding native-loop theorem was found in `NativeRefinement.v`. |
-| I5 | `StringPatricia.representative` | Read a cached sample in constant time instead of descending to a leaf. | Cached-sample residency and representative-independence lemmas in `StringPatriciaProof.v`; public `map_filter` now selects the proved `map_filter_cached` consumer. | Migrate the remaining public consumers, validate each performance-sensitive path, then remove the total-reader override. It need not return the same key as the pure reader. |
+| I5 | Resolved 2026-09-09: former `StringPatricia.representative` directive | Read a cached sample in constant time instead of descending to a leaf. | Cached-sample residency/independence lemmas; proved cached filtering, deletion, generic combine, and selected `Acc` union refinements. | The override is removed. `cached-representative-audit` forbids its reintroduction; the total structural source definition remains for raw-tree proofs. |
 | I6 | Resolved 2026-09-09: former four handwritten union directives | Public wrappers call extracted `union_*_native_acc_default` workers; direct `Acc` recursion replaces fuel and nested closures while retaining reuse decisions. | `union_left_native_acc_exact` and left/right well-formedness/lookup theorems in both companion proof files. | No handwritten high-level union body remains. I7's `(==)` adequacy, primitive contracts, extraction/compiler/runtime and allocation semantics remain separate obligations. |
 | I7 | Two selected `native_same => (==)` directives | Connect source-defined native-shaped workers to physical equality. | `NativeHeapRefinement.v` derives source soundness from a per-call object/heap adequacy contract. | Establish that target execution supplies this contract. These directives are separate from the native string identity shortcut in I3. |
 | I8 | Standard `ExtrOcamlZInt`, `ExtrOcamlNatInt`, `ExtrOcamlNativeString`/`ExtrOcamlChar` mappings | Represent numbers and byte strings natively. | Source domain/codec models and the mapping audit in `SPECIFICATION.md`. | Finite-range and primitive implementation contracts, including all reachable intermediates. The reference backend shares these mappings. |
@@ -250,7 +250,7 @@ No implementation strategy below has yet passed its replacement gate.
 
 ### V2 — Native primitives and cached representatives (S2; parent N1/N2)
 
-- [ ] V2.1 Integrate a source-defined cached representative with proved
+- [x] V2.1 Integrate a source-defined cached representative with proved
   consumer refinement, then remove I5's override after performance validation.
   Groundwork completed in `8fc60a6`: `representative_cached` and its
   `wf`-resident/nonempty refinement theorems are source-defined. The override
@@ -279,12 +279,14 @@ No implementation strategy below has yet passed its replacement gate.
   `combine_fuel` and `combine_structural` now use `branch_cached` for every
   recursive branch construction and `join_cached` for every separated fallback;
   their original pointwise and `wf` contracts are re-proved through
-  `combine_join_cached_separated_correct_wf`. The extraction gate
+  `combine_join_cached_separated_correct_wf`. Selected `Acc` union now uses
+  `join_cached` in all three separated fallbacks; its exact source-worker
+  theorem and cached disjoint-branch refinement preserve the biased contract.
+  The extraction gate
   `make cached-representative-audit` verifies generated direct cached calls in
   removal, filtering, and both generic combine workers. The remaining
-  executable regular representative consumers are the specialized union
-  workers; raw-tree proof references deliberately retain the total reader until
-  their role is removed.
+  manifest forbids reintroducing the former representative directive. Raw-tree
+  proof references deliberately retain the total source reader.
 - [ ] V2.2 Prove an executable indexed bounded-prefix scan for I4, including
   valid tags, marker cases, partial masks, short-circuit guards and termination.
 - [ ] V2.3 Prove indexed first difference and its shifting-mask/identity paths
@@ -381,6 +383,7 @@ connections in milestone 3. Empirical replacement acceptance does not close N4.
 | 2026-09-09 | V2.1 cache-aware filtering gate | `make map-filter-profile` and `PATRICIA_MAP_FILTER_PROFILE_SIZE=100000 make map-filter-profile` passed after checking every result. Legacy, cached, and public paths respectively allocated 120,024/120,024/120,024 words for 10K keep-all, 60,024/60,024/60,024 for keep-even, and 31/31/31 for drop-all; at 100K they were 1,899,042/1,899,042/1,899,042, 949,514/949,514/949,514, and 31/31/31. Retained-word deltas differed only by small measurement noise. This is allocation evidence on OCaml 4.14.3 arm64/Linux, not a timing or cost proof. |
 | 2026-09-09 | V2.1 cache-aware deletion gate | `make remove-profile` and `PATRICIA_REMOVE_PROFILE_SIZE=100000 make remove-profile` passed after checking every result and the wrapper test checked absent-key root reuse. Legacy, cached, and public paths allocated 26/26/26 words for an absent key and 136/136/136 for the selected present key at 10K; at 100K they were 26/26/26 and 199/199/199. Retained-word deltas differed only by small measurement noise. This is allocation evidence on OCaml 4.14.3 arm64/Linux, not a timing or cost proof. |
 | 2026-09-09 | V2.1 generated cached-consumer guard | `make cached-representative-audit` passed. It inspects extracted `remove_changed_cached`, `map_filter_cached`, `combine_fuel`, and `combine_structural`, requiring a cached constructor call and forbidding direct regular `branch`/`join` calls. This is a regression guard over generated syntax, not a semantic refinement proof. |
+| 2026-09-09 | V2.1 closure of I5 | Removed the `StringPatricia.representative` extraction directive after migrating selected `Acc` union's three fallback joins to `join_cached`; `union_left_native_cached_disjoint_branches_correct_wf` supplies their source contract. `make all`, `make cached-representative-audit`, and 10K/100K `make union-profile` passed. At 100K the selected integer/string `Acc` allocation remains 379/365/176/26/26 and 100/81/26/26/26 words for disjoint/half/subset/equal/empty-right, with the same reported input sharing. The audit now rejects a representative directive. Allocation/sharing evidence is not a timing or cost proof. |
 
 ## Publications
 
