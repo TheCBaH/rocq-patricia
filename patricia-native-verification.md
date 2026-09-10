@@ -55,7 +55,7 @@ workers; the public wrappers select those extracted workers.
 | I5 | Resolved 2026-09-09: former `StringPatricia.representative` directive | Read a cached sample in constant time instead of descending to a leaf. | Cached-sample residency/independence lemmas; proved cached filtering, deletion, generic combine, and selected `Acc` union refinements. | The override is removed. `cached-representative-audit` forbids its reintroduction; the total structural source definition remains for raw-tree proofs. |
 | I6 | Resolved 2026-09-09: former four handwritten union directives | Public wrappers call extracted `union_*_native_acc_default` workers; direct `Acc` recursion replaces fuel and nested closures while retaining reuse decisions. | `union_left_native_acc_exact` and left/right well-formedness/lookup theorems in both companion proof files. | No handwritten high-level union body remains. I7's `(==)` adequacy, primitive contracts, extraction/compiler/runtime and allocation semantics remain separate obligations. |
 | I7 | Two selected `native_same => (==)` directives | Connect source-defined native-shaped workers to physical equality. | `NativeHeapRefinement.v` derives source soundness from a per-call object/heap adequacy contract. | Establish that target execution supplies this contract. These directives are separate from the native string identity shortcut in I3. |
-| I8 | Standard `ExtrOcamlZInt`, `ExtrOcamlNatInt`, `ExtrOcamlNativeString`/`ExtrOcamlChar` mappings | Represent numbers and byte strings natively. | Source domain/codec models and the mapping audit in `SPECIFICATION.md`. | Finite-range and primitive implementation contracts, including all reachable intermediates. The reference backend shares these mappings. |
+| I8 | Standard `ExtrOcamlZInt`, `ExtrOcamlNatInt`, `ExtrOcamlNativeString`/`ExtrOcamlChar` mappings | Represent numbers and byte strings natively. | Source domain/codec models and the mapping audit in `SPECIFICATION.md`; integer routing has 62-bit closure, while packed string tokens require `16 * length + 8 < 2^62`. | Establish that the runtime supplies the packed-length and primitive contracts for all reachable strings/counters. The reference backend shares these mappings. |
 | I9 | `PatriciaMap.ml` and `StringPatriciaMap.ml`: 95 lines in total at the 2026-09-10 audit | Abstract map/key interfaces, positive-key validation, aliases, and the restricted combine adapter. | The `.mli` files abstract map/key types; `check_abstract_interfaces` exercises invalid/maximum integer keys, aliases, all three combine cases, and binary string keys. | Prove/extract the adapter and relate key validation to the native key domain, or verify the small wrappers directly. Abstract signatures and build visibility still need a semantic—not merely compilation—argument. |
 | I10 | Extraction, module renaming/packing/linking, OCaml compiler/runtime and host platform | Produce and execute the library, including GC and native primitive operations. | Build checks, generated-body audits and a pinned compiler-source equality audit. | Explicitly retain these assumptions, or connect the appropriate verified extraction/compiler/runtime results. A syntactic audit is not a simulation proof. |
 
@@ -310,14 +310,20 @@ No implementation strategy below has yet passed its replacement gate.
   The source-model portion is already closed by
   `native_byte_first_diff_correct`, `native_string_first_diff_correct`, and
   `native_string_first_diff_refines` in `NativeRefinement.v`: byte XOR,
-  leading-zero mask shifts, and packed-position composition are proved. Still
+  leading-zero mask shifts, and packed-position composition are proved.
   `native_string_first_diff_with_identity_refines` now verifies the
   source-level early-return path under the explicit positive-direction
   `native_string_same_sound` contract. Still open is a target-execution
   refinement of the indexed OCaml scan and the physical-equality/native
   string/int contracts.
-- [ ] V2.4 Audit reachable integer/string intermediates and prove range closure;
+- [-] V2.4 Audit reachable integer/string intermediates and prove range closure;
   give each retained native operator/byte access an explicit foreign contract.
+  Integer routing closure is already proved at 62 bits. The 2026-09-10 audit
+  identifies the remaining string precondition precisely: a packed token at
+  byte index `length` and tag 8 fits only if `16 * length + 8 < 2^62`.
+  Existing source proofs cover the token codec and guarded access once that
+  capacity contract holds; OCaml's `String.length`, allocation limits and
+  native `nat` arithmetic have not yet been connected to it.
 - [ ] V2.5 Extract the proved control flow and remove corresponding overrides
   only after checking native code shape and the full performance gate.
 
@@ -409,6 +415,7 @@ connections in milestone 3. Empirical replacement acceptance does not close N4.
 | 2026-09-09 | V2.1 closure of I5 | Removed the `StringPatricia.representative` extraction directive after migrating selected `Acc` union's three fallback joins to `join_cached`; `union_left_native_cached_disjoint_branches_correct_wf` supplies their source contract. `make all`, `make cached-representative-audit`, and 10K/100K `make union-profile` passed. At 100K the selected integer/string `Acc` allocation remains 379/365/176/26/26 and 100/81/26/26/26 words for disjoint/half/subset/equal/empty-right, with the same reported input sharing. The audit now rejects a representative directive. Allocation/sharing evidence is not a timing or cost proof. |
 | 2026-09-10 | I9 public-wrapper inventory refresh | Counted 52 integer-wrapper and 43 string-wrapper implementation lines. Inspected both `.mli` files and `check_abstract_interfaces`, which tests key rejection/conversion, aliases, combine’s three callback cases and binary string keys through the public API. This establishes current scope and test coverage, not a semantic proof of the wrappers or the native-domain relation. |
 | 2026-09-10 | V2.3 identity-shortcut source refinement | Added `native_string_same_sound`, `native_string_first_diff_with_identity`, and `native_string_first_diff_with_identity_refines`. The theorem proves the extracted first-difference worker’s successful `left == right` early return is semantically safe whenever a true physical test denotes equal source strings. `make all` passed with 481 declarations closed, extraction-boundary/native-union/cached-consumer audits, and all randomized/specialized/differential OCaml tests. This does not establish the OCaml physical-equality, string or indexed-loop semantics. |
+| 2026-09-10 | V2.4 native-range inventory | Rechecked the 62-bit integer-routing closure, packed-token codec and standard mapping boundary. The end-marker at byte `length` with tag 8 makes `16 * length + 8 < 2^62` the exact retained string-capacity precondition. This is a source/extraction audit, not proof that OCaml allocation, `String.length`, or `int` operations enforce the condition. |
 
 ## Publications
 
