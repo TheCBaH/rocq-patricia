@@ -322,9 +322,11 @@ No implementation strategy below has yet passed its replacement gate.
   identifies the remaining string precondition precisely: a packed token at
   byte index `length` and tag 8 fits only if `16 * length + 8 < 2^62`.
   `native_packed_position_fits_string_capacity` now proves every end-inclusive
-  valid token fits once `native_string_packed_capacity` holds. OCaml's
-  `String.length`, allocation limits and native `nat` arithmetic have not yet
-  been connected to that contract.
+  valid token fits once `native_string_packed_capacity` holds;
+  `native_byte_index_fits_string_capacity` and
+  `native_scan_successor_fits_string_capacity` cover guarded byte indices and
+  the scan increment. OCaml's `String.length`, allocation limits and native
+  `nat` arithmetic have not yet been connected to that contract.
 - [ ] V2.5 Extract the proved control flow and remove corresponding overrides
   only after checking native code shape and the full performance gate.
 
@@ -416,7 +418,7 @@ connections in milestone 3. Empirical replacement acceptance does not close N4.
 | 2026-09-09 | V2.1 closure of I5 | Removed the `StringPatricia.representative` extraction directive after migrating selected `Acc` union's three fallback joins to `join_cached`; `union_left_native_cached_disjoint_branches_correct_wf` supplies their source contract. `make all`, `make cached-representative-audit`, and 10K/100K `make union-profile` passed. At 100K the selected integer/string `Acc` allocation remains 379/365/176/26/26 and 100/81/26/26/26 words for disjoint/half/subset/equal/empty-right, with the same reported input sharing. The audit now rejects a representative directive. Allocation/sharing evidence is not a timing or cost proof. |
 | 2026-09-10 | I9 public-wrapper inventory refresh | Counted 52 integer-wrapper and 43 string-wrapper implementation lines. Inspected both `.mli` files and `check_abstract_interfaces`, which tests key rejection/conversion, aliases, combine’s three callback cases and binary string keys through the public API. This establishes current scope and test coverage, not a semantic proof of the wrappers or the native-domain relation. |
 | 2026-09-10 | V2.3 identity-shortcut source refinement | Added `native_string_same_sound`, `native_string_first_diff_with_identity`, and `native_string_first_diff_with_identity_refines`. The theorem proves the extracted first-difference worker’s successful `left == right` early return is semantically safe whenever a true physical test denotes equal source strings. `make all` passed with 481 declarations closed, extraction-boundary/native-union/cached-consumer audits, and all randomized/specialized/differential OCaml tests. This does not establish the OCaml physical-equality, string or indexed-loop semantics. |
-| 2026-09-10 | V2.4 native-range inventory | Rechecked the 62-bit integer-routing closure, packed-token codec and standard mapping boundary. The end-marker at byte `length` with tag 8 makes `16 * length + 8 < 2^62` the exact retained string-capacity precondition; `native_packed_position_fits_string_capacity` proves conditional closure for every valid end-inclusive token. `make all` passed with 484 declarations closed, extraction-boundary/native-union/cached-consumer audits, and all randomized/specialized/differential OCaml tests. This is not proof that OCaml allocation, `String.length`, or `int` operations enforce the condition. |
+| 2026-09-10 | V2.4 native-range inventory | Rechecked the 62-bit integer-routing closure, packed-token codec and standard mapping boundary. The end-marker at byte `length` with tag 8 makes `16 * length + 8 < 2^62` the exact retained string-capacity precondition; `native_packed_position_fits_string_capacity`, `native_byte_index_fits_string_capacity`, and `native_scan_successor_fits_string_capacity` prove conditional closure for valid tokens and scan counters. `make all` passed with 486 declarations closed, extraction-boundary/native-union/cached-consumer audits, and all randomized/specialized/differential OCaml tests. This is not proof that OCaml allocation, `String.length`, or `int` operations enforce the condition. |
 
 ## Publications
 
