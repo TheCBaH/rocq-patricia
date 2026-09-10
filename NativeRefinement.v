@@ -1192,6 +1192,17 @@ Fixpoint native_prefix_code_equal
       else false
   end.
 
+(** Exact mathematical model of the terminal expression emitted by
+    [PatriciaExtract.v]: [(left lxor right) land
+    ((255 lsl (9 - split_tag)) land 255) = 0].  The tag is a natural here;
+    the packed-token validity theorem supplies its [1..8] range when this
+    branch is reached. *)
+Definition native_terminal_mask_equal
+    (left right : Ascii.ascii) (split_tag : nat) : bool :=
+  N.eqb
+    (N.land (N.lxor (Ascii.N_of_ascii left) (Ascii.N_of_ascii right))
+      (N.land (N.shiftl 255%N (N.of_nat (9 - split_tag))) 255%N)) 0%N.
+
 Definition native_prefix_tag_equal
     (bytes_left bytes_right : list N) (byte tag : nat) : bool :=
   match tag with
