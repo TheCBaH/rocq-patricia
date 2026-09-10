@@ -1250,6 +1250,18 @@ Fixpoint native_bounded_prefix_scan
       else false
   end.
 
+(** The logical invariant for a scan beginning at [start].  Complete bytes
+    strictly before [split_byte] contribute all nine logical positions;
+    the terminal byte contributes only tags strictly before [split_tag]. *)
+Definition native_scan_prefix_agrees
+    (left right : string) (start split_byte split_tag : nat) : Prop :=
+  forall byte tag,
+    start <= byte ->
+    (byte < split_byte /\ tag < 9) \/
+    (byte = split_byte /\ tag < split_tag) ->
+    StringBits.bit_at left (logical_position byte tag) =
+    StringBits.bit_at right (logical_position byte tag).
+
 Lemma native_complete_byte_equal_guarded:
   forall bytes_left bytes_right byte,
     byte < native_byte_length bytes_left ->
@@ -1540,6 +1552,212 @@ Proof.
       destruct (string_get_in_bounds left (String.length right) ltac:(lia))
         as [left_ch Hleft].
       rewrite Hleft in Hall. discriminate.
+Qed.
+
+Lemma native_bits_equal_at_and_past_common:
+  forall left right byte tag,
+    native_common_byte (native_bytes left) (native_bytes right) <= byte ->
+    Nat.eqb (String.length left) (String.length right) = true ->
+    tag < 9 ->
+    StringBits.bit_at left (logical_position byte tag) =
+    StringBits.bit_at right (logical_position byte tag).
+Proof.
+  intros left right byte tag Hcommon Hlength Htag.
+  apply Nat.eqb_eq in Hlength.
+  assert (Hcommon_eq : native_common_byte (native_bytes left) (native_bytes right) =
+    String.length left).
+  { unfold native_common_byte. rewrite !native_bytes_length, Hlength.
+    now rewrite Nat.ltb_irrefl. }
+  rewrite Hcommon_eq in Hcommon.
+  rewrite !bit_at_logical_position by exact Htag.
+  rewrite !string_get_past_end by lia. reflexivity.
+Qed.
+
+Lemma native_prefix_tag_equal_scan_spec:
+  forall left right byte split_tag,
+    split_tag < 9 ->
+    native_prefix_tag_equal (native_bytes left) (native_bytes right) byte split_tag = true <->
+    native_scan_prefix_agrees left right byte byte split_tag.
+Proof.
+  intros left right byte [|count] Htag.
+  - unfold native_prefix_tag_equal, native_scan_prefix_agrees. cbn. split.
+    + intros _ current tag Hstart [[Hlt _]|[Heq Htag']]; lia.
+    + intros _. reflexivity.
+  - rewrite native_prefix_tag_equal_terminal_spec by lia.
+    unfold native_scan_prefix_agrees. split.
+    + intros Hall current tag Hstart [[Hlt _]|[Heq Htag']].
+      * lia.
+      * subst current. apply Hall. exact Htag'.
+    + intros Hall tag Htag'.
+      apply (Hall byte tag ltac:(lia)). right. split; [reflexivity|exact Htag'].
+Qed.
+
+Lemma native_scan_prefix_agrees_step:
+  forall left right byte split_byte split_tag,
+    byte < split_byte ->
+    native_scan_prefix_agrees left right byte split_byte split_tag <->
+    native_complete_byte_equal (native_bytes left) (native_bytes right) byte = true /\
+    native_scan_prefix_agrees left right (S byte) split_byte split_tag.
+Proof.
+  intros left right byte split_byte split_tag Hbefore.
+  rewrite native_complete_byte_equal_complete_spec.
+  unfold native_scan_prefix_agrees. split.
+  - intro Hall. split.
+    + intros tag Htag. apply (Hall byte tag ltac:(lia)). left. lia.
+    + intros current tag Hstart Hrange.
+      apply (Hall current tag ltac:(lia)). exact Hrange.
+  - intros [Hcurrent Hrest] current tag Hstart Hrange.
+    destruct (Nat.eq_dec current byte) as [->|Hneq].
+    + apply Hcurrent.
+      destruct Hrange as [[Hlt Htag]|[Heq Htag]].
+      * exact Htag.
+      * exfalso. lia.
+    + apply (Hrest current tag ltac:(lia)). exact Hrange.
+Qed.
+
+Lemma native_common_scan_prefix_agrees:
+  forall left right byte split_byte split_tag,
+    split_tag < 9 ->
+    byte < split_byte ->
+    native_common_byte (native_bytes left) (native_bytes right) = byte ->
+    Nat.eqb (String.length left) (String.length right) = true <->
+    native_scan_prefix_agrees left right byte split_byte split_tag.
+Proof.
+  intros left right byte split_byte split_tag Htag Hbefore Hcommon.
+  split.
+  - intros Hlength current tag Hstart [[Hlt Hcurrent]|[Heq Hcurrent]].
+    + eapply native_bits_equal_at_and_past_common with (left := left) (right := right).
+      * rewrite Hcommon. exact Hstart.
+      * exact Hlength.
+      * exact Hcurrent.
+    + eapply native_bits_equal_at_and_past_common with (left := left) (right := right).
+      * rewrite Hcommon. exact Hstart.
+      * exact Hlength.
+      * lia.
+  - intro Hall. apply (proj2 (native_common_sentinel_spec left right)).
+    intros tag Htag'.
+    rewrite Hcommon.
+    apply (Hall byte tag ltac:(lia)). left. split; lia.
+Qed.
+
+Theorem native_bounded_prefix_scan_correct_from:
+  forall steps left right byte split_tag,
+    split_tag < 9 ->
+    native_bounded_prefix_scan (S steps) byte (byte + steps) split_tag
+      (native_common_byte (native_bytes left) (native_bytes right))
+      (native_bytes left) (native_bytes right) = true <->
+    native_scan_prefix_agrees left right byte (byte + steps) split_tag.
+Proof.
+  induction steps as [|steps IH];
+    intros left right byte split_tag Htag.
+  - cbn. rewrite Nat.add_0_r, Nat.eqb_refl.
+    apply native_prefix_tag_equal_scan_spec. exact Htag.
+  - cbn [native_bounded_prefix_scan].
+    assert (Esplit : Nat.eqb byte (byte + S steps) = false).
+    { apply Nat.eqb_neq. lia. }
+    rewrite Esplit.
+    destruct (Nat.eqb byte
+      (native_common_byte (native_bytes left) (native_bytes right))) eqn:Ecommon.
+    + apply Nat.eqb_eq in Ecommon.
+      rewrite Ecommon.
+      rewrite !native_bytes_length.
+      apply native_common_scan_prefix_agrees; try lia; reflexivity.
+    + assert (Hcommon_neq : byte <>
+          native_common_byte (native_bytes left) (native_bytes right))
+        by (apply Nat.eqb_neq; exact Ecommon).
+      destruct (native_complete_byte_equal (native_bytes left) (native_bytes right) byte)
+        eqn:Ebyte.
+      * replace (byte + S steps) with (S byte + steps) by lia.
+        rewrite (IH left right (S byte) split_tag Htag).
+        rewrite (native_scan_prefix_agrees_step left right byte
+          (S byte + steps) split_tag ltac:(lia)).
+        now rewrite Ebyte.
+      * split.
+        -- discriminate.
+        -- intro Hall.
+           destruct (proj1 (native_scan_prefix_agrees_step left right byte
+             (byte + S steps) split_tag ltac:(lia)) Hall) as [Hcomplete _].
+           rewrite Ebyte in Hcomplete. discriminate.
+Qed.
+
+Lemma logical_position_before_iff:
+  forall position split_byte split_tag,
+    split_tag < 9 ->
+    position < logical_position split_byte split_tag <->
+    (position / 9 < split_byte /\ position mod 9 < 9) \/
+    (position / 9 = split_byte /\ position mod 9 < split_tag).
+Proof.
+  intros position split_byte split_tag Htag.
+  assert (Hmod : position mod 9 < 9)
+    by (apply Nat.mod_bound_pos; lia).
+  assert (Hdecomp : position = 9 * (position / 9) + position mod 9).
+  { apply Nat.div_mod_eq. }
+  unfold logical_position. split.
+  - intro Hposition.
+    rewrite Hdecomp in Hposition.
+    destruct (Nat.lt_ge_cases (position / 9) split_byte) as [Hbyte|Hbyte].
+    + left. split; [exact Hbyte|exact Hmod].
+    + assert (Hbyte_eq : position / 9 = split_byte) by lia.
+      right. split; [exact Hbyte_eq|].
+      assert (Htagpos : position mod 9 < split_tag) by lia. exact Htagpos.
+  - intros [[Hbyte Htag']|[Hbyte Htag']].
+    + rewrite Hdecomp. lia.
+    + rewrite Hdecomp. lia.
+Qed.
+
+Lemma native_scan_prefix_agrees_correct:
+  forall left right split_byte split_tag,
+    split_tag < 9 ->
+    native_scan_prefix_agrees left right 0 split_byte split_tag <->
+    StringBits.agrees_before_bounded left right
+      (logical_position split_byte split_tag) = true.
+Proof.
+  intros left right split_byte split_tag Htag.
+  unfold native_scan_prefix_agrees.
+  rewrite StringBits.agrees_before_bounded_spec. split.
+  - intros Hall position Hposition.
+    apply (logical_position_before_iff position split_byte split_tag Htag) in Hposition.
+    replace position with
+      (logical_position (position / 9) (position mod 9))
+      by (unfold logical_position; symmetry; apply Nat.div_mod_eq).
+    apply (Hall (position / 9) (position mod 9) ltac:(lia)). exact Hposition.
+  - intros Hall byte tag _ Hrange.
+    apply Hall.
+    unfold logical_position. destruct Hrange as [[Hbyte Htag']|[Hbyte Htag']]; lia.
+Qed.
+
+Theorem native_bounded_prefix_scan_correct:
+  forall left right split_byte split_tag,
+    split_tag < 9 ->
+    native_bounded_prefix_scan (S split_byte) 0 split_byte split_tag
+      (native_common_byte (native_bytes left) (native_bytes right))
+      (native_bytes left) (native_bytes right) =
+    StringBits.agrees_before_bounded left right
+      (logical_position split_byte split_tag).
+Proof.
+  intros left right split_byte split_tag Htag.
+  destruct (native_bounded_prefix_scan (S split_byte) 0 split_byte split_tag
+    (native_common_byte (native_bytes left) (native_bytes right))
+    (native_bytes left) (native_bytes right)) eqn:Enative,
+    (StringBits.agrees_before_bounded left right
+      (logical_position split_byte split_tag)) eqn:Esource;
+    try reflexivity.
+  - exfalso.
+    apply (proj1 (native_bounded_prefix_scan_correct_from split_byte left right
+      0 split_tag Htag)) in Enative.
+    apply (proj1 (native_scan_prefix_agrees_correct left right split_byte
+      split_tag Htag)) in Enative.
+    rewrite Esource in Enative. discriminate.
+  - exfalso.
+    assert (Hscan : native_scan_prefix_agrees left right 0 split_byte split_tag).
+    { apply (proj2 (native_scan_prefix_agrees_correct left right split_byte
+        split_tag Htag)). exact Esource. }
+    assert (Hnative : native_bounded_prefix_scan (S split_byte) 0 split_byte split_tag
+      (native_common_byte (native_bytes left) (native_bytes right))
+      (native_bytes left) (native_bytes right) = true).
+    { apply (proj2 (native_bounded_prefix_scan_correct_from split_byte left right
+        0 split_tag Htag)). exact Hscan. }
+    rewrite Enative in Hnative. discriminate.
 Qed.
 
 Lemma native_bounded_prefix_scan_terminal:

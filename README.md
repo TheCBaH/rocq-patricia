@@ -79,11 +79,9 @@ proves byte length/access/bounds and guarded-access laws, and proves the packed
 `bit_at` model correct. Connecting those laws to each actual indexed OCaml loop
 and its guards remains a target-level obligation. The packed bounded-prefix
 loop now has a source byte-scan model with explicit complete-byte, sentinel,
-terminal-partial-code and guarded-read branches; its complete-byte,
-terminal-tag and shorter-length-sentinel theorems cover their respective
-logical marker/character positions. Its refinement
-to the whole logical bounded-prefix specification and its target XOR/mask realization are
-still open. OCaml's string,
+terminal-partial-code and guarded-read branches. Its whole-scan refinement to
+the logical bounded-prefix specification is kernel-checked; the target
+XOR/mask realization and OCaml primitive correspondence remain open. OCaml's string,
 `Char.code`, and integer primitives also retain explicit foreign contracts.
 `PatriciaExtract.v` generates implementation backends under
 `patricia/extracted/`; the build names the map modules `PatriciaInternal` and
