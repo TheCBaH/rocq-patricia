@@ -91,6 +91,8 @@ The native integer model also proves the fuelled right-shift accumulator
 invariant used by the handwritten `log2` loop, with 62 steps sufficient for
 the bounded XOR operands used there; connection to OCaml `int` operations and
 loop execution remains explicit.
+Its source routing-mask contract also bounds the direct bit-test shift and
+the prefix `mask + 1` shift.
 `PatriciaExtract.v` generates implementation backends under
 `patricia/extracted/`; the build names the map modules `PatriciaInternal` and
 `StringPatriciaInternal`. `PatriciaReferenceExtract.v` separately generates

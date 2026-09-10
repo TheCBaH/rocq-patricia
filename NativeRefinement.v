@@ -163,6 +163,17 @@ Proof.
   eapply N.le_lt_trans; [apply N.shiftr_upper_bound|exact Hkey].
 Qed.
 
+(** The two native right shifts use a routing-bit index, while prefix shifts
+    add one to discard that bit.  Both counts stay within the word width. *)
+Lemma native_routing_shift_count_fits:
+  forall mask,
+    native_mask mask ->
+    (mask < native_word_bits)%N /\ (N.succ mask <= native_word_bits)%N.
+Proof.
+  intros mask Hmask. unfold native_mask in Hmask.
+  split; [exact Hmask|lia].
+Qed.
+
 Lemma native_log2_fits_mask:
   forall key,
     fits_native_word key -> key <> 0%N ->
