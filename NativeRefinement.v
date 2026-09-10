@@ -1235,6 +1235,75 @@ Proof.
            (N.testbit (Ascii.N_of_ascii right) 7); reflexivity.
 Qed.
 
+(** High-bit comparison directly over the XOR difference byte.  This is the
+    form in which the multi-bit terminal mask admits a small finite proof. *)
+Fixpoint native_difference_prefix_equal
+    (fuel offset : nat) (difference : N) : bool :=
+  match fuel with
+  | 0 => true
+  | S fuel' =>
+      if N.eqb (N.land difference (N.pow 2 (N.of_nat (7 - offset)))) 0%N
+      then native_difference_prefix_equal fuel' (S offset) difference
+      else false
+  end.
+
+Lemma native_prefix_code_equal_difference:
+  forall fuel offset left right,
+    offset + fuel <= 8 ->
+    native_prefix_code_equal fuel offset left right =
+      native_difference_prefix_equal fuel offset (N.lxor left right).
+Proof.
+  induction fuel as [|fuel IH]; intros offset left right Hbound; [reflexivity|].
+  cbn [native_prefix_code_equal native_difference_prefix_equal native_code_bit].
+  unfold native_code_bit.
+  rewrite !N_land_pow2_eqb, N.lxor_spec.
+  destruct (N.testbit left (N.of_nat (7 - offset))),
+           (N.testbit right (N.of_nat (7 - offset))); cbn;
+    try reflexivity; apply IH; lia.
+Qed.
+
+Lemma native_terminal_mask_difference_correct:
+  forall difference split_tag,
+    1 <= split_tag <= 8 ->
+    N.eqb
+      (N.land (Ascii.N_of_ascii difference)
+        (N.land (N.shiftl 255%N (N.of_nat (9 - split_tag))) 255%N)) 0%N =
+      native_difference_prefix_equal (split_tag - 1) 0
+        (Ascii.N_of_ascii difference).
+Proof.
+  intros [d0 d1 d2 d3 d4 d5 d6 d7] split_tag Htag.
+  destruct split_tag as [|[|[|[|[|[|[|[|[|split_tag]]]]]]]]]; try lia;
+    destruct d0, d1, d2, d3, d4, d5, d6, d7;
+    vm_compute; reflexivity.
+Qed.
+
+Lemma native_ascii_xor_code:
+  forall left right,
+    Ascii.N_of_ascii (ascii_xor left right) =
+      N.lxor (Ascii.N_of_ascii left) (Ascii.N_of_ascii right).
+Proof.
+  intros [l0 l1 l2 l3 l4 l5 l6 l7]
+         [r0 r1 r2 r3 r4 r5 r6 r7].
+  destruct l0, l1, l2, l3, l4, l5, l6, l7,
+           r0, r1, r2, r3, r4, r5, r6, r7;
+    vm_compute; reflexivity.
+Qed.
+
+Theorem native_terminal_mask_equal_correct:
+  forall left right split_tag,
+    1 <= split_tag <= 8 ->
+    native_terminal_mask_equal left right split_tag =
+      native_prefix_code_equal (split_tag - 1) 0
+        (Ascii.N_of_ascii left) (Ascii.N_of_ascii right).
+Proof.
+  intros left right split_tag Htag.
+  unfold native_terminal_mask_equal.
+  rewrite <- native_ascii_xor_code.
+  rewrite native_terminal_mask_difference_correct by exact Htag.
+  rewrite native_ascii_xor_code.
+  symmetry. apply native_prefix_code_equal_difference. lia.
+Qed.
+
 Definition native_prefix_tag_equal
     (bytes_left bytes_right : list N) (byte tag : nat) : bool :=
   match tag with
