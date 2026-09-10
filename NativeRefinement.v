@@ -201,6 +201,29 @@ Proof.
   now apply packed_position_le_string_capacity.
 Qed.
 
+Lemma native_byte_index_fits_string_capacity:
+  forall s byte,
+    native_string_packed_capacity s ->
+    byte <= String.length s ->
+    fits_native_word (N.of_nat byte).
+Proof.
+  intros s byte Hcapacity Hbyte.
+  eapply N.le_lt_trans; [|exact Hcapacity].
+  apply native_of_nat_le.
+  unfold packed_position. lia.
+Qed.
+
+Lemma native_scan_successor_fits_string_capacity:
+  forall s byte,
+    native_string_packed_capacity s ->
+    byte < String.length s ->
+    fits_native_word (N.of_nat (S byte)).
+Proof.
+  intros s byte Hcapacity Hbyte.
+  apply (native_byte_index_fits_string_capacity s (S byte));
+    [exact Hcapacity|lia].
+Qed.
+
 Definition encode_position (position : nat) : nat :=
   packed_position (position / 9) (position mod 9).
 
