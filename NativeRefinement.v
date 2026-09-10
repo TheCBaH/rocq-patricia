@@ -1,4 +1,4 @@
-From Stdlib Require Import Lia NArith PArith PeanoNat Lists.List Strings.Ascii Strings.String.
+From Stdlib Require Import Lia NArith NArith.Nnat PArith PeanoNat Lists.List Strings.Ascii Strings.String.
 Require Import PatriciaBits StringBits.
 
 Import ListNotations.
@@ -164,6 +164,42 @@ Qed.
     (where [t < 9]) becomes [16*b+t]. *)
 Definition logical_position (byte tag : nat) : nat := 9 * byte + tag.
 Definition packed_position (byte tag : nat) : nat := 16 * byte + tag.
+
+(** A native string must have capacity for its end-marker byte and the
+    greatest valid tag.  The predicate is intentionally a runtime contract:
+    the Rocq [string] type itself is unbounded. *)
+Definition native_string_packed_capacity (s : string) : Prop :=
+  fits_native_word (N.of_nat (packed_position (String.length s) 8)).
+
+Lemma native_of_nat_le:
+  forall left right, left <= right -> (N.of_nat left <= N.of_nat right)%N.
+Proof.
+  intros left right Hle.
+  refine (proj1 (N.compare_le_iff _ _) _).
+  rewrite <- Nat2N.inj_compare.
+  apply (proj2 (Nat.compare_le_iff _ _)). exact Hle.
+Qed.
+
+Lemma packed_position_le_string_capacity:
+  forall s byte tag,
+    byte <= String.length s -> tag < 9 ->
+    packed_position byte tag <= packed_position (String.length s) 8.
+Proof.
+  intros. unfold packed_position. lia.
+Qed.
+
+Lemma native_packed_position_fits_string_capacity:
+  forall s byte tag,
+    native_string_packed_capacity s ->
+    byte <= String.length s -> tag < 9 ->
+    fits_native_word (N.of_nat (packed_position byte tag)).
+Proof.
+  intros s byte tag Hcapacity Hbyte Htag.
+  unfold native_string_packed_capacity in Hcapacity.
+  eapply N.le_lt_trans; [|exact Hcapacity].
+  apply native_of_nat_le.
+  now apply packed_position_le_string_capacity.
+Qed.
 
 Definition encode_position (position : nat) : nat :=
   packed_position (position / 9) (position mod 9).
