@@ -304,6 +304,16 @@ Proof.
     + cbn [String.get]. apply IH. cbn in Hbound. lia.
 Qed.
 
+Lemma string_get_none_past_end:
+  forall s byte, String.get byte s = None -> String.length s <= byte.
+Proof.
+  intros s byte Hnone.
+  assert (Hnot : ~ byte < String.length s).
+  { intro Hbound. destruct (string_get_in_bounds s byte Hbound) as [ch Hsome].
+    rewrite Hsome in Hnone. discriminate. }
+  lia.
+Qed.
+
 (** ** Native byte strings and guarded access
 
     The native-string extraction maps a Rocq string to an OCaml byte string.
@@ -1242,6 +1252,53 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma native_complete_byte_equal_native_bytes:
+  forall left right byte,
+    native_complete_byte_equal (native_bytes left) (native_bytes right) byte =
+      match String.get byte left, String.get byte right with
+      | Some left_ch, Some right_ch =>
+          N.eqb (Ascii.N_of_ascii left_ch) (Ascii.N_of_ascii right_ch)
+      | None, None => true
+      | _, _ => false
+      end.
+Proof.
+  intros left right byte.
+  unfold native_complete_byte_equal.
+  rewrite !native_bytes_length.
+  destruct (String.get byte left) as [left_ch|] eqn:Hleft;
+    destruct (String.get byte right) as [right_ch|] eqn:Hright.
+  - assert (Eleft : (byte <? String.length left) = true).
+    { apply Nat.ltb_lt. destruct (Nat.lt_ge_cases byte (String.length left))
+        as [Hbound|Hbound]; [exact Hbound|].
+      rewrite string_get_past_end in Hleft by exact Hbound. discriminate. }
+    assert (Eright : (byte <? String.length right) = true).
+    { apply Nat.ltb_lt. destruct (Nat.lt_ge_cases byte (String.length right))
+        as [Hbound|Hbound]; [exact Hbound|].
+      rewrite string_get_past_end in Hright by exact Hbound. discriminate. }
+    rewrite Eleft, Eright.
+    now rewrite (native_bytes_unsafe_byte_code left byte left_ch Hleft),
+                (native_bytes_unsafe_byte_code right byte right_ch Hright).
+  - assert (Eleft : (byte <? String.length left) = true).
+    { apply Nat.ltb_lt. destruct (Nat.lt_ge_cases byte (String.length left))
+        as [Hbound|Hbound]; [exact Hbound|].
+      rewrite string_get_past_end in Hleft by exact Hbound. discriminate. }
+    assert (Eright : (byte <? String.length right) = false).
+    { apply Nat.ltb_ge. now apply string_get_none_past_end. }
+    now rewrite Eleft, Eright.
+  - assert (Eleft : (byte <? String.length left) = false).
+    { apply Nat.ltb_ge. now apply string_get_none_past_end. }
+    assert (Eright : (byte <? String.length right) = true).
+    { apply Nat.ltb_lt. destruct (Nat.lt_ge_cases byte (String.length right))
+        as [Hbound|Hbound]; [exact Hbound|].
+      rewrite string_get_past_end in Hright by exact Hbound. discriminate. }
+    now rewrite Eleft, Eright.
+  - assert (Eleft : (byte <? String.length left) = false).
+    { apply Nat.ltb_ge. now apply string_get_none_past_end. }
+    assert (Eright : (byte <? String.length right) = false).
+    { apply Nat.ltb_ge. now apply string_get_none_past_end. }
+    now rewrite Eleft, Eright.
+Qed.
+
 Lemma native_prefix_tag_equal_guarded:
   forall bytes_left bytes_right byte count,
     byte < native_byte_length bytes_left ->
@@ -1259,6 +1316,55 @@ Proof.
     by now apply Nat.ltb_lt.
   rewrite Eleft, Eright.
   reflexivity.
+Qed.
+
+Lemma native_prefix_tag_equal_native_bytes:
+  forall left right byte count,
+    native_prefix_tag_equal (native_bytes left) (native_bytes right) byte
+      (S count) =
+      match String.get byte left, String.get byte right with
+      | Some left_ch, Some right_ch =>
+          native_prefix_code_equal count 0
+            (Ascii.N_of_ascii left_ch) (Ascii.N_of_ascii right_ch)
+      | None, None => true
+      | _, _ => false
+      end.
+Proof.
+  intros left right byte count.
+  unfold native_prefix_tag_equal.
+  rewrite !native_bytes_length.
+  destruct (String.get byte left) as [left_ch|] eqn:Hleft;
+    destruct (String.get byte right) as [right_ch|] eqn:Hright.
+  - assert (Eleft : (byte <? String.length left) = true).
+    { apply Nat.ltb_lt. destruct (Nat.lt_ge_cases byte (String.length left))
+        as [Hbound|Hbound]; [exact Hbound|].
+      rewrite string_get_past_end in Hleft by exact Hbound. discriminate. }
+    assert (Eright : (byte <? String.length right) = true).
+    { apply Nat.ltb_lt. destruct (Nat.lt_ge_cases byte (String.length right))
+        as [Hbound|Hbound]; [exact Hbound|].
+      rewrite string_get_past_end in Hright by exact Hbound. discriminate. }
+    rewrite Eleft, Eright.
+    now rewrite (native_bytes_unsafe_byte_code left byte left_ch Hleft),
+                (native_bytes_unsafe_byte_code right byte right_ch Hright).
+  - assert (Eleft : (byte <? String.length left) = true).
+    { apply Nat.ltb_lt. destruct (Nat.lt_ge_cases byte (String.length left))
+        as [Hbound|Hbound]; [exact Hbound|].
+      rewrite string_get_past_end in Hleft by exact Hbound. discriminate. }
+    assert (Eright : (byte <? String.length right) = false).
+    { apply Nat.ltb_ge. now apply string_get_none_past_end. }
+    now rewrite Eleft, Eright.
+  - assert (Eleft : (byte <? String.length left) = false).
+    { apply Nat.ltb_ge. now apply string_get_none_past_end. }
+    assert (Eright : (byte <? String.length right) = true).
+    { apply Nat.ltb_lt. destruct (Nat.lt_ge_cases byte (String.length right))
+        as [Hbound|Hbound]; [exact Hbound|].
+      rewrite string_get_past_end in Hright by exact Hbound. discriminate. }
+    now rewrite Eleft, Eright.
+  - assert (Eleft : (byte <? String.length left) = false).
+    { apply Nat.ltb_ge. now apply string_get_none_past_end. }
+    assert (Eright : (byte <? String.length right) = false).
+    { apply Nat.ltb_ge. now apply string_get_none_past_end. }
+    now rewrite Eleft, Eright.
 Qed.
 
 Lemma native_prefix_code_equal_spec:
@@ -1281,6 +1387,49 @@ Proof.
       * discriminate.
       * intros H. exfalso. apply (proj1 (Bool.eqb_false_iff _ _) E).
         apply H. lia.
+Qed.
+
+Lemma native_prefix_tag_equal_terminal_spec:
+  forall left right byte count,
+    count <= 8 ->
+    native_prefix_tag_equal (native_bytes left) (native_bytes right) byte
+      (S count) = true <->
+    forall tag, tag < S count ->
+      StringBits.bit_at left (logical_position byte tag) =
+      StringBits.bit_at right (logical_position byte tag).
+Proof.
+  intros left right byte count Hcount.
+  rewrite native_prefix_tag_equal_native_bytes.
+  destruct (String.get byte left) as [left_ch|] eqn:Hleft;
+    destruct (String.get byte right) as [right_ch|] eqn:Hright.
+  - rewrite native_prefix_code_equal_spec by lia. split.
+    + intros Hall tag Htag. destruct tag as [|offset].
+      * rewrite !bit_at_logical_position by lia. now rewrite Hleft, Hright.
+      * rewrite !bit_at_logical_position by lia. rewrite Hleft, Hright.
+        replace (offset <? 8) with true by (symmetry; apply Nat.ltb_lt; lia).
+        specialize (Hall offset ltac:(lia)).
+        now rewrite !native_code_bit_ascii in Hall by lia.
+    + intros Hall offset Hoffset.
+      specialize (Hall (S offset) ltac:(lia)).
+      rewrite !bit_at_logical_position in Hall by lia.
+      rewrite Hleft, Hright in Hall.
+      replace (offset <? 8) with true in Hall
+        by (symmetry; apply Nat.ltb_lt; lia).
+      rewrite !native_code_bit_ascii by lia. exact Hall.
+  - split.
+    + discriminate.
+    + intros Hall. specialize (Hall 0 ltac:(lia)).
+      rewrite !bit_at_logical_position in Hall by lia.
+      now rewrite Hleft, Hright in Hall.
+  - split.
+    + discriminate.
+    + intros Hall. specialize (Hall 0 ltac:(lia)).
+      rewrite !bit_at_logical_position in Hall by lia.
+      now rewrite Hleft, Hright in Hall.
+  - split.
+    + intros _ tag Htag.
+      rewrite !bit_at_logical_position by lia. now rewrite Hleft, Hright.
+    + intros _. reflexivity.
 Qed.
 
 Lemma native_bounded_prefix_scan_terminal:

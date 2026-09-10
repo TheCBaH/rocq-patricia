@@ -202,7 +202,8 @@ paths use proved cached consumers.
 The native bounded-prefix byte loop has a source-level byte-scan model:
 `native_bounded_prefix_scan` follows its complete-byte, shorter-length
 sentinel and terminal partial-code branches, while its guarded-access lemmas
-make the model's unsafe reads explicit. `agrees_before_bounded_eq` still
+make the model's unsafe reads explicit and its terminal-tag theorem covers
+all preceding logical marker/character positions. `agrees_before_bounded_eq` still
 concerns only the logical bit-scanning specification: a theorem connecting the
 byte scan to it, its minimum-length invariant, and the target XOR/mask loop
 remain open. The structural first-difference model likewise leaves the indexed
