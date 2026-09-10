@@ -185,9 +185,47 @@ Proof.
   intros value accumulator Hfits.
   apply native_log2_loop_correct.
   destruct (N.eq_dec value 0%N) as [Hzero | Hnonzero].
-  - subst value. cbn. lia.
+  - subst value. unfold native_word_bits. cbn. lia.
   - change (N.log2 value < native_word_bits)%N.
     apply native_log2_fits_mask; assumption.
+Qed.
+
+Lemma native_log2_fits_native_word:
+  forall value,
+    fits_native_word value ->
+    (N.log2 value < native_word_bits)%N.
+Proof.
+  intros value Hfits.
+  destruct (N.eq_dec value 0%N) as [Hzero | Hnonzero].
+  - subst value. unfold native_word_bits. cbn. lia.
+  - apply native_log2_fits_mask; assumption.
+Qed.
+
+(** XOR cannot introduce a split bit outside either native-word operand. *)
+Lemma native_lxor_log2_fits_native_word:
+  forall left right,
+    fits_native_word left -> fits_native_word right ->
+    (N.log2 (N.lxor left right) < native_word_bits)%N.
+Proof.
+  intros left right Hleft Hright.
+  eapply N.le_lt_trans.
+  - apply N.log2_lxor.
+  - destruct (N.max_dec (N.log2 left) (N.log2 right)) as [Hmax | Hmax].
+    + rewrite Hmax. apply native_log2_fits_native_word. exact Hleft.
+    + rewrite Hmax. apply native_log2_fits_native_word. exact Hright.
+Qed.
+
+Lemma native_highest_differing_bit_loop_correct:
+  forall left right,
+    fits_native_word left -> fits_native_word right ->
+    native_log2_loop 62 (N.lxor left right) 0%N =
+      native_highest_differing_bit left right.
+Proof.
+  intros left right Hleft Hright.
+  unfold native_highest_differing_bit.
+  rewrite native_log2_loop_correct.
+  - rewrite N.add_0_l. reflexivity.
+  - apply native_lxor_log2_fits_native_word; assumption.
 Qed.
 
 Lemma native_highest_differing_bit_fits_mask:

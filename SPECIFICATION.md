@@ -217,7 +217,7 @@ are separate from the standard primitive contracts in the audit below.
 `NativeRefinement.v` proves part of the representation-level source model,
 including the packed-position codec, safe first-difference model, and the
 fuelled right-shift/accumulator invariant for the native `log2` loop (with 62
-steps sufficient in the native-word domain). It does
+steps sufficient for bounded XOR operands in the native-word domain). It does
 not remove the native primitives or handwritten algorithms above from the
 trusted boundary. The proof-aligned reference extraction shares the standard
 numeric/string mappings and extraction/compiler boundary, but omits the
