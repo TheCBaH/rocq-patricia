@@ -1203,6 +1203,38 @@ Definition native_terminal_mask_equal
     (N.land (N.lxor (Ascii.N_of_ascii left) (Ascii.N_of_ascii right))
       (N.land (N.shiftl 255%N (N.of_nat (9 - split_tag))) 255%N)) 0%N.
 
+(** At tag 1 the continuation marker is the only preceding logical position,
+    so the generated [255 lsl 8 land 255] mask is zero. *)
+Lemma native_terminal_mask_equal_tag_one:
+  forall left right, native_terminal_mask_equal left right 1 = true.
+Proof.
+  intros left right. unfold native_terminal_mask_equal.
+  change ((N.eqb (N.land
+    (N.lxor (Ascii.N_of_ascii left) (Ascii.N_of_ascii right)) 0%N) 0%N) = true).
+  rewrite N.land_0_r. apply N.eqb_refl.
+Qed.
+
+Lemma native_terminal_mask_equal_tag_two:
+  forall left right,
+    native_terminal_mask_equal left right 2 =
+      native_prefix_code_equal 1 0
+        (Ascii.N_of_ascii left) (Ascii.N_of_ascii right).
+Proof.
+  intros left right.
+  unfold native_terminal_mask_equal, native_prefix_code_equal, native_code_bit.
+  cbn.
+  change (N.eqb
+    (N.land (N.lxor (Ascii.N_of_ascii left) (Ascii.N_of_ascii right))
+      (N.pow 2 7%N)) 0%N =
+    (if Bool.eqb
+      (negb (N.eqb (N.land (Ascii.N_of_ascii left) (N.pow 2 7%N)) 0%N))
+      (negb (N.eqb (N.land (Ascii.N_of_ascii right) (N.pow 2 7%N)) 0%N))
+     then true else false)).
+  rewrite !N_land_pow2_eqb, N.lxor_spec.
+  destruct (N.testbit (Ascii.N_of_ascii left) 7),
+           (N.testbit (Ascii.N_of_ascii right) 7); reflexivity.
+Qed.
+
 Definition native_prefix_tag_equal
     (bytes_left bytes_right : list N) (byte tag : nat) : bool :=
   match tag with

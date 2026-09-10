@@ -81,8 +81,9 @@ and its guards remains a target-level obligation. The packed bounded-prefix
 loop now has a source byte-scan model with explicit complete-byte, sentinel,
 terminal-partial-code and guarded-read branches. Its whole-scan refinement to
 the logical bounded-prefix specification is kernel-checked; the terminal
-XOR/mask expression is separately modelled, while its equivalence proof,
-OCaml primitive correspondence and execution remain open. OCaml's string,
+XOR/mask expression is separately modelled, with its zero-mask and single-bit
+cases proved symbolically. The multi-bit cases, OCaml primitive correspondence
+and execution remain open. OCaml's string,
 `Char.code`, and integer primitives also retain explicit foreign contracts.
 `PatriciaExtract.v` generates implementation backends under
 `patricia/extracted/`; the build names the map modules `PatriciaInternal` and

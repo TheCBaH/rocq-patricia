@@ -206,8 +206,9 @@ make the model's unsafe reads explicit. Its complete-byte, terminal-tag and
 shorter-length-sentinel theorems compose in
 `native_bounded_prefix_scan_correct`, which refines the scan to the logical
 specification. `native_terminal_mask_equal` records the terminal byte-domain
-XOR/mask arithmetic; its high-bit equivalence proof, OCaml primitive
-correspondence and execution remain open. The structural
+XOR/mask arithmetic, with symbolic zero-mask and single-bit cases; its
+multi-bit equivalence proof, OCaml primitive correspondence and execution
+remain open. The structural
 first-difference model likewise leaves the indexed
 OCaml scan, shifting-mask loop and identity shortcut to be connected. These
 algorithmic obligations
