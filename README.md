@@ -79,8 +79,9 @@ proves byte length/access/bounds and guarded-access laws, and proves the packed
 `bit_at` model correct. Connecting those laws to each actual indexed OCaml loop
 and its guards remains a target-level obligation. The packed bounded-prefix
 loop now has a source byte-scan model with explicit complete-byte, sentinel,
-terminal-partial-code and guarded-read branches; its terminal-tag theorem
-also covers every preceding logical marker/character position. Its refinement
+terminal-partial-code and guarded-read branches; its complete-byte and
+terminal-tag theorems cover their respective logical marker/character
+positions. Its refinement
 to the whole logical bounded-prefix specification and its target XOR/mask realization are
 still open. OCaml's string,
 `Char.code`, and integer primitives also retain explicit foreign contracts.

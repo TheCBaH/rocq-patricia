@@ -1432,6 +1432,48 @@ Proof.
     + intros _. reflexivity.
 Qed.
 
+Lemma native_complete_byte_equal_complete_spec:
+  forall left right byte,
+    native_complete_byte_equal (native_bytes left) (native_bytes right) byte = true <->
+    forall tag, tag < 9 ->
+      StringBits.bit_at left (logical_position byte tag) =
+      StringBits.bit_at right (logical_position byte tag).
+Proof.
+  intros left right byte.
+  rewrite native_complete_byte_equal_native_bytes.
+  destruct (String.get byte left) as [left_ch|] eqn:Hleft;
+    destruct (String.get byte right) as [right_ch|] eqn:Hright.
+  - rewrite N.eqb_eq. split.
+    + intro Hcode. apply (f_equal Ascii.ascii_of_N) in Hcode.
+      rewrite !Ascii.ascii_N_embedding in Hcode. subst right_ch.
+      intros tag Htag. rewrite !bit_at_logical_position by exact Htag.
+      now rewrite Hleft, Hright.
+    + intro Hall.
+      assert (Hchars : left_ch = right_ch).
+      { apply StringBits.ascii_bit_ext. intros offset Hoffset.
+        specialize (Hall (S offset) ltac:(lia)).
+        rewrite !bit_at_logical_position in Hall by lia.
+        rewrite Hleft, Hright in Hall.
+        replace (offset <? 8) with true in Hall
+          by (symmetry; apply Nat.ltb_lt; lia).
+        exact Hall. }
+      subst right_ch. reflexivity.
+  - split.
+    + discriminate.
+    + intros Hall. specialize (Hall 0 ltac:(lia)).
+      rewrite !bit_at_logical_position in Hall by lia.
+      now rewrite Hleft, Hright in Hall.
+  - split.
+    + discriminate.
+    + intros Hall. specialize (Hall 0 ltac:(lia)).
+      rewrite !bit_at_logical_position in Hall by lia.
+      now rewrite Hleft, Hright in Hall.
+  - split.
+    + intros _ tag Htag.
+      rewrite !bit_at_logical_position by lia. now rewrite Hleft, Hright.
+    + intros _. reflexivity.
+Qed.
+
 Lemma native_bounded_prefix_scan_terminal:
   forall fuel byte split_byte split_tag common bytes_left bytes_right,
     Nat.eqb byte split_byte = true ->
