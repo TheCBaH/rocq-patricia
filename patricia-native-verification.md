@@ -56,7 +56,7 @@ workers; the public wrappers select those extracted workers.
 | I6 | Resolved 2026-09-09: former four handwritten union directives | Public wrappers call extracted `union_*_native_acc_default` workers; direct `Acc` recursion replaces fuel and nested closures while retaining reuse decisions. | `union_left_native_acc_exact` and left/right well-formedness/lookup theorems in both companion proof files. | No handwritten high-level union body remains. I7's `(==)` adequacy, primitive contracts, extraction/compiler/runtime and allocation semantics remain separate obligations. |
 | I7 | Two selected `native_same => (==)` directives | Connect source-defined native-shaped workers to physical equality. | `NativeHeapRefinement.v` derives source soundness from a per-call object/heap adequacy contract. | Establish that target execution supplies this contract. These directives are separate from the native string identity shortcut in I3. |
 | I8 | Standard `ExtrOcamlZInt`, `ExtrOcamlNatInt`, `ExtrOcamlNativeString`/`ExtrOcamlChar` mappings | Represent numbers and byte strings natively. | Source domain/codec models and the mapping audit in `SPECIFICATION.md`. | Finite-range and primitive implementation contracts, including all reachable intermediates. The reference backend shares these mappings. |
-| I9 | `PatriciaMap.ml` and `StringPatriciaMap.ml`: 89 lines in total at audit time | Abstract map/key interfaces, positive-key validation, aliases, and the restricted combine adapter. | Pure operation laws; wrapper tests enforce the intended boundary. | Prove/extract the adapter and relate key validation to the native key domain, or verify the small wrappers directly. Abstract signatures and build visibility still need auditing. |
+| I9 | `PatriciaMap.ml` and `StringPatriciaMap.ml`: 95 lines in total at the 2026-09-10 audit | Abstract map/key interfaces, positive-key validation, aliases, and the restricted combine adapter. | The `.mli` files abstract map/key types; `check_abstract_interfaces` exercises invalid/maximum integer keys, aliases, all three combine cases, and binary string keys. | Prove/extract the adapter and relate key validation to the native key domain, or verify the small wrappers directly. Abstract signatures and build visibility still need a semantic—not merely compilation—argument. |
 | I10 | Extraction, module renaming/packing/linking, OCaml compiler/runtime and host platform | Produce and execute the library, including GC and native primitive operations. | Build checks, generated-body audits and a pinned compiler-source equality audit. | Explicitly retain these assumptions, or connect the appropriate verified extraction/compiler/runtime results. A syntactic audit is not a simulation proof. |
 
 Ordinary extraction already handles general `combine`, public string `set`,
@@ -345,7 +345,10 @@ No implementation strategy below has yet passed its replacement gate.
   this remains a separately provisioned experiment, not an alternative label
   for ordinary Rocq extraction.
 - [ ] V4.3 Extract/prove the combine adapter and key-validation relation, or
-  verify the wrappers directly; preserve abstract interfaces (S6).
+  verify the wrappers directly; preserve abstract interfaces (S6). The
+  2026-09-10 audit confirms 95 implementation lines and opaque `.mli`
+  boundaries, while `check_abstract_interfaces` covers the public cases;
+  neither is a proof of wrapper semantics.
 - [-] V4.4 Develop a custom extraction postprocessor only if simpler routes
   fail; require a proved transformation or certificate checker to claim a TCB
   reduction, otherwise label it an additional trusted build step.
@@ -398,6 +401,7 @@ connections in milestone 3. Empirical replacement acceptance does not close N4.
 | 2026-09-09 | V2.1 cache-aware deletion gate | `make remove-profile` and `PATRICIA_REMOVE_PROFILE_SIZE=100000 make remove-profile` passed after checking every result and the wrapper test checked absent-key root reuse. Legacy, cached, and public paths allocated 26/26/26 words for an absent key and 136/136/136 for the selected present key at 10K; at 100K they were 26/26/26 and 199/199/199. Retained-word deltas differed only by small measurement noise. This is allocation evidence on OCaml 4.14.3 arm64/Linux, not a timing or cost proof. |
 | 2026-09-09 | V2.1 generated cached-consumer guard | `make cached-representative-audit` passed. It inspects extracted `remove_changed_cached`, `map_filter_cached`, `combine_fuel`, and `combine_structural`, requiring a cached constructor call and forbidding direct regular `branch`/`join` calls. This is a regression guard over generated syntax, not a semantic refinement proof. |
 | 2026-09-09 | V2.1 closure of I5 | Removed the `StringPatricia.representative` extraction directive after migrating selected `Acc` union's three fallback joins to `join_cached`; `union_left_native_cached_disjoint_branches_correct_wf` supplies their source contract. `make all`, `make cached-representative-audit`, and 10K/100K `make union-profile` passed. At 100K the selected integer/string `Acc` allocation remains 379/365/176/26/26 and 100/81/26/26/26 words for disjoint/half/subset/equal/empty-right, with the same reported input sharing. The audit now rejects a representative directive. Allocation/sharing evidence is not a timing or cost proof. |
+| 2026-09-10 | I9 public-wrapper inventory refresh | Counted 52 integer-wrapper and 43 string-wrapper implementation lines. Inspected both `.mli` files and `check_abstract_interfaces`, which tests key rejection/conversion, aliases, combine’s three callback cases and binary string keys through the public API. This establishes current scope and test coverage, not a semantic proof of the wrappers or the native-domain relation. |
 
 ## Publications
 
