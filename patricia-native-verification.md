@@ -1,6 +1,6 @@
 # Patricia native verification gaps and tracker
 
-Last updated: 2026-09-09
+Last updated: 2026-09-10
 
 This document owns the detailed inventory and forward tracker for reducing
 unverified native code without sacrificing performance. The project-wide
@@ -9,6 +9,20 @@ decisions and N1/N2 history remain in [patricia-todo.md](patricia-todo.md).
 this plan does not expand them. The verification review is in
 [patricia.md](patricia.md), and measurements belong in
 [patricia-bench.md](patricia-bench.md).
+
+### Scope-audit method
+
+The explicit-realizer inventory is reproducible with
+`rg -n '^Extract (Constant|Inlined Constant)' PatriciaExtract.v`. On the
+stated date it reports 14 directives: nine integer-routing directives (I1),
+one each for packed `bit_at`, first difference, and bounded prefix comparison
+(I2–I4), and two physical-equality directives (I7). Standard extraction
+mappings and handwritten public wrappers are separately retained as I8 and
+I9, because this command intentionally does not enumerate them. “Resolved”
+means that the listed Patricia-specific override has been removed and the
+recorded source/extraction gate passed; it never means that OCaml execution,
+the compiler, runtime, or cost semantics have been proved. The open/deferred
+items below are a forward plan, not missing sections of this document.
 
 ## Objective and boundaries
 
@@ -252,14 +266,14 @@ No implementation strategy below has yet passed its replacement gate.
 
 - [x] V2.1 Integrate a source-defined cached representative with proved
   consumer refinement, then remove I5's override after performance validation.
-  Groundwork completed in `8fc60a6`: `representative_cached` and its
-  `wf`-resident/nonempty refinement theorems are source-defined. The override
-  intentionally remains because migrating all consumers (notably `join` and
-  public update paths) is required before comparing performance safely. The
-  migration sequence is: retain total `representative` for raw-tree lemmas;
-  add cached `branch`/`join` counterparts; prove their `wf` lookup and
+  Groundwork in `8fc60a6` introduced `representative_cached` and its
+  `wf`-resident/nonempty refinement theorems. At that intermediate milestone,
+  the override remained because migrating all consumers (notably `join` and
+  public update paths) was required before comparing performance safely. The
+  completed migration sequence was to retain total `representative` for raw-tree
+  lemmas; add cached `branch`/`join` counterparts; prove their `wf` lookup and
   well-formedness refinements; migrate each public operation and benchmark it;
-  only then remove I5's override. `branch_cached` is complete with
+  then remove I5's override. `branch_cached` is complete with
   `branch_cached_nonempty_wf`, `branch_cached_wf_general`, and
   `get_branch_cached`; `join_cached` is complete for separated inputs with
   `join_cached_separated_correct_wf`. The first public migration is now
