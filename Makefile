@@ -5,7 +5,7 @@ OCAMLDEP ?= /opt/opam/4.14.3/bin/ocamldep
 ROCQFLAGS := -q -Q . ''
 
 CORE_VFILES := PatriciaBits.v Patricia.v PatriciaProof.v \
-	StringBits.v NativeRefinement.v StringPatricia.v StringPatriciaProof.v
+	StringBits.v NativeRefinement.v NativeStringWorker.v StringPatricia.v StringPatriciaProof.v
 UNION_VFILES := PatriciaUnion.v PatriciaUnionProof.v \
 	StringPatriciaUnion.v StringPatriciaUnionProof.v NativeHeapRefinement.v
 VFILES := $(CORE_VFILES) $(UNION_VFILES)
@@ -24,6 +24,8 @@ REFERENCE_PACK := PatriciaReference.cmo
 	cached-representative-audit \
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
+
+.PHONY: string-primitive-profile
 
 .PHONY: set-profile
 
@@ -206,6 +208,28 @@ reference-profile: reference-extraction PatriciaReferenceProfile.ml
 	    ../PatriciaReferenceProfile.ml
 	./patricia-reference-profile
 
+# This is the primitive-level counterpart of [reference-profile].  It keeps
+# all strings and packed/logical position conversion outside timed regions,
+# checks the selected native bodies against the proof-aligned extraction, and
+# reports a median plus range and allocated words for each batch.  A future
+# proved worker can be added as another column without changing the workload
+# generator or correctness oracle.
+string-primitive-profile: extraction reference-extraction StringPrimitiveProfile.ml
+	cd extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
+	cd $(REFERENCE_DIR) && \
+	  sources=`find . -maxdepth 1 -type f \( -name '*.mli' -o -name '*.ml' \) \
+	    ! -name 'String.mli' ! -name 'String.ml' -printf '%f '` && \
+	  $(OCAMLDEP) -sort $$sources | xargs $(OCAMLOPT) -for-pack PatriciaReference -c && \
+	  ml_sources=`find . -maxdepth 1 -type f -name '*.ml' \
+	    ! -name 'String.ml' -printf '%f '` && \
+	  objects=`$(OCAMLDEP) -sort $$ml_sources | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -pack -o ../PatriciaReference.cmx $$objects
+	$(OCAMLOPT) -I extracted -c StringPrimitiveProfile.ml
+	cd extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../patricia-string-primitive-profile \
+	  $$objects ../$(REFERENCE_PACK:.cmo=.cmx) ../StringPrimitiveProfile.cmx
+	./patricia-string-primitive-profile
+
 # Record the native compiler settings beside any comparable benchmark series.
 # CI pins the OCaml version; this target captures target-dependent details
 # such as architecture, word size, Flambda, and the C compiler flags.
@@ -228,6 +252,7 @@ Patricia.vo: PatriciaBits.vo
 PatriciaProof.vo: PatriciaBits.vo Patricia.vo
 StringPatricia.vo: StringBits.vo
 NativeRefinement.vo: PatriciaBits.vo StringBits.vo
+NativeStringWorker.vo: NativeRefinement.vo StringBits.vo
 StringPatriciaProof.vo: StringBits.vo StringPatricia.vo
 PatriciaUnion.vo: PatriciaBits.vo Patricia.vo
 PatriciaUnionProof.vo: PatriciaProof.vo PatriciaUnion.vo
@@ -245,15 +270,16 @@ clean:
 	  $(REFERENCE_DIR)/*.cmo $(REFERENCE_DIR)/*.cmx $(REFERENCE_DIR)/*.o
 	rm -f PatriciaMap.cmi PatriciaMap.cmo PatriciaMap.cmx PatriciaMap.o
 	rm -f StringPatriciaMap.cmi StringPatriciaMap.cmo StringPatriciaMap.cmx StringPatriciaMap.o
-	rm -f PatriciaReference.cmi PatriciaReference.cmo
+	rm -f PatriciaReference.cmi PatriciaReference.cmo PatriciaReference.cmx PatriciaReference.o
 	rm -f PatriciaTest.cmi PatriciaTest.cmo PatriciaDifferentialTest.cmi \
 	  PatriciaDifferentialTest.cmo PatriciaUnionTest.cmi PatriciaUnionTest.cmo \
 	  PatriciaBenchmark.cmi PatriciaBenchmark.cmx PatriciaBenchmark.o \
 	  PatriciaUnionProfile.cmi PatriciaUnionProfile.cmx PatriciaUnionProfile.o \
 	  PatriciaReferenceProfile.cmi PatriciaReferenceProfile.cmx PatriciaReferenceProfile.o \
+	  StringPrimitiveProfile.cmi StringPrimitiveProfile.cmx StringPrimitiveProfile.o \
 	  PatriciaMapFilterProfile.cmi PatriciaMapFilterProfile.cmx PatriciaMapFilterProfile.o \
 	  PatriciaRemoveProfile.cmi PatriciaRemoveProfile.cmx PatriciaRemoveProfile.o
 	rm -f patricia-test patricia-union-test patricia-differential-test \
 	  patricia-union-native-test \
 	  patricia-benchmark patricia-union-profile patricia-set-profile patricia-map-filter-profile patricia-remove-profile \
-	  patricia-reference-profile
+	  patricia-reference-profile patricia-string-primitive-profile

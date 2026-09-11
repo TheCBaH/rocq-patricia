@@ -1,7 +1,7 @@
 From Stdlib Require Import Extraction ExtrOcamlBasic ExtrOcamlNatInt ExtrOcamlZInt
   ExtrOcamlNativeString.
 Require Import PatriciaBits Patricia PatriciaUnion StringBits StringPatricia
-  StringPatriciaUnion.
+  StringPatriciaUnion NativeStringWorker.
 
 Extraction Language OCaml.
 Set Extraction Output Directory "extracted".
@@ -45,13 +45,21 @@ Extract Inlined Constant PatriciaUnion.native_same => "(==)".
     significant.  Token order is the order of the proof-side logical bit
     positions, but routing needs only shifts and masks rather than division
     and remainder by nine. *)
-Extract Constant StringBits.bit_at =>
-  "(fun s n ->
-     let byte = n lsr 4 and tag = n land 15 in
-     byte < Stdlib.String.length s &&
-       (tag = 0 ||
-        (tag <= 8 &&
-         ((Char.code (Stdlib.String.unsafe_get s byte) lsr (8 - tag)) land 1) <> 0)))".
+(** The packed bit worker itself is source-defined in [NativeStringWorker].
+    Only these three guarded primitives are realized by OCaml operations. *)
+Extract Inlined Constant NativeStringWorker.native_token_byte => "(fun token -> token lsr 4)".
+Extract Inlined Constant NativeStringWorker.native_token_tag => "(fun token -> token land 15)".
+Extract Inlined Constant NativeStringWorker.native_length => "Stdlib.String.length".
+Extract Inlined Constant NativeStringWorker.native_lt => "( < )".
+Extract Inlined Constant NativeStringWorker.native_tag_is_marker => "(fun tag -> tag = 0)".
+Extract Inlined Constant NativeStringWorker.native_tag_is_data => "(fun tag -> tag <= 8)".
+Extract Inlined Constant NativeStringWorker.native_tag_offset => "(fun tag -> tag - 1)".
+Extract Inlined Constant NativeStringWorker.native_unsafe_get =>
+  "(fun s byte -> Stdlib.String.unsafe_get s byte)".
+Extract Inlined Constant NativeStringWorker.native_code_bit =>
+  "(fun ch offset ->
+     ((Char.code ch lsr (7 - offset)) land 1) <> 0)".
+Extract Constant StringBits.bit_at => "NativeStringWorker.packed_bit_at".
 
 Extract Inlined Constant StringPatriciaUnion.native_same => "(==)".
 
@@ -124,6 +132,7 @@ Extract Constant StringBits.agrees_before_bounded =>
     than an extraction string containing a second handwritten union body. *)
 
 Separate Extraction
+  NativeStringWorker.packed_bit_at
   PatriciaBits.mask_above
   Patricia.empty Patricia.is_empty Patricia.singleton Patricia.get Patricia.mem
   Patricia.set Patricia.remove Patricia.of_list Patricia.map_filter Patricia.map_left

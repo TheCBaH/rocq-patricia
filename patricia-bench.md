@@ -15,6 +15,38 @@ in [`patricia-todo.md`](patricia-todo.md); detailed native-verification work has
 its separate tracker in
 [`patricia-native-verification.md`](patricia-native-verification.md).
 
+### Native string primitive baseline (2026-09-11)
+
+`make string-primitive-profile` is the reproducible primitive-level baseline
+for the three handwritten `StringBits` extraction bodies. It creates strings
+before timed/allocation regions, consumes every result, takes seven samples
+after one warm-up, and checks short binary inputs and long workload endpoints
+against the proof-aligned extracted oracle. It is not an executable-candidate
+comparison and does not establish target primitive correctness.
+
+On the compiler configuration recorded above, the 1,024-byte workload gave
+these medians (allocated words are per whole batch):
+
+| Primitive workload | Repetitions | Median | Range | Words |
+| --- | ---: | ---: | ---: | ---: |
+| `bit_at`, cycling positions | 200,000 | 3.015 ns/op | 2.971–3.105 | 24 |
+| `first_diff`, same object | 100,000 | 1.321 ns/op | 1.321–1.400 | 24 |
+| `first_diff`, equal copies | 20,000 | 632.393 ns/op | 631.344–639.808 | 160,024 |
+| `first_diff`, late difference | 20,000 | 636.351 ns/op | 635.493–645.304 | 300,048 |
+| bounded scan, late split | 20,000 | 1,149.094 ns/op | 1,094.353–1,161.051 | 24 |
+| bounded scan, proper prefix | 20,000 | 1,150.703 ns/op | 1,147.640–1,160.753 | 24 |
+
+The 24-word batches are measurement overhead. The two non-identity
+`first_diff` workloads include the fixed `Some` result allocation; no
+allocation proportional to the scanned prefix appears in this baseline.
+
+The current source-defined packed `bit_at` worker was then measured by the
+same command at **3.185 ns/op** (3.135–3.340) with the same 24-word batch
+overhead. It replaces the handwritten `bit_at` extraction algorithm with
+inlined length, token, guarded-read, and byte-bit primitives, but remains a
+candidate until the tracker’s map-level representation and acceptance gates
+are complete.
+
 ## Result
 
 The current benchmark completed with `Patricia comparison benchmark: ok`.

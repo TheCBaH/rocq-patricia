@@ -16,14 +16,19 @@ generated-code inspection or allocation measurement alone.
 ## Current status
 
 The three handwritten bodies remain selected in `PatriciaExtract.v`.
-Existing source proofs provide foundations, but no new executable candidate,
-primitive execution proof or performance comparison has been completed by
-this planning work. The earlier structural first-difference extraction was
+The packed `bit_at` binding now selects a source-defined worker whose native
+operations are limited to length, token shifts/masks, guarded byte access and
+the byte bit test. Its source refinement is kernel-checked, while the OCaml
+primitive and packed-binding correspondence remain explicit residual trust.
+`first_diff` and `agrees_before_bounded` are still handwritten extraction
+bodies. A reproducible native harness measures the selected binding against
+the proof-aligned extraction as an oracle; no worker is selected until its
+full S4/S5 gates pass. The earlier structural first-difference extraction was
 rejected for suffix copying; it is not a candidate to reinstate unchanged.
 
 ## S0 — Baseline and primitive interface
 
-- [ ] S0.1 Record the selected bodies, generated dependencies, compiler/Rocq
+- [x] S0.1 Record the selected bodies, generated dependencies, compiler/Rocq
   versions, architecture and optimization configuration.
 - [ ] S0.2 Add candidate-versus-current primitive profiling alongside the
   existing correctness oracles. Batch operations and consume results; separate
@@ -44,11 +49,11 @@ the string workers.
 
 ## S1 — Packed bit access
 
-- [ ] S1.1 Define a source worker using native token shifts/masks and guarded
+- [x] S1.1 Define a source worker using native token shifts/masks and guarded
   indexed byte access, preserving marker and invalid-tag behavior.
-- [ ] S1.2 Prove its bit test and decoding agree with the existing packed
+- [x] S1.2 Prove its bit test and decoding agree with the existing packed
   model; compose `native_packed_bit_at_refines_representation` with the codec.
-- [ ] S1.3 Inspect extraction/compiler output for constant-time access,
+- [x] S1.3 Inspect extraction/compiler output for constant-time access,
   correct guard ordering and no allocation.
 - [ ] S1.4 Run exhaustive byte/tag and out-of-range-index checks, differential
   tests and repeated routing/map timing comparisons.
@@ -153,6 +158,11 @@ Apply these gates to each selected worker, recording separate evidence rows.
 | Date | Item | Evidence and limits |
 | --- | --- | --- |
 | 2026-09-11 | Initial plan and tracker | Based on inspection of the current extraction bodies, `StringBits.v`, `NativeRefinement.v`, union accessibility recursion, existing tests and project notes, plus primary-source extraction/verification references. No executable replacement or new performance measurement is claimed. |
+| 2026-09-11 | S0.1 selected-body baseline | `PatriciaExtract.v` selects handwritten OCaml bodies for `StringBits.bit_at`, `StringBits.first_diff`, and `StringBits.agrees_before_bounded`; `make all` passed (492 declarations closed under the global context, extraction-boundary audits, randomized/oracle/differential tests). `make compiler-config` reported Rocq 9.2 built with OCaml 4.14.3; OCaml 4.14.3 native, arm64/aarch64 Linux 7.0.0-28-generic, 64-bit words, Flambda disabled, safe strings, and GCC `-O2 -fno-strict-aliasing -fwrapv -pthread -fPIC -D_FILE_OFFSET_BITS=64`. Generated dependencies are the optimized `extracted/StringBits.ml` and proof-aligned `reference_extracted/StringBits.ml`; wrappers bind the optimized extraction through `StringPatriciaInternal`. This records the current configuration, not runtime primitive correctness. |
+| 2026-09-11 | S0.2 primitive baseline harness | Added `StringPrimitiveProfile.ml` and `make string-primitive-profile`. It pre-creates inputs, consumes results, takes seven samples after a warm-up, and checks short binary/tag cases plus long workload endpoints against `PatriciaReference.StringBits`. A future candidate can be added without changing the generator or oracle. It currently measures only the selected body, so S0.2 remains open until a candidate-versus-current comparison exists. |
+| 2026-09-11 | Current primitive baseline | `make string-primitive-profile`: seven-sample medians on the S0.1 toolchain were 3.015 ns/op and 24 words per 200K `bit_at` batch; 1.321 ns/op and 24 words per 100K same-object `first_diff`; 632.393 ns/op and 160,024 words per 20K separately allocated equal 1,024-byte pairs; 636.351 ns/op and 300,048 words per 20K late-different pairs; 1,149.094 and 1,150.703 ns/op with 24 words per 20K bounded late/proper-prefix scans. The 24-word readings are measurement overhead; the difference worker's option accounts for its extra fixed allocation. These primitive measurements do not cover the required repeated 10K/100K map matrix, so S0.3 and later acceptance gates remain open. |
+| 2026-09-11 | S1.1/S1.2 source worker and proof | Added `NativeStringWorker.packed_bit_at`. Its source body decomposes a packed token, checks `byte < length` before the only unsafe read, returns true for tag 0, tests tags 1–8, and rejects 9–15. `packed_bit_at_refines_model` proves equality with `NativeRefinement.packed_bit_at`; `packed_bit_at_refines_representation` composes that result with `native_packed_bit_at_refines_representation`. The worker is bound to source `StringBits.bit_at` in `PatriciaExtract.v`; the binding crosses from logical source positions to packed runtime tokens, so map-level representation refinement is still an S4 obligation. |
+| 2026-09-11 | S1.3 extraction and primitive check | `make extraction` generated `extracted/NativeStringWorker.ml` with only `lsr`, `land`, `<`, `=`, `<=`, `String.length`, one branch-guarded `String.unsafe_get`, and the byte shift/mask; helpers were extraction-inlined and the worker contains no recursion, options, records, or allocations. `make all`, `make union-oracle-native`, and `make string-primitive-profile` passed (the all-suite assumption audit reports 496 closed declarations). The profile measured 3.185 ns/op (3.135–3.340) and 24 words per 200K batch for `bit_at`, where 24 words is measurement overhead. This is inspection and finite runtime evidence, not a proof of OCaml primitives or an S5 selection result. |
 
 For each implementation result add: task ID, theorem names, exact commands,
 toolchain/machine, workloads, timing distribution, allocation measurements,
