@@ -54,11 +54,28 @@ Extract Inlined Constant NativeStringWorker.native_lt => "( < )".
 Extract Inlined Constant NativeStringWorker.native_tag_is_marker => "(fun tag -> tag = 0)".
 Extract Inlined Constant NativeStringWorker.native_tag_is_data => "(fun tag -> tag <= 8)".
 Extract Inlined Constant NativeStringWorker.native_tag_offset => "(fun tag -> tag - 1)".
+Extract Inlined Constant NativeStringWorker.native_eq => "( = )".
+Extract Inlined Constant NativeStringWorker.native_min =>
+  "(fun left right -> if left < right then left else right)".
 Extract Inlined Constant NativeStringWorker.native_unsafe_get =>
   "(fun s byte -> Stdlib.String.unsafe_get s byte)".
 Extract Inlined Constant NativeStringWorker.native_code_bit =>
   "(fun ch offset ->
      ((Char.code ch lsr (7 - offset)) land 1) <> 0)".
+Extract Inlined Constant NativeStringWorker.native_byte_equal =>
+  "(fun left right byte ->
+     Stdlib.String.unsafe_get left byte = Stdlib.String.unsafe_get right byte)".
+Extract Inlined Constant NativeStringWorker.native_terminal_equal =>
+  "(fun left right byte tag ->
+     if tag = 0 then true else
+     let left_present = byte < Stdlib.String.length left
+     and right_present = byte < Stdlib.String.length right in
+     if left_present <> right_present then false
+     else if not left_present then true
+     else
+       let mask = (255 lsl (9 - tag)) land 255 in
+       ((Char.code (Stdlib.String.unsafe_get left byte) lxor
+         Char.code (Stdlib.String.unsafe_get right byte)) land mask) = 0)".
 Extract Constant StringBits.bit_at => "NativeStringWorker.packed_bit_at".
 
 Extract Inlined Constant StringPatriciaUnion.native_same => "(==)".
@@ -133,6 +150,7 @@ Extract Constant StringBits.agrees_before_bounded =>
 
 Separate Extraction
   NativeStringWorker.packed_bit_at
+  NativeStringWorker.bounded_prefix_scan
   PatriciaBits.mask_above
   Patricia.empty Patricia.is_empty Patricia.singleton Patricia.get Patricia.mem
   Patricia.set Patricia.remove Patricia.of_list Patricia.map_filter Patricia.map_left

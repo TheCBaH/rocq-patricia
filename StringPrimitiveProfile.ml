@@ -7,6 +7,7 @@
    executable candidate: add it beside [Native] and retain the same checks. *)
 
 module Native = StringBits
+module Candidate = NativeStringWorker
 module Oracle = PatriciaReference.StringBits
 
 type sample = { seconds : float; words : float; checksum : int }
@@ -76,7 +77,10 @@ let verify_pair left right =
     let split = packed split in
     if Native.agrees_before_bounded left right split
        <> Oracle.agrees_before_bounded left right (logical split) then
-      failwith "agrees_before_bounded oracle mismatch"
+      failwith "agrees_before_bounded oracle mismatch";
+    if Candidate.bounded_prefix_scan left right (split lsr 4) (split land 15)
+       <> Native.agrees_before_bounded left right split then
+      failwith "bounded candidate mismatch"
   done
 
 let verify_long_pair left right split =
@@ -90,7 +94,28 @@ let verify_long_pair left right split =
     failwith "long first_diff oracle mismatch";
   if Native.agrees_before_bounded left right split
      <> Oracle.agrees_before_bounded left right (logical split) then
-    failwith "long agrees_before_bounded oracle mismatch"
+    failwith "long agrees_before_bounded oracle mismatch";
+  if Candidate.bounded_prefix_scan left right (split lsr 4) (split land 15)
+     <> Native.agrees_before_bounded left right split then
+      failwith "long bounded candidate mismatch"
+
+let verify_exhaustive_one_byte_pairs () =
+  (* This is deliberately a direct candidate/current differential check: the
+     proof-aligned structural extraction is already exercised on the compact
+     oracle matrix above, whereas invoking it at every split of 65,536 pairs
+     would measure repeated substring construction rather than the candidate. *)
+  for left_code = 0 to 255 do
+    let left = Stdlib.String.make 1 (Char.chr left_code) in
+    for right_code = 0 to 255 do
+      let right = Stdlib.String.make 1 (Char.chr right_code) in
+      for tag = 0 to 8 do
+        let split = tag in
+        if Candidate.bounded_prefix_scan left right 0 tag
+           <> Native.agrees_before_bounded left right split then
+          failwith "exhaustive one-byte bounded candidate mismatch"
+      done
+    done
+  done
 
 let () =
   let prefix = byte_string 1024 17 in
@@ -106,6 +131,7 @@ let () =
   verify_long_pair prefix differing long_split;
   verify_long_pair prefix proper_prefix long_split;
   verify_long_pair prefix (independently_equal prefix) long_split;
+  verify_exhaustive_one_byte_pairs ();
   Printf.printf "Native string primitive baseline (7 interleaved samples; inputs pre-created)\n%!";
   let positions = Array.init (9 * Stdlib.String.length prefix + 1) packed in
   let index = ref 0 in
@@ -122,6 +148,12 @@ let () =
   let split = long_split in
   report "bounded prefix late split" 20_000 (fun () ->
       consume_bool (Native.agrees_before_bounded prefix differing split));
+  report "candidate bounded late split" 20_000 (fun () ->
+      consume_bool (Candidate.bounded_prefix_scan prefix differing
+                      (split lsr 4) (split land 15)));
   report "bounded proper prefix" 20_000 (fun () ->
       consume_bool (Native.agrees_before_bounded prefix proper_prefix split));
+  report "candidate bounded proper prefix" 20_000 (fun () ->
+      consume_bool (Candidate.bounded_prefix_scan prefix proper_prefix
+                      (split lsr 4) (split land 15)));
   Printf.printf "String primitive profile: oracle checks passed\n%!"

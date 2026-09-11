@@ -47,6 +47,14 @@ inlined length, token, guarded-read, and byte-bit primitives, but remains a
 candidate until the tracker’s map-level representation and acceptance gates
 are complete.
 
+The unselected source-defined bounded-prefix candidate was checked against the
+current primitive on the harness’s valid packed-position matrix. On the long
+workloads it measured 857.556 ns/op (830.555–900.495) for a late difference
+and 854.802 ns/op (826.347–862.193) for a proper prefix, compared with
+1,134.300 and 1,129.007 ns/op for the current body. Both versions reported
+only the 24-word batch measurement overhead. These primitive results are not
+the required 10K/100K map acceptance comparison.
+
 ## Result
 
 The current benchmark completed with `Patricia comparison benchmark: ok`.
