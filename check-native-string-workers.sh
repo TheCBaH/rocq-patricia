@@ -39,7 +39,7 @@ fi
 for signature in \
   'let rec difference_tag_acc difference offset =' \
   'let rec first_diff_scan_acc left right left_length right_length common byte =' \
-  'let rec bounded_prefix_scan_acc left right split_byte split_tag common byte ='; do
+  'let rec bounded_prefix_scan_acc left right left_length right_length split_byte split_tag common byte ='; do
   if ! rg -Fq "$signature" "$worker_file"; then
     echo "unexpected native worker recursion/arity: $signature" >&2
     exit 1

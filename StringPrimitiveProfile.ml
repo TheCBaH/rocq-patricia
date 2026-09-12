@@ -3,8 +3,9 @@
    The native implementation uses packed positions [16 * byte + tag], whereas
    the ordinary extraction uses logical positions [9 * byte + tag].  Conversion
    is deliberately performed only while checking results, never in a timed or
-   allocation region.  Thus this file is also a stable harness for a future
-   executable candidate: add it beside [Native] and retain the same checks. *)
+   allocation region. The frozen handwritten baseline remains independent of
+   the selected bindings. Paired timing samples alternate baseline/candidate
+   order; both selected and candidate implementations retain oracle checks. *)
 
 module Native = StringBitsBaseline
 module Selected = StringBits
@@ -55,13 +56,14 @@ let report_samples name repetitions samples =
     (1e9 *. hi /. float_of_int repetitions)
     (median words) (List.hd samples).checksum
 
-let report_pair name repetitions current candidate =
-  ignore (measure repetitions current);
-  ignore (measure repetitions candidate);
+let report_pair ?(prepare = fun () -> ()) name repetitions current candidate =
+  let measured operation = prepare (); measure repetitions operation in
+  ignore (measured current);
+  ignore (measured candidate);
   let current_samples = ref [] and candidate_samples = ref [] in
   for round = 1 to 7 do
-    let baseline () = current_samples := measure repetitions current :: !current_samples
-    and replacement () = candidate_samples := measure repetitions candidate :: !candidate_samples in
+    let baseline () = current_samples := measured current :: !current_samples
+    and replacement () = candidate_samples := measured candidate :: !candidate_samples in
     if round mod 2 = 0 then (replacement (); baseline ())
     else (baseline (); replacement ())
   done;
@@ -168,7 +170,8 @@ let () =
   let bit_call worker () =
     let result = worker prefix positions.(!index mod Array.length positions) in
     incr index; consume_bool result in
-  report_pair "bit_at" 200_000 (bit_call Native.bit_at) (bit_call Candidate.packed_bit_at);
+  report_pair ~prepare:(fun () -> index := 0) "bit_at" 200_000
+    (bit_call Native.bit_at) (bit_call Candidate.packed_bit_at);
   let difference_case name repetitions left right =
     report_pair name repetitions
       (fun () -> consume_option (Native.first_diff left right))

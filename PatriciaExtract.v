@@ -45,13 +45,15 @@ Extract Inlined Constant PatriciaUnion.native_same => "(==)".
     significant.  Token order is the order of the proof-side logical bit
     positions, but routing needs only shifts and masks rather than division
     and remainder by nine. *)
-(** The packed bit worker itself is source-defined in [NativeStringWorker].
-    Only these three guarded primitives are realized by OCaml operations. *)
+(** String-worker control flow is source-defined in [NativeStringWorker].
+    These bindings realize its scalar operations, guarded byte reads and
+    guarded terminal-mask primitive. Their range/cache/access contracts are
+    established by the worker proofs; target execution remains trusted. *)
 Extract Inlined Constant NativeStringWorker.native_token_byte => "(fun token -> token lsr 4)".
 Extract Inlined Constant NativeStringWorker.native_token_tag => "(fun token -> token land 15)".
 Extract Inlined Constant NativeStringWorker.native_length => "Stdlib.String.length".
 Extract Inlined Constant NativeStringWorker.native_lt => "( < )".
-Extract Inlined Constant NativeStringWorker.native_tag_is_marker => "(fun tag -> tag = 0)".
+Extract Inlined Constant NativeStringWorker.native_tag_is_nonzero => "(fun tag -> tag <> 0)".
 Extract Inlined Constant NativeStringWorker.native_tag_is_data => "(fun tag -> tag <= 8)".
 Extract Inlined Constant NativeStringWorker.native_tag_offset => "(fun tag -> tag - 1)".
 Extract Inlined Constant NativeStringWorker.native_eq =>
@@ -60,17 +62,17 @@ Extract Inlined Constant NativeStringWorker.native_min =>
   "(fun left right -> if left < right then left else right)".
 Extract Inlined Constant NativeStringWorker.native_unsafe_get =>
   "(fun s byte -> Stdlib.String.unsafe_get s byte)".
-Extract Inlined Constant NativeStringWorker.native_code_bit =>
-  "(fun ch offset ->
-     ((Char.code ch lsr (7 - offset)) land 1) <> 0)".
+Extract Inlined Constant NativeStringWorker.native_code_tag_bit =>
+  "(fun ch tag ->
+     ((Char.code ch lsr (8 - tag)) land 1) <> 0)".
 Extract Inlined Constant NativeStringWorker.native_byte_equal =>
   "(fun left right byte ->
      Stdlib.String.unsafe_get left byte = Stdlib.String.unsafe_get right byte)".
-Extract Inlined Constant NativeStringWorker.native_terminal_equal =>
-  "(fun left right byte tag ->
+Extract Inlined Constant NativeStringWorker.native_terminal_equal_cached =>
+  "(fun left right left_length right_length byte tag ->
      if tag = 0 then true else
-     let left_present = byte < Stdlib.String.length left
-     and right_present = byte < Stdlib.String.length right in
+     let left_present = byte < left_length
+     and right_present = byte < right_length in
      if left_present <> right_present then false
      else if not left_present then true
      else
@@ -87,6 +89,7 @@ Extract Inlined Constant NativeStringWorker.native_difference_zero => "(fun diff
 Extract Inlined Constant NativeStringWorker.native_difference_bit =>
   "(fun difference offset -> difference land (128 lsr offset) <> 0)".
 Extract Inlined Constant NativeStringWorker.native_string_same => "(==)".
+Extraction Inline NativeStringWorker.bounded_prefix_scan NativeStringWorker.first_diff_indexed.
 Extract Constant StringBits.bit_at => "NativeStringWorker.packed_bit_at".
 
 Extract Inlined Constant StringPatriciaUnion.native_same => "(==)".

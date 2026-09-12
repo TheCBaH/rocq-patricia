@@ -17,5 +17,6 @@
 /patricia-benchmark
 /patricia-union-profile
 /patricia-reference-profile
+/patricia-string-primitive-profile
 /extracted/
 /reference_extracted/

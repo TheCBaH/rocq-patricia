@@ -4,7 +4,7 @@ Require Import NativeRefinement StringBits.
 (** Source-defined workers used by the native packed-string binding.
 
     The definitions below intentionally separate the executable control flow
-    from the three target primitives realized in [PatriciaExtract.v].  Their
+    from the target primitives realized in [PatriciaExtract.v]. Their
     source meanings are ordinary Rocq definitions; the enclosing guard is the
     proof-side justification for the target unsafe read. *)
 
@@ -13,6 +13,7 @@ Definition native_token_tag (token : nat) : nat := token mod 16.
 Definition native_length (s : string) : nat := String.length s.
 Definition native_lt (left right : nat) : bool := left <? right.
 Definition native_tag_is_marker (tag : nat) : bool := tag =? 0.
+Definition native_tag_is_nonzero (tag : nat) : bool := negb (tag =? 0).
 Definition native_tag_is_data (tag : nat) : bool := tag <=? 8.
 Definition native_tag_offset (tag : nat) : nat := tag - 1.
 Definition native_eq (left right : nat) : bool := left =? right.
@@ -27,6 +28,18 @@ Definition native_unsafe_get (s : string) (byte : nat) : Ascii.ascii :=
 Definition native_code_bit (ch : Ascii.ascii) (offset : nat) : bool :=
   StringBits.ascii_bit ch offset.
 
+Definition native_code_tag_bit (ch : Ascii.ascii) (tag : nat) : bool :=
+  StringBits.ascii_bit ch (tag - 1).
+
+Lemma native_code_tag_bit_refines:
+  forall ch tag, 1 <= tag <= 8 ->
+    native_code_tag_bit ch tag = N.testbit (Ascii.N_of_ascii ch) (N.of_nat (8 - tag)).
+Proof.
+  intros ch tag Htag. unfold native_code_tag_bit.
+  rewrite NativeRefinement.ascii_bit_testbit by lia.
+  replace (7 - (tag - 1)) with (8 - tag) by lia. reflexivity.
+Qed.
+
 (** One guarded indexed read, with the native packed tag convention.  The
     branch order is part of the contract: no byte is consumed unless the
     index is in range, and invalid tags produce [false]. *)
@@ -34,10 +47,11 @@ Definition packed_bit_at (s : string) (token : nat) : bool :=
   let byte := native_token_byte token in
   let tag := native_token_tag token in
   if native_lt byte (native_length s) then
-    if native_tag_is_marker tag then true
-    else if native_tag_is_data tag then
-      native_code_bit (native_unsafe_get s byte) (native_tag_offset tag)
-    else false
+    if native_tag_is_nonzero tag then
+      if native_tag_is_data tag then
+        native_code_tag_bit (native_unsafe_get s byte) tag
+      else false
+    else true
   else false.
 
 Lemma native_unsafe_get_correct:
@@ -53,8 +67,8 @@ Proof.
   intros s token.
   unfold packed_bit_at, NativeRefinement.packed_bit_at,
     native_token_byte, native_token_tag, native_length, native_lt,
-    native_tag_is_marker, native_tag_is_data, native_tag_offset,
-    native_code_bit.
+    native_tag_is_marker, native_tag_is_nonzero, native_tag_is_data, native_tag_offset,
+    native_code_bit, native_code_tag_bit.
   destruct (token / 16 <? String.length s) eqn:Hbound.
   - pose proof (proj1 (Nat.ltb_lt _ _) Hbound) as Hlt.
     destruct (NativeRefinement.string_get_in_bounds s (token / 16) Hlt)
@@ -94,9 +108,8 @@ Proof.
   symmetry. now apply NativeRefinement.native_packed_bit_at_refines_representation.
 Qed.
 
-(** The bounded-prefix worker is kept separate while its refinement proof is
-    developed.  Its state invariant and accessibility argument are in [Prop],
-    so successful extraction has no fuel argument. *)
+(** The bounded-prefix worker's state invariant and accessibility argument
+    are in [Prop], so extraction has no fuel argument. *)
 Definition native_byte_equal (left right : string) (byte : nat) : bool :=
   match String.get byte left, String.get byte right with
   | Some left_ch, Some right_ch => Ascii.eqb left_ch right_ch
@@ -252,11 +265,48 @@ Proof.
   split; lia.
 Qed.
 
+(** The cache contract is established by the outer worker and preserved by
+    every recursive call. The target primitive uses these cached lengths for
+    its presence guards; its source meaning remains the logical terminal. *)
+Definition native_terminal_equal_cached (left right : string)
+    (left_length right_length byte tag : nat) : bool :=
+  if native_eq tag 0 then true
+  else if native_lt byte left_length then
+    if native_lt byte right_length then
+      native_ascii_prefix_equal (native_tag_offset tag) 0
+        (native_unsafe_get left byte) (native_unsafe_get right byte)
+    else false
+  else if native_lt byte right_length then false else true.
+
+Lemma native_terminal_equal_cached_correct:
+  forall left right byte tag,
+    native_terminal_equal_cached left right (native_length left) (native_length right) byte tag =
+      native_terminal_equal left right byte tag.
+Proof.
+  intros left right byte tag.
+  unfold native_terminal_equal_cached, native_terminal_equal, native_lt, native_length.
+  destruct (native_eq tag 0); [reflexivity|].
+  destruct (byte <? String.length left) eqn:Hl;
+    destruct (byte <? String.length right) eqn:Hr.
+  - apply Nat.ltb_lt in Hl, Hr.
+    destruct (NativeRefinement.string_get_in_bounds left byte Hl) as [lc El].
+    destruct (NativeRefinement.string_get_in_bounds right byte Hr) as [rc Er].
+    unfold native_unsafe_get. now rewrite El, Er.
+  - apply Nat.ltb_lt in Hl. apply Nat.ltb_ge in Hr.
+    destruct (NativeRefinement.string_get_in_bounds left byte Hl) as [lc El].
+    rewrite El, NativeRefinement.string_get_past_end by exact Hr. reflexivity.
+  - apply Nat.ltb_ge in Hl. apply Nat.ltb_lt in Hr.
+    destruct (NativeRefinement.string_get_in_bounds right byte Hr) as [rc Er].
+    rewrite Er, NativeRefinement.string_get_past_end by exact Hl. reflexivity.
+  - apply Nat.ltb_ge in Hl, Hr.
+    rewrite !NativeRefinement.string_get_past_end by assumption. reflexivity.
+Qed.
+
 (** Branch order matches the selected handwritten loop: split terminal,
     common-length sentinel, then complete-byte comparison.  The recursive
     call is possible only while [byte] remains strictly below both sentinels. *)
 Fixpoint bounded_prefix_scan_acc
-    (left right : string) (split_byte split_tag common byte : nat)
+    (left right : string) (left_length right_length split_byte split_tag common byte : nat)
     (Hbyte : byte <= native_min split_byte common)
     (termination : Acc lt (native_min split_byte common - byte))
     {struct termination} : bool :=
@@ -264,14 +314,14 @@ Fixpoint bounded_prefix_scan_acc
   | Acc_intro _ smaller =>
       match native_eq byte split_byte as equal_split
           return native_eq byte split_byte = equal_split -> bool with
-      | true => fun _ => native_terminal_equal left right byte split_tag
+      | true => fun _ => native_terminal_equal_cached left right left_length right_length byte split_tag
       | false => fun Hsplit =>
           match native_eq byte common as equal_common
               return native_eq byte common = equal_common -> bool with
-          | true => fun _ => native_eq (native_length left) (native_length right)
+          | true => fun _ => native_eq left_length right_length
           | false => fun Hcommon =>
               if native_byte_equal left right byte then
-                bounded_prefix_scan_acc left right split_byte split_tag common (S byte)
+                bounded_prefix_scan_acc left right left_length right_length split_byte split_tag common (S byte)
                   (proj1 (bounded_prefix_scan_step byte split_byte common
                     Hbyte Hsplit Hcommon))
                   (smaller _ (proj2 (bounded_prefix_scan_step byte split_byte common
@@ -283,25 +333,27 @@ Fixpoint bounded_prefix_scan_acc
 
 Definition bounded_prefix_scan
     (left right : string) (split_byte split_tag : nat) : bool :=
-  let common := native_min (native_length left) (native_length right) in
-  bounded_prefix_scan_acc left right split_byte split_tag common 0
+  let left_length := native_length left in
+  let right_length := native_length right in
+  let common := native_min left_length right_length in
+  bounded_prefix_scan_acc left right left_length right_length split_byte split_tag common 0
     ltac:(unfold native_min; lia) (lt_wf _).
 
 Lemma bounded_prefix_scan_acc_equation:
-  forall left right split_byte split_tag common byte Hbyte termination,
-    bounded_prefix_scan_acc left right split_byte split_tag common byte Hbyte termination =
+  forall left right left_length right_length split_byte split_tag common byte Hbyte termination,
+    bounded_prefix_scan_acc left right left_length right_length split_byte split_tag common byte Hbyte termination =
       match termination with
       | Acc_intro _ smaller =>
           match native_eq byte split_byte as equal_split
               return native_eq byte split_byte = equal_split -> bool with
-          | true => fun _ => native_terminal_equal left right byte split_tag
+          | true => fun _ => native_terminal_equal_cached left right left_length right_length byte split_tag
           | false => fun Hsplit =>
               match native_eq byte common as equal_common
                   return native_eq byte common = equal_common -> bool with
-              | true => fun _ => native_eq (native_length left) (native_length right)
+              | true => fun _ => native_eq left_length right_length
               | false => fun Hcommon =>
                   if native_byte_equal left right byte then
-                    bounded_prefix_scan_acc left right split_byte split_tag common (S byte)
+                    bounded_prefix_scan_acc left right left_length right_length split_byte split_tag common (S byte)
                       (proj1 (bounded_prefix_scan_step byte split_byte common
                         Hbyte Hsplit Hcommon))
                       (smaller _ (proj2 (bounded_prefix_scan_step byte split_byte common
@@ -315,7 +367,8 @@ Proof. intros. destruct termination; reflexivity. Qed.
 Lemma bounded_prefix_scan_acc_refines_fuel:
   forall fuel left right split_byte split_tag common byte Hbyte termination,
     native_min split_byte common - byte < fuel -> split_tag < 9 ->
-    bounded_prefix_scan_acc left right split_byte split_tag common byte Hbyte termination =
+    bounded_prefix_scan_acc left right (native_length left) (native_length right)
+      split_byte split_tag common byte Hbyte termination =
       NativeRefinement.native_bounded_prefix_scan fuel byte split_byte split_tag common
         (NativeRefinement.native_bytes left) (NativeRefinement.native_bytes right).
 Proof.
@@ -326,7 +379,8 @@ Proof.
   generalize (eq_refl (native_eq byte split_byte)).
   generalize (native_eq byte split_byte) at 2 3.
   intros split Esplit. destruct split.
-  - rewrite Esplit. apply native_terminal_equal_refines. exact Htag.
+  - rewrite Esplit, native_terminal_equal_cached_correct.
+    apply native_terminal_equal_refines. exact Htag.
   - symmetry. rewrite Esplit at 1. symmetry.
     generalize (eq_refl (native_eq byte common)).
     generalize (native_eq byte common) at 2 3.
@@ -358,9 +412,9 @@ Proof.
   reflexivity.
 Qed.
 
-(** Indexed first-difference candidate.  The tag worker is total only to keep
-    its source interface simple; its caller invokes it after a differing-byte
-    test, and the later refinement establishes tags 1--8 in that case. *)
+(** Indexed first difference. The proof companions below connect the byte
+    tag to the existing bit model; executable tag recursion is defined over
+    a shared XOR and erased accessibility evidence. *)
 Definition native_token_make (byte tag : nat) : nat := 16 * byte + tag.
 
 Fixpoint native_ascii_diff_tag_from (fuel offset : nat)
@@ -856,6 +910,12 @@ Proof.
   split; lia.
 Qed.
 
+Corollary encoded_position_le_order:
+  forall left right,
+    left <= right <-> NativeRefinement.encode_position left <=
+      NativeRefinement.encode_position right.
+Proof. intros. pose proof (encoded_position_order right left). lia. Qed.
+
 Corollary first_diff_indexed_valid:
   forall left right token,
     first_diff_indexed left right = Some token ->
@@ -923,4 +983,13 @@ Proof.
   destruct (same left right) eqn:E; [|reflexivity].
   apply Hsame in E. subst right.
   unfold NativeRefinement.packed_first_diff. now rewrite StringBits.first_diff_same.
+Qed.
+
+Corollary first_diff_indexed_with_identity_default_refines:
+  forall left right,
+    first_diff_indexed_with_identity left right = NativeRefinement.packed_first_diff left right.
+Proof.
+  intros left right. unfold first_diff_indexed_with_identity.
+  apply first_diff_indexed_with_identity_refines.
+  intros x y Hsame. discriminate Hsame.
 Qed.
