@@ -1,6 +1,6 @@
 # Verified native string primitives: tracker
 
-Last updated: 2026-09-11.
+Last updated: 2026-09-12.
 
 This tracker owns detailed implementation tasks for
 [patricia-str-plan.md](patricia-str-plan.md). The filename `patricia-str-tood.md`
@@ -22,7 +22,9 @@ operations are limited to length, token shifts/masks, guarded byte access and
 the byte bit test. Its source refinement is kernel-checked, while the OCaml
 primitive and packed-binding correspondence remain explicit residual trust.
 `first_diff` and `agrees_before_bounded` are still handwritten extraction
-bodies. A reproducible native harness measures the selected binding against
+bodies. Their indexed candidates now have compiled refinement proofs; the
+first-difference candidate also extracts its tag recursion from source and
+shares one byte XOR between its zero test and tag worker. A reproducible native harness measures the selected binding against
 the proof-aligned extraction as an oracle; no worker is selected until its
 full S4/S5 gates pass. The earlier structural first-difference extraction was
 rejected for suffix copying; it is not a candidate to reinstate unchanged.
@@ -69,7 +71,7 @@ Parent coverage: I2. Expected first executable replacement.
   sentinel, retaining terminal-before-sentinel branch ordering.
 - [x] S2.2 Prove the index/access invariant and strict decrease of
   `min(split_byte, common) - byte`; recurse on erased `Acc` evidence.
-- [ ] S2.3 Prove equivalence to the sufficiently fuelled source scanner and
+- [x] S2.3 Prove equivalence to the sufficiently fuelled source scanner and
   compose `native_bounded_prefix_scan_correct`.
 - [x] S2.4 Connect the terminal primitive mask expression through
   `native_terminal_mask_equal_correct`; cover tags 0 and 1 separately.
@@ -87,12 +89,12 @@ Parent coverage: I2. Expected first executable replacement.
 
 - [x] S3.1 Define the indexed scan with cached lengths, a common-length
   sentinel, one XOR per scanned byte and absolute token construction.
-- [ ] S3.2 Prove prior-byte equality, access safety and termination using
+- [x] S3.2 Prove prior-byte equality, access safety and termination using
   erased `Acc` evidence for `common - byte`.
 - [x] S3.3 Define and prove the nonzero-XOR shifting-mask worker: higher bits
   already zero, `mask = 128 >> count`, termination within eight tests, valid
   shifts and result tag 1–8. Return an integer without an internal option.
-- [ ] S3.4 Prove indexed-worker refinement through
+- [x] S3.4 Prove indexed-worker refinement through
   `native_string_first_diff_refines` and existing byte-selection laws.
 - [x] S3.5 Preserve and prove the identity shortcut using
   `native_string_same_sound`; keep its OCaml adequacy obligation explicit.
@@ -110,7 +112,7 @@ Parent coverage: I2. Expected first executable replacement.
 - [x] S4.1 Make the integration choice concrete: generated-worker bindings
   with explicit residual representation trust, or source-level parameterized
   map consumers with a proved native/logical representation relation.
-- [ ] S4.2 Establish valid-token production and ordered split consumption;
+- [x] S4.2 Establish valid-token production and ordered split consumption;
   compare logical `9*b+t` with packed `16*b+t`, not identical integers.
 - [x] S4.3 Ensure proof-side packing/unpacking does not execute on hot paths.
 - [x] S4.4 Retain the reference backend and abstract public interfaces; check
@@ -158,6 +160,10 @@ Apply these gates to each selected worker, recording separate evidence rows.
 
 | Date | Item | Evidence and limits |
 | --- | --- | --- |
+| 2026-09-12 | S2.3 indexed prefix refinement | `bounded_prefix_scan_acc_refines_fuel` proves equality to `native_bounded_prefix_scan` with fuel strictly above the remaining minimum-sentinel distance; `bounded_prefix_scan_refines` composes `native_bounded_prefix_scan_correct`. `bounded_prefix_packed_encode_refines` states the public correspondence through `encode_position`. `make NativeStringWorker.vo` passed. No primitive execution or map-call-site substitution theorem is claimed. |
+| 2026-09-12 | S3.2/S3.4 indexed difference refinement | `first_diff_scan_acc_refines_fuel` discharges the erased-`Acc` bridge with both guarded length bounds; `first_diff_scan_fuel_cons` relates successor indexing to structural tails in proofs only; `first_diff_scan_fuel_refines` and `first_diff_indexed_refines` compose the native whole-string refinement. `first_diff_scan_acc_none_prior` and `first_diff_indexed_spec` establish previously scanned equality for `None` and the equal logical prefix before a produced split. `first_diff_indexed_with_identity_refines` retains the positive-direction identity hypothesis. `make NativeStringWorker.vo` passed. |
+| 2026-09-12 | S3.3/S3.6 generated tag recursion | Removed the candidate's handwritten `native_byte_diff_tag` extraction loop. `difference_tag_acc` now recurses on erased `Acc (7-offset)` with `offset <= 7`; `difference_tag_acc_refines`, `difference_tag_refines`, `difference_tag_nonzero_range`, and `native_difference_bit_shift_mask` prove its bounded tag/mask behavior. `native_byte_xor_correct` connects the guarded shared XOR to byte equality and tag selection. Generated `first_diff_scan_acc` computes one XOR, and the two-argument tag loop allocates no options. `make extraction`, `make string-primitive-profile`, and `sh check-native-string-workers.sh` passed before the expanded performance series. |
+| 2026-09-12 | S4.2 source codec integration | `first_diff_indexed_valid` proves every produced split has tag below 9. `encoded_position_order` proves logical strict order iff packed strict order; together with `packed_bit_at_encode_refines` and `bounded_prefix_packed_encode_refines`, this supplies valid production and ordered source consumption through the codec. The chosen generated-binding integration still trusts consistent packed representation at extracted map call sites. |
 | 2026-09-11 | Initial plan and tracker | Based on inspection of the current extraction bodies, `StringBits.v`, `NativeRefinement.v`, union accessibility recursion, existing tests and project notes, plus primary-source extraction/verification references. No executable replacement or new performance measurement is claimed. |
 | 2026-09-11 | S0.1 selected-body baseline | `PatriciaExtract.v` selects handwritten OCaml bodies for `StringBits.bit_at`, `StringBits.first_diff`, and `StringBits.agrees_before_bounded`; `make all` passed (492 declarations closed under the global context, extraction-boundary audits, randomized/oracle/differential tests). `make compiler-config` reported Rocq 9.2 built with OCaml 4.14.3; OCaml 4.14.3 native, arm64/aarch64 Linux 7.0.0-28-generic, 64-bit words, Flambda disabled, safe strings, and GCC `-O2 -fno-strict-aliasing -fwrapv -pthread -fPIC -D_FILE_OFFSET_BITS=64`. Generated dependencies are the optimized `extracted/StringBits.ml` and proof-aligned `reference_extracted/StringBits.ml`; wrappers bind the optimized extraction through `StringPatriciaInternal`. This records the current configuration, not runtime primitive correctness. |
 | 2026-09-11 | S0.2 primitive baseline harness | Added `StringPrimitiveProfile.ml` and `make string-primitive-profile`. It pre-creates inputs, consumes results, takes seven samples after a warm-up, checks short binary/tag cases plus long workload endpoints against `PatriciaReference.StringBits`, and compares each candidate with the selected primitive. Timed inputs are created outside the timed/allocation region. |

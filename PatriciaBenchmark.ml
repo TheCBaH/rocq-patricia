@@ -217,6 +217,13 @@ let measure_short_operation operation =
   measure_operation ~samples:short_operation_samples
     ~batch:short_operation_batch operation
 
+(* Acceptance compares Patricia bindings. The AVL/hash results still serve as
+   correctness oracles, but need not repeat their slower timing batches. *)
+let measure_comparison_operation operation =
+  if Sys.getenv_opt "PATRICIA_BENCH_FAST_COMPARISONS" = Some "1"
+  then measure_operation operation
+  else measure_short_operation operation
+
 let report_build ?(operation = "build") title patricia avl hash =
   let report name measurement =
     Printf.printf
@@ -1154,11 +1161,11 @@ let time_int_union name keys expected_cardinal first_patricia first_avl first_ha
         Patricia.union_left first_patricia second_patricia)
   in
   let avl_result, avl_measurement =
-    measure_short_operation (fun () ->
+    measure_comparison_operation (fun () ->
         Int_avl.union (fun _ left _ -> Some left) first_avl second_avl)
   in
   let hash_result, hash_measurement =
-    measure_short_operation (fun () -> union_left_int_hash first_hash second_hash)
+    measure_comparison_operation (fun () -> union_left_int_hash first_hash second_hash)
   in
   if patricia_cardinal patricia_result <> expected_cardinal
      || Int_avl.cardinal avl_result <> expected_cardinal
@@ -1168,18 +1175,22 @@ let time_int_union name keys expected_cardinal first_patricia first_avl first_ha
   check_int_hash_equivalent keys hash_result avl_result;
   report_operation name patricia_measurement avl_measurement hash_measurement 1
 
-let time_string_union name keys expected_cardinal first_patricia first_avl first_hash
+let time_string_union ?(right_bias = false) name keys expected_cardinal first_patricia first_avl first_hash
     second_patricia second_avl second_hash =
   let patricia_result, patricia_measurement =
     measure_short_operation (fun () ->
-        StringPatricia.union_left first_patricia second_patricia)
+        (if right_bias then StringPatricia.union_right else StringPatricia.union_left)
+          first_patricia second_patricia)
   in
   let avl_result, avl_measurement =
-    measure_short_operation (fun () ->
-        String_avl.union (fun _ left _ -> Some left) first_avl second_avl)
+    measure_comparison_operation (fun () ->
+        String_avl.union (fun _ left right -> Some (if right_bias then right else left))
+          first_avl second_avl)
   in
   let hash_result, hash_measurement =
-    measure_short_operation (fun () -> union_left_string_hash first_hash second_hash)
+    measure_comparison_operation (fun () ->
+      if right_bias then union_left_string_hash second_hash first_hash
+      else union_left_string_hash first_hash second_hash)
   in
   if string_patricia_cardinal patricia_result <> expected_cardinal
      || String_avl.cardinal avl_result <> expected_cardinal
@@ -1234,11 +1245,11 @@ let benchmark_int () =
     measure_short_operation (fun () -> Patricia.union_left patricia_left patricia_disjoint)
   in
   let avl_merged, avl_merge =
-    measure_short_operation (fun () ->
+    measure_comparison_operation (fun () ->
         Int_avl.union (fun _ left _ -> Some left) avl_left avl_disjoint)
   in
   let hash_merged, hash_merge =
-    measure_short_operation (fun () -> union_left_int_hash hash_left hash_disjoint)
+    measure_comparison_operation (fun () -> union_left_int_hash hash_left hash_disjoint)
   in
   let all_disjoint = Array.append left_keys disjoint_keys in
   if patricia_cardinal patricia_merged <> 2 * benchmark_size
@@ -1255,11 +1266,11 @@ let benchmark_int () =
     measure_short_operation (fun () -> Patricia.union_left patricia_left patricia_overlap)
   in
   let avl_merged, avl_merge =
-    measure_short_operation (fun () ->
+    measure_comparison_operation (fun () ->
         Int_avl.union (fun _ left _ -> Some left) avl_left avl_overlap)
   in
   let hash_merged, hash_merge =
-    measure_short_operation (fun () -> union_left_int_hash hash_left hash_overlap)
+    measure_comparison_operation (fun () -> union_left_int_hash hash_left hash_overlap)
   in
   let all_overlap = Array.append left_keys overlap_keys in
   let expected_overlap = benchmark_size + (benchmark_size / 2) in
@@ -1363,11 +1374,11 @@ let benchmark_strings title make_key =
     measure_short_operation (fun () -> StringPatricia.union_left patricia_left patricia_disjoint)
   in
   let avl_merged, avl_merge =
-    measure_short_operation (fun () ->
+    measure_comparison_operation (fun () ->
         String_avl.union (fun _ left _ -> Some left) avl_left avl_disjoint)
   in
   let hash_merged, hash_merge =
-    measure_short_operation (fun () -> union_left_string_hash hash_left hash_disjoint)
+    measure_comparison_operation (fun () -> union_left_string_hash hash_left hash_disjoint)
   in
   let all_disjoint = Array.append left_keys disjoint_keys in
   if string_patricia_cardinal patricia_merged <> 2 * benchmark_size
@@ -1384,11 +1395,11 @@ let benchmark_strings title make_key =
     measure_short_operation (fun () -> StringPatricia.union_left patricia_left patricia_overlap)
   in
   let avl_merged, avl_merge =
-    measure_short_operation (fun () ->
+    measure_comparison_operation (fun () ->
         String_avl.union (fun _ left _ -> Some left) avl_left avl_overlap)
   in
   let hash_merged, hash_merge =
-    measure_short_operation (fun () -> union_left_string_hash hash_left hash_overlap)
+    measure_comparison_operation (fun () -> union_left_string_hash hash_left hash_overlap)
   in
   let all_overlap = Array.append left_keys overlap_keys in
   let expected_overlap = benchmark_size + (benchmark_size / 2) in
@@ -1407,6 +1418,22 @@ let benchmark_strings title make_key =
     hash_left subset_patricia subset_avl subset_hash;
   time_string_union "equal union" left_keys benchmark_size patricia_left avl_left
     hash_left patricia_left avl_left hash_left;
+  let equal_keys = Array.map (fun key -> Bytes.to_string (Bytes.of_string key)) left_keys in
+  let equal_patricia = build_patricia_string equal_keys in
+  let equal_avl = build_avl_string equal_keys in
+  let equal_hash = build_hash_string equal_keys in
+  time_string_union "equal copies union" left_keys benchmark_size patricia_left avl_left
+    hash_left equal_patricia equal_avl equal_hash;
+  time_string_union ~right_bias:true "right disjoint union" all_disjoint (2 * benchmark_size)
+    patricia_left avl_left hash_left patricia_disjoint avl_disjoint hash_disjoint;
+  time_string_union ~right_bias:true "right overlap union" all_overlap expected_overlap
+    patricia_left avl_left hash_left patricia_overlap avl_overlap hash_overlap;
+  time_string_union ~right_bias:true "right subset union" left_keys benchmark_size
+    patricia_left avl_left hash_left subset_patricia subset_avl subset_hash;
+  time_string_union ~right_bias:true "right equal union" left_keys benchmark_size
+    patricia_left avl_left hash_left patricia_left avl_left hash_left;
+  time_string_union ~right_bias:true "right copies union" left_keys benchmark_size
+    patricia_left avl_left hash_left equal_patricia equal_avl equal_hash;
   time_string_union "no-op union" left_keys benchmark_size patricia_left avl_left
     hash_left StringPatricia.empty String_avl.empty (String_hash.create 1);
   let sparse_existing = max 1 (benchmark_size / 8) in

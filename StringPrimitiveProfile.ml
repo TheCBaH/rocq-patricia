@@ -6,7 +6,8 @@
    allocation region.  Thus this file is also a stable harness for a future
    executable candidate: add it beside [Native] and retain the same checks. *)
 
-module Native = StringBits
+module Native = StringBitsBaseline
+module Selected = StringBits
 module Candidate = NativeStringWorker
 module Oracle = PatriciaReference.StringBits
 
@@ -44,11 +45,7 @@ let measure repetitions operation =
             -. (before.Gc.minor_words +. before.Gc.major_words);
     checksum = !checksum }
 
-let report name repetitions operation =
-  (* One warm-up runs the exact same already-created inputs, but is not
-     included in either the timing or allocation samples. *)
-  ignore (measure repetitions operation);
-  let samples = List.init 7 (fun _ -> measure repetitions operation) in
+let report_samples name repetitions samples =
   let times = List.map (fun x -> x.seconds) samples in
   let words = List.map (fun x -> x.words) samples in
   let lo, hi = min_max (List.sort Stdlib.compare times) in
@@ -57,6 +54,19 @@ let report name repetitions operation =
     (1e9 *. lo /. float_of_int repetitions)
     (1e9 *. hi /. float_of_int repetitions)
     (median words) (List.hd samples).checksum
+
+let report_pair name repetitions current candidate =
+  ignore (measure repetitions current);
+  ignore (measure repetitions candidate);
+  let current_samples = ref [] and candidate_samples = ref [] in
+  for round = 1 to 7 do
+    let baseline () = current_samples := measure repetitions current :: !current_samples
+    and replacement () = candidate_samples := measure repetitions candidate :: !candidate_samples in
+    if round mod 2 = 0 then (replacement (); baseline ())
+    else (baseline (); replacement ())
+  done;
+  report_samples ("baseline " ^ name) repetitions !current_samples;
+  report_samples ("candidate " ^ name) repetitions !candidate_samples
 
 let independently_equal s = Bytes.to_string (Bytes.of_string s)
 
@@ -68,13 +78,17 @@ let verify_pair left right =
   let limit = 9 * max (Stdlib.String.length left) (Stdlib.String.length right) + 1 in
   for position = 0 to limit do
     if Native.bit_at left (packed position) <> Oracle.bit_at left position then
-      failwith "bit_at oracle mismatch"
+      failwith "bit_at oracle mismatch";
+    if Selected.bit_at left (packed position) <> Candidate.packed_bit_at left (packed position) then
+      failwith "selected bit_at mismatch"
   done;
   if option_map logical (Native.first_diff left right)
      <> Oracle.first_diff left right then
     failwith "first_diff oracle mismatch";
   if Candidate.first_diff_indexed left right <> Native.first_diff left right then
     failwith "first_diff candidate mismatch";
+  if Selected.first_diff left right <> Native.first_diff left right then
+    failwith "selected first_diff mismatch";
   if Candidate.first_diff_indexed_with_identity left right
      <> Native.first_diff left right then
     failwith "first_diff identity candidate mismatch";
@@ -83,6 +97,9 @@ let verify_pair left right =
     if Native.agrees_before_bounded left right split
        <> Oracle.agrees_before_bounded left right (logical split) then
       failwith "agrees_before_bounded oracle mismatch";
+    if Selected.agrees_before_bounded left right split
+       <> Native.agrees_before_bounded left right split then
+      failwith "selected bounded mismatch";
     if Candidate.bounded_prefix_scan left right (split lsr 4) (split land 15)
        <> Native.agrees_before_bounded left right split then
       failwith "bounded candidate mismatch"
@@ -148,31 +165,37 @@ let () =
   Printf.printf "Native string primitive baseline (7 interleaved samples; inputs pre-created)\n%!";
   let positions = Array.init (9 * Stdlib.String.length prefix + 1) packed in
   let index = ref 0 in
-  report "bit_at long binary string" 200_000 (fun () ->
-      let result = Native.bit_at prefix positions.(!index mod Array.length positions) in
-      incr index; consume_bool result);
-  report "first_diff same object" 100_000 (fun () ->
-      consume_option (Native.first_diff prefix prefix));
+  let bit_call worker () =
+    let result = worker prefix positions.(!index mod Array.length positions) in
+    incr index; consume_bool result in
+  report_pair "bit_at" 200_000 (bit_call Native.bit_at) (bit_call Candidate.packed_bit_at);
+  let difference_case name repetitions left right =
+    report_pair name repetitions
+      (fun () -> consume_option (Native.first_diff left right))
+      (fun () -> consume_option (Candidate.first_diff_indexed_with_identity left right)) in
+  difference_case "same object" 200_000 prefix prefix;
   let equal_copy = independently_equal prefix in
-  report "first_diff equal copies" 20_000 (fun () ->
-      consume_option (Native.first_diff prefix equal_copy));
-  report "first_diff late difference" 20_000 (fun () ->
-      consume_option (Native.first_diff prefix differing));
-  report "candidate first_diff copies" 20_000 (fun () ->
-      consume_option (Candidate.first_diff_indexed prefix equal_copy));
-  report "candidate first_diff same" 100_000 (fun () ->
-      consume_option (Candidate.first_diff_indexed_with_identity prefix prefix));
-  report "candidate first_diff late" 20_000 (fun () ->
-      consume_option (Candidate.first_diff_indexed prefix differing));
+  difference_case "equal copies" 20_000 prefix equal_copy;
+  difference_case "late difference" 20_000 prefix differing;
+  difference_case "empty" 200_000 "" "";
+  difference_case "proper prefix" 20_000 prefix proper_prefix;
+  difference_case "early difference" 200_000 "\000abcd" "\255abcd";
+  List.iter (fun length ->
+    let left = byte_string length 17 in
+    let right = independently_equal left in
+    verify_long_pair left right (packed (9 * length));
+    difference_case (Printf.sprintf "equal length %d" length) 20_000 left right)
+    [1; 8; 64; 256; 4096];
   let split = long_split in
-  report "bounded prefix late split" 20_000 (fun () ->
-      consume_bool (Native.agrees_before_bounded prefix differing split));
-  report "candidate bounded late split" 20_000 (fun () ->
-      consume_bool (Candidate.bounded_prefix_scan prefix differing
-                      (split lsr 4) (split land 15)));
-  report "bounded proper prefix" 20_000 (fun () ->
-      consume_bool (Native.agrees_before_bounded prefix proper_prefix split));
-  report "candidate bounded proper prefix" 20_000 (fun () ->
-      consume_bool (Candidate.bounded_prefix_scan prefix proper_prefix
-                      (split lsr 4) (split land 15)));
+  let bounded_case name repetitions left right split =
+    report_pair name repetitions
+      (fun () -> consume_bool (Native.agrees_before_bounded left right split))
+      (fun () -> consume_bool (Candidate.bounded_prefix_packed left right split)) in
+  bounded_case "bounded late" 20_000 prefix differing split;
+  bounded_case "bounded prefix" 20_000 prefix proper_prefix split;
+  bounded_case "bounded empty" 200_000 "" "" 0;
+  bounded_case "bounded early" 200_000 "\000a" "\255a" 8;
+  for tag = 0 to 8 do
+    bounded_case (Printf.sprintf "bounded tag %d" tag) 200_000 binary binary tag
+  done;
   Printf.printf "String primitive profile: oracle checks passed\n%!"

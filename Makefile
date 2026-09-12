@@ -26,6 +26,7 @@ REFERENCE_PACK := PatriciaReference.cmo
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
 .PHONY: string-primitive-profile
+.PHONY: string-worker-performance
 
 .PHONY: set-profile
 
@@ -37,6 +38,9 @@ all: proof assumptions extraction extraction-boundary native-string-worker-audit
 	cached-representative-audit \
 	reference-extraction ocaml reference-ocaml \
 	test union-oracle differential
+
+string-worker-performance:
+	sh ./check-string-worker-performance.sh
 
 proof: $(VOFILES)
 
@@ -217,7 +221,7 @@ reference-profile: reference-extraction PatriciaReferenceProfile.ml
 # reports a median plus range and allocated words for each batch.  A future
 # proved worker can be added as another column without changing the workload
 # generator or correctness oracle.
-string-primitive-profile: extraction reference-extraction StringPrimitiveProfile.ml
+string-primitive-profile: extraction reference-extraction StringPrimitiveProfile.ml benchmarks/StringBitsBaseline.ml
 	cd extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
 	cd $(REFERENCE_DIR) && \
 	  sources=`find . -maxdepth 1 -type f \( -name '*.mli' -o -name '*.ml' \) \
@@ -227,10 +231,11 @@ string-primitive-profile: extraction reference-extraction StringPrimitiveProfile
 	    ! -name 'String.ml' -printf '%f '` && \
 	  objects=`$(OCAMLDEP) -sort $$ml_sources | sed 's/\.ml/.cmx/g'` && \
 	  $(OCAMLOPT) -pack -o ../PatriciaReference.cmx $$objects
-	$(OCAMLOPT) -I extracted -c StringPrimitiveProfile.ml
+	$(OCAMLOPT) -c benchmarks/StringBitsBaseline.ml
+	$(OCAMLOPT) -I extracted -I benchmarks -c StringPrimitiveProfile.ml
 	cd extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
 	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../patricia-string-primitive-profile \
-	  $$objects ../$(REFERENCE_PACK:.cmo=.cmx) ../StringPrimitiveProfile.cmx
+	  $$objects ../$(REFERENCE_PACK:.cmo=.cmx) ../benchmarks/StringBitsBaseline.cmx ../StringPrimitiveProfile.cmx
 	./patricia-string-primitive-profile
 
 # Record the native compiler settings beside any comparable benchmark series.

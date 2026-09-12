@@ -54,7 +54,8 @@ Extract Inlined Constant NativeStringWorker.native_lt => "( < )".
 Extract Inlined Constant NativeStringWorker.native_tag_is_marker => "(fun tag -> tag = 0)".
 Extract Inlined Constant NativeStringWorker.native_tag_is_data => "(fun tag -> tag <= 8)".
 Extract Inlined Constant NativeStringWorker.native_tag_offset => "(fun tag -> tag - 1)".
-Extract Inlined Constant NativeStringWorker.native_eq => "( = )".
+Extract Inlined Constant NativeStringWorker.native_eq =>
+  "(fun (left : int) (right : int) -> left = right)".
 Extract Inlined Constant NativeStringWorker.native_min =>
   "(fun left right -> if left < right then left else right)".
 Extract Inlined Constant NativeStringWorker.native_unsafe_get =>
@@ -78,21 +79,13 @@ Extract Inlined Constant NativeStringWorker.native_terminal_equal =>
          Char.code (Stdlib.String.unsafe_get right byte)) land mask) = 0)".
 Extract Inlined Constant NativeStringWorker.native_token_make =>
   "(fun byte tag -> (byte lsl 4) lor tag)".
-(* Temporary primitive realization for the isolated first-difference candidate;
-   its source shifting-tag worker remains the theorem target. *)
-Extract Inlined Constant NativeStringWorker.native_byte_diff_tag =>
+Extract Inlined Constant NativeStringWorker.native_byte_xor =>
   "(fun left right byte ->
-     let difference =
-       Char.code (Stdlib.String.unsafe_get left byte) lxor
-       Char.code (Stdlib.String.unsafe_get right byte) in
-     let rec tag count mask =
-       if difference land mask <> 0 then 1 + count
-       else tag (count + 1) (mask lsr 1)
-     in tag 0 128)".
-Extract Inlined Constant NativeStringWorker.native_byte_difference_zero =>
-  "(fun left right byte ->
-     (Char.code (Stdlib.String.unsafe_get left byte) lxor
-      Char.code (Stdlib.String.unsafe_get right byte)) = 0)".
+     Char.code (Stdlib.String.unsafe_get left byte) lxor
+     Char.code (Stdlib.String.unsafe_get right byte))".
+Extract Inlined Constant NativeStringWorker.native_difference_zero => "(fun difference -> difference = 0)".
+Extract Inlined Constant NativeStringWorker.native_difference_bit =>
+  "(fun difference offset -> difference land (128 lsr offset) <> 0)".
 Extract Inlined Constant NativeStringWorker.native_string_same => "(==)".
 Extract Constant StringBits.bit_at => "NativeStringWorker.packed_bit_at".
 
@@ -169,6 +162,7 @@ Extract Constant StringBits.agrees_before_bounded =>
 Separate Extraction
   NativeStringWorker.packed_bit_at
   NativeStringWorker.bounded_prefix_scan
+  NativeStringWorker.bounded_prefix_packed
   NativeStringWorker.first_diff_indexed
   NativeStringWorker.first_diff_indexed_with_identity
   PatriciaBits.mask_above

@@ -64,7 +64,7 @@ workers; the public wrappers select those extracted workers.
 | --- | --- | --- | --- | --- |
 | I1 | Nine integer directives: `Pos.eqb`, `N.eqb`, `N.ltb`, `word`, `prefix`, `matches_prefix`, `zero_bit`, `highest_differing_bit`, `mask_above` | Native comparisons, shifts, masks and XOR implement routing and split selection without recursive arithmetic on inductive numbers. | `NativeRefinement.v` proves bounded mathematical routing correspondence and 62-bit key/mask closure; `native_routing_shift_count_fits` covers routing and prefix shift counts; `native_log2_loop_correct` proves the fuelled source model of the right-shifting accumulator loop, while `native_highest_differing_bit_loop_correct` applies its 62-step instance to bounded XOR operands. | Relate actual native operators and the right-shifting `log2` loop to that model and target operators. |
 | I2 | `StringBits.bit_at` | Source-defined `NativeStringWorker.packed_bit_at` decodes a packed byte/tag token and inspects one guarded byte directly. | Codec validity, ordering, round trips, byte-array access laws; `packed_bit_at_refines_model`, `packed_bit_at_encode_refines`, and `packed_bit_at_refines_representation`. | The generated binding is checked for direct guarded access, but OCaml string/int primitive execution and the map call sites’ logical `9*b+t` to packed `16*b+t` correspondence remain explicit trust obligations. |
-| I3 | `StringBits.first_diff` | Scan bytes by index, use XOR and a mask loop for the first differing bit; identical string objects return immediately. | Safe structural bytewise scanner and `native_string_first_diff_refines`; per-byte XOR/leading-zeroes laws; `native_string_first_diff_with_identity_refines` proves the identity shortcut under `native_string_same_sound`. | Prove the indexed loop, counter progression and mask progression implement the model; establish the OCaml-string physical-equality contract and primitive execution correspondence. |
+| I3 | `StringBits.first_diff` | Scan bytes by index, use XOR and a mask loop for the first differing bit; identical string objects return immediately. | `NativeStringWorker.first_diff_indexed_refines` now connects the executable erased-`Acc` scan through the fuelled and structural models to `native_string_first_diff_refines`. `difference_tag_first_set_bit` establishes tag progression, bounds and zero higher bits. `first_diff_indexed_with_identity_refines` retains `native_string_same_sound`. | Candidate selection still needs performance acceptance. OCaml primitive execution, physical-equality adequacy, and packed representation at extracted map call sites remain trusted. |
 | I4 | `StringBits.agrees_before_bounded` | Scan only the bytes/high bits before the split; return a Boolean without allocating a first-difference option. | `native_bounded_prefix_scan_correct` (2026-09-10) refines the indexed source byte scan to `agrees_before_bounded`; its proof covers complete bytes, continuation markers, terminal partial tags, the shorter-length sentinel, short-circuiting and byte-count termination. `native_terminal_mask_equal_correct` proves the emitted terminal `lxor`/left-shift/`land` expression equal to the high-bit iterator for every valid tag 1–8. | Connect the extracted OCaml loop's integer/string primitives and execution—including guarded unsafe access—to these source models. |
 | I5 | Resolved 2026-09-09: former `StringPatricia.representative` directive | Read a cached sample in constant time instead of descending to a leaf. | Cached-sample residency/independence lemmas; proved cached filtering, deletion, generic combine, and selected `Acc` union refinements. | The override is removed. `cached-representative-audit` forbids its reintroduction; the total structural source definition remains for raw-tree proofs. |
 | I6 | Resolved 2026-09-09: former four handwritten union directives | Public wrappers call extracted `union_*_native_acc_default` workers; direct `Acc` recursion replaces fuel and nested closures while retaining reuse decisions. | `union_left_native_acc_exact` and left/right well-formedness/lookup theorems in both companion proof files. | No handwritten high-level union body remains. I7's `(==)` adequacy, primitive contracts, extraction/compiler/runtime and allocation semantics remain separate obligations. |
@@ -318,7 +318,11 @@ No implementation strategy below has yet passed its replacement gate.
   it factors the finite one-difference-byte mask theorem from the XOR-code
   bridge rather than enumerating tag/byte-pair combinations. Remaining:
   connect OCaml primitives, guarded unsafe access and execution to these
-  models.
+  models. The 2026-09-12 `NativeStringWorker.bounded_prefix_scan_acc_refines_fuel`
+  and `bounded_prefix_scan_refines` now close the source executable `Acc`
+  worker refinement; `bounded_prefix_packed_encode_refines` connects its packed
+  argument through the codec. Runtime primitive/call-site adequacy and
+  performance acceptance remain separate gates.
 - [-] V2.3 Prove indexed first difference and its shifting-mask/identity paths
   for I3; compose with the existing logical first-difference theorem.
   The source-model portion is already closed by
@@ -329,7 +333,11 @@ No implementation strategy below has yet passed its replacement gate.
   source-level early-return path under the explicit positive-direction
   `native_string_same_sound` contract. Still open is a target-execution
   refinement of the indexed OCaml scan and the physical-equality/native
-  string/int contracts.
+  string/int contracts. The 2026-09-12 executable indexed source worker is
+  now proved by `NativeStringWorker.first_diff_indexed_refines`; its generated
+  tag loop shares one XOR with the scan, and `difference_tag_first_set_bit`
+  proves the first-set-bit invariant through `difference_tag_acc_refines`.
+  This removes the source algorithm gap without discharging target execution.
 - [-] V2.4 Audit reachable integer/string intermediates and prove range closure;
   give each retained native operator/byte access an explicit foreign contract.
   Integer routing closure is already proved at 62 bits, and
