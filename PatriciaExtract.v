@@ -94,61 +94,13 @@ Extract Constant StringBits.bit_at => "NativeStringWorker.packed_bit_at".
 
 Extract Inlined Constant StringPatriciaUnion.native_same => "(==)".
 
+(* The two scanner bindings select source-defined workers.  Their packed-token
+   codec and identity contracts are proved in [NativeStringWorker.v]; OCaml
+   primitive execution and packed map call sites remain explicit trust. *)
 Extract Constant StringBits.first_diff =>
-  "(fun left right ->
-     if left == right then None else
-     let left_length = Stdlib.String.length left
-     and right_length = Stdlib.String.length right in
-     let common = if left_length < right_length then left_length else right_length in
-     let rec scan byte =
-       if byte = common then
-         if left_length = right_length then None else Some (byte lsl 4)
-       else
-         let difference =
-           Char.code (Stdlib.String.unsafe_get left byte) lxor
-           Char.code (Stdlib.String.unsafe_get right byte)
-         in
-         if difference = 0 then scan (byte + 1)
-         else
-           let rec leading_zeroes count mask =
-             if difference land mask <> 0 then count
-             else leading_zeroes (count + 1) (mask lsr 1)
-           in
-           Some ((byte lsl 4) lor (1 + leading_zeroes 0 128))
-     in scan 0)".
-
-(** The source worker is proved equal to logical [agrees_before].  Under the
-    existing packed-position refinement, scan complete bytes strictly before
-    the split byte and only the relevant high bits of its final byte.  This
-    returns the Boolean directly and does not allocate a [first_diff] option. *)
+  "NativeStringWorker.first_diff_indexed_with_identity".
 Extract Constant StringBits.agrees_before_bounded =>
-  "(fun left right split ->
-     let split_byte = split lsr 4
-     and split_tag = split land 15
-     and left_length = Stdlib.String.length left
-     and right_length = Stdlib.String.length right in
-     let common =
-       if left_length < right_length then left_length else right_length
-     in
-     let rec scan left right left_length right_length common
-                  split_byte split_tag byte =
-       if byte = split_byte then
-         if split_tag = 0 then true
-         else
-           let left_present = byte < left_length
-           and right_present = byte < right_length in
-           if left_present <> right_present then false
-           else if not left_present then true
-           else
-             let mask = (255 lsl (9 - split_tag)) land 255 in
-             ((Char.code (Stdlib.String.unsafe_get left byte) lxor
-               Char.code (Stdlib.String.unsafe_get right byte)) land mask) = 0
-       else if byte = common then left_length = right_length
-       else if Stdlib.String.unsafe_get left byte <>
-                    Stdlib.String.unsafe_get right byte then false
-       else scan left right left_length right_length common
-                 split_byte split_tag (byte + 1)
-     in scan left right left_length right_length common split_byte split_tag 0)".
+  "NativeStringWorker.bounded_prefix_packed".
 
 (** The total structural [representative] now extracts normally.  Public
     executable consumers use the separately proved [representative_cached]

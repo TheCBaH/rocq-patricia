@@ -11,6 +11,14 @@ if ! rg -Fq 'Extract Constant StringBits.bit_at => "NativeStringWorker.packed_bi
   exit 1
 fi
 
+if ! rg -Fq 'Extract Constant StringBits.first_diff =>' "$source_file" ||
+   ! rg -Fq '"NativeStringWorker.first_diff_indexed_with_identity".' "$source_file" ||
+   ! rg -Fq 'Extract Constant StringBits.agrees_before_bounded =>' "$source_file" ||
+   ! rg -Fq '"NativeStringWorker.bounded_prefix_packed".' "$source_file"; then
+  echo "expected first-difference and bounded-prefix bindings to select generated workers" >&2
+  exit 1
+fi
+
 if rg -q '^open String$|String\.get|String\.sub|native_ascii_prefix_equal' "$worker_file"; then
   echo "native string worker unexpectedly depends on a structural string helper" >&2
   exit 1
@@ -47,7 +55,7 @@ for signature in \
 done
 
 if rg -q 'first_diff_scan_fuel|native_xor_diff_tag_from|String\.sub|String\.get|encode_position|decode_position' "$worker_file"; then
-  echo "candidate string worker unexpectedly contains fuel or structural access" >&2
+  echo "selected string worker unexpectedly contains fuel or structural access" >&2
   exit 1
 fi
 

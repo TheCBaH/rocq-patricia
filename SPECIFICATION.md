@@ -136,11 +136,11 @@ Executing the supported native library additionally trusts:
 - the OCaml compiler, runtime, native integer operations, byte-string
   primitives, and the host platform;
 - the standard `positive`, `N`, `nat`, and native-string extraction mappings;
-- the packed `StringBits.bit_at` binding's OCaml length, integer and guarded
-  byte-access primitives. Its source worker has kernel-checked model/codec/
-  representation refinements and a generated-code shape audit; the logical
-  `9*b+t` to packed `16*b+t` map call-site correspondence remains a separate
-  runtime representation contract;
+- the packed `StringBits` bindings' OCaml length, integer, guarded byte-access,
+  XOR/mask and positive physical-identity primitives. Their source workers
+  have kernel-checked model/codec refinements and generated-code shape audits;
+  the logical `9*b+t` to packed `16*b+t` map-call-site correspondence remains
+  a separate runtime representation contract;
 - the handwritten wrapper modules that enforce abstract maps, positive native
   keys, and the restricted combine callback;
 - integer realizer code for equality/order tests, shifts, masks, prefixes,
@@ -204,28 +204,27 @@ The former extraction-only string representative is gone: the total structural
 source definition remains only for raw-tree proofs, while executable public
 paths use proved cached consumers.
 
-The native bounded-prefix byte loop has a source-level byte-scan model:
-`native_bounded_prefix_scan` follows its complete-byte, shorter-length
-sentinel and terminal partial-code branches, while its guarded-access lemmas
-make the model's unsafe reads explicit. Its complete-byte, terminal-tag and
-shorter-length-sentinel theorems compose in
-`native_bounded_prefix_scan_correct`, which refines the scan to the logical
-specification. `native_terminal_mask_equal_correct` proves the terminal
-byte-domain XOR/mask arithmetic equal to the high-bit iterator for all valid
-tags. OCaml primitive correspondence and execution remain open. The structural
-first-difference model proves its identity shortcut under an explicit
-positive-direction string-identity contract, but still leaves the indexed
-OCaml scan, shifting-mask loop and target `(==)` semantics to be connected. These
-algorithmic obligations
-are separate from the standard primitive contracts in the audit below.
+The selected native bounded-prefix worker has a source-level byte-scan model:
+`bounded_prefix_scan_refines` connects its erased-`Acc`, cached-length loop to
+`native_bounded_prefix_scan_correct`, including complete bytes, the
+shorter-length sentinel and terminal partial codes. The packed public binding
+is covered by `bounded_prefix_packed_encode_refines`.
+`native_terminal_mask_equal_correct` proves the terminal byte-domain XOR/mask
+arithmetic equal to the high-bit iterator for all valid tags. The selected
+first-difference worker is similarly covered by `first_diff_indexed_refines`;
+its source tag scan shares a byte XOR and `difference_tag_first_set_bit` proves
+the bounded first-set-bit behavior. Its identity shortcut remains conditional
+on the explicit positive-direction string-identity contract. OCaml primitive
+correspondence, target `(==)` semantics and execution remain separate from
+these source-level proofs.
 
 `NativeRefinement.v` proves part of the representation-level source model,
 including the packed-position codec, safe first-difference model, routing
-shift-count bounds, and the
-fuelled right-shift/accumulator invariant for the native `log2` loop (with 62
-steps sufficient for bounded XOR operands in the native-word domain). It does
-not remove the native primitives or handwritten algorithms above from the
-trusted boundary. The proof-aligned reference extraction shares the standard
+shift-count bounds, and the fuelled right-shift/accumulator invariant for the
+native `log2` loop (with 62 steps sufficient for bounded XOR operands in the
+native-word domain). It does not remove the native primitives, extraction,
+compiler or runtime from the trusted boundary. The proof-aligned reference
+extraction shares the standard
 numeric/string mappings and extraction/compiler boundary, but omits the
 Patricia-specific algorithm realizers.
 

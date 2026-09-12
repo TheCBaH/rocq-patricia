@@ -15,19 +15,18 @@ generated-code inspection or allocation measurement alone.
 
 ## Current status
 
-Two handwritten bodies (`first_diff` and `agrees_before_bounded`) remain
-selected in `PatriciaExtract.v`.
-The packed `bit_at` binding now selects a source-defined worker whose native
-operations are limited to length, token shifts/masks, guarded byte access and
-the byte bit test. Its source refinement is kernel-checked, while the OCaml
-primitive and packed-binding correspondence remain explicit residual trust.
-`first_diff` and `agrees_before_bounded` are still handwritten extraction
-bodies. Their indexed candidates now have compiled refinement proofs; the
-first-difference candidate also extracts its tag recursion from source and
-shares one byte XOR between its zero test and tag worker. A reproducible native harness measures the selected binding against
-the proof-aligned extraction as an oracle; no worker is selected until its
-full S4/S5 gates pass. The earlier structural first-difference extraction was
-rejected for suffix copying; it is not a candidate to reinstate unchanged.
+`PatriciaExtract.v` selects source-defined `NativeStringWorker` bodies for
+all three string primitives: `packed_bit_at`, `first_diff_indexed_with_identity`
+and `bounded_prefix_packed`. The scanners use erased `Acc` termination;
+first difference shares one guarded byte XOR with its bounded mask scan, and
+bounded prefix retains cached lengths and terminal-before-sentinel order.
+Their source/codec refinements are kernel-checked. OCaml primitive execution,
+the positive `(==)` contract, packed map-call-site representation, extraction,
+compiler, runtime and measured-cost conclusions remain residual trust.
+
+The frozen historical bodies are retained only as isolated benchmark fixtures.
+The previous structural first-difference extraction remains rejected for suffix
+copying and is not selected.
 
 ## S0 — Baseline and primitive interface
 
@@ -60,7 +59,7 @@ the string workers.
   correct guard ordering and no allocation.
 - [x] S1.4 Run exhaustive byte/tag and out-of-range-index checks, differential
   tests and repeated routing/map timing comparisons.
-- [ ] S1.5 Select the candidate only after S4's integration obligations and
+- [x] S1.5 Select the candidate only after S4's integration obligations and
   S5's acceptance gates pass; document remaining assumptions.
 
 Parent coverage: I2. Expected first executable replacement.
@@ -80,9 +79,9 @@ Parent coverage: I2. Expected first executable replacement.
   list access, substring copying or first-difference options.
 - [x] S2.6 Check empty/proper-prefix/equal inputs, sentinel/split coincidence,
   every valid tag, binary bytes and long prefixes against the oracle.
-- [ ] S2.7 Measure primitive timings and map combine/union allocation and
+- [x] S2.7 Measure primitive timings and map combine/union allocation and
   timings; retain near-zero-allocation overlap/subset/equality behavior.
-- [ ] S2.8 Select only after S4/S5 pass and update parent I4/V2.2/V2.5 with
+- [x] S2.8 Select only after S4/S5 pass and update parent I4/V2.2/V2.5 with
   the exact scope now established.
 
 ## S3 — Indexed first difference
@@ -102,9 +101,9 @@ Parent coverage: I2. Expected first executable replacement.
   suffixes, no runtime fuel and no per-byte result wrapping or allocation.
 - [x] S3.7 Validate exhaustive one-byte pairs, proper prefixes, binary keys,
   long equal prefixes, same-object and separately allocated equal strings.
-- [ ] S3.8 Compare repeated primitive and map build/update timings and
+- [x] S3.8 Compare repeated primitive and map build/update timings and
   allocations, including fixed closure costs and the identity fast path.
-- [ ] S3.9 Select only after S4/S5 pass and update parent I3/V2.3/V2.5 with
+- [x] S3.9 Select only after S4/S5 pass and update parent I3/V2.3/V2.5 with
   the exact refinement and residual contracts.
 
 ## S4 — Bindings and map representation
@@ -118,7 +117,7 @@ Parent coverage: I2. Expected first executable replacement.
 - [x] S4.4 Retain the reference backend and abstract public interfaces; check
   module generation/linking for shadowed `String` units and accidental logical
   helper dependencies.
-- [ ] S4.5 Remove selected handwritten bodies only after their gates pass.
+- [x] S4.5 Remove selected handwritten bodies only after their gates pass.
   If generated-worker aliases remain, inventory them and their exact trust
   status rather than claiming all substitution obligations disappeared.
 - [x] S4.6 Add focused extraction-boundary guards for the final selected
@@ -134,10 +133,10 @@ Apply these gates to each selected worker, recording separate evidence rows.
   exhaustive/differential checks. Investigate every failure.
 - [x] S5.3 Record generated OCaml and relevant compiler-output findings for
   recursive arity, tail calls, closures, copying, fuel and allocations.
-- [ ] S5.4 Run repeated, interleaved current/candidate primitive and 10K/100K
+- [x] S5.4 Run repeated, interleaved current/candidate primitive and 10K/100K
   map workloads on the same toolchain; report medians, dispersion and words
   allocated. Use larger sizes when practical.
-- [ ] S5.5 Require no reproducible regression outside measured variability
+- [x] S5.5 Require no reproducible regression outside measured variability
   and no new allocation proportional to scanned bytes or map size in the
   existing constant-allocation paths. Record tradeoffs as failed gates.
 - [x] S5.6 Update `patricia-bench.md`, the parent native inventory/tracker and
@@ -160,6 +159,9 @@ Apply these gates to each selected worker, recording separate evidence rows.
 
 | Date | Item | Evidence and limits |
 | --- | --- | --- |
+| 2026-09-12 | S1.5/S2.7--S2.8/S3.8--S3.9/S4.5/S5 selection | `PatriciaExtract.v` now binds `StringBits.bit_at` to `packed_bit_at`, `StringBits.first_diff` to `first_diff_indexed_with_identity`, and `StringBits.agrees_before_bounded` to `bounded_prefix_packed`; the former handwritten scanner bodies are removed. `packed_bit_at_refines_representation`, `bounded_prefix_scan_refines`, `bounded_prefix_packed_encode_refines`, `first_diff_indexed_refines`, `first_diff_indexed_spec`, `difference_tag_first_set_bit`, `first_diff_indexed_with_identity_refines`, `first_diff_indexed_valid`, and `encoded_position_order` supply the source/codec chain. The identity theorem retains `native_string_same_sound`; OCaml `(==)`, string/int/XOR/mask primitives, extraction/compiler/runtime execution and packed map-call-site representation are residual trust. |
+| 2026-09-12 | S5.2/S5.3 final selected checks | After selecting all three bindings, `make all`, `make union-oracle-native`, and `make string-primitive-profile` passed. The all-suite assumption audit reports 542 declarations closed under the global context; randomized/oracle, specialized-union native, optimized/reference differential, exhaustive byte/tag and primitive-oracle checks passed. `check-native-string-workers.sh` confirmed direct packed access and scalar tail-recursive prefix/difference/tag workers with no structural strings, fuel, list access, copied suffixes, runtime proof arguments, or handwritten worker overrides. Native compiler inspection found tail branches for the scan/tag recursions and allocation sites only for final `Some` results. These checks do not prove target execution. |
+| 2026-09-12 | S5.4/S5.5 interleaved acceptance | `PATRICIA_STRING_ROUNDS=5 PATRICIA_BENCH_SHORT_BATCH=8 make string-worker-performance` wrote `/tmp/patricia-string-acceptance.EjzGYB`: five interleaved samples for historical, each isolated worker, and all workers at 10K/100K, with arm64 Linux, OCaml 4.14.3, Flambda disabled, safe strings, GCC `-O2 -fno-strict-aliasing -fwrapv -pthread -fPIC -D_FILE_OFFSET_BITS=64`. Every run passed map equivalence. The all-workers rows had no timing range wholly above the normalized historical baseline and no median allocation increase; the isolated difference fixture had one 10K variable-key equal-union regression, recorded by the summarizer, but the actual selected all-workers arrangement did not reproduce it. At 100K fixed keys, selected build/lookup/membership were 10.105 ms/74.4/66.2 ns/op versus 9.973 ms/75.4/69.3 and allocated 6,082,676 versus 7,391,327 build words. At 100K variable keys, they were 17.564 ms/75.2/56.2 versus 17.526 ms/78.1/55.6 and 10,283,200 versus 11,578,414 words. Raw logs, source hashes and dispersion are reproducible through `benchmarks/README.md`; this is an empirical acceptance result for this configuration, not a portable cost claim. |
 | 2026-09-12 | S2.3 indexed prefix refinement | `bounded_prefix_scan_acc_refines_fuel` proves equality to `native_bounded_prefix_scan` with fuel strictly above the remaining minimum-sentinel distance; `bounded_prefix_scan_refines` composes `native_bounded_prefix_scan_correct`. `bounded_prefix_packed_encode_refines` states the public correspondence through `encode_position`. `make NativeStringWorker.vo` passed. No primitive execution or map-call-site substitution theorem is claimed. |
 | 2026-09-12 | S3.2/S3.4 indexed difference refinement | `first_diff_scan_acc_refines_fuel` discharges the erased-`Acc` bridge with both guarded length bounds; `first_diff_scan_fuel_cons` relates successor indexing to structural tails in proofs only; `first_diff_scan_fuel_refines` and `first_diff_indexed_refines` compose the native whole-string refinement. `first_diff_scan_acc_none_prior` and `first_diff_indexed_spec` establish previously scanned equality for `None` and the equal logical prefix before a produced split. `first_diff_indexed_with_identity_refines` retains the positive-direction identity hypothesis. `make NativeStringWorker.vo` passed. |
 | 2026-09-12 | S3.3/S3.6 generated tag recursion | Removed the candidate's handwritten `native_byte_diff_tag` extraction loop. `difference_tag_acc` now recurses on erased `Acc (7-offset)` with `offset <= 7`; `difference_tag_acc_refines`, `difference_tag_refines`, `difference_tag_nonzero_range`, and `native_difference_bit_shift_mask` prove its bounded tag/mask behavior. `native_byte_xor_correct` connects the guarded shared XOR to byte equality and tag selection. Generated `first_diff_scan_acc` computes one XOR, and the two-argument tag loop allocates no options. `make extraction`, `make string-primitive-profile`, and `sh check-native-string-workers.sh` passed before the expanded performance series. |

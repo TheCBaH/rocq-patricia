@@ -18,7 +18,7 @@ its separate tracker in
 ### Native string primitive baseline (2026-09-11)
 
 `make string-primitive-profile` is the reproducible primitive-level baseline
-for the three handwritten `StringBits` extraction bodies. It creates strings
+for the then-handwritten `StringBits` extraction bodies. It creates strings
 before timed/allocation regions, consumes every result, takes seven samples
 after one warm-up, and checks short binary inputs and long workload endpoints
 against the proof-aligned extracted oracle. It is not an executable-candidate
@@ -40,12 +40,10 @@ The 24-word batches are measurement overhead. The two non-identity
 `first_diff` workloads include the fixed `Some` result allocation; no
 allocation proportional to the scanned prefix appears in this baseline.
 
-The current source-defined packed `bit_at` worker was then measured by the
-same command at **3.185 ns/op** (3.135–3.340) with the same 24-word batch
-overhead. It replaces the handwritten `bit_at` extraction algorithm with
-inlined length, token, guarded-read, and byte-bit primitives, but remains a
-candidate until the tracker’s map-level representation and acceptance gates
-are complete.
+The source-defined packed `bit_at` worker was then measured by the same command
+at **3.185 ns/op** (3.135–3.340) with the same 24-word batch overhead. At that
+point it remained a candidate; the 2026-09-12 section records its later
+selection after the map-level acceptance gate.
 
 The unselected source-defined bounded-prefix candidate was checked against the
 current primitive on the harness’s valid packed-position matrix. On the long
@@ -75,6 +73,51 @@ equal union allocations were 106/96/3/1 words at 10K and 145/140/32/30 at
 100K. Disjoint-union elapsed time is below reliable resolution (0.186–0.253
 us at 10K and 0.954–3.099 us at 100K), so allocation is the dependable signal
 for that case.
+
+### Selected source-defined string workers (2026-09-12)
+
+The selected `StringBits.bit_at`, `first_diff`, and
+`agrees_before_bounded` bindings now respectively target
+`NativeStringWorker.packed_bit_at`,
+`NativeStringWorker.first_diff_indexed_with_identity`, and
+`NativeStringWorker.bounded_prefix_packed`. The historical OCaml bodies are
+retained only in isolated benchmark fixtures.
+
+`make string-primitive-profile` used seven paired, alternating samples after
+warm-up, with inputs created outside measurement. It checked selected and
+generated workers against the frozen historical body and the proof-aligned
+reference extraction. On 1,024-byte inputs, selected `first_diff` improved
+equal copies from 622.749 to 596.845 ns/op and late difference from 626.445
+to 606.406 ns/op, while batch words fell from 160,024/300,048 to 24/40,024.
+Bounded late/proper-prefix scans improved from 1,111.543/1,097.953 to
+854.349/849.307 ns/op with the same 24-word measurement overhead. Packed
+`bit_at` was 3.455 versus 3.515 ns/op; its seven-sample ranges overlap. The
+identity, empty, proper-prefix, early-difference, every terminal tag, binary,
+separately allocated equality, exhaustive one-byte and oracle checks passed.
+
+`PATRICIA_STRING_ROUNDS=5 PATRICIA_BENCH_SHORT_BATCH=8
+make string-worker-performance` built five independently linked variants
+(historical, each isolated worker, and all selected workers) and interleaved
+them at 10K and 100K. Each run exercised fixed four-byte, variable up-to-four
+byte, and 192-byte-common-prefix keys; build/random build, lookup,
+membership, update, unchanged update, removal, combine, mixed operations,
+and left/right disjoint/overlap/subset/equal/separately-built-equal unions.
+Every completed run reported `Patricia comparison benchmark: ok`. The summary
+requires five samples per row; the all-workers variant had no timing range
+wholly above its historical baseline and no median allocation increase. Its
+fixed-four-byte 100K build/lookup/membership medians were 10.105 ms/74.4/66.2
+ns/op versus 9.973 ms/75.4/69.3 ns/op, with 6,082,676 versus 7,391,327 build
+words. Its variable-key 100K build/lookup/membership medians were 17.564
+ms/75.2/56.2 ns/op versus 17.526 ms/78.1/55.6 ns/op, with 10,283,200 versus
+11,578,414 build words. Timing dispersion is retained in the generated CSV,
+not collapsed into a portability claim.
+
+The acceptance fixture and summarizer are in
+[`benchmarks/`](benchmarks/README.md); its temporary artifact directory holds
+the exact compiler configuration, source hashes, workload settings, binaries
+and raw logs. The measurements establish this toolchain/machine acceptance
+gate only. They do not prove primitive execution, extraction/compiler
+correctness, or a universal performance/GC property.
 
 ## Result
 

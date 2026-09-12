@@ -1,6 +1,6 @@
 # Patricia native verification gaps and tracker
 
-Last updated: 2026-09-10
+Last updated: 2026-09-12
 
 This document owns the detailed inventory and forward tracker for reducing
 unverified native code without sacrificing performance. The project-wide
@@ -13,16 +13,17 @@ this plan does not expand them. The verification review is in
 ### Scope-audit method
 
 The explicit-realizer inventory is reproducible with
-`rg -n '^Extract (Constant|Inlined Constant)' PatriciaExtract.v`. On the
-stated date it reports 14 directives: nine integer-routing directives (I1),
-one each for packed `bit_at`, first difference, and bounded prefix comparison
-(I2–I4), and two physical-equality directives (I7). Standard extraction
-mappings and handwritten public wrappers are separately retained as I8 and
-I9, because this command intentionally does not enumerate them. “Resolved”
-means that the listed Patricia-specific override has been removed and the
-recorded source/extraction gate passed; it never means that OCaml execution,
-the compiler, runtime, or cost semantics have been proved. The open/deferred
-items below are a forward plan, not missing sections of this document.
+`rg -n '^Extract (Constant|Inlined Constant)' PatriciaExtract.v`. On
+2026-09-12 it reports 32 directives: nine integer-routing directives (I1),
+nineteen scalar/guarded native operations used by the source-defined string
+workers, three worker bindings (I2--I4), and two physical-equality directives
+(I7). Standard extraction mappings and handwritten public wrappers are
+separately retained as I8 and I9, because this command intentionally does not
+enumerate them. “Resolved” means that a handwritten algorithm substitution has
+been removed and its recorded source/extraction gate passed; it never means
+that OCaml execution, the compiler, runtime, or cost semantics have been
+proved. The open/deferred items below are a forward plan, not missing sections
+of this document.
 
 ## Objective and boundaries
 
@@ -64,8 +65,8 @@ workers; the public wrappers select those extracted workers.
 | --- | --- | --- | --- | --- |
 | I1 | Nine integer directives: `Pos.eqb`, `N.eqb`, `N.ltb`, `word`, `prefix`, `matches_prefix`, `zero_bit`, `highest_differing_bit`, `mask_above` | Native comparisons, shifts, masks and XOR implement routing and split selection without recursive arithmetic on inductive numbers. | `NativeRefinement.v` proves bounded mathematical routing correspondence and 62-bit key/mask closure; `native_routing_shift_count_fits` covers routing and prefix shift counts; `native_log2_loop_correct` proves the fuelled source model of the right-shifting accumulator loop, while `native_highest_differing_bit_loop_correct` applies its 62-step instance to bounded XOR operands. | Relate actual native operators and the right-shifting `log2` loop to that model and target operators. |
 | I2 | `StringBits.bit_at` | Source-defined `NativeStringWorker.packed_bit_at` decodes a packed byte/tag token and inspects one guarded byte directly. | Codec validity, ordering, round trips, byte-array access laws; `packed_bit_at_refines_model`, `packed_bit_at_encode_refines`, and `packed_bit_at_refines_representation`. | The generated binding is checked for direct guarded access, but OCaml string/int primitive execution and the map call sites’ logical `9*b+t` to packed `16*b+t` correspondence remain explicit trust obligations. |
-| I3 | `StringBits.first_diff` | Scan bytes by index, use XOR and a mask loop for the first differing bit; identical string objects return immediately. | `NativeStringWorker.first_diff_indexed_refines` now connects the executable erased-`Acc` scan through the fuelled and structural models to `native_string_first_diff_refines`. `difference_tag_first_set_bit` establishes tag progression, bounds and zero higher bits. `first_diff_indexed_with_identity_refines` retains `native_string_same_sound`. | Candidate selection still needs performance acceptance. OCaml primitive execution, physical-equality adequacy, and packed representation at extracted map call sites remain trusted. |
-| I4 | `StringBits.agrees_before_bounded` | Scan only the bytes/high bits before the split; return a Boolean without allocating a first-difference option. | `native_bounded_prefix_scan_correct` (2026-09-10) refines the indexed source byte scan to `agrees_before_bounded`; its proof covers complete bytes, continuation markers, terminal partial tags, the shorter-length sentinel, short-circuiting and byte-count termination. `native_terminal_mask_equal_correct` proves the emitted terminal `lxor`/left-shift/`land` expression equal to the high-bit iterator for every valid tag 1–8. | Connect the extracted OCaml loop's integer/string primitives and execution—including guarded unsafe access—to these source models. |
+| I3 | `StringBits.first_diff` | Selected `NativeStringWorker.first_diff_indexed_with_identity` scans bytes by index, shares one XOR with its mask loop, and returns immediately on positive physical identity. | `first_diff_indexed_refines`, `first_diff_indexed_spec`, `difference_tag_first_set_bit`, and `first_diff_indexed_with_identity_refines` connect erased-`Acc` recursion through the fuelled and structural models to the packed source result. | OCaml primitive execution, physical-equality adequacy, extraction/compiler/runtime behavior, and packed representation at map call sites remain trusted. |
+| I4 | `StringBits.agrees_before_bounded` | Selected `NativeStringWorker.bounded_prefix_packed` scans complete bytes and terminal high bits directly, returning a Boolean. | `bounded_prefix_scan_refines`, `bounded_prefix_packed_encode_refines`, `native_bounded_prefix_scan_correct`, and `native_terminal_mask_equal_correct` cover the cached indexed loop, codec, sentinels and tags. | OCaml length/int/string primitive execution, extraction/compiler/runtime behavior, and packed map-call-site representation remain trusted. |
 | I5 | Resolved 2026-09-09: former `StringPatricia.representative` directive | Read a cached sample in constant time instead of descending to a leaf. | Cached-sample residency/independence lemmas; proved cached filtering, deletion, generic combine, and selected `Acc` union refinements. | The override is removed. `cached-representative-audit` forbids its reintroduction; the total structural source definition remains for raw-tree proofs. |
 | I6 | Resolved 2026-09-09: former four handwritten union directives | Public wrappers call extracted `union_*_native_acc_default` workers; direct `Acc` recursion replaces fuel and nested closures while retaining reuse decisions. | `union_left_native_acc_exact` and left/right well-formedness/lookup theorems in both companion proof files. | No handwritten high-level union body remains. I7's `(==)` adequacy, primitive contracts, extraction/compiler/runtime and allocation semantics remain separate obligations. |
 | I7 | Two selected `native_same => (==)` directives | Connect source-defined native-shaped workers to physical equality. | `NativeHeapRefinement.v` derives source soundness from a per-call object/heap adequacy contract. | Establish that target execution supplies this contract. These directives are separate from the native string identity shortcut in I3. |
@@ -301,7 +302,8 @@ No implementation strategy below has yet passed its replacement gate.
   removal, filtering, both generic combine workers, and selected `Acc` union.
   The manifest audit forbids reintroducing the former representative directive. Raw-tree
   proof references deliberately retain the total source reader.
-- [-] V2.2 Model the executable indexed bounded-prefix scan for I4. The
+- [x] V2.2 Model and select the executable indexed bounded-prefix scan for I4.
+  The
   2026-09-10 source model now follows its complete-byte, shorter-length
   sentinel, terminal-tag and partial-code control flow;
   `native_complete_byte_equal_guarded` and
@@ -321,9 +323,11 @@ No implementation strategy below has yet passed its replacement gate.
   models. The 2026-09-12 `NativeStringWorker.bounded_prefix_scan_acc_refines_fuel`
   and `bounded_prefix_scan_refines` now close the source executable `Acc`
   worker refinement; `bounded_prefix_packed_encode_refines` connects its packed
-  argument through the codec. Runtime primitive/call-site adequacy and
-  performance acceptance remain separate gates.
-- [-] V2.3 Prove indexed first difference and its shifting-mask/identity paths
+  argument through the codec. `PatriciaExtract.v` selects
+  `bounded_prefix_packed`; its five-round 10K/100K acceptance matrix and
+  primitive profile passed without an all-worker regression or allocation
+  growth. Runtime primitive/call-site adequacy remains separate.
+- [x] V2.3 Prove and select indexed first difference and its shifting-mask/identity paths
   for I3; compose with the existing logical first-difference theorem.
   The source-model portion is already closed by
   `native_byte_first_diff_correct`, `native_string_first_diff_correct`, and
@@ -338,6 +342,9 @@ No implementation strategy below has yet passed its replacement gate.
   tag loop shares one XOR with the scan, and `difference_tag_first_set_bit`
   proves the first-set-bit invariant through `difference_tag_acc_refines`.
   This removes the source algorithm gap without discharging target execution.
+  `PatriciaExtract.v` selects `first_diff_indexed_with_identity`; the five-round
+  10K/100K acceptance matrix and primitive profile passed without an
+  all-worker regression or allocation growth.
 - [-] V2.4 Audit reachable integer/string intermediates and prove range closure;
   give each retained native operator/byte access an explicit foreign contract.
   Integer routing closure is already proved at 62 bits, and
@@ -358,13 +365,17 @@ No implementation strategy below has yet passed its replacement gate.
   `native_scan_successor_fits_string_capacity` cover guarded byte indices and
   the scan increment. OCaml's `String.length`, allocation limits and native
   `nat` arithmetic have not yet been connected to that contract.
-- [-] V2.5 Extract the proved control flow and remove corresponding overrides
+- [x] V2.5 Extract the proved control flow and remove corresponding overrides
   only after checking native code shape and the full performance gate. A
   2026-09-10 candidate extraction of `native_string_first_diff` was rejected:
   generated native-string elimination recursively called
   `String.sub s 1 (l - 1)`, copying a suffix per byte, and emitted an empty
-  `String` unit that shadowed `Stdlib.String`. It was not selected or retained;
-  a viable candidate must preserve indexed constant-time byte access.
+  `String` unit that shadowed `Stdlib.String`. It was not selected or retained.
+  The selected indexed workers instead pass `make native-string-worker-audit`:
+  they have direct scalar tail recursion, guarded `Stdlib.String.unsafe_get`,
+  no runtime fuel/list/substring access, and only the final `Some` allocation.
+  `make all`, `make union-oracle-native`, `make string-primitive-profile`, and
+  the five-round 10K/100K matrix passed. Target execution remains I10 trust.
 
 ### V3 — Target-language refinement (S3; parent N2)
 
