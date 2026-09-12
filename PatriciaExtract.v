@@ -76,6 +76,24 @@ Extract Inlined Constant NativeStringWorker.native_terminal_equal =>
        let mask = (255 lsl (9 - tag)) land 255 in
        ((Char.code (Stdlib.String.unsafe_get left byte) lxor
          Char.code (Stdlib.String.unsafe_get right byte)) land mask) = 0)".
+Extract Inlined Constant NativeStringWorker.native_token_make =>
+  "(fun byte tag -> (byte lsl 4) lor tag)".
+(* Temporary primitive realization for the isolated first-difference candidate;
+   its source shifting-tag worker remains the theorem target. *)
+Extract Inlined Constant NativeStringWorker.native_byte_diff_tag =>
+  "(fun left right byte ->
+     let difference =
+       Char.code (Stdlib.String.unsafe_get left byte) lxor
+       Char.code (Stdlib.String.unsafe_get right byte) in
+     let rec tag count mask =
+       if difference land mask <> 0 then 1 + count
+       else tag (count + 1) (mask lsr 1)
+     in tag 0 128)".
+Extract Inlined Constant NativeStringWorker.native_byte_difference_zero =>
+  "(fun left right byte ->
+     (Char.code (Stdlib.String.unsafe_get left byte) lxor
+      Char.code (Stdlib.String.unsafe_get right byte)) = 0)".
+Extract Inlined Constant NativeStringWorker.native_string_same => "(==)".
 Extract Constant StringBits.bit_at => "NativeStringWorker.packed_bit_at".
 
 Extract Inlined Constant StringPatriciaUnion.native_same => "(==)".
@@ -151,6 +169,8 @@ Extract Constant StringBits.agrees_before_bounded =>
 Separate Extraction
   NativeStringWorker.packed_bit_at
   NativeStringWorker.bounded_prefix_scan
+  NativeStringWorker.first_diff_indexed
+  NativeStringWorker.first_diff_indexed_with_identity
   PatriciaBits.mask_above
   Patricia.empty Patricia.is_empty Patricia.singleton Patricia.get Patricia.mem
   Patricia.set Patricia.remove Patricia.of_list Patricia.map_filter Patricia.map_left

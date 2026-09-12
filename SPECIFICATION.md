@@ -136,6 +136,11 @@ Executing the supported native library additionally trusts:
 - the OCaml compiler, runtime, native integer operations, byte-string
   primitives, and the host platform;
 - the standard `positive`, `N`, `nat`, and native-string extraction mappings;
+- the packed `StringBits.bit_at` binding's OCaml length, integer and guarded
+  byte-access primitives. Its source worker has kernel-checked model/codec/
+  representation refinements and a generated-code shape audit; the logical
+  `9*b+t` to packed `16*b+t` map call-site correspondence remains a separate
+  runtime representation contract;
 - the handwritten wrapper modules that enforce abstract maps, positive native
   keys, and the restricted combine callback;
 - integer realizer code for equality/order tests, shifts, masks, prefixes,

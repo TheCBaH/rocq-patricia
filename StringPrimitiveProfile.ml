@@ -73,6 +73,11 @@ let verify_pair left right =
   if option_map logical (Native.first_diff left right)
      <> Oracle.first_diff left right then
     failwith "first_diff oracle mismatch";
+  if Candidate.first_diff_indexed left right <> Native.first_diff left right then
+    failwith "first_diff candidate mismatch";
+  if Candidate.first_diff_indexed_with_identity left right
+     <> Native.first_diff left right then
+    failwith "first_diff identity candidate mismatch";
   for split = 0 to limit do
     let split = packed split in
     if Native.agrees_before_bounded left right split
@@ -92,6 +97,11 @@ let verify_long_pair left right split =
   if option_map logical (Native.first_diff left right)
      <> Oracle.first_diff left right then
     failwith "long first_diff oracle mismatch";
+  if Candidate.first_diff_indexed left right <> Native.first_diff left right then
+    failwith "long first_diff candidate mismatch";
+  if Candidate.first_diff_indexed_with_identity left right
+     <> Native.first_diff left right then
+    failwith "long first_diff identity candidate mismatch";
   if Native.agrees_before_bounded left right split
      <> Oracle.agrees_before_bounded left right (logical split) then
     failwith "long agrees_before_bounded oracle mismatch";
@@ -108,6 +118,9 @@ let verify_exhaustive_one_byte_pairs () =
     let left = Stdlib.String.make 1 (Char.chr left_code) in
     for right_code = 0 to 255 do
       let right = Stdlib.String.make 1 (Char.chr right_code) in
+      if Candidate.first_diff_indexed_with_identity left right
+         <> Native.first_diff left right then
+        failwith "exhaustive one-byte first_diff candidate mismatch";
       for tag = 0 to 8 do
         let split = tag in
         if Candidate.bounded_prefix_scan left right 0 tag
@@ -145,6 +158,12 @@ let () =
       consume_option (Native.first_diff prefix equal_copy));
   report "first_diff late difference" 20_000 (fun () ->
       consume_option (Native.first_diff prefix differing));
+  report "candidate first_diff copies" 20_000 (fun () ->
+      consume_option (Candidate.first_diff_indexed prefix equal_copy));
+  report "candidate first_diff same" 100_000 (fun () ->
+      consume_option (Candidate.first_diff_indexed_with_identity prefix prefix));
+  report "candidate first_diff late" 20_000 (fun () ->
+      consume_option (Candidate.first_diff_indexed prefix differing));
   let split = long_split in
   report "bounded prefix late split" 20_000 (fun () ->
       consume_bool (Native.agrees_before_bounded prefix differing split));

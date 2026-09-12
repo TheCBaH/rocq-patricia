@@ -55,6 +55,27 @@ and 854.802 ns/op (826.347–862.193) for a proper prefix, compared with
 only the 24-word batch measurement overhead. These primitive results are not
 the required 10K/100K map acceptance comparison.
 
+### Repeated string-map baseline (2026-09-11)
+
+Three native `make benchmark` runs at 10,000 and 100,000 bindings used
+four-byte keys, variable keys up to four bytes, five union samples, and the
+compiler configuration recorded above. Every run ended with `Patricia
+comparison benchmark: ok`. This is the baseline variability record for later
+candidate comparisons; inputs and all map results are checked by the benchmark
+before reporting timings.
+
+| Size | Build ms | Lookup ns/op | Membership ns/op | Overlap union us | Subset union us | Equal union us |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10K (min–max) | 0.809–0.843 | 68.7–74.7 | 64.5–66.5 | 67.219–69.462 | 64.097–64.559 | 127.718–132.345 |
+| 100K (min–max) | 9.610–9.849 | 73.3–74.8 | 66.3–67.8 | 638.008–653.029 | 611.067–681.877 | 1,180.887–1,270.056 |
+
+Retained/build-allocation words were invariant across the three samples:
+79,993/638,258 at 10K and 799,991/7,391,327 at 100K. Disjoint/overlap/subset/
+equal union allocations were 106/96/3/1 words at 10K and 145/140/32/30 at
+100K. Disjoint-union elapsed time is below reliable resolution (0.186–0.253
+us at 10K and 0.954–3.099 us at 100K), so allocation is the dependable signal
+for that case.
+
 ## Result
 
 The current benchmark completed with `Patricia comparison benchmark: ok`.

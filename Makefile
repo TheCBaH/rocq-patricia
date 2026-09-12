@@ -19,7 +19,7 @@ PUBLIC_CMXS := PatriciaMap.cmx StringPatriciaMap.cmx
 REFERENCE_DIR := reference_extracted
 REFERENCE_PACK := PatriciaReference.cmo
 
-.PHONY: all proof core-proof union-proof assumptions extraction extraction-boundary \
+.PHONY: all proof core-proof union-proof assumptions extraction extraction-boundary native-string-worker-audit \
 	native-union-realizer-audit ocaml-physical-equality-audit \
 	cached-representative-audit \
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
@@ -33,7 +33,7 @@ REFERENCE_PACK := PatriciaReference.cmo
 
 .PHONY: remove-profile
 
-all: proof assumptions extraction extraction-boundary native-union-realizer-audit \
+all: proof assumptions extraction extraction-boundary native-string-worker-audit native-union-realizer-audit \
 	cached-representative-audit \
 	reference-extraction ocaml reference-ocaml \
 	test union-oracle differential
@@ -52,6 +52,9 @@ assumptions: proof check-assumptions.sh
 
 extraction-boundary: PatriciaExtract.v check-extraction-boundary.sh
 	sh ./check-extraction-boundary.sh PatriciaExtract.v
+
+native-string-worker-audit: extraction check-native-string-workers.sh
+	sh ./check-native-string-workers.sh PatriciaExtract.v extracted/NativeStringWorker.ml
 
 # Check the source-extracted proof-guided workers remain direct recursion with
 # no operational size/fuel argument or nested recursive closure.

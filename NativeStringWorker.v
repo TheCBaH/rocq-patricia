@@ -311,3 +311,257 @@ Lemma bounded_prefix_scan_acc_equation:
           end eq_refl
       end.
 Proof. intros. destruct termination; reflexivity. Qed.
+
+(** Indexed first-difference candidate.  The tag worker is total only to keep
+    its source interface simple; its caller invokes it after a differing-byte
+    test, and the later refinement establishes tags 1--8 in that case. *)
+Definition native_token_make (byte tag : nat) : nat := 16 * byte + tag.
+
+Fixpoint native_ascii_diff_tag_from (fuel offset : nat)
+    (left right : Ascii.ascii) : nat :=
+  match fuel with
+  | 0 => 1
+  | S fuel' =>
+      if Bool.eqb (StringBits.ascii_bit left offset)
+          (StringBits.ascii_bit right offset)
+      then native_ascii_diff_tag_from fuel' (S offset) left right
+      else S offset
+  end.
+
+Definition native_ascii_diff_tag (left right : Ascii.ascii) : nat :=
+  native_ascii_diff_tag_from 8 0 left right.
+
+(** Total source counterpart of the extracted XOR/shifting-mask loop.  The
+    byte test is [xor land (128 lsr offset) <> 0]; a caller invokes this only
+    after a nonzero byte difference, so the fallback is unreachable there. *)
+Fixpoint native_xor_diff_tag_from (fuel offset : nat)
+    (left right : Ascii.ascii) : nat :=
+  match fuel with
+  | 0 => 1
+  | S fuel' =>
+      if NativeRefinement.native_byte_bit left right offset
+      then S offset
+      else native_xor_diff_tag_from fuel' (S offset) left right
+  end.
+
+Definition native_xor_diff_tag (left right : Ascii.ascii) : nat :=
+  native_xor_diff_tag_from 8 0 left right.
+
+Lemma native_ascii_diff_tag_from_range:
+  forall fuel offset left right,
+    offset + fuel <= 8 ->
+    1 <= native_ascii_diff_tag_from fuel offset left right <= 8.
+Proof.
+  induction fuel as [|fuel IH]; intros offset left right Hbound; cbn.
+  - lia.
+  - destruct (Bool.eqb (StringBits.ascii_bit left offset)
+      (StringBits.ascii_bit right offset)) eqn:E.
+    + apply IH. lia.
+    + lia.
+Qed.
+
+Corollary native_ascii_diff_tag_range:
+  forall left right, 1 <= native_ascii_diff_tag left right <= 8.
+Proof. intros. unfold native_ascii_diff_tag. apply native_ascii_diff_tag_from_range. lia. Qed.
+
+Lemma native_ascii_diff_tag_from_some:
+  forall fuel offset left right differing,
+    NativeRefinement.ascii_first_diff_from fuel offset left right = Some differing ->
+    native_ascii_diff_tag_from fuel offset left right = S differing.
+Proof.
+  induction fuel as [|fuel IH]; intros offset left right differing H; cbn in H.
+  - discriminate.
+  - destruct (Bool.eqb (StringBits.ascii_bit left offset)
+      (StringBits.ascii_bit right offset)) eqn:E.
+    + cbn. rewrite E. now apply IH.
+    + inversion H; subst differing. cbn. now rewrite E.
+Qed.
+
+Corollary native_ascii_diff_tag_some:
+  forall left right differing,
+    NativeRefinement.ascii_first_diff left right = Some differing ->
+    native_ascii_diff_tag left right = S differing.
+Proof.
+  intros. unfold NativeRefinement.ascii_first_diff, native_ascii_diff_tag.
+  now apply native_ascii_diff_tag_from_some.
+Qed.
+
+Lemma native_xor_diff_tag_from_some:
+  forall fuel offset left right differing,
+    NativeRefinement.native_byte_leading_zeroes_from fuel offset left right =
+      Some differing ->
+    native_xor_diff_tag_from fuel offset left right = S differing.
+Proof.
+  induction fuel as [|fuel IH]; intros offset left right differing H; cbn in H.
+  - discriminate.
+  - destruct (NativeRefinement.native_byte_bit left right offset) eqn:E.
+    + inversion H; subst differing. cbn. now rewrite E.
+    + cbn. rewrite E. now apply IH.
+Qed.
+
+Lemma native_xor_diff_tag_some:
+  forall left right differing,
+    NativeRefinement.native_byte_first_diff left right = Some differing ->
+    native_xor_diff_tag left right = S differing.
+Proof.
+  intros left right differing H.
+  unfold NativeRefinement.native_byte_first_diff in H.
+  destruct (N.eqb (NativeRefinement.native_byte_difference left right) 0)
+    eqn:E; cbn in H; try discriminate.
+  unfold native_xor_diff_tag.
+  now apply native_xor_diff_tag_from_some.
+Qed.
+
+Lemma native_xor_diff_tag_range:
+  forall left right,
+    left <> right -> 1 <= native_xor_diff_tag left right <= 8.
+Proof.
+  intros left right Hneq.
+  assert (Hexists : exists differing,
+    NativeRefinement.native_byte_first_diff left right = Some differing).
+  { rewrite NativeRefinement.native_byte_first_diff_correct.
+    now apply NativeRefinement.ascii_first_diff_unequal_exists. }
+  destruct Hexists as [differing Hdiff].
+  rewrite (native_xor_diff_tag_some left right differing Hdiff).
+  pose proof (NativeRefinement.ascii_first_diff_from_some 8 0 left right
+    differing (eq_trans
+      (eq_sym (NativeRefinement.native_byte_first_diff_correct left right)) Hdiff))
+    as [Hrange _].
+  lia.
+Qed.
+
+Definition native_byte_diff_tag (left right : string) (byte : nat) : nat :=
+  match String.get byte left, String.get byte right with
+  | Some left_ch, Some right_ch => native_xor_diff_tag left_ch right_ch
+  | _, _ => 1
+  end.
+
+(** Kept distinct from [native_byte_equal] so first-difference extraction
+    emits exactly one byte XOR on every scanned iteration. *)
+Definition native_byte_difference_zero (left right : string) (byte : nat) : bool :=
+  native_byte_equal left right byte.
+
+Lemma first_diff_scan_step:
+  forall byte common,
+    byte <= common -> native_eq byte common = false ->
+    S byte <= common /\ common - S byte < common - byte.
+Proof.
+  intros byte common Hbyte Hneq.
+  unfold native_eq in Hneq. apply Nat.eqb_neq in Hneq. lia.
+Qed.
+
+(** A non-sentinel iteration of the indexed scan reads both strings only
+    after the cached common length has established both bounds. *)
+Lemma first_diff_scan_complete_read_safe:
+  forall left right left_length right_length common byte,
+    byte <= common ->
+    native_eq byte common = false ->
+    common <= left_length -> common <= right_length ->
+    left_length = native_length left -> right_length = native_length right ->
+    byte < native_length left /\ byte < native_length right.
+Proof.
+  intros left right left_length right_length common byte Hbyte Hcommon
+    Hleft Hright Eleft Eright.
+  pose proof (first_diff_scan_step byte common Hbyte Hcommon) as [Hnext _].
+  rewrite <- Eleft, <- Eright. lia.
+Qed.
+
+(** At a guarded complete-byte iteration, the XOR-zero test is precisely
+    character equality.  This is the prior-byte invariant's local step. *)
+Lemma native_byte_difference_zero_complete:
+  forall left right byte left_ch right_ch,
+    String.get byte left = Some left_ch ->
+    String.get byte right = Some right_ch ->
+    native_byte_difference_zero left right byte = true <-> left_ch = right_ch.
+Proof.
+  intros left right byte left_ch right_ch Hleft Hright.
+  unfold native_byte_difference_zero, native_byte_equal.
+  rewrite Hleft, Hright. apply Ascii.eqb_eq.
+Qed.
+
+(** A non-extracted structural companion makes the semantic induction over
+    completed bytes explicit.  The executable worker below uses erased [Acc]
+    instead; this function is proof scaffolding only. *)
+Fixpoint first_diff_scan_fuel
+    (fuel : nat) (left right : string)
+    (left_length right_length common byte : nat) : option nat :=
+  match fuel with
+  | 0 => None
+  | S fuel' =>
+      if native_eq byte common then
+        if native_eq left_length right_length then None
+        else Some (native_token_make byte 0)
+      else if native_byte_difference_zero left right byte then
+        first_diff_scan_fuel fuel' left right left_length right_length common (S byte)
+      else Some (native_token_make byte (native_byte_diff_tag left right byte))
+  end.
+
+Lemma first_diff_scan_fuel_none_prior:
+  forall fuel left right left_length right_length common byte,
+    common - byte <= fuel ->
+    first_diff_scan_fuel fuel left right left_length right_length common byte = None ->
+    forall index, byte <= index -> index < common ->
+      native_byte_equal left right index = true.
+Proof.
+  induction fuel as [|fuel IH];
+    intros left right left_length right_length common byte Hfuel Hnone
+      index Hbyte Hindex; cbn in Hnone.
+  - lia.
+  - destruct (native_eq byte common) eqn:Ecommon.
+    + unfold native_eq in Ecommon. apply Nat.eqb_eq in Ecommon. lia.
+    + destruct (native_byte_difference_zero left right byte) eqn:Edifference.
+      * destruct (Nat.eq_dec index byte) as [Eindex|Eindex].
+        -- subst index. exact Edifference.
+        -- apply (IH left right left_length right_length common (S byte)).
+           ++ unfold native_eq in Ecommon. apply Nat.eqb_neq in Ecommon. lia.
+           ++ exact Hnone.
+           ++ lia.
+           ++ exact Hindex.
+      * discriminate Hnone.
+Qed.
+
+Fixpoint first_diff_scan_acc
+    (left right : string) (left_length right_length common byte : nat)
+    (Hbyte : byte <= common) (termination : Acc lt (common - byte))
+    {struct termination} : option nat :=
+  match termination with
+  | Acc_intro _ smaller =>
+      match native_eq byte common as at_common
+          return native_eq byte common = at_common -> option nat with
+      | true => fun _ =>
+          if native_eq left_length right_length then None
+          else Some (native_token_make byte 0)
+      | false => fun Hcommon =>
+          if native_byte_difference_zero left right byte then
+            first_diff_scan_acc left right left_length right_length common (S byte)
+              (proj1 (first_diff_scan_step byte common Hbyte Hcommon))
+              (smaller _ (proj2 (first_diff_scan_step byte common Hbyte Hcommon)))
+          else Some (native_token_make byte (native_byte_diff_tag left right byte))
+      end eq_refl
+  end.
+
+Definition first_diff_indexed (left right : string) : option nat :=
+  let left_length := native_length left in
+  let right_length := native_length right in
+  let common := native_min left_length right_length in
+  first_diff_scan_acc left right left_length right_length common 0
+    ltac:(unfold native_min; lia) (lt_wf _).
+
+(** The source model is deliberately conservative.  Extraction realizes this
+    with OCaml physical equality; only a positive result is relied upon. *)
+Definition native_string_same (_ _ : string) : bool := false.
+
+Definition first_diff_indexed_with_identity (left right : string) : option nat :=
+  if native_string_same left right then None else first_diff_indexed left right.
+
+Lemma first_diff_indexed_identity_shortcut:
+  forall same left right,
+    NativeRefinement.native_string_same_sound same ->
+    same left right = true -> left = right /\
+    (if same left right then None else first_diff_indexed left right) = None.
+Proof.
+  intros same left right Hsound Hsame.
+  split.
+  - now apply Hsound.
+  - now rewrite Hsame.
+Qed.
