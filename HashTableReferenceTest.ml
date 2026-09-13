@@ -44,13 +44,24 @@ let () =
 
   let routed =
     Stdlib.List.fold_left (fun map key -> M.set equal hash key (string_of_int key) map)
-      empty [ 0; 1; 32; 1024; 32768; 1048576 ]
+      empty [ 0; 1; 32; 1024; 32768; 1048576; 33554432 ]
   in
   Stdlib.List.iter (fun key -> expect_get hash key (Some (string_of_int key)) routed)
-    [ 0; 1; 32; 1024; 32768; 1048576 ];
+    [ 0; 1; 32; 1024; 32768; 1048576; 33554432 ];
   let routed' = M.remove equal hash 32768 routed in
   expect_get hash 32768 None routed';
   expect_get hash 32768 (Some "32768") routed;
+
+  let every_slot =
+    Stdlib.List.fold_left (fun map slot -> M.set equal hash slot slot map)
+      empty (Stdlib.List.init 32 Fun.id)
+  in
+  Stdlib.List.iter (fun slot -> expect_get hash slot (Some slot) every_slot)
+    (Stdlib.List.init 32 Fun.id);
+  let every_slot = M.remove equal hash 31 every_slot in
+  expect_get hash 31 None every_slot;
+  Stdlib.List.iter (fun slot -> if slot <> 31 then expect_get hash slot (Some slot) every_slot)
+    (Stdlib.List.init 32 Fun.id);
 
   let bulk = M.of_list equal hash 9 [ (7, "first"); (7, "second"); (8, "eight") ] in
   expect_get hash 7 (Some "first") bulk;
