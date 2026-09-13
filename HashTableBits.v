@@ -226,6 +226,17 @@ Proof.
     simpl. apply IH; lia.
 Qed.
 
+Lemma dense_insert_in :
+  forall A index (child : A) children item,
+    In item (dense_insert index child children) <-> item = child \/ In item children.
+Proof.
+  intros A index. induction index as [|index IH]; intros child children item.
+  - simpl. intuition subst; auto.
+  - destruct children as [|head tail].
+    + simpl. intuition subst; auto.
+    + simpl. rewrite IH. intuition subst; auto.
+Qed.
+
 Lemma dense_get_replace_same :
   forall A index (child : A) children,
     index < length children ->
@@ -279,4 +290,15 @@ Proof.
   - destruct after as [|after]; simpl in Hafter; try lia.
     destruct children as [|head tail]; simpl; auto.
     apply IH. lia.
+Qed.
+
+Lemma dense_remove_in :
+  forall A index (children : list A) item,
+    In item (dense_remove index children) -> In item children.
+Proof.
+  intros A index. induction index as [|index IH]; intros children item Hin.
+  - destruct children as [|head tail]; simpl in *; auto.
+  - destruct children as [|head tail]; simpl in *; auto.
+    destruct Hin as [Hin|Hin]; [now left|].
+    now right; apply IH.
 Qed.

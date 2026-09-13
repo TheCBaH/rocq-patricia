@@ -45,7 +45,7 @@ Dependencies: documentation baseline.
 Dependencies: H0.G.
 
 - [ ] **H1.1** In progress: `HashTableBits.v` defines chunks, proves the per-chunk bound and proves a normalized 30-bit hash has zero chunk at depth six; six-chunk reconstruction/separation remains open.
-- [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary calculations, full occupied-slot enumeration, and bounded lookup laws before/at/after insertion plus replacement/removal lookup preservation; general bitmap-rank correspondence remains open.
+- [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary calculations, full occupied-slot enumeration, bounded lookup laws before/at/after insertion plus replacement/removal lookup preservation, and insertion/deletion membership laws; general bitmap-rank correspondence remains open.
 - [ ] **H1.3** In progress: `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with head replacement/removal and exact miss-insertion/cardinality lemmas; uniqueness and full pointwise laws remain open.
 - [ ] **H1.G** Gate: primitive proofs compile and theorem assumption audit passes.
 
@@ -140,6 +140,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H3.1 (partial) | Added singleton bulk-loading and duplicate-singleton first-wins laws in `HashTable.v`. `make hashtable-proof hashtable-assumptions` passed with 97 declarations closed. General pointwise first-wins, enumeration and extensional laws remain open. |
 | 2026-09-13 | H2.2 (partial) | Added flattened binding-union theorems for `join_two` and `join_worker`, including the fuel-zero fallback. `make hashtable-proof hashtable-assumptions` passed with 100 declarations closed. Validity and unreachable-fallback routing proofs remain open. |
 | 2026-09-13 | H2.4 (partial) | Added the distinct-hash leaf-update binding characterization in `HashTableProof.v`, deriving exact old/new membership from the join binding theorem. `make hashtable-proof hashtable-assumptions` passed with 101 declarations closed. Recursive routing, global pointwise and validity laws remain open. |
+| 2026-09-13 | H1.2 (partial) | Added exact dense-insertion membership and dense-removal membership-subset laws in `HashTableBits.v`. `make hashtable-proof hashtable-assumptions` passed with 103 declarations closed. General bitmap/rank correspondence remains open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
