@@ -57,6 +57,46 @@ Lemma pseq_remove_view :
     pseq_view (pseq_remove index items) = dense_remove index (pseq_view items).
 Proof. reflexivity. Qed.
 
+Lemma pseq_get_insert_same :
+  forall A index (item : A) items,
+    index <= length (pseq_view items) ->
+    pseq_get index (pseq_insert index item items) = Some item.
+Proof.
+  intros A index item items Hbound.
+  unfold pseq_get, pseq_insert, pseq_of_list.
+  now apply dense_get_insert_same.
+Qed.
+
+Lemma pseq_get_replace_same :
+  forall A index (item : A) items,
+    index < length (pseq_view items) ->
+    pseq_get index (pseq_replace index item items) = Some item.
+Proof.
+  intros A index item items Hbound.
+  unfold pseq_get, pseq_replace, pseq_of_list.
+  now apply dense_get_replace_same.
+Qed.
+
+Lemma pseq_get_remove_before :
+  forall A index before (items : pseq A),
+    before < index ->
+    pseq_get before (pseq_remove index items) = pseq_get before items.
+Proof.
+  intros A index before items Hbefore.
+  unfold pseq_get, pseq_remove, pseq_of_list.
+  now apply dense_get_remove_before.
+Qed.
+
+Lemma pseq_get_remove_after :
+  forall A index after (items : pseq A),
+    index <= after ->
+    pseq_get after (pseq_remove index items) = pseq_get (S after) items.
+Proof.
+  intros A index after items Hafter.
+  unfold pseq_get, pseq_remove, pseq_of_list.
+  now apply dense_get_remove_after.
+Qed.
+
 Inductive native_tree (K A : Type) : Type :=
 | NativeEmpty
 | NativeLeaf (full_hash : N) (key : K) (value : A)
