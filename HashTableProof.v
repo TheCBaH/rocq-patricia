@@ -109,6 +109,37 @@ Proof.
     + apply bindings_join_two.
 Qed.
 
+(** This mirrors only the branch test in [join_worker].  It makes the fuel
+    fallback observable in a small proposition without changing the source
+    worker's extracted behavior. *)
+Fixpoint join_falls_back (fuel depth : nat) (left_hash right_hash : N) : bool :=
+  match fuel with
+  | O => true
+  | S fuel' =>
+      if N.eqb (chunk left_hash depth) (chunk right_hash depth)
+      then join_falls_back fuel' (S depth) left_hash right_hash
+      else false
+  end.
+
+Lemma join_worker_six_no_fallback :
+  forall left_hash right_hash,
+    (left_hash < hash_space)%N ->
+    (right_hash < hash_space)%N ->
+    left_hash <> right_hash ->
+    join_falls_back branch_levels 0 left_hash right_hash = false.
+Proof.
+  intros left_hash right_hash Hleft Hright Hdifferent.
+  cbn [join_falls_back branch_levels].
+  destruct (N.eqb (chunk left_hash 0) (chunk right_hash 0)) eqn:H0; auto.
+  destruct (N.eqb (chunk left_hash 1) (chunk right_hash 1)) eqn:H1; auto.
+  destruct (N.eqb (chunk left_hash 2) (chunk right_hash 2)) eqn:H2; auto.
+  destruct (N.eqb (chunk left_hash 3) (chunk right_hash 3)) eqn:H3; auto.
+  destruct (N.eqb (chunk left_hash 4) (chunk right_hash 4)) eqn:H4; auto.
+  destruct (N.eqb (chunk left_hash 5) (chunk right_hash 5)) eqn:H5; auto.
+  exfalso. apply Hdifferent. eapply chunk_six_ext; eauto;
+    apply N.eqb_eq; assumption.
+Qed.
+
 Lemma get_tree_zero_branch :
   forall (K A : Type) (eqb : K -> K -> bool) depth full_hash (key : K)
          bitmap (children : list (tree K A)),

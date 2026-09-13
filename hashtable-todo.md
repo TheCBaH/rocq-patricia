@@ -54,7 +54,7 @@ Dependencies: H0.G.
 Dependencies: H1.G.
 
 - [ ] **H2.1** In progress: `HashTable.v` defines raw nodes, seeded tables and an independent flattened `bindings` view; `HashTableProof.v` now defines the hash/prefix, collision-uniqueness and bitmap/dense-child well-formedness invariant. Its preservation proofs remain open.
-- [ ] **H2.2** In progress: `HashTable.v` implements bounded `join_worker`; `HashTableProof.v` proves flattened binding union for both `join_two` and every fuelled worker path, including the fallback. Validity and unreachable-fallback routing proofs remain open.
+- [ ] **H2.2** In progress: `HashTable.v` implements bounded `join_worker`; `HashTableProof.v` proves flattened binding union for both `join_two` and every fuelled worker path, including the fallback, and proves that six-level routing of distinct bounded hashes does not take the fallback. Validity remains open.
 - [ ] **H2.3** In progress: `HashTable.v` implements fuelled bitmap-routed `get_tree`; `HashTableProof.v` proves matching/mismatching leaf and collision base cases, normalized same-hash collision lookup and zero-fuel branch fallback. Independent binding equivalence and fallback unreachability remain open.
 - [ ] **H2.4** In progress: `HashTable.v` implements persistent `set_tree` and the public seeded `set`; `HashTableProof.v` proves leaf replacement/representative, same-hash collision insertion/lookup, distinct-hash leaf and branch insertion/replacement binding, zero-fuel branch fallback, and `set_seed` base cases. Global pointwise and validity laws remain open.
 - [ ] **H2.5** In progress: `HashTable.v` implements persistent `remove_tree` and retains unary branches; `HashTableProof.v` proves matching/mismatching leaf removal, same-hash collision removal/miss preservation, branch-removal binding subset, zero-fuel branch fallback and `remove_seed`. Pointwise and validity laws remain open.
@@ -163,6 +163,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H1.3 (partial) | Added `bucket_get_set_other`: with symmetric/transitive boolean key equality, a set leaves lookup unchanged for a query in a different equivalence class. Bucket uniqueness and pointwise removal remain open. |
 | 2026-09-13 | H1.3 (partial) | Added `bucket_get_remove_other`: with symmetric/transitive boolean key equality, a removal leaves lookup unchanged for a query in a different equivalence class. Bucket uniqueness remains open. |
 | 2026-09-13 | H1.2 (partial) | Added `dense_remove_length_hit`: removal at a valid dense-child index reduces length by exactly one, complementing the existing total-operation upper bound. |
+| 2026-09-13 | H2.2 (partial) | Added `join_falls_back` and `join_worker_six_no_fallback`: the control-flow mirror reaches no fuel fallback for distinct normalized hashes with `branch_levels` fuel at depth zero, by the six-chunk separation theorem. Join validity remains open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
