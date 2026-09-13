@@ -46,7 +46,7 @@ Dependencies: H0.G.
 
 - [ ] **H1.1** In progress: `HashTableBits.v` defines chunks and proves the per-chunk bound; six-chunk reconstruction/separation remains open.
 - [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary calculations, full occupied-slot enumeration, and bounded lookup laws before/at/after insertion plus replacement/removal lookup preservation; general bitmap-rank correspondence remains open.
-- [ ] **H1.3** In progress: `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with head replacement/removal lemmas; uniqueness and full pointwise laws remain open.
+- [ ] **H1.3** In progress: `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with head replacement/removal and exact miss-insertion/cardinality lemmas; uniqueness and full pointwise laws remain open.
 - [ ] **H1.G** Gate: primitive proofs compile and theorem assumption audit passes.
 
 ## H2 — Source HAMT
@@ -131,6 +131,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H5.2 (partial) | Added `HashTableBenchmark.ml`; `make hashtable-benchmark-smoke` passed through `ocamlopt` with 100 bindings. It checked all wrapper/`Map.Make`/`Hashtbl` lookup results against an association-list oracle before reporting times and allocation bytes. Measurements are local workload evidence only. |
 | 2026-09-13 | H1.2 (partial) | Added full-bitmap `popcount32`, slot-31 rank and occupied-slot enumeration lemmas in `HashTableBits.v`; `make hashtable-proof hashtable-assumptions` passed with 79 declarations closed. General bitmap/rank correspondence remains open. |
 | 2026-09-13 | H1.2 (partial) | Added dense-child lookup preservation before/after insert, replacement off the edited index, and removal before/after the edited index. `make hashtable-proof hashtable-assumptions` passed with 84 declarations closed. General bitmap/rank correspondence remains open. |
+| 2026-09-13 | H1.3 (partial) | Added exact collision-bucket miss insertion and its cardinality law under an explicit reflected-equality miss condition. `make hashtable-proof hashtable-assumptions` passed with 86 declarations closed. Bucket uniqueness and general pointwise laws remain open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

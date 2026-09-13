@@ -87,6 +87,31 @@ Proof.
   - destruct (eqb key stored) eqn:Hstored; simpl; now rewrite Hstored.
 Qed.
 
+Lemma bucket_set_miss :
+  forall K A (eqb : K -> K -> bool) key (value : A) (entries : list (K * A)),
+    (forall stored old_value, In (stored, old_value) entries -> eqb key stored = false) ->
+    bucket_set eqb key value entries = entries ++ [(key, value)].
+Proof.
+  intros K A eqb key value entries Hmiss.
+  induction entries as [|[stored old_value] tail IH]; simpl.
+  - reflexivity.
+  - assert (Hhead : eqb key stored = false).
+    { apply (Hmiss stored old_value). simpl. auto. }
+    rewrite Hhead. f_equal. apply IH.
+    intros stored' old_value' Hin.
+    apply (Hmiss stored' old_value'). simpl. now right.
+Qed.
+
+Lemma bucket_set_miss_length :
+  forall K A (eqb : K -> K -> bool) key (value : A) (entries : list (K * A)),
+    (forall stored old_value, In (stored, old_value) entries -> eqb key stored = false) ->
+    length (bucket_set eqb key value entries) = S (length entries).
+Proof.
+  intros K A eqb key value entries Hmiss.
+  rewrite bucket_set_miss by exact Hmiss.
+  rewrite length_app. simpl. lia.
+Qed.
+
 Lemma bucket_remove_miss :
   forall K A (eqb : K -> K -> bool) key (entries : list (K * A)),
     (forall stored value, In (stored, value) entries -> eqb key stored = false) ->
