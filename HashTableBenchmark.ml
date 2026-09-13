@@ -23,6 +23,22 @@ let seed =
   | None -> 31
   | Some value -> int_of_string value
 
+type workload = Ascending | Root_slot_collision
+
+let workload =
+  match Sys.getenv_opt "HASHTABLE_BENCH_PATTERN" with
+  | None | Some "ascending" -> Ascending
+  | Some "root-slot-collision" -> Root_slot_collision
+  | Some value ->
+      failwith
+        ("HashTable benchmark: unknown HASHTABLE_BENCH_PATTERN " ^ value)
+
+let workload_name, key_at =
+  match workload with
+  | Ascending -> ("ascending integer keys", Fun.id)
+  | Root_slot_collision ->
+      ("root-slot-collision integer keys (multiples of 32)", fun index -> index lsl 5)
+
 let fail message = failwith ("HashTable benchmark: " ^ message)
 
 let time name run =
@@ -67,10 +83,12 @@ let retained_versions name empty set get bindings =
 let () =
   if size < 1 then fail "HASHTABLE_BENCH_SIZE must be positive";
   Printf.printf
-    "HashTable benchmark workload: ascending integer keys [0,%d), seed %d; \
+    "HashTable benchmark workload: %s [0,%d), seed %d; \
      retained policy: every prefix root for persistent maps\n%!"
-    size seed;
-  let bindings = Stdlib.List.init size (fun key -> (key, string_of_int key)) in
+    workload_name size seed;
+  let bindings = Stdlib.List.init size (fun index ->
+      let key = key_at index in (key, string_of_int key))
+  in
   let oracle = Stdlib.List.rev bindings in
   let hashed = time "HashMap.Make build" (fun () -> Hash_map.of_list ~seed bindings) in
   let native_hashed = time "HashMapNative.Make build"
