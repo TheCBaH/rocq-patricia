@@ -16,10 +16,10 @@ planning documents are not evidence that code exists.
 | Deliverable | State |
 | --- | --- |
 | Design, implementation plan and tracker | Written; documentation checks recorded below |
-| Rocq implementation and proofs | H0 complete; H1 bitmap/dense-list and bucket source modules compile, with their full primitive proof gate still open |
-| Reference OCaml extraction and public wrapper | Not started |
-| Compact-array model, proofs and native backend | Not started |
-| Tests, build/CI integration and benchmarks | Not started |
+| Rocq implementation and proofs | H0 complete; H1–H3 source/reference foundations and modeled H4 refinement compile, while their recursive/global proof gates remain open |
+| Reference OCaml extraction and public wrapper | Separately regenerated list-source extraction and abstract `HashMap.Make` wrapper build and pass direct/wrapper tests; full H3 proof gate remains open |
+| Compact-array model, proofs and native backend | Modeled persistent sequence/refinement and tested fresh-copy OCaml primitives exist; extraction bindings, native map realization and public switch remain open |
+| Tests, build/CI integration and benchmarks | Implemented aggregate, CI steps, direct/wrapper/native primitive tests and checked benchmark smoke; broader native differential and release evidence remain open |
 
 ## Documentation baseline
 
@@ -54,7 +54,7 @@ Dependencies: H0.G.
 Dependencies: H1.G.
 
 - [ ] **H2.1** In progress: `HashTable.v` defines raw nodes, seeded tables and an independent flattened `bindings` view; `HashTableProof.v` now defines the hash/prefix, collision-uniqueness and bitmap/dense-child well-formedness invariant. Its preservation proofs remain open.
-- [ ] **H2.2** In progress: `HashTable.v` implements bounded `join_worker`; validity/binding and unreachable-fallback proofs remain open.
+- [ ] **H2.2** In progress: `HashTable.v` implements bounded `join_worker`; `HashTableProof.v` proves flattened binding union for both `join_two` and every fuelled worker path, including the fallback. Validity and unreachable-fallback routing proofs remain open.
 - [ ] **H2.3** In progress: `HashTable.v` implements fuelled bitmap-routed `get_tree`; `HashTableProof.v` proves leaf/collision base cases and normalized same-hash collision lookup. Independent binding equivalence remains open.
 - [ ] **H2.4** In progress: `HashTable.v` implements persistent `set_tree` and the public seeded `set`; `HashTableProof.v` proves leaf replacement/representative, same-hash collision insertion/lookup base cases and `set_seed`. Global pointwise and validity laws remain open.
 - [ ] **H2.5** In progress: `HashTable.v` implements persistent `remove_tree` and retains unary branches; `HashTableProof.v` proves matching-leaf removal, same-hash collision removal/miss preservation and `remove_seed`. Pointwise and validity laws remain open.
@@ -138,6 +138,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H4.5 (partial) | Added `check-hashtable-primitives.sh` and `make hashtable-native-primitives-audit`; it checks the current private array-sequence realizer for fresh update allocation and rejects map overrides or unsafe escapes. Generated native map workers and extraction bindings do not yet exist and remain unaudited. |
 | 2026-09-13 | H1.1 (partial) | Added `chunk_after_hash_bits_zero` in `HashTableBits.v`: every hash below `2^30` shifts to zero at depth six. `make hashtable-proof hashtable-assumptions` passed with 95 declarations closed. Six-chunk reconstruction and separation remain open. |
 | 2026-09-13 | H3.1 (partial) | Added singleton bulk-loading and duplicate-singleton first-wins laws in `HashTable.v`. `make hashtable-proof hashtable-assumptions` passed with 97 declarations closed. General pointwise first-wins, enumeration and extensional laws remain open. |
+| 2026-09-13 | H2.2 (partial) | Added flattened binding-union theorems for `join_two` and `join_worker`, including the fuel-zero fallback. `make hashtable-proof hashtable-assumptions` passed with 100 declarations closed. Validity and unreachable-fallback routing proofs remain open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

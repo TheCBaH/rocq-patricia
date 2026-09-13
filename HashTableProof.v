@@ -31,7 +31,7 @@ Section WellFormed.
         chunk full_hash depth = slot /\ prefix_matches full_hash (S depth) rest
     end.
 
-  Lemma prefix_matches_append_slot :
+Lemma prefix_matches_append_slot :
     forall full_hash depth prefix slot,
       prefix_matches full_hash depth prefix ->
       chunk full_hash (depth + length prefix) = slot ->
@@ -78,6 +78,36 @@ Section WellFormed.
       wf depth prefix (Branch bitmap children).
 
 End WellFormed.
+
+Lemma bindings_join_two :
+  forall (K A : Type) depth left_hash right_hash (left right : tree K A)
+         (entry : K * A),
+    In entry (bindings (join_two left_hash left right_hash right depth)) <->
+    In entry (bindings left) \/ In entry (bindings right).
+Proof.
+  intros K A depth left_hash right_hash left right entry.
+  unfold join_two. destruct (N.ltb (chunk left_hash depth) (chunk right_hash depth)).
+  - simpl. rewrite app_nil_r. change (In entry (bindings left ++ bindings right) <->
+      In entry (bindings left) \/ In entry (bindings right)).
+    now rewrite in_app_iff.
+  - simpl. rewrite app_nil_r. change (In entry (bindings right ++ bindings left) <->
+      In entry (bindings left) \/ In entry (bindings right)).
+    rewrite in_app_iff. tauto.
+Qed.
+
+Lemma bindings_join_worker :
+  forall (K A : Type) fuel depth left_hash right_hash (left right : tree K A)
+         (entry : K * A),
+    In entry (bindings (join_worker fuel depth left_hash left right_hash right)) <->
+    In entry (bindings left) \/ In entry (bindings right).
+Proof.
+  intros K A fuel. induction fuel as [|fuel IH];
+    intros depth left_hash right_hash left right entry.
+  - apply bindings_join_two.
+  - cbn [join_worker]. destruct (N.eqb (chunk left_hash depth) (chunk right_hash depth)).
+    + simpl. rewrite app_nil_r. apply IH.
+    + apply bindings_join_two.
+Qed.
 
 Lemma wf_empty_root :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
