@@ -311,6 +311,27 @@ Lemma of_list_empty :
     @of_list K Seed A eqb hash seed [] = empty seed.
 Proof. reflexivity. Qed.
 
+Lemma of_list_singleton :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         (seed : Seed) (key : K) (value : A),
+    of_list eqb hash seed [(key, value)] = singleton eqb hash seed key value.
+Proof. reflexivity. Qed.
+
+Lemma of_list_first_wins_same_key :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N),
+    (forall key, eqb key key = true) ->
+    forall seed key (first second : A),
+      of_list eqb hash seed [(key, first); (key, second)] =
+      singleton eqb hash seed key first.
+Proof.
+  intros K Seed A eqb hash Heqb seed key first second.
+  change (add_first eqb hash [(key, second)]
+    (singleton eqb hash seed key first) = singleton eqb hash seed key first).
+  cbn [add_first].
+  rewrite get_singleton by exact Heqb.
+  reflexivity.
+Qed.
+
 Lemma set_seed :
   forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
          (key : K) (value : A) (m : table K Seed A),

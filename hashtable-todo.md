@@ -65,7 +65,7 @@ Dependencies: H1.G.
 
 Dependencies: H2.G.
 
-- [ ] **H3.1** In progress: `HashTable.v` now proves empty/singleton emptiness, singleton membership/removal and empty bulk loading; pointwise first-wins, enumeration and extensional laws remain open.
+- [ ] **H3.1** In progress: `HashTable.v` now proves empty/singleton emptiness, singleton membership/removal, singleton bulk loading and the duplicate-singleton first-wins case; general pointwise first-wins, enumeration and extensional laws remain open.
 - [ ] **H3.2** In progress: `HashTableReferenceExtract.v` regenerates a separately isolated list-source extraction. The public reference package name and bounded test-hash API remain open.
 - [ ] **H3.3** In progress: `HashMap.mli` / `.ml` expose `HashMap.Make(Key)` over the reference extraction and normalize raw hashes with `land 0x3fffffff`. Callback/foreign-contract inventory and record example remain open.
 - [ ] **H3.4** In progress: direct and public-wrapper tests exercise controlled collisions, routing depths, first-wins values, retained roots and a 500-step deterministic association-list-oracle history. The broader custom-equivalence and boundary matrix remains open.
@@ -137,6 +137,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H3.1 (partial) | Added public singleton removal and resulting emptiness laws in `HashTable.v`. `make hashtable-proof hashtable-assumptions` passed with 94 declarations closed. Pointwise first-wins, enumeration and extensional laws remain open. |
 | 2026-09-13 | H4.5 (partial) | Added `check-hashtable-primitives.sh` and `make hashtable-native-primitives-audit`; it checks the current private array-sequence realizer for fresh update allocation and rejects map overrides or unsafe escapes. Generated native map workers and extraction bindings do not yet exist and remain unaudited. |
 | 2026-09-13 | H1.1 (partial) | Added `chunk_after_hash_bits_zero` in `HashTableBits.v`: every hash below `2^30` shifts to zero at depth six. `make hashtable-proof hashtable-assumptions` passed with 95 declarations closed. Six-chunk reconstruction and separation remain open. |
+| 2026-09-13 | H3.1 (partial) | Added singleton bulk-loading and duplicate-singleton first-wins laws in `HashTable.v`. `make hashtable-proof hashtable-assumptions` passed with 97 declarations closed. General pointwise first-wins, enumeration and extensional laws remain open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
