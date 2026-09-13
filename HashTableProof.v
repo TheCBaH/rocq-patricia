@@ -139,6 +139,32 @@ Proof.
   apply bindings_dense_insert.
 Qed.
 
+Lemma bindings_dense_remove_in :
+  forall (K A : Type) index children (entry : K * A),
+    In entry (flat_map bindings (dense_remove index children)) ->
+    In entry (flat_map bindings children).
+Proof.
+  intros K A index children entry Hin.
+  apply in_flat_map in Hin. destruct Hin as [node [Hnode Hin]].
+  apply dense_remove_in in Hnode.
+  apply in_flat_map. now exists node.
+Qed.
+
+Lemma bindings_branch_remove_in :
+  forall (K A : Type) bitmap slot children (entry : K * A),
+    In entry (bindings (branch_remove bitmap slot children)) ->
+    In entry (bindings (Branch bitmap children)).
+Proof.
+  intros K A bitmap slot children entry Hin.
+  unfold branch_remove in Hin.
+  remember (dense_remove (rank bitmap slot) children) as remaining.
+  destruct remaining as [|child remaining]; simpl in Hin.
+  - contradiction.
+  - simpl. apply (bindings_dense_remove_in (rank bitmap slot) children entry).
+    change (In entry (flat_map bindings (child :: remaining))) in Hin.
+    rewrite Heqremaining in Hin. exact Hin.
+Qed.
+
 Lemma wf_empty_root :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed),
