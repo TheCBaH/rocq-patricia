@@ -315,6 +315,11 @@ Proof.
   destruct fuel; simpl; now rewrite N.eqb_refl, Heqb.
 Qed.
 
+Lemma get_tree_empty :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (query : K),
+    get_tree eqb fuel depth full_hash query (@Empty K A) = None.
+Proof. intros. destruct fuel; reflexivity. Qed.
+
 Lemma get_tree_leaf_other_hash :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash stored_hash
          key stored (value : A),
@@ -469,6 +474,17 @@ Lemma get_tree_collision_same_hash :
     get_tree eqb fuel depth full_hash query (Collision full_hash entries) =
     bucket_get eqb query entries.
 Proof. intros. destruct fuel; cbn [get_tree]; now rewrite N.eqb_refl. Qed.
+
+Lemma get_tree_collision_other_hash :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash stored_hash
+         (query : K) (entries : list (K * A)),
+    full_hash <> stored_hash ->
+    get_tree eqb fuel depth full_hash query (Collision stored_hash entries) = None.
+Proof.
+  intros K A eqb fuel depth full_hash stored_hash query entries Hdifferent.
+  apply N.eqb_neq in Hdifferent.
+  destruct fuel; cbn [get_tree]; now rewrite Hdifferent.
+Qed.
 
 Lemma bindings_normalize_collision :
   forall (K A : Type) full_hash (entries : list (K * A)),
