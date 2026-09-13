@@ -415,6 +415,36 @@ Lemma set_tree_collision_same_hash_wf :
         unfold binding_equiv. reflexivity.
   Qed.
 
+Lemma set_tree_collision_miss_wf :
+    forall fuel depth prefix full_hash key (value : A)
+           (entries : list (K * A)) (eqb : K -> K -> bool),
+      wf E hash seed depth prefix (Collision full_hash entries) ->
+      entry_matches hash seed full_hash depth prefix (key, value) ->
+      Symmetric E ->
+      (forall stored old_value,
+          In (stored, old_value) entries -> eqb key stored = false) ->
+      ~ InA (binding_equiv E) (key, value) entries ->
+      wf E hash seed depth prefix
+        (set_tree eqb fuel depth full_hash key value
+          (Collision full_hash entries)).
+  Proof.
+    intros fuel depth prefix full_hash key value entries eqb Hwf Hentry
+      Hsymmetric Hmiss Hfresh.
+    inversion Hwf as [| |depth' prefix' full_hash' entries' Hlength Hentries Hnodup|];
+      subst.
+    rewrite set_tree_collision_same_hash.
+    apply wf_normalize_collision.
+    - rewrite bucket_set_miss by exact Hmiss.
+      apply Forall_app. split; [exact Hentries|].
+      constructor; [exact Hentry|constructor].
+    - eapply bucket_set_miss_nodup.
+      + intros [left_key left_value] [right_key right_value] Hrelated.
+        now apply Hsymmetric.
+      + exact Hnodup.
+      + exact Hmiss.
+      + exact Hfresh.
+  Qed.
+
 End CollisionUpdateInvariant.
 
 Lemma get_tree_normalize_collision_same_hash :
