@@ -69,14 +69,14 @@ Dependencies: H2.G.
 - [ ] **H3.2** In progress: `HashTableReferenceExtract.v` regenerates a separately isolated list-source extraction. The public reference package name and bounded test-hash API remain open.
 - [ ] **H3.3** In progress: `HashMap.mli` / `.ml` expose `HashMap.Make(Key)` over the reference extraction and normalize raw hashes with `land 0x3fffffff`. Callback/foreign-contract inventory and record example remain open.
 - [ ] **H3.4** In progress: direct and public-wrapper tests exercise controlled collisions, routing depths, first-wins values, retained roots and a 500-step deterministic association-list-oracle history. The broader custom-equivalence and boundary matrix remains open.
-- [ ] **H3.5** In progress: `HashMapTest.ml` compiles through the abstract wrapper and checks callback-instance isolation. A broader interface/extraction audit remains open.
+- [ ] **H3.5** In progress: `HashMapTest.ml` compiles through the abstract wrapper and checks callback-instance isolation. `hashtable-extraction-audit` verifies abstract public types, hidden routing internals and functor-bound normalized callbacks; a generated-interface audit remains open.
 - [ ] **H3.G** Gate: proved reference exports to OCaml; reference proof/audit/build/test subset passes from regenerated output.
 
 ## H4 — Compact-array backend
 
 Dependencies: H3.G.
 
-- [ ] **H4.1** Define persistent sequence interface and array/source representation relation; prove view laws.
+- [ ] **H4.1** In progress: `HashTableNative.v` defines a source-modeled persistent sequence interface, fresh-update view laws and a native-tree/source relation with empty/leaf/collision refinement lemmas. Array realization and branch refinement remain open.
 - [ ] **H4.2** Prove native modeled get/set/remove refinement and invariant/seed preservation.
 - [ ] **H4.3** Prove bounded bitmap/scalar/popcount workers including all native intermediate and shift bounds.
 - [ ] **H4.4** Implement private fresh-copy array primitives and extraction bindings; document remaining target obligations.
@@ -123,6 +123,8 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H1.2 (partial) | Added bounded same-index `dense_get` laws for insertion and replacement in `HashTableBits.v`; `make hashtable-proof` passed. Bitmap/rank correspondence is still open. |
 | 2026-09-13 | H2.1 (partial) | Defined the parameterized `wf` invariant in `HashTableProof.v`, including occupied-slot ordering, bitmap/popcount density, prefix/hash routing, nonempty branch children and collision uniqueness. Empty/leaf root constructors and prefix-extension routing lemma are kernel-checked; `make hashtable-proof` passed. Preservation and lookup-refinement proofs remain open. |
 | 2026-09-13 | H1.G/H2.G support (partial) | Added `check-hashtable-assumptions.sh`; `make hashtable-assumptions` audited all 56 current hash-table theorem declarations as closed under the global context. This audit does not close the still-incomplete H1/H2 proof gates. |
+| 2026-09-13 | H3.5 (partial) | Added `check-hashtable-extraction-boundary.sh`; `make hashtable-extraction-audit` passed, confirming an abstract public map type, no exposed routing representation/workers, and wrapper-owned 30-bit normalization with functor-bound callbacks. |
+| 2026-09-13 | H4.1 (partial) | Added `HashTableNative.v`; `make hashtable-proof` passed. It provides modeled persistent-sequence view laws and base source refinement lemmas, without an OCaml array realizer or native operation-refinement claim. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

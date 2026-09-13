@@ -18,7 +18,7 @@ PUBLIC_CMOS := PatriciaMap.cmo StringPatriciaMap.cmo
 PUBLIC_CMXS := PatriciaMap.cmx StringPatriciaMap.cmx
 REFERENCE_DIR := reference_extracted
 REFERENCE_PACK := PatriciaReference.cmo
-HASHTABLE_VFILES := HashTableSpec.v HashTableBits.v HashTableBucket.v HashTable.v HashTableProof.v HashTableSkeleton.v
+HASHTABLE_VFILES := HashTableSpec.v HashTableBits.v HashTableBucket.v HashTable.v HashTableProof.v HashTableNative.v HashTableSkeleton.v
 HASHTABLE_VOFILES := $(HASHTABLE_VFILES:.v=.vo)
 
 .PHONY: all proof core-proof union-proof assumptions extraction extraction-boundary native-string-worker-audit \
@@ -27,7 +27,7 @@ HASHTABLE_VOFILES := $(HASHTABLE_VFILES:.v=.vo)
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
-.PHONY: hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-assumptions
+.PHONY: hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-extraction-audit hashtable-assumptions
 
 .PHONY: string-primitive-profile
 .PHONY: string-worker-performance
@@ -94,6 +94,9 @@ hashtable-wrapper-test-native: hashtable-reference HashMap.mli HashMap.ml HashMa
 	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
 	  $(OCAMLOPT) -I . -I .. -o ../hashtable-wrapper-native-test $$objects ../HashMap.cmx ../HashMapTest.ml
 	./hashtable-wrapper-native-test
+
+hashtable-extraction-audit: HashMap.mli HashMap.ml check-hashtable-extraction-boundary.sh
+	sh ./check-hashtable-extraction-boundary.sh HashMap.mli HashMap.ml
 
 hashtable-assumptions: hashtable-proof check-hashtable-assumptions.sh
 	sh ./check-hashtable-assumptions.sh $(ROCQ) $(ROCQFLAGS)
@@ -318,6 +321,7 @@ HashTableBits.vo: HashTableSpec.vo
 HashTableBucket.vo: HashTableSpec.vo
 HashTable.vo: HashTableSpec.vo HashTableBits.vo HashTableBucket.vo
 HashTableProof.vo: HashTable.vo HashTableBucket.vo
+HashTableNative.vo: HashTable.vo HashTableBits.vo
 HashTableSkeleton.vo: HashTableSpec.vo HashTableBits.vo
 
 %.vo: %.v
