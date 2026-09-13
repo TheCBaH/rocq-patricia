@@ -68,17 +68,10 @@ Extract Inlined Constant NativeStringWorker.native_code_tag_bit =>
 Extract Inlined Constant NativeStringWorker.native_byte_equal =>
   "(fun left right byte ->
      Stdlib.String.unsafe_get left byte = Stdlib.String.unsafe_get right byte)".
-Extract Inlined Constant NativeStringWorker.native_terminal_equal_cached =>
-  "(fun left right left_length right_length byte tag ->
-     if tag = 0 then true else
-     let left_present = byte < left_length
-     and right_present = byte < right_length in
-     if left_present <> right_present then false
-     else if not left_present then true
-     else
-       let mask = (255 lsl (9 - tag)) land 255 in
-       ((Char.code (Stdlib.String.unsafe_get left byte) lxor
-         Char.code (Stdlib.String.unsafe_get right byte)) land mask) = 0)".
+Extract Inlined Constant NativeStringWorker.native_terminal_mask_equal_chars =>
+  "(fun left right tag ->
+     let mask = (255 lsl (9 - tag)) land 255 in
+     ((Char.code left lxor Char.code right) land mask) = 0)".
 Extract Inlined Constant NativeStringWorker.native_token_make =>
   "(fun byte tag -> (byte lsl 4) lor tag)".
 Extract Inlined Constant NativeStringWorker.native_byte_xor =>

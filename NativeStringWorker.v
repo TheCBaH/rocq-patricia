@@ -213,6 +213,23 @@ Proof.
   symmetry. now apply NativeRefinement.native_terminal_mask_equal_correct.
 Qed.
 
+(** The only target-specific part of the terminal comparison is this
+    byte/tag mask operation.  Bounds checks and byte access stay in the
+    source-defined cached worker below. *)
+Definition native_terminal_mask_equal_chars
+    (left right : Ascii.ascii) (tag : nat) : bool :=
+  native_ascii_prefix_equal (native_tag_offset tag) 0 left right.
+
+Lemma native_terminal_mask_equal_chars_refines:
+  forall left right tag,
+    1 <= tag <= 8 ->
+    native_terminal_mask_equal_chars left right tag =
+      NativeRefinement.native_terminal_mask_equal left right tag.
+Proof.
+  intros. unfold native_terminal_mask_equal_chars, native_tag_offset.
+  now apply native_terminal_mask_expression_refines.
+Qed.
+
 Lemma native_min_le_left:
   forall left right, native_min left right <= left.
 Proof. intros. unfold native_min. apply Nat.le_min_l. Qed.
@@ -266,15 +283,15 @@ Proof.
 Qed.
 
 (** The cache contract is established by the outer worker and preserved by
-    every recursive call. The target primitive uses these cached lengths for
-    its presence guards; its source meaning remains the logical terminal. *)
+    every recursive call.  Its length guards, byte reads, and control flow
+    are source-defined; only the final two-character mask is primitive. *)
 Definition native_terminal_equal_cached (left right : string)
     (left_length right_length byte tag : nat) : bool :=
   if native_eq tag 0 then true
   else if native_lt byte left_length then
     if native_lt byte right_length then
-      native_ascii_prefix_equal (native_tag_offset tag) 0
-        (native_unsafe_get left byte) (native_unsafe_get right byte)
+      native_terminal_mask_equal_chars
+        (native_unsafe_get left byte) (native_unsafe_get right byte) tag
     else false
   else if native_lt byte right_length then false else true.
 
@@ -284,7 +301,8 @@ Lemma native_terminal_equal_cached_correct:
       native_terminal_equal left right byte tag.
 Proof.
   intros left right byte tag.
-  unfold native_terminal_equal_cached, native_terminal_equal, native_lt, native_length.
+  unfold native_terminal_equal_cached, native_terminal_equal,
+    native_terminal_mask_equal_chars, native_lt, native_length.
   destruct (native_eq tag 0); [reflexivity|].
   destruct (byte <? String.length left) eqn:Hl;
     destruct (byte <? String.length right) eqn:Hr.

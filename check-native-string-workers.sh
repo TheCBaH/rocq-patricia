@@ -39,8 +39,13 @@ if ! rg -q '^let rec first_diff_scan_acc ' "$worker_file"; then
   exit 1
 fi
 
-if rg -q '^Extract (Inlined )?Constant NativeStringWorker\.(native_byte_diff_tag|difference_tag(_acc)?|first_diff_scan_acc|bounded_prefix_scan_acc) ' "$source_file"; then
+if rg -q '^Extract (Inlined )?Constant NativeStringWorker\.(native_terminal_equal_cached|native_byte_diff_tag|difference_tag(_acc)?|first_diff_scan_acc|bounded_prefix_scan_acc) ' "$source_file"; then
   echo "a string-worker algorithm has become a handwritten extraction primitive" >&2
+  exit 1
+fi
+
+if ! rg -q '^Extract Inlined Constant NativeStringWorker\.native_terminal_mask_equal_chars =>' "$source_file"; then
+  echo "missing the terminal character-mask primitive binding" >&2
   exit 1
 fi
 
