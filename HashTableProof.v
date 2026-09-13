@@ -645,6 +645,30 @@ Lemma remove_tree_collision_same_hash_wf :
 
 End CollisionInvariant.
 
+Section CollisionRemovalInvariant.
+
+  Context {K Seed A : Type}.
+  Variable E : K -> K -> Prop.
+  Variable hash : Seed -> K -> N.
+  Variable seed : Seed.
+
+Lemma remove_tree_collision_wf :
+    forall fuel depth prefix full_hash key stored_hash
+           (entries : list (K * A)) (eqb : K -> K -> bool),
+      wf E hash seed depth prefix (Collision stored_hash entries) ->
+      wf E hash seed depth prefix
+        (remove_tree eqb fuel depth full_hash key
+          (Collision stored_hash entries)).
+  Proof.
+    intros fuel depth prefix full_hash key stored_hash entries eqb Hwf.
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    - apply N.eqb_eq in Hhash. subst full_hash.
+      now apply remove_tree_collision_same_hash_wf.
+    - destruct fuel; cbn [remove_tree]; now rewrite Hhash.
+  Qed.
+
+End CollisionRemovalInvariant.
+
 Lemma remove_tree_collision_miss_bindings :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
          (entries : list (K * A)),
