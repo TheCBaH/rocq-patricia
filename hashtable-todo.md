@@ -44,7 +44,7 @@ Dependencies: documentation baseline.
 
 Dependencies: H0.G.
 
-- [ ] **H1.1** In progress: `HashTableBits.v` defines chunks, proves the per-chunk bound and proves a normalized 30-bit hash has zero chunk at depth six; six-chunk reconstruction/separation remains open.
+- [ ] **H1.1** In progress: `HashTableBits.v` defines chunks, proves the per-chunk bound, proves a normalized 30-bit hash has zero chunk at depth six, and reconstructs every normalized hash from its six routing chunks; a first-differing-chunk/separation theorem remains open.
 - [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary calculations, full occupied-slot enumeration, bounded lookup laws before/at/after insertion plus replacement/removal lookup preservation, and insertion/replacement/deletion membership laws; general bitmap-rank correspondence remains open.
 - [ ] **H1.3** In progress: `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with head replacement/removal and exact miss-insertion/cardinality lemmas; uniqueness and full pointwise laws remain open.
 - [ ] **H1.G** Gate: primitive proofs compile and theorem assumption audit passes.
@@ -156,6 +156,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H5.2 (partial) | Extended `HashTableBenchmark.ml` to check and measure the private fresh-array backend alongside the reference wrapper, `Map.Make` and OCaml's imperative `Hashtbl` on one integer workload. Measurements remain local workload evidence only. |
 | 2026-09-13 | H4.6 (partial) | Extended `HashMapNativeTest.ml` with a case-insensitive string key callback, intentionally colliding equal-length keys, functional payloads and retained versions across replacement/removal. The bytecode/native differential targets exercise this case; randomized generic-instance coverage remains open. |
 | 2026-09-13 | H4.5 (partial) | Strengthened `check-hashtable-native-array-backend.sh` to require exactly one `HashTablePrimitives.to_list` call and require it in the enumeration worker. Routing and persistent edits remain statically constrained to compact-sequence operations. |
+| 2026-09-13 | H1.1 (partial) | Added `chunk_six_reconstruct` in `HashTableBits.v`: normalized 30-bit hashes equal the weighted sum of chunks 0 through 5. The proof unfolds shifts into base-32 quotients and uses the hash bound to eliminate the seventh quotient. First-differing-chunk routing remains open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

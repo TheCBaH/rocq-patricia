@@ -77,6 +77,59 @@ Proof.
     now rewrite N.land_0_l.
 Qed.
 
+(** A normalized hash is completely determined by the six chunks used for
+    routing.  The least-significant chunk comes first, as it does in the
+    executable workers. *)
+Lemma chunk_six_reconstruct :
+  forall full_hash,
+    (full_hash < hash_space)%N ->
+    (full_hash = chunk full_hash 0 + 32 * chunk full_hash 1 +
+      1024 * chunk full_hash 2 + 32768 * chunk full_hash 3 +
+      1048576 * chunk full_hash 4 + 33554432 * chunk full_hash 5)%N.
+Proof.
+  intros h Hbound.
+  unfold chunk, branch_mask.
+  change (h = N.land (N.shiftr h 0) (N.ones 5) +
+    32 * N.land (N.shiftr h 5) (N.ones 5) +
+    1024 * N.land (N.shiftr h 10) (N.ones 5) +
+    32768 * N.land (N.shiftr h 15) (N.ones 5) +
+    1048576 * N.land (N.shiftr h 20) (N.ones 5) +
+    33554432 * N.land (N.shiftr h 25) (N.ones 5))%N.
+  rewrite !N.shiftr_div_pow2, !N.land_ones, N.div_1_r.
+  change (h = h mod 32 + 32 * ((h / 32) mod 32) +
+    1024 * ((h / 1024) mod 32) + 32768 * ((h / 32768) mod 32) +
+    1048576 * ((h / 1048576) mod 32) +
+    33554432 * ((h / 33554432) mod 32))%N.
+  pose proof (N.div_mod h 32 ltac:(lia)) as E0.
+  pose proof (N.div_mod (h / 32) 32 ltac:(lia)) as E1.
+  pose proof (N.div_mod (h / 1024) 32 ltac:(lia)) as E2.
+  pose proof (N.div_mod (h / 32768) 32 ltac:(lia)) as E3.
+  pose proof (N.div_mod (h / 1048576) 32 ltac:(lia)) as E4.
+  pose proof (N.div_mod (h / 33554432) 32 ltac:(lia)) as E5.
+  assert (Q1 : (h / 32 / 32 = h / 1024)%N).
+  { change (h / 32 / 32 = h / (32 * 32))%N. apply N.div_div.
+    - discriminate. - discriminate. }
+  assert (Q2 : (h / 1024 / 32 = h / 32768)%N).
+  { change (h / 1024 / 32 = h / (1024 * 32))%N. apply N.div_div.
+    - discriminate. - discriminate. }
+  assert (Q3 : (h / 32768 / 32 = h / 1048576)%N).
+  { change (h / 32768 / 32 = h / (32768 * 32))%N. apply N.div_div.
+    - discriminate. - discriminate. }
+  assert (Q4 : (h / 1048576 / 32 = h / 33554432)%N).
+  { change (h / 1048576 / 32 = h / (1048576 * 32))%N. apply N.div_div.
+    - discriminate. - discriminate. }
+  assert (Q5 : (h / 33554432 / 32 = 0)%N).
+  { rewrite N.div_div.
+    - change (h / 1073741824 = 0)%N.
+      apply (proj1 (N.le_0_r _)). apply (proj1 (N.lt_succ_r _ 0)).
+      apply N.div_lt_upper_bound;
+        [discriminate | change (h < 1073741824 * 1)%N; exact Hbound].
+    - discriminate. - discriminate. }
+  rewrite Q1 in E1. rewrite Q2 in E2. rewrite Q3 in E3.
+  rewrite Q4 in E4. rewrite Q5 in E5.
+  nia.
+Qed.
+
 Lemma bitmap_bit_zero : bitmap_bit 0 = 1%N.
 Proof. reflexivity. Qed.
 
