@@ -27,7 +27,7 @@ HASHTABLE_VOFILES := $(HASHTABLE_VFILES:.v=.vo)
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
-.PHONY: hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-native-primitives-test hashtable-extraction-audit hashtable-assumptions
+.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-native-primitives-test hashtable-extraction-audit hashtable-assumptions
 
 .PHONY: string-primitive-profile
 .PHONY: string-worker-performance
@@ -58,6 +58,10 @@ union-proof: $(UNION_VOFILES)
 # H0 is intentionally separate from the established Patricia build.  Later
 # gates extend these targets without making the two extraction namespaces
 # collide.
+hashtable: hashtable-proof hashtable-assumptions hashtable-extraction-audit \
+	hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native \
+	hashtable-native-primitives-test
+
 hashtable-proof: $(HASHTABLE_VOFILES)
 
 hashtable-skeleton-extraction: hashtable-proof HashTableSkeletonExtract.v
@@ -337,8 +341,18 @@ clean:
 	rm -f extracted/*.ml extracted/*.mli extracted/*.cmi extracted/*.cmo extracted/*.cmx extracted/*.o
 	rm -f $(REFERENCE_DIR)/*.ml $(REFERENCE_DIR)/*.mli $(REFERENCE_DIR)/*.cmi \
 	  $(REFERENCE_DIR)/*.cmo $(REFERENCE_DIR)/*.cmx $(REFERENCE_DIR)/*.o
+	rm -f hashtable_reference_extracted/*.ml hashtable_reference_extracted/*.mli \
+	  hashtable_reference_extracted/*.cmi hashtable_reference_extracted/*.cmo \
+	  hashtable_reference_extracted/*.cmx hashtable_reference_extracted/*.o
+	rm -f hashtable_skeleton_extracted/*.ml hashtable_skeleton_extracted/*.mli \
+	  hashtable_skeleton_extracted/*.cmi hashtable_skeleton_extracted/*.cmo \
+	  hashtable_skeleton_extracted/*.cmx hashtable_skeleton_extracted/*.o
 	rm -f PatriciaMap.cmi PatriciaMap.cmo PatriciaMap.cmx PatriciaMap.o
 	rm -f StringPatriciaMap.cmi StringPatriciaMap.cmo StringPatriciaMap.cmx StringPatriciaMap.o
+	rm -f HashMap.cmi HashMap.cmo HashMap.cmx HashMap.o
+	rm -f HashTablePrimitives.cmi HashTablePrimitives.cmo HashTablePrimitives.cmx HashTablePrimitives.o
+	rm -f HashTablePrimitivesTest.cmi HashTablePrimitivesTest.cmo HashTablePrimitivesTest.cmx HashTablePrimitivesTest.o
+	rm -f hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-native-test hashtable-native-primitives-test
 	rm -f PatriciaReference.cmi PatriciaReference.cmo PatriciaReference.cmx PatriciaReference.o
 	rm -f PatriciaTest.cmi PatriciaTest.cmo PatriciaDifferentialTest.cmi \
 	  PatriciaDifferentialTest.cmo PatriciaUnionTest.cmi PatriciaUnionTest.cmo \

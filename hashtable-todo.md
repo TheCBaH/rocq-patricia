@@ -89,7 +89,7 @@ Dependencies: H3.G.
 
 Dependencies: H4.G; benchmark harness may begin after H3.G.
 
-- [ ] **H5.1** Integrate aggregate targets, assumption discovery, cleanup and CI without regressing Patricia.
+- [ ] **H5.1** In progress: `make hashtable` aggregates the implemented proof/audit/reference/wrapper/primitive gates, clean removes its generated outputs, and CI invokes it under the existing pinned toolchain. Hosted result and completion of the remaining gates are open.
 - [ ] **H5.2** Add generic-key checked benchmarks against list reference, compatible Map.Make and Hashtbl instances; include StringPatriciaMap for string workloads.
 - [ ] **H5.3** Record timing/allocation/retained heap with compiler, seed, key distributions and version-retention policy.
 - [ ] **H5.4** In progress: README and design status now describe the source-reference milestone without claiming proof/native completion. Final supported API, theorem inventory and extraction boundary remain open.
@@ -127,6 +127,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H4.1 (partial) | Added `HashTableNative.v`; `make hashtable-proof` passed. It provides modeled persistent-sequence view laws and base source refinement lemmas, without an OCaml array realizer or native operation-refinement claim. |
 | 2026-09-13 | H4.2 (partial) | Extended `HashTableNative.v` with modeled native get/set/remove and source refinement lemmas; `make hashtable-proof` passed. The model does not yet claim array realization, heap safety, invariant preservation or public-backend switching. |
 | 2026-09-13 | H4.4 (partial) | Added `HashTablePrimitives.ml` / `.mli` and `HashTablePrimitivesTest.ml`; `make hashtable-native-primitives-test` passed through `ocamlopt`. It checks insert/replace/remove views, out-of-range behavior, fresh storage for all updates and unchanged retained storage. No extraction binding or full native-map realization is claimed. |
+| 2026-09-13 | H5.1 (partial) | Added `make hashtable`, cleanup rules and a CI hash-table step. A local `make clean && make hashtable` regenerated all reference output and passed the proof, 68-theorem audit, extraction-boundary, direct reference, wrapper bytecode/native and primitive tests. A monitored fresh `make` then exited 0 with Patricia randomized, union and optimized/reference differential tests passing. Hosted CI has not run in this tracker. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
