@@ -8,6 +8,17 @@ end
 module Reference = HashMap.Make (Key)
 module Native = HashMapNative.Make (Key)
 
+module Folded_key = struct
+  type t = string
+  let canonical = String.lowercase_ascii
+  let equal left right = String.equal (canonical left) (canonical right)
+  (* Deliberately collision-heavy, while remaining compatible with [equal]. *)
+  let hash ~seed key = seed lxor String.length (canonical key)
+end
+
+module Folded_reference = HashMap.Make (Folded_key)
+module Folded_native = HashMapNative.Make (Folded_key)
+
 let fail message = failwith ("HashMap native test: " ^ message)
 let check message condition = if not condition then fail message
 
@@ -19,6 +30,35 @@ let check_agreement message reference native =
          (Reference.get key reference = Native.get key native))
     probes;
   check (message ^ " empty") (Reference.is_empty reference = Native.is_empty native)
+
+let functional_value map key =
+  Option.map (fun value -> value 10) (Folded_reference.get key map)
+
+let functional_native_value map key =
+  Option.map (fun value -> value 10) (Folded_native.get key map)
+
+let check_functional message reference native key expected =
+  check (message ^ " reference") (functional_value reference key = expected);
+  check (message ^ " native") (functional_native_value native key = expected);
+  check (message ^ " agreement")
+    (functional_value reference key = functional_native_value native key)
+
+let check_custom_key_and_payload () =
+  let base_reference = Folded_reference.empty ~seed:23 in
+  let base_native = Folded_native.empty ~seed:23 in
+  let first_reference = Folded_reference.set "Alpha" (fun x -> x + 1) base_reference in
+  let first_native = Folded_native.set "Alpha" (fun x -> x + 1) base_native in
+  let collision_reference = Folded_reference.set "Gamma" (fun x -> x + 2) first_reference in
+  let collision_native = Folded_native.set "Gamma" (fun x -> x + 2) first_native in
+  let replaced_reference = Folded_reference.set "ALPHA" (fun x -> x + 3) collision_reference in
+  let replaced_native = Folded_native.set "ALPHA" (fun x -> x + 3) collision_native in
+  let removed_reference = Folded_reference.remove "gAmMa" replaced_reference in
+  let removed_native = Folded_native.remove "gAmMa" replaced_native in
+  check_functional "custom retained alpha" first_reference first_native "alpha" (Some 11);
+  check_functional "custom retained collision" collision_reference collision_native "GAMMA" (Some 12);
+  check_functional "custom replacement" replaced_reference replaced_native "aLpHa" (Some 13);
+  check_functional "custom removal" removed_reference removed_native "gamma" None;
+  check_functional "custom retained replacement" replaced_reference replaced_native "gamma" (Some 12)
 
 let () =
   let random = Random.State.make [| 0x41525241; 0x59544553 |] in
@@ -54,4 +94,5 @@ let () =
   check "first-wins native" (Native.get 0 native = Some "first");
   check_agreement "bulk load" reference native;
   loop 0 reference native [ (reference, native) ];
+  check_custom_key_and_payload ();
   print_endline "HashMap native array differential test passed"

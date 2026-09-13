@@ -81,7 +81,7 @@ Dependencies: H3.G.
 - [ ] **H4.3** Prove bounded bitmap/scalar/popcount workers including all native intermediate and shift bounds.
 - [ ] **H4.4** In progress: `HashTablePrimitives.ml` / `.mli` provide private fresh-copy sequence primitives and `HashMapNative.ml` uses them for a private-array HAMT; primitive and reference/native differential tests validate views, storage freshness and map behavior. Extraction bindings and their full target inventory remain open.
 - [ ] **H4.5** In progress: primitive and native-array audits inventory the private sequence realizer and standalone array workers, reject reference delegation/unsafe escapes, and check the public wrapper remains reference-backed; generated map-worker and extraction-binding audit remain open.
-- [ ] **H4.6** In progress: `hashtable-native-array-test` and `hashtable-native-array-test-native` run retained-version reference/native histories in bytecode/native code. Broader payload/custom-key coverage remains open.
+- [ ] **H4.6** In progress: `hashtable-native-array-test` and `hashtable-native-array-test-native` run retained-version reference/native histories in bytecode/native code, plus a collision-heavy case-insensitive string-key scenario with functional payloads. Broader randomized payload/custom-key coverage remains open.
 - [ ] **H4.7** Switch public wrapper to native backend after passing correctness and refinement gates.
 - [ ] **H4.G** Gate: modeled refinement proofs and all native checks pass; foreign/heap trust remains accurately stated.
 
@@ -154,6 +154,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H4.4/H4.6 (partial) | Added private-array `HashMapNative.Make` and `HashMapNativeTest.ml`, plus bytecode/native differential targets. Bytecode passed 1,000 deterministic reference/native set/remove steps with retained versions, collision-heavy keys, `min_int`/`max_int` and first-wins bulk loading. The public wrapper is unchanged and no kernel proof of this OCaml heap implementation is claimed. |
 | 2026-09-13 | H4.5 (partial) | Added `check-hashtable-native-array-backend.sh` and `make hashtable-native-array-audit`. It checks that the standalone backend uses private sequence operations, rejects reference-map delegation and unsafe escapes, and confirms `HashMap.Make` has not switched backends. Generated source-native worker and extraction-binding audits remain open. |
 | 2026-09-13 | H5.2 (partial) | Extended `HashTableBenchmark.ml` to check and measure the private fresh-array backend alongside the reference wrapper, `Map.Make` and OCaml's imperative `Hashtbl` on one integer workload. Measurements remain local workload evidence only. |
+| 2026-09-13 | H4.6 (partial) | Extended `HashMapNativeTest.ml` with a case-insensitive string key callback, intentionally colliding equal-length keys, functional payloads and retained versions across replacement/removal. The bytecode/native differential targets exercise this case; randomized generic-instance coverage remains open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
