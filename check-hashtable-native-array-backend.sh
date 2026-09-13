@@ -27,8 +27,16 @@ for worker in get_tree set_tree remove_tree; do
     fail "backend is missing native $worker worker"
 done
 
+# Enumeration is the only API allowed to materialize compact children as a
+# list.  Routing and persistent edits must use the private sequence workers.
+to_list_uses=$(grep -Fc 'HashTablePrimitives.to_list' "$backend_file" || true)
+[ "$to_list_uses" -eq 1 ] ||
+  fail "backend materializes compact children outside enumeration"
+grep -A5 'let rec bindings' "$backend_file" | grep -Fq 'HashTablePrimitives.to_list' ||
+  fail "the sole compact-child materialization is not in bindings"
+
 if grep -Fq 'HashMapNative' "$public_wrapper"; then
   fail "public wrapper switched to the native backend before the gate closed"
 fi
 
-echo "Hash-table native-array audit: private sequence workers only; no reference delegation or unsafe escape; public wrapper remains reference-backed"
+echo "Hash-table native-array audit: private sequence workers only; compact children materialized only for enumeration; no reference delegation or unsafe escape; public wrapper remains reference-backed"
