@@ -344,6 +344,49 @@ Proof.
   intros stored' value' Hin. apply (Hmiss stored' value'). simpl. now right.
 Qed.
 
+Lemma bucket_get_none_miss :
+  forall K A (eqb : K -> K -> bool) key (entries : list (K * A)),
+    bucket_get eqb key entries = None ->
+    forall stored value,
+      In (stored, value) entries -> eqb key stored = false.
+Proof.
+  intros K A eqb key entries.
+  induction entries as [|[stored value] tail IH]; intros Hnone stored' value' Hin.
+  - inversion Hin.
+  - simpl in Hnone. destruct (eqb key stored) eqn:Hstored.
+    + discriminate.
+    + simpl in Hin. destruct Hin as [Hin|Hin].
+      * inversion Hin. subst. exact Hstored.
+      * now apply (IH Hnone stored' value').
+Qed.
+
+Lemma bucket_set_key_nodup :
+  forall K A (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         key (value : A) (entries : list (K * A)),
+    Symmetric E ->
+    NoDupA (fun left right => E (fst left) (fst right)) entries ->
+    (bucket_get eqb key entries = None ->
+      ~ InA (fun left right => E (fst left) (fst right)) (key, value) entries) ->
+    NoDupA (fun left right => E (fst left) (fst right))
+      (bucket_set eqb key value entries).
+Proof.
+  intros K A E eqb key value entries Hsymmetric Hnodup Hfresh.
+  destruct (bucket_get eqb key entries) eqn:Hget.
+  - eapply bucket_set_nodup_hit.
+    + rewrite Hget. discriminate.
+    + exact Hnodup.
+    + intros stored old_value new_value entry.
+      unfold fst. reflexivity.
+    + intros entry stored old_value new_value.
+      unfold fst. reflexivity.
+  - eapply bucket_set_miss_nodup.
+    + intros [left_key left_value] [right_key right_value] Hrelated.
+      now apply Hsymmetric.
+    + exact Hnodup.
+    + now apply bucket_get_none_miss.
+    + now apply Hfresh.
+Qed.
+
 Lemma bucket_remove_length_le :
   forall K A (eqb : K -> K -> bool) key (entries : list (K * A)),
     length (bucket_remove eqb key entries) <= length entries.

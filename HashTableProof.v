@@ -445,6 +445,28 @@ Lemma set_tree_collision_miss_wf :
       + exact Hfresh.
   Qed.
 
+Lemma set_tree_collision_wf :
+    forall fuel depth prefix full_hash key (value : A)
+           (entries : list (K * A)) (eqb : K -> K -> bool),
+      wf E hash seed depth prefix (Collision full_hash entries) ->
+      (bucket_get eqb key entries = None ->
+        entry_matches hash seed full_hash depth prefix (key, value)) ->
+      Symmetric E ->
+      (bucket_get eqb key entries = None ->
+        ~ InA (binding_equiv E) (key, value) entries) ->
+      wf E hash seed depth prefix
+        (set_tree eqb fuel depth full_hash key value
+          (Collision full_hash entries)).
+  Proof.
+    intros fuel depth prefix full_hash key value entries eqb Hwf Hentry
+      Hsymmetric Hfresh.
+    destruct (bucket_get eqb key entries) eqn:Hget.
+    - apply set_tree_collision_same_hash_wf; auto.
+      rewrite Hget. discriminate.
+    - eapply set_tree_collision_miss_wf; eauto.
+      now apply bucket_get_none_miss.
+  Qed.
+
 End CollisionUpdateInvariant.
 
 Lemma get_tree_normalize_collision_same_hash :
