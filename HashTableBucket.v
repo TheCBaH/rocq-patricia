@@ -164,6 +164,42 @@ Proof.
   rewrite length_app. simpl. lia.
 Qed.
 
+Lemma nodupA_snoc :
+  forall A (R : A -> A -> Prop),
+    Symmetric R ->
+    forall (entries : list A) entry,
+      NoDupA R entries ->
+      ~ InA R entry entries ->
+      NoDupA R (entries ++ [entry]).
+Proof.
+  intros A R Hsymmetric entries. induction entries as [|head tail IH]; intros entry Hnodup Hentry.
+  - constructor; [intro Hin; inversion Hin|constructor].
+  - inversion Hnodup as [|head' tail' Hhead Htail]; subst.
+    constructor.
+    + intro Hin. apply (proj1 (InA_app_iff R tail [entry] head)) in Hin.
+      destruct Hin as [Hintail|Hinentry].
+      * now apply Hhead.
+      * apply Hentry. apply (proj2 (InA_cons R entry head tail)).
+        left. apply Hsymmetric.
+        apply (proj1 (InA_cons R head entry [])) in Hinentry.
+        destruct Hinentry as [Hinentry|Hinentry]; [exact Hinentry|inversion Hinentry].
+    + apply IH; auto.
+Qed.
+
+Lemma bucket_set_miss_nodup :
+  forall K A (R : K * A -> K * A -> Prop) (eqb : K -> K -> bool)
+         key (value : A) (entries : list (K * A)),
+    Symmetric R ->
+    NoDupA R entries ->
+    (forall stored old_value, In (stored, old_value) entries -> eqb key stored = false) ->
+    ~ InA R (key, value) entries ->
+    NoDupA R (bucket_set eqb key value entries).
+Proof.
+  intros K A R eqb key value entries Hsymmetric Hnodup Hmiss Hfresh.
+  rewrite bucket_set_miss by exact Hmiss.
+  now apply nodupA_snoc.
+Qed.
+
 Lemma bucket_set_length_hit :
   forall K A (eqb : K -> K -> bool) key (value : A) (entries : list (K * A)),
     bucket_get eqb key entries <> None ->
