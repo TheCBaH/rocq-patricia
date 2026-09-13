@@ -157,6 +157,22 @@ Proof.
   destruct fuel; cbn [set_tree]; now rewrite Heqb.
 Qed.
 
+Lemma bindings_set_tree_leaf_other_hash :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash stored_hash
+         key stored (old value : A) (entry : K * A),
+    eqb key stored = false ->
+    full_hash <> stored_hash ->
+    In entry (bindings (set_tree eqb fuel depth full_hash key value
+      (Leaf stored_hash stored old))) <->
+    entry = (key, value) \/ entry = (stored, old).
+Proof.
+  intros K A eqb fuel depth full_hash stored_hash key stored old value entry
+    Heqb Hhash.
+  apply N.eqb_neq in Hhash.
+  destruct fuel; cbn [set_tree]; rewrite Heqb, Hhash;
+    rewrite bindings_join_worker; simpl; intuition subst; auto.
+Qed.
+
 Lemma remove_tree_leaf_removes :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
          (value : A),
