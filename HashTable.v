@@ -285,3 +285,39 @@ Lemma of_list_empty :
          (seed : Seed),
     @of_list K Seed A eqb hash seed [] = empty seed.
 Proof. reflexivity. Qed.
+
+Lemma set_seed :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         (key : K) (value : A) (m : table K Seed A),
+    table_seed (set eqb hash key value m) = table_seed m.
+Proof. reflexivity. Qed.
+
+Lemma remove_seed :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         (key : K) (m : table K Seed A),
+    table_seed (remove eqb hash key m) = table_seed m.
+Proof. reflexivity. Qed.
+
+Lemma singleton_seed :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         (seed : Seed) (key : K) (value : A),
+    table_seed (singleton eqb hash seed key value) = seed.
+Proof. reflexivity. Qed.
+
+Lemma add_first_seed :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         entries (m : table K Seed A),
+    table_seed (add_first eqb hash entries m) = table_seed m.
+Proof.
+  intros K Seed A eqb hash entries.
+  induction entries as [|[key value] tail IH]; intros m; simpl; auto.
+  destruct (get eqb hash key m).
+  - apply IH.
+  - rewrite IH. reflexivity.
+Qed.
+
+Lemma of_list_seed :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         (seed : Seed) entries,
+    table_seed (@of_list K Seed A eqb hash seed entries) = seed.
+Proof. intros. unfold of_list. now rewrite add_first_seed. Qed.
