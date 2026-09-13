@@ -56,7 +56,7 @@ Dependencies: H1.G.
 - [ ] **H2.1** In progress: `HashTable.v` defines raw nodes, seeded tables and an independent flattened `bindings` view; `HashTableProof.v` now defines the hash/prefix, collision-uniqueness and bitmap/dense-child well-formedness invariant. Its preservation proofs remain open.
 - [ ] **H2.2** In progress: `HashTable.v` implements bounded `join_worker`; `HashTableProof.v` proves flattened binding union for both `join_two` and every fuelled worker path, including the fallback. Validity and unreachable-fallback routing proofs remain open.
 - [ ] **H2.3** In progress: `HashTable.v` implements fuelled bitmap-routed `get_tree`; `HashTableProof.v` proves leaf/collision base cases and normalized same-hash collision lookup. Independent binding equivalence remains open.
-- [ ] **H2.4** In progress: `HashTable.v` implements persistent `set_tree` and the public seeded `set`; `HashTableProof.v` proves leaf replacement/representative, same-hash collision insertion/lookup, distinct-hash leaf binding and `set_seed` base cases. Global pointwise and validity laws remain open.
+- [ ] **H2.4** In progress: `HashTable.v` implements persistent `set_tree` and the public seeded `set`; `HashTableProof.v` proves leaf replacement/representative, same-hash collision insertion/lookup, distinct-hash leaf and branch-insert binding, and `set_seed` base cases. Global pointwise and validity laws remain open.
 - [ ] **H2.5** In progress: `HashTable.v` implements persistent `remove_tree` and retains unary branches; `HashTableProof.v` proves matching-leaf removal, same-hash collision removal/miss preservation and `remove_seed`. Pointwise and validity laws remain open.
 - [ ] **H2.6** Prove branch-path height at most six and global key uniqueness.
 - [ ] **H2.G** Gate: core laws kernel-checked; assumption audit and existing Patricia proof build pass.
@@ -141,6 +141,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H2.2 (partial) | Added flattened binding-union theorems for `join_two` and `join_worker`, including the fuel-zero fallback. `make hashtable-proof hashtable-assumptions` passed with 100 declarations closed. Validity and unreachable-fallback routing proofs remain open. |
 | 2026-09-13 | H2.4 (partial) | Added the distinct-hash leaf-update binding characterization in `HashTableProof.v`, deriving exact old/new membership from the join binding theorem. `make hashtable-proof hashtable-assumptions` passed with 101 declarations closed. Recursive routing, global pointwise and validity laws remain open. |
 | 2026-09-13 | H1.2 (partial) | Added exact dense-insertion membership and dense-removal membership-subset laws in `HashTableBits.v`. `make hashtable-proof hashtable-assumptions` passed with 103 declarations closed. General bitmap/rank correspondence remains open. |
+| 2026-09-13 | H2.4 (partial) | Added dense-child-to-branch insertion binding preservation in `HashTableProof.v`: the result contains exactly the new child's bindings plus the prior branch bindings. `make hashtable-proof hashtable-assumptions` passed with 105 declarations closed. Recursive routing, global pointwise and validity laws remain open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

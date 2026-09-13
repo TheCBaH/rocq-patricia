@@ -109,6 +109,36 @@ Proof.
     + apply bindings_join_two.
 Qed.
 
+Lemma bindings_dense_insert :
+  forall (K A : Type) index (child : tree K A) children (entry : K * A),
+    In entry (flat_map bindings (dense_insert index child children)) <->
+    In entry (bindings child) \/ In entry (flat_map bindings children).
+Proof.
+  intros K A index child children entry.
+  split.
+  - intro Hin. apply in_flat_map in Hin.
+    destruct Hin as [node [Hnode Hin]].
+    apply dense_insert_in in Hnode. destruct Hnode as [Hnode|Hnode].
+    + subst node. now left.
+    + right. apply in_flat_map. now exists node.
+  - intro Hin. destruct Hin as [Hin|Hin].
+    + apply in_flat_map. exists child. split; auto.
+      apply dense_insert_in. now left.
+    + apply in_flat_map in Hin. destruct Hin as [node [Hnode Hin]].
+      apply in_flat_map. exists node. split; auto.
+      apply dense_insert_in. now right.
+Qed.
+
+Lemma bindings_branch_insert :
+  forall (K A : Type) bitmap slot (child : tree K A) children (entry : K * A),
+    In entry (bindings (branch_insert bitmap slot child children)) <->
+    In entry (bindings child) \/ In entry (bindings (Branch bitmap children)).
+Proof.
+  intros K A bitmap slot child children entry.
+  unfold branch_insert. simpl.
+  apply bindings_dense_insert.
+Qed.
+
 Lemma wf_empty_root :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed),
