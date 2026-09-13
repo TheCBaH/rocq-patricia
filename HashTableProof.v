@@ -109,6 +109,26 @@ Proof.
     + apply bindings_join_two.
 Qed.
 
+Lemma get_tree_zero_branch :
+  forall (K A : Type) (eqb : K -> K -> bool) depth full_hash (key : K)
+         bitmap (children : list (tree K A)),
+    get_tree eqb 0 depth full_hash key (Branch bitmap children) = None.
+Proof. reflexivity. Qed.
+
+Lemma set_tree_zero_branch :
+  forall (K A : Type) (eqb : K -> K -> bool) depth full_hash (key : K)
+         (value : A) bitmap (children : list (tree K A)),
+    set_tree eqb 0 depth full_hash key value (Branch bitmap children) =
+    Branch bitmap children.
+Proof. reflexivity. Qed.
+
+Lemma remove_tree_zero_branch :
+  forall (K A : Type) (eqb : K -> K -> bool) depth full_hash (key : K)
+         bitmap (children : list (tree K A)),
+    remove_tree eqb 0 depth full_hash key (Branch bitmap children) =
+    Branch bitmap children.
+Proof. reflexivity. Qed.
+
 Lemma bindings_dense_insert :
   forall (K A : Type) index (child : tree K A) children (entry : K * A),
     In entry (flat_map bindings (dense_insert index child children)) <->
