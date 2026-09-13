@@ -76,7 +76,7 @@ Dependencies: H2.G.
 
 Dependencies: H3.G.
 
-- [ ] **H4.1** In progress: `HashTableNative.v` defines a source-modeled persistent sequence interface, fresh-update view laws and a native-tree/source relation with empty/leaf/collision refinement lemmas. Array realization and branch refinement remain open.
+- [ ] **H4.1** In progress: `HashTableNative.v` defines a source-modeled persistent sequence interface, fresh-update view laws and a native-tree/source relation with empty/leaf/collision refinement lemmas; `HashTableExtract.v` compiles a separately extracted modeled-native artifact. Array realization and recursive branch refinement remain open.
 - [ ] **H4.2** In progress: `HashTableNative.v` / `HashTableNativeProof.v` define modeled native get/set/remove and prove refinement for arbitrary related source/native trees. Invariant/seed preservation and any array-realizer refinement remain open.
 - [ ] **H4.3** Prove bounded bitmap/scalar/popcount workers including all native intermediate and shift bounds.
 - [ ] **H4.4** In progress: `HashTablePrimitives.ml` / `.mli` provide private fresh-copy sequence primitives and `hashtable-native-primitives-test` validates views and storage freshness. Extraction bindings and their full target inventory remain open.
@@ -149,6 +149,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H3.4 (partial) | Added `HashTableDifferentialTest.ml`, `make hashtable-differential` and `make hashtable-test-native`. Both bytecode/native tests passed 1,000 deterministic set/remove steps against `Stdlib.Map`, checking current and sampled retained versions across `min_int`, `max_int` and bounded keys. This exercises the reference wrapper only; a compact native-map differential remains open. |
 | 2026-09-13 | H2.3–H2.5 (partial) | Added explicit zero-fuel branch equations for get/set/remove in `HashTableProof.v`. `make hashtable-proof hashtable-assumptions` passed with 114 declarations closed. The invariant proof that valid six-level routing never reaches these fallbacks remains open. |
 | 2026-09-13 | H3.1 (partial) | Added enumeration laws for singleton removal and duplicate-singleton first-wins bulk loading in `HashTable.v`. `make hashtable-proof hashtable-assumptions` passed with 116 declarations closed. General pointwise first-wins and extensional laws remain open. |
+| 2026-09-13 | H4.1 (partial) | Added `HashTableExtract.v` and `make hashtable-native` to extract and compile the source-defined modeled native operations in `hashtable_extracted/`. No array binding, recursive native branch realization or OCaml heap claim is made. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

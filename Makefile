@@ -27,7 +27,7 @@ HASHTABLE_VOFILES := $(HASHTABLE_VFILES:.v=.vo)
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
-.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-test hashtable-differential hashtable-test-native hashtable-native-primitives-test hashtable-native-primitives-audit hashtable-benchmark hashtable-benchmark-smoke hashtable-extraction-audit hashtable-assumptions
+.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-test hashtable-differential hashtable-test-native hashtable-native hashtable-native-primitives-test hashtable-native-primitives-audit hashtable-benchmark hashtable-benchmark-smoke hashtable-extraction-audit hashtable-assumptions
 
 .PHONY: string-primitive-profile
 .PHONY: string-worker-performance
@@ -60,7 +60,7 @@ union-proof: $(UNION_VOFILES)
 # collide.
 hashtable: hashtable-proof hashtable-assumptions hashtable-extraction-audit \
 	hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native \
-	hashtable-differential hashtable-test-native hashtable-native-primitives-test \
+	hashtable-differential hashtable-test-native hashtable-native hashtable-native-primitives-test \
 	hashtable-native-primitives-audit
 
 hashtable-proof: $(HASHTABLE_VOFILES)
@@ -79,6 +79,14 @@ hashtable-reference: hashtable-proof HashTableReferenceExtract.v
 	  hashtable_reference_extracted/*.cmx hashtable_reference_extracted/*.o
 	$(ROCQ) compile $(ROCQFLAGS) HashTableReferenceExtract.v
 	cd hashtable_reference_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLC) -c
+
+hashtable-native: hashtable-proof HashTableExtract.v
+	@mkdir -p hashtable_extracted
+	$(RM) hashtable_extracted/*.ml hashtable_extracted/*.mli \
+	  hashtable_extracted/*.cmi hashtable_extracted/*.cmo \
+	  hashtable_extracted/*.cmx hashtable_extracted/*.o
+	$(ROCQ) compile $(ROCQFLAGS) HashTableExtract.v
+	cd hashtable_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLC) -c
 
 hashtable-reference-ocaml: hashtable-reference HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml
 	$(OCAMLC) -I hashtable_reference_extracted -c HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml
@@ -372,6 +380,9 @@ clean:
 	rm -f hashtable_reference_extracted/*.ml hashtable_reference_extracted/*.mli \
 	  hashtable_reference_extracted/*.cmi hashtable_reference_extracted/*.cmo \
 	  hashtable_reference_extracted/*.cmx hashtable_reference_extracted/*.o
+	rm -f hashtable_extracted/*.ml hashtable_extracted/*.mli \
+	  hashtable_extracted/*.cmi hashtable_extracted/*.cmo \
+	  hashtable_extracted/*.cmx hashtable_extracted/*.o
 	rm -f hashtable_skeleton_extracted/*.ml hashtable_skeleton_extracted/*.mli \
 	  hashtable_skeleton_extracted/*.cmi hashtable_skeleton_extracted/*.cmo \
 	  hashtable_skeleton_extracted/*.cmx hashtable_skeleton_extracted/*.o
