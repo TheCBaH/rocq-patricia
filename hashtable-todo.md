@@ -46,7 +46,7 @@ Dependencies: H0.G.
 
 - [ ] **H1.1** Implemented: `HashTableBits.v` defines chunks, proves the per-chunk bound, proves a normalized 30-bit hash has zero chunk at depth six, reconstructs every normalized hash from its six routing chunks, and proves distinct normalized hashes differ at one of depths 0 through 5.
 - [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary calculations, full occupied-slot enumeration, bounded lookup laws before/at/after insertion plus replacement/removal lookup preservation, and insertion/replacement/deletion membership laws; general bitmap-rank correspondence remains open.
-- [ ] **H1.3** In progress: `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with head replacement/removal, exact miss-insertion/cardinality, and successful-removal cardinality lemmas; uniqueness and full pointwise laws remain open.
+- [ ] **H1.3** In progress: `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with head replacement/removal, exact hit/miss insertion cardinality, and successful-removal cardinality lemmas; uniqueness and full pointwise laws remain open.
 - [ ] **H1.G** Gate: primitive proofs compile and theorem assumption audit passes.
 
 ## H2 — Source HAMT
@@ -159,6 +159,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H1.1 (partial) | Added `chunk_six_reconstruct` in `HashTableBits.v`: normalized 30-bit hashes equal the weighted sum of chunks 0 through 5. The proof unfolds shifts into base-32 quotients and uses the hash bound to eliminate the seventh quotient. First-differing-chunk routing remains open. |
 | 2026-09-13 | H1.1 | Added `chunk_six_ext` and `chunk_six_separates`: equality of all six chunks reconstructs equal bounded hashes, so distinct normalized hashes diverge at a routing depth below six. |
 | 2026-09-13 | H1.3 (partial) | Added `bucket_remove_length_hit`: when lookup finds a binding, removal reduces bucket length by exactly one. This complements the existing exact miss-preservation law without relying on value equality. |
+| 2026-09-13 | H1.3 (partial) | Added `bucket_set_length_hit`: when lookup finds a binding, update keeps bucket length unchanged. Together with the existing miss-insertion theorem, bucket update now has exact hit/miss cardinality behavior. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

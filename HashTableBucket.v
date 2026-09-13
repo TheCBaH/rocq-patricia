@@ -112,6 +112,19 @@ Proof.
   rewrite length_app. simpl. lia.
 Qed.
 
+Lemma bucket_set_length_hit :
+  forall K A (eqb : K -> K -> bool) key (value : A) (entries : list (K * A)),
+    bucket_get eqb key entries <> None ->
+    length (bucket_set eqb key value entries) = length entries.
+Proof.
+  intros K A eqb key value entries.
+  induction entries as [|[stored old_value] tail IH]; intro Hhit; simpl in Hhit.
+  - contradiction.
+  - destruct (eqb key stored) eqn:Hstored.
+    + simpl. now rewrite Hstored.
+    + simpl. rewrite Hstored. simpl. now rewrite (IH Hhit).
+Qed.
+
 Lemma bucket_remove_miss :
   forall K A (eqb : K -> K -> bool) key (entries : list (K * A)),
     (forall stored value, In (stored, value) entries -> eqb key stored = false) ->
