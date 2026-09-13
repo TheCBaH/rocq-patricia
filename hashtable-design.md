@@ -1,6 +1,7 @@
 # Persistent generic hash table: design
 
-Date: 2026-09-13. Status: specified, not implemented or proved.
+Date: 2026-09-13. Status: H0 complete; source/reference implementation and
+initial proofs in progress. The tracker is authoritative for delivery gates.
 
 This document turns the investigation in [hashtable.md](hashtable.md) into an
 implementation contract. The [plan](hashtable-plan.md) defines delivery gates;

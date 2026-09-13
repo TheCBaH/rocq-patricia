@@ -15,6 +15,14 @@ end
 module Int_map = HashMap.Make (Int_key)
 module Case_map = HashMap.Make (Case_key)
 
+module Record_key = struct
+  type t = { id : int; label : string }
+  let equal left right = left.id = right.id
+  let hash ~seed key = Hashtbl.seeded_hash seed key.id
+end
+
+module Record_map = HashMap.Make (Record_key)
+
 let fail message = failwith ("HashMap test: " ^ message)
 let check message condition = if not condition then fail message
 
@@ -42,6 +50,20 @@ let () =
   let first = Case_map.of_list ~seed:8 [ ("Bob", 1); ("BOB", 2) ] in
   check "first value wins" (Case_map.get "bob" first = Some 1);
   check "first representative wins" (Case_map.elements first = [ ("Bob", 1) ]);
+  let original = { Record_key.id = 4; label = "original" } in
+  let equivalent = { Record_key.id = 4; label = "later spelling" } in
+  let records = Record_map.singleton ~seed:5 original (fun x -> x + 1) in
+  let records = Record_map.set equivalent (fun x -> x + 2) records in
+  check "record-ID lookup" (Option.map (fun f -> f 40) (Record_map.get original records) = Some 42);
+  check "record representative retained"
+    (match Record_map.elements records with
+     | [ (stored, _) ] -> stored.label = "original"
+     | _ -> false);
+  let payload = ref 1 in
+  let payloads = Int_map.singleton ~seed:1 99 payload in
+  let retrieved = match Int_map.get 99 payloads with Some value -> value | None -> fail "payload" in
+  retrieved := 2;
+  check "mutable payload preserved" (!payload = 2);
   (* Separate functor instances must retain their own callbacks. *)
   check "callback instance isolation" (Int_map.get 0 retained = Some "zero");
   print_endline "HashMap public wrapper test passed"

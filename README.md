@@ -18,12 +18,15 @@ strategies and separate native-verification tracker are in
 Publication citations and local PDF provenance are indexed in
 [`papers/README.md`](papers/README.md).
 
-The planned persistent generic hash table accepts a key module supplying
+The in-progress persistent generic hash table accepts a key module supplying
 equality and hashing through `HashMap.Make(Key)`. It has a separate
 [design](hashtable-design.md), [implementation plan](hashtable-plan.md) and
 [tracker](hashtable-todo.md), based on [hashtable.md](hashtable.md). The design
 compares HAMT and CHAMP for OCaml runtime behavior and Rocq proof effort.
-The hash table is not implemented yet.
+Its list-backed source HAMT, reference extraction, public wrapper and finite
+runtime tests exist; the primitive/core proof gates, full reference release,
+compact-array backend and release integration remain open. Run
+`make hashtable-wrapper-test` for the current extracted-wrapper check.
 
 Run:
 

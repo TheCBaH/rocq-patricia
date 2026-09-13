@@ -18,7 +18,7 @@ PUBLIC_CMOS := PatriciaMap.cmo StringPatriciaMap.cmo
 PUBLIC_CMXS := PatriciaMap.cmx StringPatriciaMap.cmx
 REFERENCE_DIR := reference_extracted
 REFERENCE_PACK := PatriciaReference.cmo
-HASHTABLE_VFILES := HashTableSpec.v HashTableBits.v HashTableBucket.v HashTable.v HashTableSkeleton.v
+HASHTABLE_VFILES := HashTableSpec.v HashTableBits.v HashTableBucket.v HashTable.v HashTableProof.v HashTableSkeleton.v
 HASHTABLE_VOFILES := $(HASHTABLE_VFILES:.v=.vo)
 
 .PHONY: all proof core-proof union-proof assumptions extraction extraction-boundary native-string-worker-audit \
@@ -310,6 +310,7 @@ NativeHeapRefinement.vo: PatriciaUnionProof.vo StringPatriciaUnionProof.vo
 HashTableBits.vo: HashTableSpec.vo
 HashTableBucket.vo: HashTableSpec.vo
 HashTable.vo: HashTableSpec.vo HashTableBits.vo HashTableBucket.vo
+HashTableProof.vo: HashTable.vo HashTableBucket.vo
 HashTableSkeleton.vo: HashTableSpec.vo HashTableBits.vo
 
 %.vo: %.v

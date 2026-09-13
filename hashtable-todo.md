@@ -55,9 +55,9 @@ Dependencies: H1.G.
 
 - [ ] **H2.1** In progress: `HashTable.v` defines raw nodes, seeded tables and an independent flattened `bindings` view; the well-formedness invariant remains open.
 - [ ] **H2.2** In progress: `HashTable.v` implements bounded `join_worker`; validity/binding and unreachable-fallback proofs remain open.
-- [ ] **H2.3** In progress: `HashTable.v` implements fuelled bitmap-routed `get_tree`; independent binding equivalence remains open.
-- [ ] **H2.4** In progress: `HashTable.v` implements persistent `set_tree` and the public seeded `set`; only the singleton law is proved so far.
-- [ ] **H2.5** In progress: `HashTable.v` implements persistent `remove_tree` and retains unary branches; pointwise, validity and seed laws remain open.
+- [ ] **H2.3** In progress: `HashTable.v` implements fuelled bitmap-routed `get_tree`; `HashTableProof.v` proves leaf/collision base cases. Independent binding equivalence remains open.
+- [ ] **H2.4** In progress: `HashTable.v` implements persistent `set_tree` and the public seeded `set`; `HashTableProof.v` proves the leaf replacement/representative base case. Global pointwise and validity laws remain open.
+- [ ] **H2.5** In progress: `HashTable.v` implements persistent `remove_tree` and retains unary branches; `HashTableProof.v` proves matching-leaf removal. Pointwise, validity and seed laws remain open.
 - [ ] **H2.6** Prove branch-path height at most six and global key uniqueness.
 - [ ] **H2.G** Gate: core laws kernel-checked; assumption audit and existing Patricia proof build pass.
 
@@ -92,7 +92,7 @@ Dependencies: H4.G; benchmark harness may begin after H3.G.
 - [ ] **H5.1** Integrate aggregate targets, assumption discovery, cleanup and CI without regressing Patricia.
 - [ ] **H5.2** Add generic-key checked benchmarks against list reference, compatible Map.Make and Hashtbl instances; include StringPatriciaMap for string workloads.
 - [ ] **H5.3** Record timing/allocation/retained heap with compiler, seed, key distributions and version-retention policy.
-- [ ] **H5.4** Update supported API specification, theorem inventory, extraction boundary and README usage.
+- [ ] **H5.4** In progress: README and design status now describe the source-reference milestone without claiming proof/native completion. Final supported API, theorem inventory and extraction boundary remain open.
 - [ ] **H5.5** Run fresh full build and benchmark smoke; record local and hosted CI evidence separately.
 - [ ] **H5.G** Gate: all required deliverables exist and release claims match proof and runtime evidence.
 
@@ -117,7 +117,9 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H1.1–H1.3 (partial) | Added `HashTableBits.v` and `HashTableBucket.v`; `make hashtable-proof hashtable-skeleton-extraction` and compilation of the generated reference modules passed. Primitive evidence currently covers chunk bounds, a 32-step popcount/rank bound, slot 31/full bitmap checks, dense edit sizes, bucket self-update/miss/removal behavior and normalization cases. It does not close the H1 gate. |
 | 2026-09-13 | H2.1–H2.5 (partial) | Added `HashTable.v`; `make hashtable-proof` passed. The source executes bounded bitmap-HAMT workers, provides an independent flattening/elements view and first-wins bulk loader, and proves empty/singleton basics. It has no established global invariant or pointwise update/removal proof yet. |
 | 2026-09-13 | H3.2, H3.4 (partial) | Added `HashTableReferenceExtract.v` and `HashTableReferenceTest.ml`; `make hashtable-reference-test` regenerated, compiled and ran the reference extraction successfully. The deterministic test covers empty/singleton, constant-hash collisions, replacement, deletion, depths 0–4 routing, first-wins duplicate values and retained versions. It directly calls extracted source modules and does not yet validate the public functor. |
-| 2026-09-13 | H3.3, H3.5 (partial) | Added `HashMap.mli`, `HashMap.ml` and `HashMapTest.ml`; `make hashtable-wrapper-test` passed. The abstract wrapper test covers negative normalized hashes, `min_int`/`max_int`, equivalent string keys, first representative/value retention, retained versions and two simultaneous key modules. It remains a reference-backend test, not the H3 proof/audit gate. |
+| 2026-09-13 | H3.3, H3.5 (partial) | Added `HashMap.mli`, `HashMap.ml` and `HashMapTest.ml`; `make hashtable-wrapper-test` passed. The abstract wrapper test covers negative normalized hashes, `min_int`/`max_int`, equivalent string and record-ID keys, first representative/value retention, retained versions, function/reference payloads and three simultaneous key modules. It remains a reference-backend test, not the H3 proof/audit gate. |
+| 2026-09-13 | H2.1, H2.3–H2.5 (partial) | Added `HashTableProof.v`; `make hashtable-proof` passed. It kernel-checks collision-normalization binding preservation, empty-tree binding equations, matching/mismatching leaf lookup, collision dispatch, representative-preserving leaf replacement and leaf removal. Recursive routing and invariant proofs remain open. |
+| 2026-09-13 | H5.4 (partial) | Updated README and design status to describe the tested source-reference milestone and open proof/native gates; `git diff --check` passed. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
