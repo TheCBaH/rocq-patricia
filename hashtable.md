@@ -1,8 +1,11 @@
 # Persistent hash-table feasibility investigation
 
-This standalone note records feasibility questions for a possible functional
-hash table.  It makes no claim about the current library, changes no Patricia
-plan, and is not an implementation commitment.
+This note records the original feasibility investigation for a functional
+hash table. The selected contract is now in [hashtable-design.md](hashtable-design.md),
+with an [implementation plan](hashtable-plan.md) and [tracker](hashtable-todo.md).
+The design also compares HAMT and CHAMP runtime and Rocq proof costs. These
+documents plan a new module; they do not claim an implemented or proved hash
+table and do not change the existing Patricia plan.
 
 ## Relationship to the existing maps
 
