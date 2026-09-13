@@ -20,6 +20,7 @@
 /patricia-string-primitive-profile
 /hashtable-reference-test
 /hashtable-wrapper-test
+/hashtable-wrapper-native-test
 /extracted/
 /reference_extracted/
 /hashtable_reference_extracted/

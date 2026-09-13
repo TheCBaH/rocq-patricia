@@ -26,6 +26,52 @@ module Record_map = HashMap.Make (Record_key)
 let fail message = failwith ("HashMap test: " ^ message)
 let check message condition = if not condition then fail message
 
+type model = (int * string) list
+
+let model_get key model =
+  match Stdlib.List.find_opt (fun (stored, _) -> stored = key) model with
+  | None -> None
+  | Some (_, value) -> Some value
+
+let model_set key value model =
+  (key, value) :: Stdlib.List.filter (fun (stored, _) -> stored <> key) model
+
+let model_remove key model =
+  Stdlib.List.filter (fun (stored, _) -> stored <> key) model
+
+let check_model message map model =
+  let bounded_keys = Stdlib.List.init 129 (fun index -> index - 64) in
+  Stdlib.List.iter
+    (fun key -> check (message ^ " key " ^ string_of_int key)
+       (Int_map.get key map = model_get key model))
+    (min_int :: max_int :: bounded_keys)
+
+let run_history () =
+  let random = Random.State.make [| 0x48414d54 |] in
+  let rec loop step map model retained =
+    if step = 500 then ()
+    else
+      let key =
+        match Random.State.int random 12 with
+        | 0 -> min_int | 1 -> max_int
+        | _ -> Random.State.int random 129 - 64
+      in
+      let map, model =
+        if Random.State.bool random then
+          let value = string_of_int step in
+          (Int_map.set key value map, model_set key value model)
+        else
+          (Int_map.remove key map, model_remove key model)
+      in
+      check_model "history current" map model;
+      let retained = (map, model) :: retained in
+      let old_map, old_model = Stdlib.List.nth retained (Random.State.int random (Stdlib.List.length retained)) in
+      check_model "history retained" old_map old_model;
+      loop (step + 1) map model retained
+  in
+  let empty = Int_map.empty ~seed:91 in
+  loop 0 empty [] [ (empty, []) ]
+
 let () =
   let numbers = Int_map.empty ~seed:17 in
   let numbers = Int_map.set (-7) "negative" numbers in
@@ -66,4 +112,5 @@ let () =
   check "mutable payload preserved" (!payload = 2);
   (* Separate functor instances must retain their own callbacks. *)
   check "callback instance isolation" (Int_map.get 0 retained = Some "zero");
+  run_history ();
   print_endline "HashMap public wrapper test passed"

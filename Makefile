@@ -27,7 +27,7 @@ HASHTABLE_VOFILES := $(HASHTABLE_VFILES:.v=.vo)
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
-.PHONY: hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-assumptions
+.PHONY: hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-assumptions
 
 .PHONY: string-primitive-profile
 .PHONY: string-worker-performance
@@ -87,6 +87,13 @@ hashtable-wrapper-test: hashtable-reference-ocaml HashMapTest.ml
 	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
 	  $(OCAMLC) -I . -I .. -o ../hashtable-wrapper-test $$objects ../HashMap.cmo ../HashMapTest.ml
 	./hashtable-wrapper-test
+
+hashtable-wrapper-test-native: hashtable-reference HashMap.mli HashMap.ml HashMapTest.ml
+	cd hashtable_reference_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
+	$(OCAMLOPT) -I hashtable_reference_extracted -c HashMap.mli HashMap.ml
+	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. -o ../hashtable-wrapper-native-test $$objects ../HashMap.cmx ../HashMapTest.ml
+	./hashtable-wrapper-native-test
 
 hashtable-assumptions: hashtable-proof check-assumptions.sh
 	sh ./check-assumptions.sh $(ROCQ) $(ROCQFLAGS)
