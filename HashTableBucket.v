@@ -113,6 +113,32 @@ Proof.
       * cbn [bucket_get]. rewrite Hquery_stored. now apply IH.
 Qed.
 
+Lemma bucket_get_remove_other :
+  forall K A (eqb : K -> K -> bool),
+    (forall left right, eqb left right = eqb right left) ->
+    (forall left middle right,
+        eqb left middle = true -> eqb middle right = true -> eqb left right = true) ->
+    forall query key (entries : list (K * A)),
+      eqb query key = false ->
+      bucket_get eqb query (bucket_remove eqb key entries) =
+      bucket_get eqb query entries.
+Proof.
+  intros K A eqb Hsymmetric Htrans query key entries Hdifferent.
+  induction entries as [|[stored value] tail IH]; simpl.
+  - reflexivity.
+  - destruct (eqb key stored) eqn:Hkey_stored.
+    + assert (Hquery_stored : eqb query stored = false).
+      { destruct (eqb query stored) eqn:Hquery_stored; auto.
+        assert (Hequal : eqb query key = true).
+        { apply Htrans with (middle := stored); auto.
+          rewrite Hsymmetric. exact Hkey_stored. }
+        rewrite Hdifferent in Hequal. discriminate. }
+      cbn [bucket_get]. now rewrite Hquery_stored.
+    + destruct (eqb query stored) eqn:Hquery_stored.
+      * cbn [bucket_get]. now rewrite Hquery_stored.
+      * cbn [bucket_get]. rewrite Hquery_stored. now apply IH.
+Qed.
+
 Lemma bucket_set_miss :
   forall K A (eqb : K -> K -> bool) key (value : A) (entries : list (K * A)),
     (forall stored old_value, In (stored, old_value) entries -> eqb key stored = false) ->
