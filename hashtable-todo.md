@@ -16,7 +16,7 @@ planning documents are not evidence that code exists.
 | Deliverable | State |
 | --- | --- |
 | Design, implementation plan and tracker | Written; documentation checks recorded below |
-| Rocq implementation and proofs | Not started |
+| Rocq implementation and proofs | H0 contract and structural prototype complete; H1 primitives open |
 | Reference OCaml extraction and public wrapper | Not started |
 | Compact-array model, proofs and native backend | Not started |
 | Tests, build/CI integration and benchmarks | Not started |
@@ -35,10 +35,10 @@ planning documents are not evidence that code exists.
 
 Dependencies: documentation baseline.
 
-- [ ] **H0.1** Add generic key-equivalence/seed/hash contracts, normalization proof and integer/string/record instances.
-- [ ] **H0.2** Demonstrate positive recursive types, join termination and extraction shape; record native container strategy.
-- [ ] **H0.3** Set up module dependencies and separate extraction directories; record actual Rocq/OCaml versions.
-- [ ] **H0.G** Gate: compiling skeleton with explicit hypotheses and no admitted obligations.
+- [x] **H0.1** `HashTableSpec.v` defines explicit equivalence/reflection and hash-congruence contracts; `normalize_hash` is bounded by `2^30`, including checked negative boundary hashes, with Z/string/record-ID instances.
+- [x] **H0.2** `HashTableSkeleton.v` demonstrates strictly-positive list children and fuel-decreasing `join_worker`/`update_worker`; `HashTableSkeletonExtract.v` confirms callbacks and fuel survive reference extraction. H1 retains this list source shape; H4 will relate private fresh-copy arrays to it.
+- [x] **H0.3** `Makefile` adds H0 proof/extraction targets and `hashtable_reference_extracted/` / `hashtable_extracted/` are ignored separately from Patricia output. Toolchain recorded: Rocq 9.2, OCaml 4.14.3.
+- [x] **H0.G** Gate: skeleton compiles, extracts, and its theorem assumptions are closed under the global context.
 
 ## H1 — Primitive proofs
 
@@ -113,6 +113,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | D5 | Reviewed the original CHAMP paper; added the design comparison and benchmark-controlled revisit criteria. OCaml speed and proof-effort judgments are explicitly prospective. |
 | 2026-09-13 | D6 | Corrected scope to arbitrary lawful key types; updated design, plan, tracker, investigation and README. Documentation link/whitespace checks passed; implementation gates remain open. |
 | 2026-09-13 | D4 | Checked relative Markdown file links in the new documents and README/investigation additions; `git diff --check` passed. |
+| 2026-09-13 | H0.1–H0.G | Added `HashTableSpec.v`, `HashTableSkeleton.v`, `HashTableSkeletonExtract.v`, separate paths and H0 Make targets. `make hashtable-proof hashtable-skeleton-extraction` passed with Rocq 9.2 / OCaml 4.14.3. Printed assumptions for all 14 H0 lemmas: every result was `Closed under the global context`. Generated `HashTableSkeleton.ml` retains `eqb0`, `fuel`, `full_hash`, key and value arguments in `update_worker`. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

@@ -18,12 +18,16 @@ PUBLIC_CMOS := PatriciaMap.cmo StringPatriciaMap.cmo
 PUBLIC_CMXS := PatriciaMap.cmx StringPatriciaMap.cmx
 REFERENCE_DIR := reference_extracted
 REFERENCE_PACK := PatriciaReference.cmo
+HASHTABLE_VFILES := HashTableSpec.v HashTableSkeleton.v
+HASHTABLE_VOFILES := $(HASHTABLE_VFILES:.v=.vo)
 
 .PHONY: all proof core-proof union-proof assumptions extraction extraction-boundary native-string-worker-audit \
 	native-union-realizer-audit ocaml-physical-equality-audit \
 	cached-representative-audit \
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
+
+.PHONY: hashtable-proof hashtable-skeleton-extraction hashtable-assumptions
 
 .PHONY: string-primitive-profile
 .PHONY: string-worker-performance
@@ -50,6 +54,18 @@ core-proof: $(CORE_VOFILES)
 # certificates.  Established map proofs are reused through their cached .vo
 # files and are rebuilt only when their own sources changed.
 union-proof: $(UNION_VOFILES)
+
+# H0 is intentionally separate from the established Patricia build.  Later
+# gates extend these targets without making the two extraction namespaces
+# collide.
+hashtable-proof: $(HASHTABLE_VOFILES)
+
+hashtable-skeleton-extraction: hashtable-proof HashTableSkeletonExtract.v
+	@mkdir -p hashtable_reference_extracted
+	$(ROCQ) compile $(ROCQFLAGS) HashTableSkeletonExtract.v
+
+hashtable-assumptions: hashtable-proof check-assumptions.sh
+	sh ./check-assumptions.sh $(ROCQ) $(ROCQFLAGS)
 
 assumptions: proof check-assumptions.sh
 	sh ./check-assumptions.sh $(ROCQ) $(ROCQFLAGS)
@@ -267,6 +283,7 @@ PatriciaUnionProof.vo: PatriciaProof.vo PatriciaUnion.vo
 StringPatriciaUnion.vo: StringBits.vo StringPatricia.vo
 StringPatriciaUnionProof.vo: StringPatriciaProof.vo StringPatriciaUnion.vo
 NativeHeapRefinement.vo: PatriciaUnionProof.vo StringPatriciaUnionProof.vo
+HashTableSkeleton.vo: HashTableSpec.vo
 
 %.vo: %.v
 	$(ROCQ) compile $(ROCQFLAGS) $<
