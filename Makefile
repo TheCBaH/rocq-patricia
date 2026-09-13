@@ -27,7 +27,7 @@ HASHTABLE_VOFILES := $(HASHTABLE_VFILES:.v=.vo)
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
-.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-native-primitives-test hashtable-benchmark hashtable-benchmark-smoke hashtable-extraction-audit hashtable-assumptions
+.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-native-primitives-test hashtable-native-primitives-audit hashtable-benchmark hashtable-benchmark-smoke hashtable-extraction-audit hashtable-assumptions
 
 .PHONY: string-primitive-profile
 .PHONY: string-worker-performance
@@ -60,7 +60,7 @@ union-proof: $(UNION_VOFILES)
 # collide.
 hashtable: hashtable-proof hashtable-assumptions hashtable-extraction-audit \
 	hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native \
-	hashtable-native-primitives-test
+	hashtable-native-primitives-test hashtable-native-primitives-audit
 
 hashtable-proof: $(HASHTABLE_VOFILES)
 
@@ -106,6 +106,9 @@ hashtable-native-primitives-test: HashTablePrimitives.mli HashTablePrimitives.ml
 	$(OCAMLOPT) -c HashTablePrimitives.mli HashTablePrimitives.ml HashTablePrimitivesTest.ml
 	$(OCAMLOPT) -o hashtable-native-primitives-test HashTablePrimitives.cmx HashTablePrimitivesTest.cmx
 	./hashtable-native-primitives-test
+
+hashtable-native-primitives-audit: HashTablePrimitives.ml check-hashtable-primitives.sh
+	sh ./check-hashtable-primitives.sh HashTablePrimitives.ml
 
 hashtable-benchmark: hashtable-reference HashMap.mli HashMap.ml HashTableBenchmark.ml
 	cd hashtable_reference_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c

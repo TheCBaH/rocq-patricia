@@ -80,7 +80,7 @@ Dependencies: H3.G.
 - [ ] **H4.2** In progress: `HashTableNative.v` / `HashTableNativeProof.v` define modeled native get/set/remove and prove refinement for arbitrary related source/native trees. Invariant/seed preservation and any array-realizer refinement remain open.
 - [ ] **H4.3** Prove bounded bitmap/scalar/popcount workers including all native intermediate and shift bounds.
 - [ ] **H4.4** In progress: `HashTablePrimitives.ml` / `.mli` provide private fresh-copy sequence primitives and `hashtable-native-primitives-test` validates views and storage freshness. Extraction bindings and their full target inventory remain open.
-- [ ] **H4.5** Audit generated map workers and primitive realizer inventory; reject high-level algorithm overrides.
+- [ ] **H4.5** In progress: `hashtable-native-primitives-audit` inventories the current private sequence realizer and rejects map overrides/unsafe escapes; generated map-worker and extraction-binding audit remain open.
 - [ ] **H4.6** Run reference/native/oracle histories in bytecode and native code, including retained versions and function/reference payloads.
 - [ ] **H4.7** Switch public wrapper to native backend after passing correctness and refinement gates.
 - [ ] **H4.G** Gate: modeled refinement proofs and all native checks pass; foreign/heap trust remains accurately stated.
@@ -135,6 +135,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H2.3/H2.4 (partial) | Added same-hash collision normalization, set-binding and lookup-after-set base laws in `HashTableProof.v`, using the explicit bucket miss/equality conditions. `make hashtable-proof hashtable-assumptions` passed with 90 declarations closed. Recursive routing and global pointwise/validity laws remain open. |
 | 2026-09-13 | H2.5 (partial) | Added same-hash collision removal and miss-preservation binding laws in `HashTableProof.v`, using the explicit bucket miss condition. `make hashtable-proof hashtable-assumptions` passed with 92 declarations closed. Recursive routing and global pointwise/validity laws remain open. |
 | 2026-09-13 | H3.1 (partial) | Added public singleton removal and resulting emptiness laws in `HashTable.v`. `make hashtable-proof hashtable-assumptions` passed with 94 declarations closed. Pointwise first-wins, enumeration and extensional laws remain open. |
+| 2026-09-13 | H4.5 (partial) | Added `check-hashtable-primitives.sh` and `make hashtable-native-primitives-audit`; it checks the current private array-sequence realizer for fresh update allocation and rejects map overrides or unsafe escapes. Generated native map workers and extraction bindings do not yet exist and remain unaudited. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
