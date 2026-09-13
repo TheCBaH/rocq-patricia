@@ -258,3 +258,30 @@ Lemma bindings_singleton :
          (seed : Seed) (key : K) (value : A),
     elements (singleton eqb hash seed key value) = [(key, value)].
 Proof. reflexivity. Qed.
+
+Lemma is_empty_empty :
+  forall (K Seed A : Type) (seed : Seed),
+    @is_empty K Seed A (empty seed) = true.
+Proof. reflexivity. Qed.
+
+Lemma is_empty_singleton :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         (seed : Seed) (key : K) (value : A),
+    is_empty (singleton eqb hash seed key value) = false.
+Proof. reflexivity. Qed.
+
+Lemma mem_singleton :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N),
+    (forall key, eqb key key = true) ->
+    forall seed key (value : A),
+      mem eqb hash key (singleton eqb hash seed key value) = true.
+Proof.
+  intros K Seed A eqb hash Heqb seed key value.
+  unfold mem. rewrite get_singleton; auto.
+Qed.
+
+Lemma of_list_empty :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         (seed : Seed),
+    @of_list K Seed A eqb hash seed [] = empty seed.
+Proof. reflexivity. Qed.

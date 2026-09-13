@@ -15,6 +15,14 @@ end
 module Int_map = HashMap.Make (Int_key)
 module Case_map = HashMap.Make (Case_key)
 
+module Byte_key = struct
+  type t = string
+  let equal = String.equal
+  let hash ~seed key = Hashtbl.seeded_hash seed key
+end
+
+module Byte_map = HashMap.Make (Byte_key)
+
 module Record_key = struct
   type t = { id : int; label : string }
   let equal left right = left.id = right.id
@@ -96,6 +104,18 @@ let () =
   let first = Case_map.of_list ~seed:8 [ ("Bob", 1); ("BOB", 2) ] in
   check "first value wins" (Case_map.get "bob" first = Some 1);
   check "first representative wins" (Case_map.elements first = [ ("Bob", 1) ]);
+  let long_prefix = String.make 4096 'p' ^ "\000suffix" in
+  let byte_keys = [ ""; "\000"; "\255"; "prefix\000"; long_prefix ] in
+  let bytes =
+    Stdlib.List.fold_left (fun map key -> Byte_map.set key (String.length key) map)
+      (Byte_map.empty ~seed:13) byte_keys
+  in
+  Stdlib.List.iter
+    (fun key -> check "byte-string key" (Byte_map.get key bytes = Some (String.length key)))
+    byte_keys;
+  let bytes = Byte_map.remove "\000" bytes in
+  check "NUL removal" (Byte_map.get "\000" bytes = None);
+  check "NUL neighbor retained" (Byte_map.get "prefix\000" bytes = Some 7);
   let original = { Record_key.id = 4; label = "original" } in
   let equivalent = { Record_key.id = 4; label = "later spelling" } in
   let records = Record_map.singleton ~seed:5 original (fun x -> x + 1) in
