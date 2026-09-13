@@ -30,4 +30,11 @@ grep -Fq 'Key.hash ~seed key' "$implementation_file" ||
 grep -Fq 'Key.equal' "$implementation_file" ||
   fail "wrapper does not use the functor-bound equality callback"
 
-echo "Hash-table extraction boundary audit: public type abstract; routing internals hidden; callbacks normalized and functor-bound"
+grep -Fq 'HashTableReference.' "$implementation_file" ||
+  fail "wrapper does not use the named source-reference package"
+
+if grep -Eq 'HashTable\.' "$implementation_file"; then
+  fail "wrapper depends directly on the generated HashTable module"
+fi
+
+echo "Hash-table extraction boundary audit: public type abstract; routing internals hidden; callbacks normalized and functor-bound; named source-reference package used"

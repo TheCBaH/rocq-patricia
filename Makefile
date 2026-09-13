@@ -79,8 +79,8 @@ hashtable-reference: hashtable-proof HashTableReferenceExtract.v
 	$(ROCQ) compile $(ROCQFLAGS) HashTableReferenceExtract.v
 	cd hashtable_reference_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLC) -c
 
-hashtable-reference-ocaml: hashtable-reference HashMap.mli HashMap.ml
-	$(OCAMLC) -I hashtable_reference_extracted -c HashMap.mli HashMap.ml
+hashtable-reference-ocaml: hashtable-reference HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml
+	$(OCAMLC) -I hashtable_reference_extracted -c HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml
 
 hashtable-reference-test: hashtable-reference HashTableReferenceTest.ml
 	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
@@ -89,14 +89,14 @@ hashtable-reference-test: hashtable-reference HashTableReferenceTest.ml
 
 hashtable-wrapper-test: hashtable-reference-ocaml HashMapTest.ml
 	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
-	  $(OCAMLC) -I . -I .. -o ../hashtable-wrapper-test $$objects ../HashMap.cmo ../HashMapTest.ml
+	  $(OCAMLC) -I . -I .. -o ../hashtable-wrapper-test $$objects ../HashTableReference.cmo ../HashMap.cmo ../HashMapTest.ml
 	./hashtable-wrapper-test
 
-hashtable-wrapper-test-native: hashtable-reference HashMap.mli HashMap.ml HashMapTest.ml
+hashtable-wrapper-test-native: hashtable-reference HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashMapTest.ml
 	cd hashtable_reference_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
-	$(OCAMLOPT) -I hashtable_reference_extracted -c HashMap.mli HashMap.ml
+	$(OCAMLOPT) -I hashtable_reference_extracted -c HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml
 	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
-	  $(OCAMLOPT) -I . -I .. -o ../hashtable-wrapper-native-test $$objects ../HashMap.cmx ../HashMapTest.ml
+	  $(OCAMLOPT) -I . -I .. -o ../hashtable-wrapper-native-test $$objects ../HashTableReference.cmx ../HashMap.cmx ../HashMapTest.ml
 	./hashtable-wrapper-native-test
 
 hashtable-extraction-audit: HashMap.mli HashMap.ml check-hashtable-extraction-boundary.sh
@@ -110,11 +110,11 @@ hashtable-native-primitives-test: HashTablePrimitives.mli HashTablePrimitives.ml
 hashtable-native-primitives-audit: HashTablePrimitives.ml check-hashtable-primitives.sh
 	sh ./check-hashtable-primitives.sh HashTablePrimitives.ml
 
-hashtable-benchmark: hashtable-reference HashMap.mli HashMap.ml HashTableBenchmark.ml
+hashtable-benchmark: hashtable-reference HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashTableBenchmark.ml
 	cd hashtable_reference_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
-	$(OCAMLOPT) -I hashtable_reference_extracted -c HashMap.mli HashMap.ml HashTableBenchmark.ml
+	$(OCAMLOPT) -I hashtable_reference_extracted -c HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashTableBenchmark.ml
 	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
-	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-benchmark $$objects ../HashMap.cmx ../HashTableBenchmark.cmx
+	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-benchmark $$objects ../HashTableReference.cmx ../HashMap.cmx ../HashTableBenchmark.cmx
 	./hashtable-benchmark
 
 hashtable-benchmark-smoke: hashtable-benchmark
@@ -364,6 +364,7 @@ clean:
 	  hashtable_skeleton_extracted/*.cmx hashtable_skeleton_extracted/*.o
 	rm -f PatriciaMap.cmi PatriciaMap.cmo PatriciaMap.cmx PatriciaMap.o
 	rm -f StringPatriciaMap.cmi StringPatriciaMap.cmo StringPatriciaMap.cmx StringPatriciaMap.o
+	rm -f HashTableReference.cmi HashTableReference.cmo HashTableReference.cmx HashTableReference.o
 	rm -f HashMap.cmi HashMap.cmo HashMap.cmx HashMap.o
 	rm -f HashTableBenchmark.cmi HashTableBenchmark.cmo HashTableBenchmark.cmx HashTableBenchmark.o
 	rm -f HashTablePrimitives.cmi HashTablePrimitives.cmo HashTablePrimitives.cmx HashTablePrimitives.o

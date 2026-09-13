@@ -66,8 +66,8 @@ Dependencies: H1.G.
 Dependencies: H2.G.
 
 - [ ] **H3.1** In progress: `HashTable.v` now proves empty/singleton emptiness, singleton membership/removal, singleton bulk loading and the duplicate-singleton first-wins case; general pointwise first-wins, enumeration and extensional laws remain open.
-- [ ] **H3.2** In progress: `HashTableReferenceExtract.v` regenerates a separately isolated list-source extraction. The public reference package name and bounded test-hash API remain open.
-- [ ] **H3.3** In progress: `HashMap.mli` / `.ml` expose `HashMap.Make(Key)` over the reference extraction and normalize raw hashes with `land 0x3fffffff`. Callback/foreign-contract inventory and record example remain open.
+- [ ] **H3.2** In progress: `HashTableReferenceExtract.v` regenerates a separately isolated list-source extraction, while `HashTableReference.ml` / `.mli` provide its stable package name. The bounded test-hash API remains open.
+- [ ] **H3.3** In progress: `HashMap.mli` / `.ml` expose `HashMap.Make(Key)` over `HashTableReference` and normalize raw hashes with `land 0x3fffffff`. Callback/foreign-contract inventory and record example remain open.
 - [ ] **H3.4** In progress: direct and public-wrapper tests exercise controlled collisions, routing depths, first-wins values, retained roots and a 500-step deterministic association-list-oracle history. The broader custom-equivalence and boundary matrix remains open.
 - [ ] **H3.5** In progress: `HashMapTest.ml` compiles through the abstract wrapper and checks callback-instance isolation. `hashtable-extraction-audit` verifies abstract public types, hidden routing internals and functor-bound normalized callbacks; a generated-interface audit remains open.
 - [ ] **H3.G** Gate: proved reference exports to OCaml; reference proof/audit/build/test subset passes from regenerated output.
@@ -144,6 +144,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H2.4 (partial) | Added dense-child-to-branch insertion binding preservation in `HashTableProof.v`: the result contains exactly the new child's bindings plus the prior branch bindings. `make hashtable-proof hashtable-assumptions` passed with 105 declarations closed. Recursive routing, global pointwise and validity laws remain open. |
 | 2026-09-13 | H2.5 (partial) | Added dense-child-to-branch removal binding-subset preservation in `HashTableProof.v`: branch removal introduces no flattened bindings. `make hashtable-proof hashtable-assumptions` passed with 107 declarations closed. Recursive routing, global pointwise and validity laws remain open. |
 | 2026-09-13 | H2.3/H2.5 (partial) | Added same-hash leaf key-miss lookup and removal-preservation laws in `HashTableProof.v`. `make hashtable-proof hashtable-assumptions` passed with 109 declarations closed. Recursive routing, global pointwise and validity laws remain open. |
+| 2026-09-13 | H3.2/H3.3/H3.5 (partial) | Added the stable `HashTableReference` package over regenerated source extraction and routed `HashMap.Make` through it. Bytecode/native wrapper tests passed; the extraction-boundary audit now rejects direct generated-module use. The bounded test-hash API, callback inventory and record example remain open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
