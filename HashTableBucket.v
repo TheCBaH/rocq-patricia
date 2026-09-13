@@ -284,6 +284,26 @@ Proof.
       * apply IH; auto.
 Qed.
 
+Lemma bucket_set_forall_hit :
+  forall K A (P : K * A -> Prop) (eqb : K -> K -> bool)
+         key (value : A) entries,
+    bucket_get eqb key entries <> None ->
+    Forall P entries ->
+    (forall stored old_value new_value,
+        P (stored, new_value) <-> P (stored, old_value)) ->
+    Forall P (bucket_set eqb key value entries).
+Proof.
+  intros K A P eqb key value entries.
+  induction entries as [|[stored old_value] tail IH];
+    intros Hhit Hforall Hstable; simpl in Hhit.
+  - contradiction.
+  - inversion Hforall as [|entry entries Hhead Htail]; subst.
+    destruct (eqb key stored) eqn:Hstored.
+    + rewrite bucket_set_retains_head_representative by exact Hstored.
+      constructor; [now apply (proj2 (Hstable stored old_value value))|exact Htail].
+    + simpl. rewrite Hstored. constructor; auto.
+Qed.
+
 Lemma bucket_set_length_hit :
   forall K A (eqb : K -> K -> bool) key (value : A) (entries : list (K * A)),
     bucket_get eqb key entries <> None ->

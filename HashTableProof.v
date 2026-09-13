@@ -384,6 +384,39 @@ Proof.
   intros. destruct fuel; cbn [set_tree]; now rewrite N.eqb_refl.
 Qed.
 
+Section CollisionUpdateInvariant.
+
+  Context {K Seed A : Type}.
+  Variable E : K -> K -> Prop.
+  Variable hash : Seed -> K -> N.
+  Variable seed : Seed.
+
+Lemma set_tree_collision_same_hash_wf :
+    forall fuel depth prefix full_hash key (value : A)
+           (entries : list (K * A)) (eqb : K -> K -> bool),
+      wf E hash seed depth prefix (Collision full_hash entries) ->
+      bucket_get eqb key entries <> None ->
+      wf E hash seed depth prefix
+        (set_tree eqb fuel depth full_hash key value
+          (Collision full_hash entries)).
+  Proof.
+    intros fuel depth prefix full_hash key value entries eqb Hwf Hhit.
+    inversion Hwf as [| |depth' prefix' full_hash' entries' Hlength Hentries Hnodup|];
+      subst.
+    rewrite set_tree_collision_same_hash.
+    apply wf_normalize_collision.
+    - eapply bucket_set_forall_hit; eauto.
+      intros stored old_value new_value.
+      unfold entry_matches. reflexivity.
+    - eapply bucket_set_nodup_hit; eauto.
+      + intros stored old_value new_value entry.
+        unfold binding_equiv. reflexivity.
+      + intros entry stored old_value new_value.
+        unfold binding_equiv. reflexivity.
+  Qed.
+
+End CollisionUpdateInvariant.
+
 Lemma get_tree_normalize_collision_same_hash :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash query
          (entries : list (K * A)),
