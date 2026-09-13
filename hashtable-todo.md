@@ -91,7 +91,7 @@ Dependencies: H4.G; benchmark harness may begin after H3.G.
 
 - [ ] **H5.1** In progress: `make hashtable` aggregates the implemented proof/audit/reference/wrapper/primitive gates, clean removes its generated outputs, and CI invokes it under the existing pinned toolchain. Hosted result and completion of the remaining gates are open.
 - [ ] **H5.2** In progress: `HashTableBenchmark.ml` supplies checked integer-key source-reference and fresh-array backend benchmarks against an association-list oracle, `Map.Make` and OCaml's imperative `Hashtbl`; string/`StringPatriciaMap` workloads and broader generic instances remain open.
-- [ ] **H5.3** In progress: `HashTableBenchmark.ml` reports timing, allocation and post-GC retained heap for every prefix version of the persistent implementations, with a fixed integer sequence and seed 31. Compiler configuration capture and broader seed/key-distribution series remain open.
+- [ ] **H5.3** In progress: `HashTableBenchmark.ml` reports its ascending-integer workload, seed, every-prefix retention policy, timing, allocation and post-GC retained heap for persistent implementations; `HASHTABLE_BENCH_SEED` selects the seed. Compiler configuration capture and broader key-distribution series remain open.
 - [ ] **H5.4** In progress: README and design status now describe the source-reference milestone without claiming proof/native completion. Final supported API, theorem inventory and extraction boundary remain open.
 - [ ] **H5.5** In progress: local clean aggregate and hash-table benchmark smoke pass; CI is configured to run the smoke separately. Hosted results remain open.
 - [ ] **H5.G** Gate: all required deliverables exist and release claims match proof and runtime evidence.
@@ -167,6 +167,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H3.4 (partial) | Extended `HashTableDifferentialTest.ml` with a 500-step retained-version `Map.Make` differential history for case-insensitive, collision-heavy string keys and functional payloads. It runs through the abstract public wrapper in bytecode and native targets. |
 | 2026-09-13 | H5.3 (partial) | Extended `HashTableBenchmark.ml` to retain every prefix root of each persistent implementation, force collection, report live-heap delta, and verify oldest/newest roots. The current workload is ascending integer keys with seed 31; compiler capture and broader distributions remain open. |
 | 2026-09-13 | H1.3 (partial) | Added `bucket_remove_nodup`: bucket deletion preserves `NoDupA` for any entry relation, supplying the uniqueness-preservation direction needed by collision removal. Update uniqueness remains open. |
+| 2026-09-13 | H5.3 (partial) | Added `HASHTABLE_BENCH_SEED` and workload metadata to benchmark output. Each measurement now records the ascending integer range, selected seed and every-prefix retention policy alongside timing/allocation/live-heap values. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

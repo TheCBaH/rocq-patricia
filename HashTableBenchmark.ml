@@ -18,6 +18,11 @@ let size =
   | None -> 2_000
   | Some value -> int_of_string value
 
+let seed =
+  match Sys.getenv_opt "HASHTABLE_BENCH_SEED" with
+  | None -> 31
+  | Some value -> int_of_string value
+
 let fail message = failwith ("HashTable benchmark: " ^ message)
 
 let time name run =
@@ -61,11 +66,15 @@ let retained_versions name empty set get bindings =
 
 let () =
   if size < 1 then fail "HASHTABLE_BENCH_SIZE must be positive";
+  Printf.printf
+    "HashTable benchmark workload: ascending integer keys [0,%d), seed %d; \
+     retained policy: every prefix root for persistent maps\n%!"
+    size seed;
   let bindings = Stdlib.List.init size (fun key -> (key, string_of_int key)) in
   let oracle = Stdlib.List.rev bindings in
-  let hashed = time "HashMap.Make build" (fun () -> Hash_map.of_list ~seed:31 bindings) in
+  let hashed = time "HashMap.Make build" (fun () -> Hash_map.of_list ~seed bindings) in
   let native_hashed = time "HashMapNative.Make build"
-      (fun () -> Native_hash_map.of_list ~seed:31 bindings)
+      (fun () -> Native_hash_map.of_list ~seed bindings)
   in
   let ordered = time "Map.Make build"
       (fun () -> Stdlib.List.fold_left (fun map (key, value) -> Ordered_map.add key value map)
@@ -76,9 +85,9 @@ let () =
       Stdlib.List.iter (fun (key, value) -> Hashtbl.replace table key value) bindings;
       table)
   in
-  ignore (retained_versions "HashMap.Make" (Hash_map.empty ~seed:31)
+  ignore (retained_versions "HashMap.Make" (Hash_map.empty ~seed)
             Hash_map.set Hash_map.get bindings);
-  ignore (retained_versions "HashMapNative.Make" (Native_hash_map.empty ~seed:31)
+  ignore (retained_versions "HashMapNative.Make" (Native_hash_map.empty ~seed)
             Native_hash_map.set Native_hash_map.get bindings);
   ignore (retained_versions "Map.Make" Ordered_map.empty Ordered_map.add
             Ordered_map.find_opt bindings);

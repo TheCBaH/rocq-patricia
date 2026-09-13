@@ -173,6 +173,7 @@ hashtable-benchmark: hashtable-reference HashTableReference.mli HashTableReferen
 hashtable-benchmark-smoke: hashtable-benchmark
 
 hashtable-benchmark-smoke: export HASHTABLE_BENCH_SIZE := 100
+hashtable-benchmark-smoke: export HASHTABLE_BENCH_SEED := 31
 
 hashtable-assumptions: hashtable-proof check-hashtable-assumptions.sh
 	sh ./check-hashtable-assumptions.sh $(ROCQ) $(ROCQFLAGS)
