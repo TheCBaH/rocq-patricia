@@ -37,6 +37,11 @@ jobs:
           opam exec -- make hashtable
           ROCQ=rocq OCAMLC=ocamlc OCAMLOPT=ocamlopt OCAMLDEP=ocamldep
 
+      - name: Hash-table checked benchmark smoke test
+        run: >-
+          opam exec -- make hashtable-benchmark-smoke
+          ROCQ=rocq OCAMLC=ocamlc OCAMLOPT=ocamlopt OCAMLDEP=ocamldep
+
       - name: Checked benchmark smoke test
         run: >-
           opam exec -- make benchmark-smoke

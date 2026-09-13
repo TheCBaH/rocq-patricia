@@ -22,6 +22,7 @@
 /hashtable-wrapper-test
 /hashtable-wrapper-native-test
 /hashtable-native-primitives-test
+/hashtable-benchmark
 /extracted/
 /reference_extracted/
 /hashtable_reference_extracted/

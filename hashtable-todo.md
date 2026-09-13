@@ -90,10 +90,10 @@ Dependencies: H3.G.
 Dependencies: H4.G; benchmark harness may begin after H3.G.
 
 - [ ] **H5.1** In progress: `make hashtable` aggregates the implemented proof/audit/reference/wrapper/primitive gates, clean removes its generated outputs, and CI invokes it under the existing pinned toolchain. Hosted result and completion of the remaining gates are open.
-- [ ] **H5.2** Add generic-key checked benchmarks against list reference, compatible Map.Make and Hashtbl instances; include StringPatriciaMap for string workloads.
+- [ ] **H5.2** In progress: `HashTableBenchmark.ml` supplies a checked integer-key native benchmark against an association-list oracle, `Map.Make` and `Hashtbl`; string/`StringPatriciaMap` workloads and broader generic instances remain open.
 - [ ] **H5.3** Record timing/allocation/retained heap with compiler, seed, key distributions and version-retention policy.
 - [ ] **H5.4** In progress: README and design status now describe the source-reference milestone without claiming proof/native completion. Final supported API, theorem inventory and extraction boundary remain open.
-- [ ] **H5.5** Run fresh full build and benchmark smoke; record local and hosted CI evidence separately.
+- [ ] **H5.5** In progress: local clean aggregate and hash-table benchmark smoke pass; CI is configured to run the smoke separately. Hosted results remain open.
 - [ ] **H5.G** Gate: all required deliverables exist and release claims match proof and runtime evidence.
 
 ## Deferred scope
@@ -128,6 +128,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H4.2 (partial) | Added modeled native get/set/remove in `HashTableNative.v` and arbitrary-relation refinement lemmas in `HashTableNativeProof.v`; `make hashtable-proof hashtable-assumptions` passed with 76 theorem declarations closed. The model does not yet claim array realization, heap safety, invariant preservation or public-backend switching. |
 | 2026-09-13 | H4.4 (partial) | Added `HashTablePrimitives.ml` / `.mli` and `HashTablePrimitivesTest.ml`; `make hashtable-native-primitives-test` passed through `ocamlopt`. It checks insert/replace/remove views, out-of-range behavior, fresh storage for all updates and unchanged retained storage. No extraction binding or full native-map realization is claimed. |
 | 2026-09-13 | H5.1 (partial) | Added `make hashtable`, cleanup rules and a CI hash-table step. A local `make clean && make hashtable` regenerated all reference output and passed the proof, 68-theorem audit, extraction-boundary, direct reference, wrapper bytecode/native and primitive tests. A monitored fresh `make` then exited 0 with Patricia randomized, union and optimized/reference differential tests passing. Hosted CI has not run in this tracker. |
+| 2026-09-13 | H5.2 (partial) | Added `HashTableBenchmark.ml`; `make hashtable-benchmark-smoke` passed through `ocamlopt` with 100 bindings. It checked all wrapper/`Map.Make`/`Hashtbl` lookup results against an association-list oracle before reporting times and allocation bytes. Measurements are local workload evidence only. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

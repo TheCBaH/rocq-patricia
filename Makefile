@@ -27,7 +27,7 @@ HASHTABLE_VOFILES := $(HASHTABLE_VFILES:.v=.vo)
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
-.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-native-primitives-test hashtable-extraction-audit hashtable-assumptions
+.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-native-primitives-test hashtable-benchmark hashtable-benchmark-smoke hashtable-extraction-audit hashtable-assumptions
 
 .PHONY: string-primitive-profile
 .PHONY: string-worker-performance
@@ -106,6 +106,17 @@ hashtable-native-primitives-test: HashTablePrimitives.mli HashTablePrimitives.ml
 	$(OCAMLOPT) -c HashTablePrimitives.mli HashTablePrimitives.ml HashTablePrimitivesTest.ml
 	$(OCAMLOPT) -o hashtable-native-primitives-test HashTablePrimitives.cmx HashTablePrimitivesTest.cmx
 	./hashtable-native-primitives-test
+
+hashtable-benchmark: hashtable-reference HashMap.mli HashMap.ml HashTableBenchmark.ml
+	cd hashtable_reference_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
+	$(OCAMLOPT) -I hashtable_reference_extracted -c HashMap.mli HashMap.ml HashTableBenchmark.ml
+	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-benchmark $$objects ../HashMap.cmx ../HashTableBenchmark.cmx
+	./hashtable-benchmark
+
+hashtable-benchmark-smoke: hashtable-benchmark
+
+hashtable-benchmark-smoke: export HASHTABLE_BENCH_SIZE := 100
 
 hashtable-assumptions: hashtable-proof check-hashtable-assumptions.sh
 	sh ./check-hashtable-assumptions.sh $(ROCQ) $(ROCQFLAGS)
@@ -351,9 +362,10 @@ clean:
 	rm -f PatriciaMap.cmi PatriciaMap.cmo PatriciaMap.cmx PatriciaMap.o
 	rm -f StringPatriciaMap.cmi StringPatriciaMap.cmo StringPatriciaMap.cmx StringPatriciaMap.o
 	rm -f HashMap.cmi HashMap.cmo HashMap.cmx HashMap.o
+	rm -f HashTableBenchmark.cmi HashTableBenchmark.cmo HashTableBenchmark.cmx HashTableBenchmark.o
 	rm -f HashTablePrimitives.cmi HashTablePrimitives.cmo HashTablePrimitives.cmx HashTablePrimitives.o
 	rm -f HashTablePrimitivesTest.cmi HashTablePrimitivesTest.cmo HashTablePrimitivesTest.cmx HashTablePrimitivesTest.o
-	rm -f hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-native-test hashtable-native-primitives-test
+	rm -f hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-native-test hashtable-native-primitives-test hashtable-benchmark
 	rm -f PatriciaReference.cmi PatriciaReference.cmo PatriciaReference.cmx PatriciaReference.o
 	rm -f PatriciaTest.cmi PatriciaTest.cmo PatriciaDifferentialTest.cmi \
 	  PatriciaDifferentialTest.cmo PatriciaUnionTest.cmi PatriciaUnionTest.cmo \
