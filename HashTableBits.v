@@ -276,6 +276,18 @@ Proof.
     destruct children as [|head tail]; simpl; auto with arith.
 Qed.
 
+Lemma dense_remove_length_hit :
+  forall A index (children : list A),
+    index < length children ->
+    length (dense_remove index children) = Nat.pred (length children).
+Proof.
+  intros A index. induction index as [|index IH]; intros children Hbound.
+  - destruct children as [|head tail]; simpl in Hbound; try lia. reflexivity.
+  - destruct children as [|head tail]; simpl in Hbound; try lia.
+    simpl. rewrite IH by lia.
+    apply Nat.succ_pred_pos. lia.
+Qed.
+
 Lemma dense_insert_empty :
   forall A (child : A) index, dense_insert index child [] = [child].
 Proof. intros A child [|index]; reflexivity. Qed.
