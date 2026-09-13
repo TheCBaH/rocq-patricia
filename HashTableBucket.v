@@ -230,6 +230,60 @@ Proof.
   eapply nodupA_replace_head; eauto.
 Qed.
 
+Lemma bucket_set_inA_hit :
+  forall K A (R : K * A -> K * A -> Prop) (eqb : K -> K -> bool)
+         key (value : A) entries entry,
+    bucket_get eqb key entries <> None ->
+    (forall stored old_value new_value,
+        R entry (stored, new_value) <-> R entry (stored, old_value)) ->
+    InA R entry (bucket_set eqb key value entries) ->
+    InA R entry entries.
+Proof.
+  intros K A R eqb key value entries.
+  induction entries as [|[stored old_value] tail IH]; intros entry Hhit Hstable Hin;
+    simpl in Hhit, Hin.
+  - contradiction.
+  - destruct (eqb key stored) eqn:Hstored.
+    + apply (proj2 (InA_cons R entry (stored, old_value) tail)).
+      apply (proj1 (InA_cons R entry (stored, value) tail)) in Hin.
+      destruct Hin as [Hhead|Htail].
+      * left. now apply (proj1 (Hstable stored old_value value)).
+      * right. exact Htail.
+    + apply (proj2 (InA_cons R entry (stored, old_value) tail)).
+      apply (proj1 (InA_cons R entry (stored, old_value)
+        (bucket_set eqb key value tail))) in Hin.
+      destruct Hin as [Hhead|Htail].
+      * left. exact Hhead.
+      * right. apply IH with (entry := entry); auto.
+Qed.
+
+Lemma bucket_set_nodup_hit :
+  forall K A (R : K * A -> K * A -> Prop) (eqb : K -> K -> bool)
+         key (value : A) entries,
+    bucket_get eqb key entries <> None ->
+    NoDupA R entries ->
+    (forall stored old_value new_value entry,
+        R (stored, new_value) entry <-> R (stored, old_value) entry) ->
+    (forall entry stored old_value new_value,
+        R entry (stored, new_value) <-> R entry (stored, old_value)) ->
+    NoDupA R (bucket_set eqb key value entries).
+Proof.
+  intros K A R eqb key value entries.
+  induction entries as [|[stored old_value] tail IH];
+    intros Hhit Hnodup Hleft Hright; simpl in Hhit.
+  - contradiction.
+  - inversion Hnodup as [|head entries Hnotin Htail]; subst.
+    destruct (eqb key stored) eqn:Hstored.
+    + rewrite bucket_set_retains_head_representative by exact Hstored.
+      eapply (nodupA_replace_head (R := R));
+        [exact Hnodup|].
+      intro entry. now apply Hleft.
+    + simpl. rewrite Hstored. constructor.
+      * intro Hin. apply Hnotin.
+        eapply bucket_set_inA_hit; eauto.
+      * apply IH; auto.
+Qed.
+
 Lemma bucket_set_length_hit :
   forall K A (eqb : K -> K -> bool) key (value : A) (entries : list (K * A)),
     bucket_get eqb key entries <> None ->
