@@ -155,6 +155,55 @@ Proof.
   - reflexivity.
 Qed.
 
+Lemma set_tree_collision_same_hash :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
+         (value : A) entries,
+    set_tree eqb fuel depth full_hash key value (Collision full_hash entries) =
+    normalize_collision full_hash (bucket_set eqb key value entries).
+Proof.
+  intros. destruct fuel; cbn [set_tree]; now rewrite N.eqb_refl.
+Qed.
+
+Lemma get_tree_normalize_collision_same_hash :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash query
+         (entries : list (K * A)),
+    get_tree eqb fuel depth full_hash query (normalize_collision full_hash entries) =
+    bucket_get eqb query entries.
+Proof.
+  intros K A eqb fuel depth full_hash query entries.
+  destruct fuel; destruct entries as [|entry [|next tail]];
+    cbn [normalize_collision normalize_bucket get_tree bucket_get].
+  all: try reflexivity.
+  all: try (destruct entry as [key value]; now rewrite N.eqb_refl).
+  all: now rewrite N.eqb_refl.
+Qed.
+
+Lemma set_tree_collision_miss_bindings :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
+         (value : A) entries,
+    (forall stored old_value, In (stored, old_value) entries -> eqb key stored = false) ->
+    bindings (set_tree eqb fuel depth full_hash key value (Collision full_hash entries)) =
+    entries ++ [(key, value)].
+Proof.
+  intros K A eqb fuel depth full_hash key value entries Hmiss.
+  rewrite set_tree_collision_same_hash.
+  rewrite bindings_normalize_collision.
+  now apply bucket_set_miss.
+Qed.
+
+Lemma get_tree_collision_after_set :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
+         (value : A) entries,
+    (forall query, eqb query query = true) ->
+    get_tree eqb fuel depth full_hash key
+      (set_tree eqb fuel depth full_hash key value (Collision full_hash entries)) = Some value.
+Proof.
+  intros K A eqb fuel depth full_hash key value entries Heqb.
+  rewrite set_tree_collision_same_hash.
+  rewrite get_tree_normalize_collision_same_hash.
+  now apply bucket_get_after_set.
+Qed.
+
 Lemma set_tree_empty_bindings :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
          (value : A),
