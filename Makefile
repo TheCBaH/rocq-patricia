@@ -27,7 +27,7 @@ HASHTABLE_VOFILES := $(HASHTABLE_VFILES:.v=.vo)
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
-.PHONY: hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-extraction-audit hashtable-assumptions
+.PHONY: hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-native-primitives-test hashtable-extraction-audit hashtable-assumptions
 
 .PHONY: string-primitive-profile
 .PHONY: string-worker-performance
@@ -97,6 +97,11 @@ hashtable-wrapper-test-native: hashtable-reference HashMap.mli HashMap.ml HashMa
 
 hashtable-extraction-audit: HashMap.mli HashMap.ml check-hashtable-extraction-boundary.sh
 	sh ./check-hashtable-extraction-boundary.sh HashMap.mli HashMap.ml
+
+hashtable-native-primitives-test: HashTablePrimitives.mli HashTablePrimitives.ml HashTablePrimitivesTest.ml
+	$(OCAMLOPT) -c HashTablePrimitives.mli HashTablePrimitives.ml HashTablePrimitivesTest.ml
+	$(OCAMLOPT) -o hashtable-native-primitives-test HashTablePrimitives.cmx HashTablePrimitivesTest.cmx
+	./hashtable-native-primitives-test
 
 hashtable-assumptions: hashtable-proof check-hashtable-assumptions.sh
 	sh ./check-hashtable-assumptions.sh $(ROCQ) $(ROCQFLAGS)

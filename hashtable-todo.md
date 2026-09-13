@@ -77,9 +77,9 @@ Dependencies: H2.G.
 Dependencies: H3.G.
 
 - [ ] **H4.1** In progress: `HashTableNative.v` defines a source-modeled persistent sequence interface, fresh-update view laws and a native-tree/source relation with empty/leaf/collision refinement lemmas. Array realization and branch refinement remain open.
-- [ ] **H4.2** Prove native modeled get/set/remove refinement and invariant/seed preservation.
+- [ ] **H4.2** In progress: `HashTableNative.v` defines modeled native get/set/remove and proves refinement through `source_of_native`. Invariant/seed preservation and any array-realizer refinement remain open.
 - [ ] **H4.3** Prove bounded bitmap/scalar/popcount workers including all native intermediate and shift bounds.
-- [ ] **H4.4** Implement private fresh-copy array primitives and extraction bindings; document remaining target obligations.
+- [ ] **H4.4** In progress: `HashTablePrimitives.ml` / `.mli` provide private fresh-copy sequence primitives and `hashtable-native-primitives-test` validates views and storage freshness. Extraction bindings and their full target inventory remain open.
 - [ ] **H4.5** Audit generated map workers and primitive realizer inventory; reject high-level algorithm overrides.
 - [ ] **H4.6** Run reference/native/oracle histories in bytecode and native code, including retained versions and function/reference payloads.
 - [ ] **H4.7** Switch public wrapper to native backend after passing correctness and refinement gates.
@@ -125,6 +125,8 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H1.G/H2.G support (partial) | Added `check-hashtable-assumptions.sh`; `make hashtable-assumptions` audited all 56 current hash-table theorem declarations as closed under the global context. This audit does not close the still-incomplete H1/H2 proof gates. |
 | 2026-09-13 | H3.5 (partial) | Added `check-hashtable-extraction-boundary.sh`; `make hashtable-extraction-audit` passed, confirming an abstract public map type, no exposed routing representation/workers, and wrapper-owned 30-bit normalization with functor-bound callbacks. |
 | 2026-09-13 | H4.1 (partial) | Added `HashTableNative.v`; `make hashtable-proof` passed. It provides modeled persistent-sequence view laws and base source refinement lemmas, without an OCaml array realizer or native operation-refinement claim. |
+| 2026-09-13 | H4.2 (partial) | Extended `HashTableNative.v` with modeled native get/set/remove and source refinement lemmas; `make hashtable-proof` passed. The model does not yet claim array realization, heap safety, invariant preservation or public-backend switching. |
+| 2026-09-13 | H4.4 (partial) | Added `HashTablePrimitives.ml` / `.mli` and `HashTablePrimitivesTest.ml`; `make hashtable-native-primitives-test` passed through `ocamlopt`. It checks insert/replace/remove views, out-of-range behavior, fresh storage for all updates and unchanged retained storage. No extraction binding or full native-map realization is claimed. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
