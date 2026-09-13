@@ -305,6 +305,17 @@ Proof.
   apply is_empty_empty.
 Qed.
 
+Lemma bindings_remove_singleton :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N),
+    (forall key, eqb key key = true) ->
+    forall seed key (value : A),
+      elements (remove eqb hash key (singleton eqb hash seed key value)) = [].
+Proof.
+  intros K Seed A eqb hash Heqb seed key value.
+  rewrite remove_singleton by exact Heqb.
+  apply bindings_empty.
+Qed.
+
 Lemma of_list_empty :
   forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
          (seed : Seed),
@@ -330,6 +341,18 @@ Proof.
   cbn [add_first].
   rewrite get_singleton by exact Heqb.
   reflexivity.
+Qed.
+
+Lemma bindings_of_list_first_wins_same_key :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N),
+    (forall key, eqb key key = true) ->
+    forall seed key (first second : A),
+      elements (of_list eqb hash seed [(key, first); (key, second)]) =
+      [(key, first)].
+Proof.
+  intros K Seed A eqb hash Heqb seed key first second.
+  rewrite of_list_first_wins_same_key by exact Heqb.
+  apply bindings_singleton.
 Qed.
 
 Lemma set_seed :

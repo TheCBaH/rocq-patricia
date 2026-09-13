@@ -65,7 +65,7 @@ Dependencies: H1.G.
 
 Dependencies: H2.G.
 
-- [ ] **H3.1** In progress: `HashTable.v` now proves empty/singleton emptiness, singleton membership/removal, singleton bulk loading and the duplicate-singleton first-wins case; general pointwise first-wins, enumeration and extensional laws remain open.
+- [ ] **H3.1** In progress: `HashTable.v` now proves empty/singleton emptiness, singleton membership/removal and enumeration, singleton bulk loading, and duplicate-singleton first-wins lookup/enumeration; general pointwise first-wins and extensional laws remain open.
 - [ ] **H3.2** In progress: `HashTableReferenceExtract.v` regenerates a separately isolated list-source extraction, while `HashTableReference.ml` / `.mli` provide its stable package name. The bounded test-hash API remains open.
 - [ ] **H3.3** In progress: `HashMap.mli` / `.ml` expose `HashMap.Make(Key)` over `HashTableReference` and normalize raw hashes with `land 0x3fffffff`. Callback/foreign-contract inventory and record example remain open.
 - [ ] **H3.4** In progress: direct and public-wrapper tests exercise controlled collisions, routing depths, first-wins values, retained roots, a 500-step association-list-oracle history, and a 1,000-step `Stdlib.Map` differential history in bytecode/native code. The broader custom-equivalence and boundary matrix remains open.
@@ -148,6 +148,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H1.2/H2.4 (partial) | Added valid-index dense-replacement membership and its branch-binding lift: resulting branch bindings come from the replacement child or the prior branch. `make hashtable-proof hashtable-assumptions` passed with 111 declarations closed. General bitmap/rank correspondence, recursive routing and global validity remain open. |
 | 2026-09-13 | H3.4 (partial) | Added `HashTableDifferentialTest.ml`, `make hashtable-differential` and `make hashtable-test-native`. Both bytecode/native tests passed 1,000 deterministic set/remove steps against `Stdlib.Map`, checking current and sampled retained versions across `min_int`, `max_int` and bounded keys. This exercises the reference wrapper only; a compact native-map differential remains open. |
 | 2026-09-13 | H2.3–H2.5 (partial) | Added explicit zero-fuel branch equations for get/set/remove in `HashTableProof.v`. `make hashtable-proof hashtable-assumptions` passed with 114 declarations closed. The invariant proof that valid six-level routing never reaches these fallbacks remains open. |
+| 2026-09-13 | H3.1 (partial) | Added enumeration laws for singleton removal and duplicate-singleton first-wins bulk loading in `HashTable.v`. `make hashtable-proof hashtable-assumptions` passed with 116 declarations closed. General pointwise first-wins and extensional laws remain open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
