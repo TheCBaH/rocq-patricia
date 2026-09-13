@@ -204,6 +204,28 @@ Proof.
   now apply bucket_get_after_set.
 Qed.
 
+Lemma remove_tree_collision_same_hash :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
+         (entries : list (K * A)),
+    remove_tree eqb fuel depth full_hash key (Collision full_hash entries) =
+    normalize_collision full_hash (bucket_remove eqb key entries).
+Proof.
+  intros. destruct fuel; cbn [remove_tree]; now rewrite N.eqb_refl.
+Qed.
+
+Lemma remove_tree_collision_miss_bindings :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
+         (entries : list (K * A)),
+    (forall stored value, In (stored, value) entries -> eqb key stored = false) ->
+    bindings (remove_tree eqb fuel depth full_hash key (Collision full_hash entries)) =
+    entries.
+Proof.
+  intros K A eqb fuel depth full_hash key entries Hmiss.
+  rewrite remove_tree_collision_same_hash.
+  rewrite bindings_normalize_collision.
+  now apply bucket_remove_miss.
+Qed.
+
 Lemma set_tree_empty_bindings :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
          (value : A),

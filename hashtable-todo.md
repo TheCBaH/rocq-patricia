@@ -57,7 +57,7 @@ Dependencies: H1.G.
 - [ ] **H2.2** In progress: `HashTable.v` implements bounded `join_worker`; validity/binding and unreachable-fallback proofs remain open.
 - [ ] **H2.3** In progress: `HashTable.v` implements fuelled bitmap-routed `get_tree`; `HashTableProof.v` proves leaf/collision base cases and normalized same-hash collision lookup. Independent binding equivalence remains open.
 - [ ] **H2.4** In progress: `HashTable.v` implements persistent `set_tree` and the public seeded `set`; `HashTableProof.v` proves leaf replacement/representative, same-hash collision insertion/lookup base cases and `set_seed`. Global pointwise and validity laws remain open.
-- [ ] **H2.5** In progress: `HashTable.v` implements persistent `remove_tree` and retains unary branches; `HashTableProof.v` proves matching-leaf removal and `remove_seed`. Pointwise and validity laws remain open.
+- [ ] **H2.5** In progress: `HashTable.v` implements persistent `remove_tree` and retains unary branches; `HashTableProof.v` proves matching-leaf removal, same-hash collision removal/miss preservation and `remove_seed`. Pointwise and validity laws remain open.
 - [ ] **H2.6** Prove branch-path height at most six and global key uniqueness.
 - [ ] **H2.G** Gate: core laws kernel-checked; assumption audit and existing Patricia proof build pass.
 
@@ -133,6 +133,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H1.2 (partial) | Added dense-child lookup preservation before/after insert, replacement off the edited index, and removal before/after the edited index. `make hashtable-proof hashtable-assumptions` passed with 84 declarations closed. General bitmap/rank correspondence remains open. |
 | 2026-09-13 | H1.3 (partial) | Added exact collision-bucket miss insertion and its cardinality law under an explicit reflected-equality miss condition. `make hashtable-proof hashtable-assumptions` passed with 86 declarations closed. Bucket uniqueness and general pointwise laws remain open. |
 | 2026-09-13 | H2.3/H2.4 (partial) | Added same-hash collision normalization, set-binding and lookup-after-set base laws in `HashTableProof.v`, using the explicit bucket miss/equality conditions. `make hashtable-proof hashtable-assumptions` passed with 90 declarations closed. Recursive routing and global pointwise/validity laws remain open. |
+| 2026-09-13 | H2.5 (partial) | Added same-hash collision removal and miss-preservation binding laws in `HashTableProof.v`, using the explicit bucket miss condition. `make hashtable-proof hashtable-assumptions` passed with 92 declarations closed. Recursive routing and global pointwise/validity laws remain open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
