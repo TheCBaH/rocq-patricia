@@ -68,7 +68,7 @@ Dependencies: H2.G.
 - [ ] **H3.1** In progress: `HashTable.v` now proves empty/singleton emptiness, singleton membership/removal and enumeration, singleton bulk loading, and duplicate-singleton first-wins lookup/enumeration; general pointwise first-wins and extensional laws remain open.
 - [ ] **H3.2** In progress: `HashTableReferenceExtract.v` regenerates a separately isolated list-source extraction, while `HashTableReference.ml` / `.mli` provide its stable package name. The bounded test-hash API remains open.
 - [ ] **H3.3** In progress: `HashMap.mli` / `.ml` expose `HashMap.Make(Key)` over `HashTableReference` and normalize raw hashes with `land 0x3fffffff`. Callback/foreign-contract inventory and record example remain open.
-- [ ] **H3.4** In progress: direct and public-wrapper tests exercise controlled collisions, routing depths, first-wins values, retained roots, a 500-step association-list-oracle history, and a 1,000-step `Stdlib.Map` differential history in bytecode/native code. The broader custom-equivalence and boundary matrix remains open.
+- [ ] **H3.4** In progress: direct and public-wrapper tests exercise controlled collisions, routing depths, first-wins values, retained roots, a 500-step association-list-oracle history, a 1,000-step integer `Stdlib.Map` differential history, and a 500-step collision-heavy case-insensitive string/function-payload differential history in bytecode/native code. The broader custom-equivalence and boundary matrix remains open.
 - [ ] **H3.5** In progress: `HashMapTest.ml` compiles through the abstract wrapper and checks callback-instance isolation. `hashtable-extraction-audit` verifies abstract public types, hidden routing internals and functor-bound normalized callbacks; a generated-interface audit remains open.
 - [ ] **H3.G** Gate: proved reference exports to OCaml; reference proof/audit/build/test subset passes from regenerated output.
 
@@ -164,6 +164,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H1.3 (partial) | Added `bucket_get_remove_other`: with symmetric/transitive boolean key equality, a removal leaves lookup unchanged for a query in a different equivalence class. Bucket uniqueness remains open. |
 | 2026-09-13 | H1.2 (partial) | Added `dense_remove_length_hit`: removal at a valid dense-child index reduces length by exactly one, complementing the existing total-operation upper bound. |
 | 2026-09-13 | H2.2 (partial) | Added `join_falls_back` and `join_worker_six_no_fallback`: the control-flow mirror reaches no fuel fallback for distinct normalized hashes with `branch_levels` fuel at depth zero, by the six-chunk separation theorem. Join validity remains open. |
+| 2026-09-13 | H3.4 (partial) | Extended `HashTableDifferentialTest.ml` with a 500-step retained-version `Map.Make` differential history for case-insensitive, collision-heavy string keys and functional payloads. It runs through the abstract public wrapper in bytecode and native targets. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
