@@ -320,6 +320,63 @@ Proof.
   destruct fuel; cbn [set_tree]; now rewrite Heqb.
 Qed.
 
+Section LeafUpdateInvariant.
+
+  Context {K Seed A : Type}.
+  Variable E : K -> K -> Prop.
+  Variable hash : Seed -> K -> N.
+  Variable seed : Seed.
+
+Lemma set_tree_leaf_replacement_wf :
+    forall fuel depth prefix full_hash key stored (old_value value : A)
+           (eqb : K -> K -> bool),
+      wf E hash seed depth prefix (Leaf full_hash stored old_value) ->
+      eqb key stored = true ->
+      wf E hash seed depth prefix
+        (set_tree eqb fuel depth full_hash key value
+          (Leaf full_hash stored old_value)).
+  Proof.
+    intros fuel depth prefix full_hash key stored old_value value eqb Hwf Hmatch.
+    rewrite set_tree_leaf_replaces_representative by exact Hmatch.
+    inversion Hwf; subst; eauto using wf_leaf.
+  Qed.
+
+Lemma set_tree_leaf_collision_wf :
+    forall fuel depth prefix full_hash key stored (old_value value : A)
+           (eqb : K -> K -> bool),
+      wf E hash seed depth prefix (Leaf full_hash stored old_value) ->
+      entry_matches hash seed full_hash depth prefix (key, value) ->
+      eqb key stored = false ->
+      ~ E stored key ->
+      wf E hash seed depth prefix
+        (set_tree eqb fuel depth full_hash key value
+          (Leaf full_hash stored old_value)).
+  Proof.
+    intros fuel depth prefix full_hash key stored old_value value eqb Hwf Hentry
+      Hdifferent Hdistinct.
+    assert (Hstored : entry_matches hash seed full_hash depth prefix (stored, old_value)).
+    { inversion Hwf; subst. repeat split; assumption. }
+    assert (Hset :
+      set_tree eqb fuel depth full_hash key value
+        (Leaf full_hash stored old_value) =
+      Collision full_hash [(stored, old_value); (key, value)]).
+    { destruct fuel; cbn [set_tree]; now rewrite Hdifferent, N.eqb_refl. }
+    rewrite Hset.
+    apply wf_collision.
+    - simpl. lia.
+    - constructor.
+      + exact Hstored.
+      + constructor; [exact Hentry|constructor].
+    - constructor.
+      + intro Hin. apply Hdistinct.
+        apply (proj1 (InA_cons (binding_equiv E) (stored, old_value)
+          (key, value) [])) in Hin.
+        destruct Hin as [Hrelated|Htail]; [exact Hrelated|inversion Htail].
+      + constructor; [intro Hin; inversion Hin|constructor].
+  Qed.
+
+End LeafUpdateInvariant.
+
 Lemma bindings_set_tree_leaf_other_hash :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash stored_hash
          key stored (old value : A) (entry : K * A),
