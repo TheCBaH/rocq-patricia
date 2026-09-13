@@ -1,0 +1,137 @@
+(** Collision buckets for equal full hashes.
+
+    A bucket compares only keys and never values.  Replacement preserves the
+    resident key representative; this is the representative-retention rule
+    required by the public functor. *)
+
+From Stdlib Require Import Bool Lia List NArith.
+Import ListNotations.
+
+Set Implicit Arguments.
+
+Fixpoint bucket_get {K A : Type} (eqb : K -> K -> bool)
+    (query : K) (entries : list (K * A)) : option A :=
+  match entries with
+  | [] => None
+  | (stored, value) :: tail =>
+      if eqb query stored then Some value else bucket_get eqb query tail
+  end.
+
+Fixpoint bucket_set {K A : Type} (eqb : K -> K -> bool)
+    (key : K) (value : A) (entries : list (K * A)) : list (K * A) :=
+  match entries with
+  | [] => [(key, value)]
+  | (stored, old_value) :: tail =>
+      if eqb key stored
+      then (stored, value) :: tail
+      else (stored, old_value) :: bucket_set eqb key value tail
+  end.
+
+Fixpoint bucket_remove {K A : Type} (eqb : K -> K -> bool)
+    (key : K) (entries : list (K * A)) : list (K * A) :=
+  match entries with
+  | [] => []
+  | (stored, value) :: tail =>
+      if eqb key stored then tail
+      else (stored, value) :: bucket_remove eqb key tail
+  end.
+
+Inductive normalized_bucket (K A : Type) : Type :=
+| BucketEmpty
+| BucketLeaf (entry : K * A)
+| BucketMany (entries : list (K * A)).
+
+Arguments BucketEmpty {K A}.
+Arguments BucketLeaf {K A} _.
+Arguments BucketMany {K A} _.
+
+Definition normalize_bucket {K A : Type}
+    (entries : list (K * A)) : normalized_bucket K A :=
+  match entries with
+  | [] => BucketEmpty
+  | [entry] => BucketLeaf entry
+  | _ => BucketMany entries
+  end.
+
+Lemma bucket_get_empty :
+  forall K A (eqb : K -> K -> bool) query,
+    @bucket_get K A eqb query [] = None.
+Proof. reflexivity. Qed.
+
+Lemma bucket_set_empty :
+  forall K A (eqb : K -> K -> bool) key (value : A),
+    bucket_set eqb key value [] = [(key, value)].
+Proof. reflexivity. Qed.
+
+Lemma bucket_set_retains_head_representative :
+  forall K A (eqb : K -> K -> bool) key stored (old value : A) tail,
+    eqb key stored = true ->
+    bucket_set eqb key value ((stored, old) :: tail) = (stored, value) :: tail.
+Proof. intros. simpl. now rewrite H. Qed.
+
+Lemma bucket_remove_head :
+  forall K A (eqb : K -> K -> bool) key stored (value : A) tail,
+    eqb key stored = true ->
+    bucket_remove eqb key ((stored, value) :: tail) = tail.
+Proof. intros. simpl. now rewrite H. Qed.
+
+Lemma bucket_get_after_set :
+  forall K A (eqb : K -> K -> bool),
+    (forall key, eqb key key = true) ->
+    forall key (value : A) entries,
+      bucket_get eqb key (bucket_set eqb key value entries) = Some value.
+Proof.
+  intros K A eqb Heqb key value entries.
+  induction entries as [|[stored old] tail IH]; simpl.
+  - now rewrite Heqb.
+  - destruct (eqb key stored) eqn:Hstored; simpl; now rewrite Hstored.
+Qed.
+
+Lemma bucket_remove_miss :
+  forall K A (eqb : K -> K -> bool) key (entries : list (K * A)),
+    (forall stored value, In (stored, value) entries -> eqb key stored = false) ->
+    bucket_remove eqb key entries = entries.
+Proof.
+  intros K A eqb key entries Hmiss.
+  induction entries as [|[stored value] tail IH]; simpl; auto.
+  assert (Hhead : eqb key stored = false).
+  { apply (Hmiss stored value). simpl. auto. }
+  rewrite Hhead. f_equal.
+  apply IH. intros stored' value' Hin.
+  apply (Hmiss stored' value'). simpl. now right.
+Qed.
+
+Lemma bucket_get_miss :
+  forall K A (eqb : K -> K -> bool) key (entries : list (K * A)),
+    (forall stored value, In (stored, value) entries -> eqb key stored = false) ->
+    bucket_get eqb key entries = None.
+Proof.
+  intros K A eqb key entries Hmiss.
+  induction entries as [|[stored value] tail IH]; simpl; auto.
+  assert (Hhead : eqb key stored = false).
+  { apply (Hmiss stored value). simpl. auto. }
+  rewrite Hhead. apply IH.
+  intros stored' value' Hin. apply (Hmiss stored' value'). simpl. now right.
+Qed.
+
+Lemma bucket_remove_length_le :
+  forall K A (eqb : K -> K -> bool) key (entries : list (K * A)),
+    length (bucket_remove eqb key entries) <= length entries.
+Proof.
+  intros K A eqb key entries.
+  induction entries as [|[stored value] tail IH]; simpl; auto with arith.
+  destruct (eqb key stored); simpl; auto with arith.
+Qed.
+
+Lemma normalize_bucket_empty :
+  forall K A, @normalize_bucket K A [] = BucketEmpty.
+Proof. reflexivity. Qed.
+
+Lemma normalize_bucket_singleton :
+  forall K A (entry : K * A), normalize_bucket [entry] = BucketLeaf entry.
+Proof. reflexivity. Qed.
+
+Lemma normalize_bucket_many :
+  forall K A (first second : K * A) tail,
+    normalize_bucket (first :: second :: tail) = BucketMany (first :: second :: tail).
+Proof. reflexivity. Qed.

@@ -18,7 +18,10 @@
 /patricia-union-profile
 /patricia-reference-profile
 /patricia-string-primitive-profile
+/hashtable-reference-test
+/hashtable-wrapper-test
 /extracted/
 /reference_extracted/
 /hashtable_reference_extracted/
+/hashtable_skeleton_extracted/
 /hashtable_extracted/

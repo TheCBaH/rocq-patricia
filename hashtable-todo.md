@@ -16,7 +16,7 @@ planning documents are not evidence that code exists.
 | Deliverable | State |
 | --- | --- |
 | Design, implementation plan and tracker | Written; documentation checks recorded below |
-| Rocq implementation and proofs | H0 contract and structural prototype complete; H1 primitives open |
+| Rocq implementation and proofs | H0 complete; H1 bitmap/dense-list and bucket source modules compile, with their full primitive proof gate still open |
 | Reference OCaml extraction and public wrapper | Not started |
 | Compact-array model, proofs and native backend | Not started |
 | Tests, build/CI integration and benchmarks | Not started |
@@ -44,20 +44,20 @@ Dependencies: documentation baseline.
 
 Dependencies: H0.G.
 
-- [ ] **H1.1** Prove hash bounds, chunk bounds and six-chunk reconstruction/separation.
-- [ ] **H1.2** Implement/prove bitmap rank and dense-list lookup/insert/replace/delete, including slot 31 and full bitmap.
-- [ ] **H1.3** Implement/prove collision lookup/replacement/deletion, uniqueness and size normalization.
+- [ ] **H1.1** In progress: `HashTableBits.v` defines chunks and proves the per-chunk bound; six-chunk reconstruction/separation remains open.
+- [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary lemmas; rank/edit correspondence proofs remain open.
+- [ ] **H1.3** In progress: `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with head replacement/removal lemmas; uniqueness and full pointwise laws remain open.
 - [ ] **H1.G** Gate: primitive proofs compile and theorem assumption audit passes.
 
 ## H2 — Source HAMT
 
 Dependencies: H1.G.
 
-- [ ] **H2.1** Define nodes, flattened bindings and seed/depth/prefix well-formedness.
-- [ ] **H2.2** Implement join; prove validity, preserved bindings and unreachable fuel fallback.
-- [ ] **H2.3** Implement lookup and prove equivalence to flattened bindings.
-- [ ] **H2.4** Implement set; prove pointwise law, validity and seed preservation.
-- [ ] **H2.5** Implement remove; prove pointwise law, validity, seed preservation and unary-depth safety.
+- [ ] **H2.1** In progress: `HashTable.v` defines raw nodes, seeded tables and an independent flattened `bindings` view; the well-formedness invariant remains open.
+- [ ] **H2.2** In progress: `HashTable.v` implements bounded `join_worker`; validity/binding and unreachable-fallback proofs remain open.
+- [ ] **H2.3** In progress: `HashTable.v` implements fuelled bitmap-routed `get_tree`; independent binding equivalence remains open.
+- [ ] **H2.4** In progress: `HashTable.v` implements persistent `set_tree` and the public seeded `set`; only the singleton law is proved so far.
+- [ ] **H2.5** In progress: `HashTable.v` implements persistent `remove_tree` and retains unary branches; pointwise, validity and seed laws remain open.
 - [ ] **H2.6** Prove branch-path height at most six and global key uniqueness.
 - [ ] **H2.G** Gate: core laws kernel-checked; assumption audit and existing Patricia proof build pass.
 
@@ -66,10 +66,10 @@ Dependencies: H1.G.
 Dependencies: H2.G.
 
 - [ ] **H3.1** Add/prove singleton, emptiness, membership, first-wins of_list, elements and extensional equivalence.
-- [ ] **H3.2** Add pure bounded test hash; extract list reference with separately named modules.
-- [ ] **H3.3** Add abstract HashMap.Make(Key) wrapper, hash normalization and string/integer/record examples; inventory callback and foreign contracts.
-- [ ] **H3.4** Add equality-based oracle histories, controlled collisions, generic keys/custom equivalences, representative retention, normalized-hash edge cases, full native int boundaries and retained-root tests.
-- [ ] **H3.5** Compile wrapper clients and verify that constructors, per-operation hashes, depth and fuel remain private; supplied callbacks stay bound to their functor instance.
+- [ ] **H3.2** In progress: `HashTableReferenceExtract.v` regenerates a separately isolated list-source extraction. The public reference package name and bounded test-hash API remain open.
+- [ ] **H3.3** In progress: `HashMap.mli` / `.ml` expose `HashMap.Make(Key)` over the reference extraction and normalize raw hashes with `land 0x3fffffff`. Callback/foreign-contract inventory and record example remain open.
+- [ ] **H3.4** In progress: `HashTableReferenceTest.ml` exercises direct extracted source operations for controlled collisions, routing depths, first-wins values and retained roots. The public-functor oracle histories, custom equivalences and boundary matrix remain open.
+- [ ] **H3.5** In progress: `HashMapTest.ml` compiles through the abstract wrapper and checks callback-instance isolation. A broader interface/extraction audit remains open.
 - [ ] **H3.G** Gate: proved reference exports to OCaml; reference proof/audit/build/test subset passes from regenerated output.
 
 ## H4 — Compact-array backend
@@ -114,6 +114,10 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | D6 | Corrected scope to arbitrary lawful key types; updated design, plan, tracker, investigation and README. Documentation link/whitespace checks passed; implementation gates remain open. |
 | 2026-09-13 | D4 | Checked relative Markdown file links in the new documents and README/investigation additions; `git diff --check` passed. |
 | 2026-09-13 | H0.1–H0.G | Added `HashTableSpec.v`, `HashTableSkeleton.v`, `HashTableSkeletonExtract.v`, separate paths and H0 Make targets. `make hashtable-proof hashtable-skeleton-extraction` passed with Rocq 9.2 / OCaml 4.14.3. Printed assumptions for all 14 H0 lemmas: every result was `Closed under the global context`. Generated `HashTableSkeleton.ml` retains `eqb0`, `fuel`, `full_hash`, key and value arguments in `update_worker`. |
+| 2026-09-13 | H1.1–H1.3 (partial) | Added `HashTableBits.v` and `HashTableBucket.v`; `make hashtable-proof hashtable-skeleton-extraction` and compilation of the generated reference modules passed. Primitive evidence currently covers chunk bounds, a 32-step popcount/rank bound, slot 31/full bitmap checks, dense edit sizes, bucket self-update/miss/removal behavior and normalization cases. It does not close the H1 gate. |
+| 2026-09-13 | H2.1–H2.5 (partial) | Added `HashTable.v`; `make hashtable-proof` passed. The source executes bounded bitmap-HAMT workers, provides an independent flattening/elements view and first-wins bulk loader, and proves empty/singleton basics. It has no established global invariant or pointwise update/removal proof yet. |
+| 2026-09-13 | H3.2, H3.4 (partial) | Added `HashTableReferenceExtract.v` and `HashTableReferenceTest.ml`; `make hashtable-reference-test` regenerated, compiled and ran the reference extraction successfully. The deterministic test covers empty/singleton, constant-hash collisions, replacement, deletion, depths 0–4 routing, first-wins duplicate values and retained versions. It directly calls extracted source modules and does not yet validate the public functor. |
+| 2026-09-13 | H3.3, H3.5 (partial) | Added `HashMap.mli`, `HashMap.ml` and `HashMapTest.ml`; `make hashtable-wrapper-test` passed. The abstract wrapper test covers negative normalized hashes, `min_int`/`max_int`, equivalent string keys, first representative/value retention, retained versions and two simultaneous key modules. It remains a reference-backend test, not the H3 proof/audit gate. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
