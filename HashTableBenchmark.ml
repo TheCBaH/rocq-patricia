@@ -1,6 +1,7 @@
-(* Checked, workload-specific benchmark for the current source-reference
-   backend.  Every timed result is checked against the association-list
-   oracle; timings are not proof or portable performance claims. *)
+(* Checked, workload-specific benchmark for the source-reference and
+   experimental fresh-array backends, plus OCaml's imperative [Hashtbl].
+   Every timed result is checked against the association-list oracle; timings
+   are not proof or portable performance claims. *)
 
 module Key = struct
   type t = int
@@ -9,6 +10,7 @@ module Key = struct
 end
 
 module Hash_map = HashMap.Make (Key)
+module Native_hash_map = HashMapNative.Make (Key)
 module Ordered_map = Map.Make (Int)
 
 let size =
@@ -38,11 +40,14 @@ let () =
   let bindings = Stdlib.List.init size (fun key -> (key, string_of_int key)) in
   let oracle = Stdlib.List.rev bindings in
   let hashed = time "HashMap.Make build" (fun () -> Hash_map.of_list ~seed:31 bindings) in
+  let native_hashed = time "HashMapNative.Make build"
+      (fun () -> Native_hash_map.of_list ~seed:31 bindings)
+  in
   let ordered = time "Map.Make build"
       (fun () -> Stdlib.List.fold_left (fun map (key, value) -> Ordered_map.add key value map)
                Ordered_map.empty bindings)
   in
-  let standard = time "Hashtbl build" (fun () ->
+  let standard = time "OCaml Hashtbl (imperative) build" (fun () ->
       let table = Hashtbl.create size in
       Stdlib.List.iter (fun (key, value) -> Hashtbl.replace table key value) bindings;
       table)
@@ -53,6 +58,9 @@ let () =
     if get (-1) <> None then fail (name ^ " missing lookup mismatch")
   in
   time "HashMap.Make checked lookup" (fun () -> check "HashMap.Make" (fun key -> Hash_map.get key hashed));
+  time "HashMapNative.Make checked lookup"
+    (fun () -> check "HashMapNative.Make" (fun key -> Native_hash_map.get key native_hashed));
   time "Map.Make checked lookup" (fun () -> check "Map.Make" (fun key -> Ordered_map.find_opt key ordered));
-  time "Hashtbl checked lookup" (fun () -> check "Hashtbl" (fun key -> Hashtbl.find_opt standard key));
+  time "OCaml Hashtbl (imperative) checked lookup"
+    (fun () -> check "Hashtbl" (fun key -> Hashtbl.find_opt standard key));
   Printf.printf "HashTable checked benchmark passed (%d bindings)\n%!" size

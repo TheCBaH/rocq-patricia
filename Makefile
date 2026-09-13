@@ -163,11 +163,11 @@ hashtable-native-primitives-test: HashTablePrimitives.mli HashTablePrimitives.ml
 hashtable-native-primitives-audit: HashTablePrimitives.ml check-hashtable-primitives.sh
 	sh ./check-hashtable-primitives.sh HashTablePrimitives.ml
 
-hashtable-benchmark: hashtable-reference HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashTableBenchmark.ml
+hashtable-benchmark: hashtable-reference HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableBenchmark.ml
 	cd hashtable_reference_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
-	$(OCAMLOPT) -I hashtable_reference_extracted -c HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashTableBenchmark.ml
+	$(OCAMLOPT) -I hashtable_reference_extracted -c HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableBenchmark.ml
 	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
-	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-benchmark $$objects ../HashTableReference.cmx ../HashMap.cmx ../HashTableBenchmark.cmx
+	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-benchmark $$objects ../HashTableReference.cmx ../HashMap.cmx ../HashTablePrimitives.cmx ../HashMapNative.cmx ../HashTableBenchmark.cmx
 	./hashtable-benchmark
 
 hashtable-benchmark-smoke: hashtable-benchmark

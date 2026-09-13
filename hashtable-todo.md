@@ -90,7 +90,7 @@ Dependencies: H3.G.
 Dependencies: H4.G; benchmark harness may begin after H3.G.
 
 - [ ] **H5.1** In progress: `make hashtable` aggregates the implemented proof/audit/reference/wrapper/primitive gates, clean removes its generated outputs, and CI invokes it under the existing pinned toolchain. Hosted result and completion of the remaining gates are open.
-- [ ] **H5.2** In progress: `HashTableBenchmark.ml` supplies a checked integer-key native benchmark against an association-list oracle, `Map.Make` and `Hashtbl`; string/`StringPatriciaMap` workloads and broader generic instances remain open.
+- [ ] **H5.2** In progress: `HashTableBenchmark.ml` supplies checked integer-key source-reference and fresh-array backend benchmarks against an association-list oracle, `Map.Make` and OCaml's imperative `Hashtbl`; string/`StringPatriciaMap` workloads and broader generic instances remain open.
 - [ ] **H5.3** Record timing/allocation/retained heap with compiler, seed, key distributions and version-retention policy.
 - [ ] **H5.4** In progress: README and design status now describe the source-reference milestone without claiming proof/native completion. Final supported API, theorem inventory and extraction boundary remain open.
 - [ ] **H5.5** In progress: local clean aggregate and hash-table benchmark smoke pass; CI is configured to run the smoke separately. Hosted results remain open.
@@ -153,6 +153,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H4.2 (partial) | Added `HashTableNativeModelTest.ml`, `make hashtable-native-model-test` and `make hashtable-native-model-test-native`. The regenerated extracted native model passed 750 deterministic set/remove steps in bytecode/native code, comparing source/native lookup results for current and sampled retained versions. This is model/extraction evidence only; it does not test an array-backed native map. |
 | 2026-09-13 | H4.4/H4.6 (partial) | Added private-array `HashMapNative.Make` and `HashMapNativeTest.ml`, plus bytecode/native differential targets. Bytecode passed 1,000 deterministic reference/native set/remove steps with retained versions, collision-heavy keys, `min_int`/`max_int` and first-wins bulk loading. The public wrapper is unchanged and no kernel proof of this OCaml heap implementation is claimed. |
 | 2026-09-13 | H4.5 (partial) | Added `check-hashtable-native-array-backend.sh` and `make hashtable-native-array-audit`. It checks that the standalone backend uses private sequence operations, rejects reference-map delegation and unsafe escapes, and confirms `HashMap.Make` has not switched backends. Generated source-native worker and extraction-binding audits remain open. |
+| 2026-09-13 | H5.2 (partial) | Extended `HashTableBenchmark.ml` to check and measure the private fresh-array backend alongside the reference wrapper, `Map.Make` and OCaml's imperative `Hashtbl` on one integer workload. Measurements remain local workload evidence only. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
