@@ -432,3 +432,28 @@ Proof.
     destruct Hin as [Hin|Hin]; [now left|].
     now right; apply IH.
 Qed.
+
+Lemma Forall2_dense_replace :
+  forall A B (R : A -> B -> Prop) index (child : B) slots children,
+    Forall2 R slots children ->
+    index < length children ->
+    (forall slot old_child,
+        nth_error slots index = Some slot ->
+        nth_error children index = Some old_child ->
+        R slot child) ->
+    Forall2 R slots (dense_replace index child children).
+Proof.
+  intros A B R index.
+  induction index as [|index IH]; intros child slots children Hpaired Hbound Hnew.
+  - destruct children as [|old_child tail]; simpl in Hbound; [lia|].
+    inversion Hpaired as [|slot child' slots' children' Hhead Htail]; subst.
+    simpl. constructor.
+    + apply (Hnew slot old_child); reflexivity.
+    + exact Htail.
+  - destruct children as [|old_child tail]; simpl in Hbound; [lia|].
+    inversion Hpaired as [|slot child' slots' children' Hhead Htail]; subst.
+    simpl. constructor; [exact Hhead|].
+    apply IH; [exact Htail|lia|].
+    intros slot' old_child' Hslot Hchild.
+    apply (Hnew slot' old_child'); simpl; exact Hslot || exact Hchild.
+Qed.
