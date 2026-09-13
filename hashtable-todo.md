@@ -53,11 +53,11 @@ Dependencies: H0.G.
 
 Dependencies: H1.G.
 
-- [ ] **H2.1** In progress: `HashTable.v` defines raw nodes, seeded tables and an independent flattened `bindings` view; `HashTableProof.v` now defines the hash/prefix, collision-uniqueness and bitmap/dense-child well-formedness invariant. Its preservation proofs remain open.
+- [ ] **H2.1** In progress: `HashTable.v` defines raw nodes, seeded tables and an independent flattened `bindings` view; `HashTableProof.v` now defines the hash/prefix, collision-uniqueness and bitmap/dense-child well-formedness invariant. It proves normalization and same-hash removal preserve the collision portion of that invariant; branch and insertion preservation remain open.
 - [ ] **H2.2** In progress: `HashTable.v` implements bounded `join_worker`; `HashTableProof.v` proves flattened binding union for both `join_two` and every fuelled worker path, including the fallback, and proves that six-level routing of distinct bounded hashes does not take the fallback. Validity remains open.
 - [ ] **H2.3** In progress: `HashTable.v` implements fuelled bitmap-routed `get_tree`; `HashTableProof.v` proves matching/mismatching leaf and collision base cases, normalized same-hash collision lookup and zero-fuel branch fallback. Independent binding equivalence and fallback unreachability remain open.
 - [ ] **H2.4** In progress: `HashTable.v` implements persistent `set_tree` and the public seeded `set`; `HashTableProof.v` proves leaf replacement/representative, same-hash collision insertion/lookup, distinct-hash leaf and branch insertion/replacement binding, zero-fuel branch fallback, and `set_seed` base cases. Global pointwise and validity laws remain open.
-- [ ] **H2.5** In progress: `HashTable.v` implements persistent `remove_tree` and retains unary branches; `HashTableProof.v` proves matching/mismatching leaf removal, same-hash collision removal/miss preservation, branch-removal binding subset, zero-fuel branch fallback and `remove_seed`. Pointwise and validity laws remain open.
+- [ ] **H2.5** In progress: `HashTable.v` implements persistent `remove_tree` and retains unary branches; `HashTableProof.v` proves matching/mismatching leaf removal, same-hash collision removal/miss preservation and collision-invariant preservation, branch-removal binding subset, zero-fuel branch fallback and `remove_seed`. Pointwise and branch validity laws remain open.
 - [ ] **H2.6** Prove branch-path height at most six and global key uniqueness.
 - [ ] **H2.G** Gate: core laws kernel-checked; assumption audit and existing Patricia proof build pass.
 
@@ -175,6 +175,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H5.3 (partial) | Added `HASHTABLE_BENCH_SEED` and workload metadata to benchmark output. Each measurement now records the ascending integer range, selected seed and every-prefix retention policy alongside timing/allocation/live-heap values. |
 | 2026-09-13 | H5.3 (partial) | `make compiler-config hashtable-benchmark` passed locally with OCaml 4.14.3, arm64, 64-bit Linux, Flambda disabled, seed 31 and ascending keys `[0,2000)`. It reported build allocation/retained heap: source `HashMap.Make` 229,043,504/1,914,720 bytes; private-array `HashMapNative.Make` 1,394,040/1,258,912 bytes; `Map.Make` 1,244,688/1,197,232 bytes; imperative `Hashtbl` build allocation 80,568 bytes. Timings are machine-local workload evidence only; broader distributions remain open. |
 | 2026-09-13 | H5.3 (partial) | Added `HASHTABLE_BENCH_PATTERN=root-slot-collision`, which uses distinct multiples of 32 so the normalized xor hash routes every key through one root slot. Benchmark output records the selected distribution; broader string and randomized series remain open. |
+| 2026-09-13 | H1.3/H2.1/H2.5 (partial) | Added `bucket_remove_forall`, `wf_normalize_collision` and `remove_tree_collision_same_hash_wf`. Removing from a well-formed same-hash collision now kernel-checks through normalization, retaining hash/prefix membership and collision-key uniqueness; recursive branch removal and insertion preservation remain open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

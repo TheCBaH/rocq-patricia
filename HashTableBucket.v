@@ -384,6 +384,20 @@ Proof.
       * now apply IH.
 Qed.
 
+Lemma bucket_remove_forall :
+  forall K A (P : K * A -> Prop) (eqb : K -> K -> bool)
+         key (entries : list (K * A)),
+    Forall P entries -> Forall P (bucket_remove eqb key entries).
+Proof.
+  intros K A P eqb key entries Hforall.
+  induction entries as [|[stored value] tail IH]; simpl.
+  - constructor.
+  - inversion Hforall as [|entry entries Hhead Htail]; subst.
+    destruct (eqb key stored) eqn:Hstored.
+    + exact Htail.
+    + constructor; auto.
+Qed.
+
 Lemma normalize_bucket_empty :
   forall K A, @normalize_bucket K A [] = BucketEmpty.
 Proof. reflexivity. Qed.

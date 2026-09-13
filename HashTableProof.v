@@ -77,6 +77,37 @@ Lemma prefix_matches_append_slot :
       NoDupA binding_equiv (bindings (Branch bitmap children)) ->
       wf depth prefix (Branch bitmap children).
 
+Lemma wf_normalize_collision :
+    forall depth prefix full_hash entries,
+      Forall (entry_matches full_hash depth prefix) entries ->
+      NoDupA binding_equiv entries ->
+      wf depth prefix (normalize_collision full_hash entries).
+  Proof.
+    intros depth prefix full_hash entries Hentries Hnodup.
+    destruct entries as [|[key value] [|[next_key next_value] tail]].
+    - cbn [normalize_collision normalize_bucket]. constructor.
+    - inversion Hentries as [|entry entries Hentry Htail]; subst.
+      destruct Hentry as [Hhash [Hbound Hprefix]].
+      cbn [normalize_collision normalize_bucket].
+      eapply wf_leaf; eauto.
+    - cbn [normalize_collision normalize_bucket].
+      eapply wf_collision; eauto. simpl. lia.
+  Qed.
+
+Lemma wf_collision_remove :
+    forall depth prefix full_hash entries (eqb : K -> K -> bool) key,
+      wf depth prefix (Collision full_hash entries) ->
+      wf depth prefix
+        (normalize_collision full_hash (bucket_remove eqb key entries)).
+  Proof.
+    intros depth prefix full_hash entries eqb key Hwf.
+    inversion Hwf as [| |depth' prefix' full_hash' entries' Hlength Hentries Hnodup|];
+      subst.
+    apply wf_normalize_collision.
+    - now apply bucket_remove_forall.
+    - now apply bucket_remove_nodup.
+  Qed.
+
 End WellFormed.
 
 Lemma bindings_join_two :
@@ -401,6 +432,27 @@ Lemma remove_tree_collision_same_hash :
 Proof.
   intros. destruct fuel; cbn [remove_tree]; now rewrite N.eqb_refl.
 Qed.
+
+Section CollisionInvariant.
+
+  Context {K Seed A : Type}.
+  Variable E : K -> K -> Prop.
+  Variable hash : Seed -> K -> N.
+  Variable seed : Seed.
+
+Lemma remove_tree_collision_same_hash_wf :
+    forall fuel depth prefix full_hash key (entries : list (K * A))
+           (eqb : K -> K -> bool),
+      wf E hash seed depth prefix (Collision full_hash entries) ->
+      wf E hash seed depth prefix
+        (remove_tree eqb fuel depth full_hash key (Collision full_hash entries)).
+  Proof.
+    intros fuel depth prefix full_hash key entries eqb Hwf.
+    rewrite remove_tree_collision_same_hash.
+    now eapply wf_collision_remove.
+  Qed.
+
+End CollisionInvariant.
 
 Lemma remove_tree_collision_miss_bindings :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
