@@ -280,6 +280,31 @@ Proof.
   unfold mem. rewrite get_singleton; auto.
 Qed.
 
+Lemma remove_singleton :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N),
+    (forall key, eqb key key = true) ->
+    forall seed key (value : A),
+      remove eqb hash key (singleton eqb hash seed key value) = empty seed.
+Proof.
+  intros K Seed A eqb hash Heqb seed key value.
+  unfold remove, singleton, set, empty. cbn [remove_tree set_tree]. simpl.
+  rewrite N.eqb_refl.
+  destruct (eqb key key) eqn:Heq.
+  - reflexivity.
+  - rewrite Heqb in Heq. discriminate.
+Qed.
+
+Lemma is_empty_remove_singleton :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N),
+    (forall key, eqb key key = true) ->
+    forall seed key (value : A),
+      is_empty (remove eqb hash key (singleton eqb hash seed key value)) = true.
+Proof.
+  intros K Seed A eqb hash Heqb seed key value.
+  rewrite remove_singleton by exact Heqb.
+  apply is_empty_empty.
+Qed.
+
 Lemma of_list_empty :
   forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
          (seed : Seed),

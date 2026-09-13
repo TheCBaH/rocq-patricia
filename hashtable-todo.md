@@ -65,7 +65,7 @@ Dependencies: H1.G.
 
 Dependencies: H2.G.
 
-- [ ] **H3.1** In progress: `HashTable.v` now proves empty/singleton emptiness, singleton membership and empty bulk loading; pointwise first-wins, enumeration and extensional laws remain open.
+- [ ] **H3.1** In progress: `HashTable.v` now proves empty/singleton emptiness, singleton membership/removal and empty bulk loading; pointwise first-wins, enumeration and extensional laws remain open.
 - [ ] **H3.2** In progress: `HashTableReferenceExtract.v` regenerates a separately isolated list-source extraction. The public reference package name and bounded test-hash API remain open.
 - [ ] **H3.3** In progress: `HashMap.mli` / `.ml` expose `HashMap.Make(Key)` over the reference extraction and normalize raw hashes with `land 0x3fffffff`. Callback/foreign-contract inventory and record example remain open.
 - [ ] **H3.4** In progress: direct and public-wrapper tests exercise controlled collisions, routing depths, first-wins values, retained roots and a 500-step deterministic association-list-oracle history. The broader custom-equivalence and boundary matrix remains open.
@@ -134,6 +134,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H1.3 (partial) | Added exact collision-bucket miss insertion and its cardinality law under an explicit reflected-equality miss condition. `make hashtable-proof hashtable-assumptions` passed with 86 declarations closed. Bucket uniqueness and general pointwise laws remain open. |
 | 2026-09-13 | H2.3/H2.4 (partial) | Added same-hash collision normalization, set-binding and lookup-after-set base laws in `HashTableProof.v`, using the explicit bucket miss/equality conditions. `make hashtable-proof hashtable-assumptions` passed with 90 declarations closed. Recursive routing and global pointwise/validity laws remain open. |
 | 2026-09-13 | H2.5 (partial) | Added same-hash collision removal and miss-preservation binding laws in `HashTableProof.v`, using the explicit bucket miss condition. `make hashtable-proof hashtable-assumptions` passed with 92 declarations closed. Recursive routing and global pointwise/validity laws remain open. |
+| 2026-09-13 | H3.1 (partial) | Added public singleton removal and resulting emptiness laws in `HashTable.v`. `make hashtable-proof hashtable-assumptions` passed with 94 declarations closed. Pointwise first-wins, enumeration and extensional laws remain open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
