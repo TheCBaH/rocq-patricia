@@ -45,7 +45,7 @@ Dependencies: documentation baseline.
 Dependencies: H0.G.
 
 - [x] **H1.1** `HashTableBits.v` defines chunks, proves the per-chunk bound, proves a normalized 30-bit hash has zero chunk at depth six, reconstructs every normalized hash from its six routing chunks, and proves distinct normalized hashes differ at one of depths 0 through 5.
-- [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary calculations, full occupied-slot enumeration, bounded lookup laws before/at/after insertion plus replacement/removal lookup preservation, insertion/replacement/deletion membership laws, exact valid-index removal cardinality, and valid-index slot/child paired replacement preservation; general bitmap-rank correspondence remains open.
+- [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary calculations, empty and full occupied-slot enumeration, a 32-slot enumeration bound, bounded lookup laws before/at/after insertion plus replacement/removal lookup preservation, insertion/replacement/deletion membership laws, exact valid-index removal cardinality, and valid-index slot/child paired replacement preservation; general bitmap-rank correspondence remains open.
 - [ ] **H1.3** In progress: `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with pointwise update/removal preservation for different equivalence classes, exact hit/miss insertion cardinality, successful-removal cardinality, relation-parametric uniqueness preservation for removal, miss-insertion uniqueness under explicit fresh-key conditions, and recursive hit-update uniqueness when the relation is stable under payload replacement; a single all-cases theorem specialized to the collision-key relation remains open.
 - [ ] **H1.G** Gate: primitive proofs compile and theorem assumption audit passes.
 
@@ -180,6 +180,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H2.4 (partial) | Added `set_tree_collision_miss_wf`: inserting into a same-hash collision preserves `wf` given a matching hash/prefix entry, symmetric key equivalence, reflected bucket miss and relation freshness. Recursive branch preservation and derivation of these premises from public callbacks remain open. |
 | 2026-09-13 | H1.2 (partial) | Added `Forall2_dense_replace`: valid dense-child replacement preserves a slot/child `Forall2` relation when the replacement meets the relation for its indexed slot. This supplies the paired-child component for future branch-update preservation. |
 | 2026-09-13 | H5.2 (partial) | Added `HashTableStringBenchmark.ml` with `hashtable-string-benchmark` and a 100-key smoke target. It checks build and lookup results for the reference wrapper, private-array backend, `Map.Make(String)` and imperative `Hashtbl`, and reports persistent retained-version heaps. |
+| 2026-09-13 | H1.2 (partial) | Added empty-bitmap and length-bound contracts for sparse occupied-slot enumeration: `occupied_slots 0 = []` and every enumerated bitmap has at most 32 slots. General bitmap/rank correspondence remains open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

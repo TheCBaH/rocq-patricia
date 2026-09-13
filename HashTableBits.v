@@ -48,6 +48,39 @@ Fixpoint occupied_slots_from (fuel : nat) (bitmap slot : N) : list N :=
 Definition occupied_slots (bitmap : N) : list N :=
   occupied_slots_from 32 bitmap 0.
 
+Lemma bitmap_has_empty :
+  forall slot, bitmap_has 0 slot = false.
+Proof.
+  intros slot. unfold bitmap_has.
+  now rewrite N.land_0_l.
+Qed.
+
+Lemma occupied_slots_from_empty :
+  forall fuel slot, occupied_slots_from fuel 0 slot = [].
+Proof.
+  induction fuel as [|fuel IH]; intros slot.
+  - reflexivity.
+  - simpl. apply IH.
+Qed.
+
+Lemma occupied_slots_empty : occupied_slots 0 = [].
+Proof. apply occupied_slots_from_empty. Qed.
+
+Lemma occupied_slots_from_length_le :
+  forall fuel bitmap slot,
+    length (occupied_slots_from fuel bitmap slot) <= fuel.
+Proof.
+  induction fuel as [|fuel IH]; intros bitmap slot.
+  - simpl. lia.
+  - simpl. destruct (bitmap_has bitmap slot) eqn:Hhas; simpl.
+    + specialize (IH bitmap (N.succ slot)). lia.
+    + eapply Nat.le_trans; [apply IH|lia].
+Qed.
+
+Lemma occupied_slots_length_le :
+  forall bitmap, length (occupied_slots bitmap) <= 32.
+Proof. intros. apply occupied_slots_from_length_le. Qed.
+
 Lemma chunk_bound :
   forall full_hash depth, (chunk full_hash depth < branch_width)%N.
 Proof.
