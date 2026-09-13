@@ -377,6 +377,29 @@ Lemma set_tree_leaf_collision_wf :
 
 End LeafUpdateInvariant.
 
+Section LeafRemovalInvariant.
+
+  Context {K Seed A : Type}.
+  Variable E : K -> K -> Prop.
+  Variable hash : Seed -> K -> N.
+  Variable seed : Seed.
+
+Lemma remove_tree_leaf_wf :
+    forall fuel depth prefix full_hash key stored_hash stored (value : A)
+           (eqb : K -> K -> bool),
+      wf E hash seed depth prefix (Leaf stored_hash stored value) ->
+      wf E hash seed depth prefix
+        (remove_tree eqb fuel depth full_hash key
+          (Leaf stored_hash stored value)).
+  Proof.
+    intros fuel depth prefix full_hash key stored_hash stored value eqb Hwf.
+    destruct fuel; cbn [remove_tree];
+      destruct (N.eqb full_hash stored_hash); destruct (eqb key stored);
+      eauto using wf_empty.
+  Qed.
+
+End LeafRemovalInvariant.
+
 Lemma bindings_set_tree_leaf_other_hash :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash stored_hash
          key stored (old value : A) (entry : K * A),

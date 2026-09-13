@@ -57,7 +57,7 @@ Dependencies: H1.G.
 - [ ] **H2.2** In progress: `HashTable.v` implements bounded `join_worker`; `HashTableProof.v` proves flattened binding union for both `join_two` and every fuelled worker path, including the fallback, and proves that six-level routing of distinct bounded hashes does not take the fallback. Validity remains open.
 - [ ] **H2.3** In progress: `HashTable.v` implements fuelled bitmap-routed `get_tree`; `HashTableProof.v` proves matching/mismatching leaf and collision base cases, normalized same-hash collision lookup and zero-fuel branch fallback. Independent binding equivalence and fallback unreachability remain open.
 - [ ] **H2.4** In progress: `HashTable.v` implements persistent `set_tree` and the public seeded `set`; `HashTableProof.v` proves same-hash leaf and collision invariant preservation under explicit key-equivalence, hash/prefix and miss-freshness conditions, distinct-hash leaf and branch insertion/replacement binding, zero-fuel branch fallback, and `set_seed` base cases. Global pointwise, distinct-hash join validity and branch validity laws remain open.
-- [ ] **H2.5** In progress: `HashTable.v` implements persistent `remove_tree` and retains unary branches; `HashTableProof.v` proves matching/mismatching leaf removal, same-hash collision removal/miss preservation and collision-invariant preservation, branch-removal binding subset, zero-fuel branch fallback and `remove_seed`. Pointwise and branch validity laws remain open.
+- [ ] **H2.5** In progress: `HashTable.v` implements persistent `remove_tree` and retains unary branches; `HashTableProof.v` proves total leaf and same-hash collision invariant preservation, matching/mismatching leaf removal, same-hash collision removal/miss preservation, branch-removal binding subset, zero-fuel branch fallback and `remove_seed`. Pointwise and branch validity laws remain open.
 - [ ] **H2.6** Prove branch-path height at most six and global key uniqueness.
 - [ ] **H2.G** Gate: core laws kernel-checked; assumption audit and existing Patricia proof build pass.
 
@@ -187,6 +187,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H3.3/H3.4 (partial) | Extended `HashMapTest.ml` with a public key module returning `min_int`, `max_int`, `-1`, the 30-bit maximum and a deliberate normalized collision. Bytecode and native wrapper tests confirm normalization preserves all bindings and collision peers. |
 | 2026-09-13 | H3.1 (partial) | Added `mem_spec` and `mem_empty` in `HashTable.v`, kernel-checking the public membership boolean against `get` and its empty-table behavior. General pointwise and extensional laws remain open. |
 | 2026-09-13 | H2.4 (partial) | Added `set_tree_leaf_replacement_wf` and `set_tree_leaf_collision_wf`. Updating a well-formed leaf now preserves `wf` for representative replacement and same-hash distinct-key collision creation; distinct-hash joins and recursive branches remain open. |
+| 2026-09-13 | H2.5 (partial) | Added `remove_tree_leaf_wf`: removal from any well-formed leaf yields either that leaf or `Empty`, and preserves `wf` for every hash/key/fuel case. Collision and branch cases remain separately scoped. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
