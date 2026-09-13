@@ -45,7 +45,7 @@ Dependencies: documentation baseline.
 Dependencies: H0.G.
 
 - [ ] **H1.1** In progress: `HashTableBits.v` defines chunks and proves the per-chunk bound; six-chunk reconstruction/separation remains open.
-- [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary lemmas and bounded same-index insertion/replacement lookup laws; bitmap-rank correspondence remains open.
+- [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary calculations, full occupied-slot enumeration, and bounded same-index insertion/replacement lookup laws; general bitmap-rank correspondence remains open.
 - [ ] **H1.3** In progress: `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with head replacement/removal lemmas; uniqueness and full pointwise laws remain open.
 - [ ] **H1.G** Gate: primitive proofs compile and theorem assumption audit passes.
 
@@ -129,6 +129,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H4.4 (partial) | Added `HashTablePrimitives.ml` / `.mli` and `HashTablePrimitivesTest.ml`; `make hashtable-native-primitives-test` passed through `ocamlopt`. It checks insert/replace/remove views, out-of-range behavior, fresh storage for all updates and unchanged retained storage. No extraction binding or full native-map realization is claimed. |
 | 2026-09-13 | H5.1 (partial) | Added `make hashtable`, cleanup rules and a CI hash-table step. A local `make clean && make hashtable` regenerated all reference output and passed the proof, 68-theorem audit, extraction-boundary, direct reference, wrapper bytecode/native and primitive tests. A monitored fresh `make` then exited 0 with Patricia randomized, union and optimized/reference differential tests passing. Hosted CI has not run in this tracker. |
 | 2026-09-13 | H5.2 (partial) | Added `HashTableBenchmark.ml`; `make hashtable-benchmark-smoke` passed through `ocamlopt` with 100 bindings. It checked all wrapper/`Map.Make`/`Hashtbl` lookup results against an association-list oracle before reporting times and allocation bytes. Measurements are local workload evidence only. |
+| 2026-09-13 | H1.2 (partial) | Added full-bitmap `popcount32`, slot-31 rank and occupied-slot enumeration lemmas in `HashTableBits.v`; `make hashtable-proof hashtable-assumptions` passed with 79 declarations closed. General bitmap/rank correspondence remains open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

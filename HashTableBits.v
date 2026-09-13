@@ -99,6 +99,16 @@ Proof. intros. unfold rank, popcount32. now rewrite N.ones_0, N.land_0_r, popcou
 Lemma full_bitmap_has_slot_31 : bitmap_has full_bitmap 31 = true.
 Proof. now vm_compute. Qed.
 
+Lemma full_bitmap_popcount : popcount32 full_bitmap = 32.
+Proof. now vm_compute. Qed.
+
+Lemma full_bitmap_rank_slot_31 : rank full_bitmap 31 = 31.
+Proof. now vm_compute. Qed.
+
+Lemma full_bitmap_occupied_slots :
+  occupied_slots full_bitmap = map N.of_nat (List.seq 0 32).
+Proof. now vm_compute. Qed.
+
 Definition dense_get {A : Type} (index : nat) (children : list A) : option A :=
   nth_error children index.
 
