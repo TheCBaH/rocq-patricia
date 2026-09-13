@@ -181,6 +181,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H1.2 (partial) | Added `Forall2_dense_replace`: valid dense-child replacement preserves a slot/child `Forall2` relation when the replacement meets the relation for its indexed slot. This supplies the paired-child component for future branch-update preservation. |
 | 2026-09-13 | H5.2 (partial) | Added `HashTableStringBenchmark.ml` with `hashtable-string-benchmark` and a 100-key smoke target. It checks build and lookup results for the reference wrapper, private-array backend, `Map.Make(String)` and imperative `Hashtbl`, and reports persistent retained-version heaps. |
 | 2026-09-13 | H1.2 (partial) | Added empty-bitmap and length-bound contracts for sparse occupied-slot enumeration: `occupied_slots 0 = []` and every enumerated bitmap has at most 32 slots. General bitmap/rank correspondence remains open. |
+| 2026-09-13 | H4.4 (partial) | Extended `HashTablePrimitivesTest.ml` with negative-index insertion/replacement/removal and empty-array removal. It checks list views and fresh storage for all no-op boundary updates in native code; this is runtime evidence for the private OCaml array realizer, not a heap proof. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

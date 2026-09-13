@@ -9,17 +9,32 @@ let () =
   check "insert view" (HashTablePrimitives.to_list inserted = [ 10; 15; 20; 30 ]);
   let appended = HashTablePrimitives.insert 999 40 items in
   check "out-of-range insert appends" (HashTablePrimitives.to_list appended = [ 10; 20; 30; 40 ]);
+  let prepended = HashTablePrimitives.insert (-1) 5 items in
+  check "negative insert prepends" (HashTablePrimitives.to_list prepended = [ 5; 10; 20; 30 ]);
   let replaced = HashTablePrimitives.replace 1 25 items in
   check "replace view" (HashTablePrimitives.to_list replaced = [ 10; 25; 30 ]);
   let unchanged = HashTablePrimitives.replace 99 0 items in
   check "out-of-range replace view" (HashTablePrimitives.to_list unchanged = [ 10; 20; 30 ]);
+  let negative_replace = HashTablePrimitives.replace (-1) 0 items in
+  check "negative replace view"
+    (HashTablePrimitives.to_list negative_replace = [ 10; 20; 30 ]);
   let removed = HashTablePrimitives.remove 1 items in
   check "remove view" (HashTablePrimitives.to_list removed = [ 10; 30 ]);
   let missing_remove = HashTablePrimitives.remove 99 items in
   check "out-of-range remove view" (HashTablePrimitives.to_list missing_remove = [ 10; 20; 30 ]);
+  let negative_remove = HashTablePrimitives.remove (-1) items in
+  check "negative remove view"
+    (HashTablePrimitives.to_list negative_remove = [ 10; 20; 30 ]);
+  let empty = HashTablePrimitives.empty () in
+  let empty_remove = HashTablePrimitives.remove 0 empty in
+  check "empty remove view" (HashTablePrimitives.to_list empty_remove = []);
   check "insert storage fresh" (not (items == inserted));
+  check "negative insert storage fresh" (not (items == prepended));
   check "replace storage fresh" (not (items == replaced));
   check "remove storage fresh" (not (items == removed));
-  check "no-op update storage fresh" (not (items == unchanged) && not (items == missing_remove));
+  check "no-op update storage fresh"
+    (not (items == unchanged) && not (items == negative_replace) &&
+     not (items == missing_remove) && not (items == negative_remove));
+  check "empty no-op storage fresh" (not (empty == empty_remove));
   check "old storage unchanged" (HashTablePrimitives.to_list items = [ 10; 20; 30 ]);
   print_endline "HashTable primitive test passed"
