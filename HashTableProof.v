@@ -165,6 +165,21 @@ Proof.
     rewrite Heqremaining in Hin. exact Hin.
 Qed.
 
+Lemma bindings_branch_replace_in :
+  forall (K A : Type) bitmap slot (child : tree K A) children (entry : K * A),
+    rank bitmap slot < length children ->
+    In entry (bindings (branch_replace bitmap slot child children)) ->
+    In entry (bindings child) \/ In entry (bindings (Branch bitmap children)).
+Proof.
+  intros K A bitmap slot child children entry Hbound Hin.
+  unfold branch_replace in Hin. simpl in Hin.
+  apply in_flat_map in Hin. destruct Hin as [node [Hnode Hin]].
+  apply (@dense_replace_in (tree K A) (rank bitmap slot) child children node Hbound) in Hnode.
+  destruct Hnode as [Hnode|Hnode].
+  - subst node. now left.
+  - right. apply in_flat_map. now exists node.
+Qed.
+
 Lemma wf_empty_root :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed),

@@ -45,7 +45,7 @@ Dependencies: documentation baseline.
 Dependencies: H0.G.
 
 - [ ] **H1.1** In progress: `HashTableBits.v` defines chunks, proves the per-chunk bound and proves a normalized 30-bit hash has zero chunk at depth six; six-chunk reconstruction/separation remains open.
-- [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary calculations, full occupied-slot enumeration, bounded lookup laws before/at/after insertion plus replacement/removal lookup preservation, and insertion/deletion membership laws; general bitmap-rank correspondence remains open.
+- [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary calculations, full occupied-slot enumeration, bounded lookup laws before/at/after insertion plus replacement/removal lookup preservation, and insertion/replacement/deletion membership laws; general bitmap-rank correspondence remains open.
 - [ ] **H1.3** In progress: `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with head replacement/removal and exact miss-insertion/cardinality lemmas; uniqueness and full pointwise laws remain open.
 - [ ] **H1.G** Gate: primitive proofs compile and theorem assumption audit passes.
 
@@ -56,7 +56,7 @@ Dependencies: H1.G.
 - [ ] **H2.1** In progress: `HashTable.v` defines raw nodes, seeded tables and an independent flattened `bindings` view; `HashTableProof.v` now defines the hash/prefix, collision-uniqueness and bitmap/dense-child well-formedness invariant. Its preservation proofs remain open.
 - [ ] **H2.2** In progress: `HashTable.v` implements bounded `join_worker`; `HashTableProof.v` proves flattened binding union for both `join_two` and every fuelled worker path, including the fallback. Validity and unreachable-fallback routing proofs remain open.
 - [ ] **H2.3** In progress: `HashTable.v` implements fuelled bitmap-routed `get_tree`; `HashTableProof.v` proves matching/mismatching leaf and collision base cases plus normalized same-hash collision lookup. Independent binding equivalence remains open.
-- [ ] **H2.4** In progress: `HashTable.v` implements persistent `set_tree` and the public seeded `set`; `HashTableProof.v` proves leaf replacement/representative, same-hash collision insertion/lookup, distinct-hash leaf and branch-insert binding, and `set_seed` base cases. Global pointwise and validity laws remain open.
+- [ ] **H2.4** In progress: `HashTable.v` implements persistent `set_tree` and the public seeded `set`; `HashTableProof.v` proves leaf replacement/representative, same-hash collision insertion/lookup, distinct-hash leaf and branch insertion/replacement binding, and `set_seed` base cases. Global pointwise and validity laws remain open.
 - [ ] **H2.5** In progress: `HashTable.v` implements persistent `remove_tree` and retains unary branches; `HashTableProof.v` proves matching/mismatching leaf removal, same-hash collision removal/miss preservation, branch-removal binding subset and `remove_seed`. Pointwise and validity laws remain open.
 - [ ] **H2.6** Prove branch-path height at most six and global key uniqueness.
 - [ ] **H2.G** Gate: core laws kernel-checked; assumption audit and existing Patricia proof build pass.
@@ -145,6 +145,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H2.5 (partial) | Added dense-child-to-branch removal binding-subset preservation in `HashTableProof.v`: branch removal introduces no flattened bindings. `make hashtable-proof hashtable-assumptions` passed with 107 declarations closed. Recursive routing, global pointwise and validity laws remain open. |
 | 2026-09-13 | H2.3/H2.5 (partial) | Added same-hash leaf key-miss lookup and removal-preservation laws in `HashTableProof.v`. `make hashtable-proof hashtable-assumptions` passed with 109 declarations closed. Recursive routing, global pointwise and validity laws remain open. |
 | 2026-09-13 | H3.2/H3.3/H3.5 (partial) | Added the stable `HashTableReference` package over regenerated source extraction and routed `HashMap.Make` through it. Bytecode/native wrapper tests passed; the extraction-boundary audit now rejects direct generated-module use. The bounded test-hash API, callback inventory and record example remain open. |
+| 2026-09-13 | H1.2/H2.4 (partial) | Added valid-index dense-replacement membership and its branch-binding lift: resulting branch bindings come from the replacement child or the prior branch. `make hashtable-proof hashtable-assumptions` passed with 111 declarations closed. General bitmap/rank correspondence, recursive routing and global validity remain open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

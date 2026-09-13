@@ -265,6 +265,27 @@ Proof.
       * simpl. apply IH. intro Heq. apply Hother. now f_equal.
 Qed.
 
+Lemma dense_replace_in :
+  forall A index (child : A) children item,
+    index < length children ->
+    In item (dense_replace index child children) ->
+    item = child \/ In item children.
+Proof.
+  intros A index. induction index as [|index IH];
+    intros child children item Hbound Hin.
+  - destruct children as [|head tail]; simpl in Hbound; try lia.
+    simpl in Hin. destruct Hin as [Hin|Hin].
+    + now left; symmetry.
+    + now right; right.
+  - destruct children as [|head tail]; simpl in Hbound; try lia.
+    simpl in Hin. destruct Hin as [Hin|Hin].
+    + now right; left.
+    + specialize (IH child tail item ltac:(lia) Hin).
+      destruct IH as [IH|IH].
+      * now left.
+      * now right; right.
+Qed.
+
 Lemma dense_get_remove_before :
   forall A index before (children : list A),
     before < index ->
