@@ -44,7 +44,7 @@ Dependencies: documentation baseline.
 
 Dependencies: H0.G.
 
-- [ ] **H1.1** In progress: `HashTableBits.v` defines chunks and proves the per-chunk bound; six-chunk reconstruction/separation remains open.
+- [ ] **H1.1** In progress: `HashTableBits.v` defines chunks, proves the per-chunk bound and proves a normalized 30-bit hash has zero chunk at depth six; six-chunk reconstruction/separation remains open.
 - [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary calculations, full occupied-slot enumeration, and bounded lookup laws before/at/after insertion plus replacement/removal lookup preservation; general bitmap-rank correspondence remains open.
 - [ ] **H1.3** In progress: `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with head replacement/removal and exact miss-insertion/cardinality lemmas; uniqueness and full pointwise laws remain open.
 - [ ] **H1.G** Gate: primitive proofs compile and theorem assumption audit passes.
@@ -136,6 +136,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H2.5 (partial) | Added same-hash collision removal and miss-preservation binding laws in `HashTableProof.v`, using the explicit bucket miss condition. `make hashtable-proof hashtable-assumptions` passed with 92 declarations closed. Recursive routing and global pointwise/validity laws remain open. |
 | 2026-09-13 | H3.1 (partial) | Added public singleton removal and resulting emptiness laws in `HashTable.v`. `make hashtable-proof hashtable-assumptions` passed with 94 declarations closed. Pointwise first-wins, enumeration and extensional laws remain open. |
 | 2026-09-13 | H4.5 (partial) | Added `check-hashtable-primitives.sh` and `make hashtable-native-primitives-audit`; it checks the current private array-sequence realizer for fresh update allocation and rejects map overrides or unsafe escapes. Generated native map workers and extraction bindings do not yet exist and remain unaudited. |
+| 2026-09-13 | H1.1 (partial) | Added `chunk_after_hash_bits_zero` in `HashTableBits.v`: every hash below `2^30` shifts to zero at depth six. `make hashtable-proof hashtable-assumptions` passed with 95 declarations closed. Six-chunk reconstruction and separation remain open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

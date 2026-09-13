@@ -59,6 +59,24 @@ Qed.
 Lemma chunk_zero : forall full_hash, chunk full_hash 0 = N.land full_hash branch_mask.
 Proof. intros. reflexivity. Qed.
 
+Lemma chunk_after_hash_bits_zero :
+  forall full_hash,
+    (full_hash < hash_space)%N ->
+    chunk full_hash 6 = 0%N.
+Proof.
+  intros full_hash Hbound.
+  unfold chunk, branch_mask.
+  replace (N.of_nat (5 * 6)) with 30%N by reflexivity.
+  destruct (N.eq_dec full_hash 0%N) as [Hzero|Hnonzero].
+  - subst full_hash. now rewrite N.shiftr_0_l, N.land_0_l.
+  - assert (Hpositive : (0 < full_hash)%N) by lia.
+    assert (Hpow : (full_hash < 2 ^ 30)%N).
+    { change (full_hash < 1073741824)%N. exact Hbound. }
+    apply (proj1 (N.log2_lt_pow2 full_hash 30 Hpositive)) in Hpow.
+    rewrite N.shiftr_eq_0 by exact Hpow.
+    now rewrite N.land_0_l.
+Qed.
+
 Lemma bitmap_bit_zero : bitmap_bit 0 = 1%N.
 Proof. reflexivity. Qed.
 
