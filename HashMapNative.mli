@@ -4,7 +4,11 @@
     It is not selected by [HashMap.Make] until the source/refinement and
     differential gates recorded in the tracker are complete. *)
 
-module type KEY = HashMap.KEY
+module type KEY = sig
+  type t
+  val equal : t -> t -> bool
+  val hash : seed:int -> t -> int
+end
 
 module Make (Key : KEY) : sig
   type key = Key.t
