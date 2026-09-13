@@ -171,10 +171,41 @@ Lemma dense_get_insert_same :
     dense_get index (dense_insert index child children) = Some child.
 Proof.
   intros A index. induction index as [|index IH]; intros child children Hbound.
-  - destruct children; reflexivity.
+  - destruct children as [|head tail]; reflexivity.
   - destruct children as [|head tail]; simpl in Hbound.
     + lia.
     + simpl. unfold dense_get in IH. apply IH. lia.
+Qed.
+
+Lemma dense_get_insert_before :
+  forall A index before (child : A) children,
+    before < index ->
+    index <= length children ->
+    dense_get before (dense_insert index child children) = dense_get before children.
+Proof.
+  intros A index. induction index as [|index IH];
+    intros before child children Hbefore Hbound.
+  - lia.
+  - destruct before as [|before].
+    + destruct children as [|head tail]; simpl in Hbound; try lia. reflexivity.
+    + destruct children as [|head tail]; simpl in Hbound; try lia.
+      simpl. apply IH; lia.
+Qed.
+
+Lemma dense_get_insert_after :
+  forall A index after (child : A) children,
+    index <= after ->
+    index <= length children ->
+    dense_get (S after) (dense_insert index child children) = dense_get after children.
+Proof.
+  intros A index. induction index as [|index IH];
+    intros after child children Hafter Hbound.
+  - destruct children as [|head tail].
+    + destruct after; reflexivity.
+    + reflexivity.
+  - destruct after as [|after]; simpl in Hafter; try lia.
+    destruct children as [|head tail]; simpl in Hbound; try lia.
+    simpl. apply IH; lia.
 Qed.
 
 Lemma dense_get_replace_same :
@@ -187,4 +218,47 @@ Proof.
   - destruct children as [|head tail]; simpl in Hbound.
     + lia.
     + simpl. unfold dense_get in IH. apply IH. lia.
+Qed.
+
+Lemma dense_get_replace_other :
+  forall A index other (child : A) children,
+    other <> index ->
+    dense_get other (dense_replace index child children) = dense_get other children.
+Proof.
+  intros A index. induction index as [|index IH];
+    intros other child children Hother.
+  - destruct other as [|other]; [contradiction|].
+    destruct children; reflexivity.
+  - destruct other as [|other].
+    + destruct children; reflexivity.
+    + destruct children as [|head tail].
+      * reflexivity.
+      * simpl. apply IH. intro Heq. apply Hother. now f_equal.
+Qed.
+
+Lemma dense_get_remove_before :
+  forall A index before (children : list A),
+    before < index ->
+    dense_get before (dense_remove index children) = dense_get before children.
+Proof.
+  intros A index. induction index as [|index IH]; intros before children Hbefore.
+  - lia.
+  - destruct before as [|before].
+    + destruct children; reflexivity.
+    + destruct children as [|head tail]; simpl; auto.
+      apply IH. lia.
+Qed.
+
+Lemma dense_get_remove_after :
+  forall A index after (children : list A),
+    index <= after ->
+    dense_get after (dense_remove index children) = dense_get (S after) children.
+Proof.
+  intros A index. induction index as [|index IH]; intros after children Hafter.
+  - destruct children as [|head tail].
+    + destruct after; reflexivity.
+    + reflexivity.
+  - destruct after as [|after]; simpl in Hafter; try lia.
+    destruct children as [|head tail]; simpl; auto.
+    apply IH. lia.
 Qed.
