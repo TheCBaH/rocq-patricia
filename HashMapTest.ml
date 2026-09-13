@@ -23,6 +23,19 @@ end
 
 module Byte_map = HashMap.Make (Byte_key)
 
+module Extreme_hash_key = struct
+  type t = int
+  let equal (left : int) right = left = right
+  let hash ~seed:_ = function
+    | 0 -> min_int
+    | 1 -> max_int
+    | 2 -> -1
+    | 3 -> 0x3fffffff
+    | _ -> 0
+end
+
+module Extreme_hash_map = HashMap.Make (Extreme_hash_key)
+
 module Record_key = struct
   type t = { id : int; label : string }
   let equal left right = left.id = right.id
@@ -90,6 +103,18 @@ let () =
   check "zero key" (Int_map.get 0 numbers = Some "zero");
   check "native bounds" (Int_map.get max_int numbers = Some "max" &&
                          Int_map.get min_int numbers = Some "min");
+  let extremes = Extreme_hash_map.empty ~seed:0 in
+  let extremes = Extreme_hash_map.set 0 "min-int" extremes in
+  let extremes = Extreme_hash_map.set 1 "max-int" extremes in
+  let extremes = Extreme_hash_map.set 2 "minus-one" extremes in
+  let extremes = Extreme_hash_map.set 3 "30-bit-max" extremes in
+  Stdlib.List.iter
+    (fun (key, value) -> check "normalized raw hash" (Extreme_hash_map.get key extremes = Some value))
+    [ (0, "min-int"); (1, "max-int"); (2, "minus-one"); (3, "30-bit-max") ];
+  let collision = Extreme_hash_map.set 4 "zero" extremes in
+  check "normalized raw collision retains peer"
+    (Extreme_hash_map.get 4 collision = Some "zero" &&
+     Extreme_hash_map.get 0 collision = Some "min-int");
   let retained = numbers in
   let numbers = Int_map.remove 0 numbers in
   check "removed" (Int_map.get 0 numbers = None);
