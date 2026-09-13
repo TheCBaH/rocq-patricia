@@ -95,8 +95,8 @@ hashtable-wrapper-test-native: hashtable-reference HashMap.mli HashMap.ml HashMa
 	  $(OCAMLOPT) -I . -I .. -o ../hashtable-wrapper-native-test $$objects ../HashMap.cmx ../HashMapTest.ml
 	./hashtable-wrapper-native-test
 
-hashtable-assumptions: hashtable-proof check-assumptions.sh
-	sh ./check-assumptions.sh $(ROCQ) $(ROCQFLAGS)
+hashtable-assumptions: hashtable-proof check-hashtable-assumptions.sh
+	sh ./check-hashtable-assumptions.sh $(ROCQ) $(ROCQFLAGS)
 
 assumptions: proof check-assumptions.sh
 	sh ./check-assumptions.sh $(ROCQ) $(ROCQFLAGS)

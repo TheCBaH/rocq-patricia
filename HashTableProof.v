@@ -31,6 +31,24 @@ Section WellFormed.
         chunk full_hash depth = slot /\ prefix_matches full_hash (S depth) rest
     end.
 
+  Lemma prefix_matches_append_slot :
+    forall full_hash depth prefix slot,
+      prefix_matches full_hash depth prefix ->
+      chunk full_hash (depth + length prefix) = slot ->
+      prefix_matches full_hash depth (prefix ++ [slot]).
+  Proof.
+    intros full_hash depth prefix. revert depth.
+    induction prefix as [|head tail IH]; intros depth slot Hprefix Hslot.
+    - simpl in Hprefix. simpl in Hslot.
+      replace (depth + 0) with depth in Hslot by lia.
+      simpl. split; [exact Hslot|exact I].
+    - simpl in Hprefix. destruct Hprefix as [Hhead Htail]. simpl.
+      split; auto.
+      apply IH with (slot := slot); auto.
+      replace (S depth + length tail) with (depth + S (length tail)) by lia.
+      exact Hslot.
+  Qed.
+
   Definition entry_matches (full_hash : N) (depth : nat) (prefix : list N)
       (entry : K * A) : Prop :=
     full_hash = hash seed (fst entry) /\
