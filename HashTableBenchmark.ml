@@ -35,6 +35,30 @@ let oracle_get key bindings =
   | None -> None
   | Some (_, value) -> Some value
 
+let retained_versions name empty set get bindings =
+  Gc.compact ();
+  let before = (Gc.stat ()).live_words in
+  (* Keep every prefix root: this is the version-retention policy reported by
+     the benchmark, rather than an implementation-dependent snapshot count. *)
+  let roots =
+    Stdlib.List.fold_left
+      (fun roots (key, value) -> set key value (Stdlib.List.hd roots) :: roots)
+      [ empty ] bindings
+  in
+  Gc.compact ();
+  let roots = Sys.opaque_identity roots in
+  let after = (Gc.stat ()).live_words in
+  let newest = Stdlib.List.hd roots in
+  let oldest = Stdlib.List.hd (Stdlib.List.rev roots) in
+  if Stdlib.List.length roots <> Stdlib.List.length bindings + 1 then
+    fail (name ^ " retained-root count mismatch");
+  if get 0 newest <> Some "0" || get 0 oldest <> None then
+    fail (name ^ " retained-root lookup mismatch");
+  let bytes = (after - before) * (Sys.word_size / 8) in
+  Printf.printf "%s retained heap: %d bytes (%d prefix roots)\n%!"
+    name bytes (Stdlib.List.length roots);
+  Sys.opaque_identity roots
+
 let () =
   if size < 1 then fail "HASHTABLE_BENCH_SIZE must be positive";
   let bindings = Stdlib.List.init size (fun key -> (key, string_of_int key)) in
@@ -52,6 +76,12 @@ let () =
       Stdlib.List.iter (fun (key, value) -> Hashtbl.replace table key value) bindings;
       table)
   in
+  ignore (retained_versions "HashMap.Make" (Hash_map.empty ~seed:31)
+            Hash_map.set Hash_map.get bindings);
+  ignore (retained_versions "HashMapNative.Make" (Native_hash_map.empty ~seed:31)
+            Native_hash_map.set Native_hash_map.get bindings);
+  ignore (retained_versions "Map.Make" Ordered_map.empty Ordered_map.add
+            Ordered_map.find_opt bindings);
   let check name get =
     Stdlib.List.iter (fun (key, _) ->
       if get key <> oracle_get key oracle then fail (name ^ " lookup mismatch")) bindings;
