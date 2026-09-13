@@ -200,6 +200,36 @@ Proof.
   now apply nodupA_snoc.
 Qed.
 
+Lemma nodupA_replace_head :
+  forall K A (R : K * A -> K * A -> Prop) stored old_value new_value tail,
+    NoDupA R ((stored, old_value) :: tail) ->
+    (forall entry, R (stored, new_value) entry <-> R (stored, old_value) entry) ->
+    NoDupA R ((stored, new_value) :: tail).
+Proof.
+  intros K A R stored old_value new_value tail Hnodup Hstable.
+  inversion Hnodup as [|head entries Hnotin Htail]; subst.
+  constructor.
+  - intro Hin. apply Hnotin.
+    apply (proj2 (InA_alt R (stored, old_value) tail)).
+    apply (proj1 (InA_alt R (stored, new_value) tail)) in Hin.
+    destruct Hin as [entry [Hrelated Hin]].
+    exists entry. split; [now apply (proj1 (Hstable entry))|exact Hin].
+  - exact Htail.
+Qed.
+
+Lemma bucket_set_head_nodup :
+  forall K A (R : K * A -> K * A -> Prop) (eqb : K -> K -> bool)
+         key stored (old_value new_value : A) tail,
+    eqb key stored = true ->
+    NoDupA R ((stored, old_value) :: tail) ->
+    (forall entry, R (stored, new_value) entry <-> R (stored, old_value) entry) ->
+    NoDupA R (bucket_set eqb key new_value ((stored, old_value) :: tail)).
+Proof.
+  intros K A R eqb key stored old_value new_value tail Hmatch Hnodup Hstable.
+  rewrite (bucket_set_retains_head_representative eqb key stored old_value new_value tail Hmatch).
+  eapply nodupA_replace_head; eauto.
+Qed.
+
 Lemma bucket_set_length_hit :
   forall K A (eqb : K -> K -> bool) key (value : A) (entries : list (K * A)),
     bucket_get eqb key entries <> None ->
