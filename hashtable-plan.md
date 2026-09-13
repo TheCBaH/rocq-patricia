@@ -1,10 +1,12 @@
 # Persistent generic hash table: implementation plan
 
-Date: 2026-09-13. Status: ready for implementation; all code/proof gates open.
+Date: 2026-09-13. Status: implementation in progress; the tracker records the
+current evidence and open gates.
 
 The [design](hashtable-design.md) is the contract, [hashtable.md](hashtable.md)
 is the original investigation, and [hashtable-todo.md](hashtable-todo.md) owns
-progress. Proposed paths and Make targets below do not exist yet. This work is
+progress. Some paths and Make targets below now exist; the tracker distinguishes
+implemented evidence from remaining proposals. This work is
 independent of the Patricia completion and native-verification trackers.
 
 The [layout comparison](hashtable-design.md#hamt-versus-champ-runtime-and-proof-cost)
