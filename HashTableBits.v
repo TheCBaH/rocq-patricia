@@ -130,6 +130,50 @@ Proof.
   nia.
 Qed.
 
+Lemma chunk_six_ext :
+  forall left_hash right_hash,
+    (left_hash < hash_space)%N ->
+    (right_hash < hash_space)%N ->
+    chunk left_hash 0 = chunk right_hash 0 ->
+    chunk left_hash 1 = chunk right_hash 1 ->
+    chunk left_hash 2 = chunk right_hash 2 ->
+    chunk left_hash 3 = chunk right_hash 3 ->
+    chunk left_hash 4 = chunk right_hash 4 ->
+    chunk left_hash 5 = chunk right_hash 5 ->
+    left_hash = right_hash.
+Proof.
+  intros left_hash right_hash Hleft Hright H0 H1 H2 H3 H4 H5.
+  rewrite (chunk_six_reconstruct Hleft).
+  rewrite (chunk_six_reconstruct Hright).
+  now rewrite H0, H1, H2, H3, H4, H5.
+Qed.
+
+(** Distinct normalized hashes diverge in the finite routing domain. *)
+Lemma chunk_six_separates :
+  forall left_hash right_hash,
+    (left_hash < hash_space)%N ->
+    (right_hash < hash_space)%N ->
+    left_hash <> right_hash ->
+    exists depth, depth < branch_levels /\
+      chunk left_hash depth <> chunk right_hash depth.
+Proof.
+  intros left_hash right_hash Hleft Hright Hdifferent.
+  destruct (N.eq_dec (chunk left_hash 0) (chunk right_hash 0)) as [H0|H0].
+  2: { exists 0. split; [cbv [branch_levels]; lia|exact H0]. }
+  destruct (N.eq_dec (chunk left_hash 1) (chunk right_hash 1)) as [H1|H1].
+  2: { exists 1. split; [cbv [branch_levels]; lia|exact H1]. }
+  destruct (N.eq_dec (chunk left_hash 2) (chunk right_hash 2)) as [H2|H2].
+  2: { exists 2. split; [cbv [branch_levels]; lia|exact H2]. }
+  destruct (N.eq_dec (chunk left_hash 3) (chunk right_hash 3)) as [H3|H3].
+  2: { exists 3. split; [cbv [branch_levels]; lia|exact H3]. }
+  destruct (N.eq_dec (chunk left_hash 4) (chunk right_hash 4)) as [H4|H4].
+  2: { exists 4. split; [cbv [branch_levels]; lia|exact H4]. }
+  destruct (N.eq_dec (chunk left_hash 5) (chunk right_hash 5)) as [H5|H5].
+  2: { exists 5. split; [cbv [branch_levels]; lia|exact H5]. }
+  exfalso. apply Hdifferent.
+  eapply chunk_six_ext; eauto.
+Qed.
+
 Lemma bitmap_bit_zero : bitmap_bit 0 = 1%N.
 Proof. reflexivity. Qed.
 
