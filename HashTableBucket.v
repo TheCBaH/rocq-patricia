@@ -148,6 +148,23 @@ Proof.
   destruct (eqb key stored); simpl; auto with arith.
 Qed.
 
+Lemma bucket_remove_length_hit :
+  forall K A (eqb : K -> K -> bool) key (entries : list (K * A)),
+    bucket_get eqb key entries <> None ->
+    length (bucket_remove eqb key entries) = Nat.pred (length entries).
+Proof.
+  intros K A eqb key entries.
+  induction entries as [|[stored value] tail IH]; intro Hhit; simpl in Hhit.
+  - contradiction.
+  - destruct (eqb key stored) eqn:Hstored.
+    + simpl. now rewrite Hstored.
+    + simpl. rewrite Hstored.
+      specialize (IH Hhit).
+      destruct tail as [|[next_key next_value] rest].
+      * simpl in Hhit. contradiction.
+      * simpl in IH. simpl. rewrite IH. reflexivity.
+Qed.
+
 Lemma normalize_bucket_empty :
   forall K A, @normalize_bucket K A [] = BucketEmpty.
 Proof. reflexivity. Qed.
