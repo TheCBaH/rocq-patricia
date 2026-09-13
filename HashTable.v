@@ -113,6 +113,24 @@ Definition mem {K Seed A : Type} (eqb : K -> K -> bool)
     (hash : Seed -> K -> N) (query : K) (m : table K Seed A) : bool :=
   match get eqb hash query m with Some _ => true | None => false end.
 
+Lemma mem_spec :
+  forall K Seed A (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         (query : K) (m : table K Seed A),
+    mem eqb hash query m = true <->
+    exists value, get eqb hash query m = Some value.
+Proof.
+  intros K Seed A eqb hash query m.
+  unfold mem. destruct (get eqb hash query m) as [value|] eqn:Hget; simpl.
+  - split; intro H; [now exists value|reflexivity].
+  - split; intro H; [discriminate|destruct H as [value Hvalue]; discriminate].
+Qed.
+
+Lemma mem_empty :
+  forall K Seed A (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         (seed : Seed) (query : K),
+    mem eqb hash query (@empty K Seed A seed) = false.
+Proof. reflexivity. Qed.
+
 Definition branch_insert {K A : Type} (bitmap : N) (slot : N)
     (child : tree K A) (children : list (tree K A)) : tree K A :=
   Branch (N.lor bitmap (bitmap_bit slot)) (dense_insert (rank bitmap slot) child children).

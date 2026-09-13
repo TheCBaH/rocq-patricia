@@ -65,7 +65,7 @@ Dependencies: H1.G.
 
 Dependencies: H2.G.
 
-- [ ] **H3.1** In progress: `HashTable.v` now proves empty/singleton emptiness, singleton membership/removal and enumeration, singleton bulk loading, and duplicate-singleton first-wins lookup/enumeration; general pointwise first-wins and extensional laws remain open.
+- [ ] **H3.1** In progress: `HashTable.v` now proves empty/singleton emptiness, empty membership semantics, singleton membership/removal and enumeration, singleton bulk loading, duplicate-singleton first-wins lookup/enumeration, and the general `mem`/`get` option correspondence; general pointwise first-wins and extensional laws remain open.
 - [ ] **H3.2** In progress: `HashTableReferenceExtract.v` regenerates a separately isolated list-source extraction, while `HashTableReference.ml` / `.mli` provide its stable package name. The bounded test-hash API remains open.
 - [ ] **H3.3** In progress: `HashMap.mli` / `.ml` expose `HashMap.Make(Key)` over `HashTableReference` and normalize raw hashes with `land 0x3fffffff`; public tests cover negative, maximal and deliberately colliding raw callback results. Callback/foreign-contract inventory remains open.
 - [ ] **H3.4** In progress: direct and public-wrapper tests exercise controlled collisions, routing depths, first-wins values, retained roots, explicit raw-hash normalization boundaries, a 500-step association-list-oracle history, a 1,000-step integer `Stdlib.Map` differential history, and a 500-step collision-heavy case-insensitive string/function-payload differential history in bytecode/native code. The broader custom-equivalence and boundary matrix remains open.
@@ -185,6 +185,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H5.5 (partial) | Ran `make clean && make hashtable && make hashtable-benchmark-smoke` locally. The clean aggregate and both 100-key integer/string checked benchmark workloads passed; CI invokes the same smoke target. Hosted execution remains unverified. |
 | 2026-09-13 | H1.3/H2.4 | Added `bucket_get_none_miss` and `bucket_set_key_nodup`, then lifted the hit/miss split into `set_tree_collision_wf`. Collision-bucket update uniqueness and collision update invariant preservation are now each expressed as single all-cases theorems with explicit miss-only freshness premises. |
 | 2026-09-13 | H3.3/H3.4 (partial) | Extended `HashMapTest.ml` with a public key module returning `min_int`, `max_int`, `-1`, the 30-bit maximum and a deliberate normalized collision. Bytecode and native wrapper tests confirm normalization preserves all bindings and collision peers. |
+| 2026-09-13 | H3.1 (partial) | Added `mem_spec` and `mem_empty` in `HashTable.v`, kernel-checking the public membership boolean against `get` and its empty-table behavior. General pointwise and extensional laws remain open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
