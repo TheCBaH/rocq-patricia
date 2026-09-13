@@ -90,7 +90,7 @@ Dependencies: H3.G.
 Dependencies: H4.G; benchmark harness may begin after H3.G.
 
 - [ ] **H5.1** In progress: `make hashtable` aggregates the implemented proof/audit/reference/wrapper/primitive gates, clean removes its generated outputs, and CI invokes it under the existing pinned toolchain. Hosted result and completion of the remaining gates are open.
-- [ ] **H5.2** In progress: `HashTableBenchmark.ml` supplies checked integer-key source-reference and fresh-array backend benchmarks against an association-list oracle, `Map.Make` and OCaml's imperative `Hashtbl`; string/`StringPatriciaMap` workloads and broader generic instances remain open.
+- [ ] **H5.2** In progress: `HashTableBenchmark.ml` supplies checked integer-key source-reference and fresh-array backend benchmarks against an association-list oracle, `Map.Make` and OCaml's imperative `Hashtbl`; `HashTableStringBenchmark.ml` supplies the same checked comparison for fixed-width strings. `StringPatriciaMap` workloads and broader generic instances remain open.
 - [ ] **H5.3** In progress: `HashTableBenchmark.ml` reports workload, seed, every-prefix retention policy, timing, allocation and post-GC retained heap for persistent implementations; `HASHTABLE_BENCH_SEED` and `HASHTABLE_BENCH_PATTERN` select the seed and ascending or root-slot-collision integer distribution. A local OCaml 4.14.3/arm64 ascending run is recorded below; broader series remain open.
 - [ ] **H5.4** In progress: README and design status now describe the source-reference milestone without claiming proof/native completion, and document the aggregate and checked benchmark controls. Final supported API, theorem inventory and extraction boundary remain open.
 - [ ] **H5.5** In progress: local clean aggregate and hash-table benchmark smoke pass; CI is configured to run the smoke separately. Hosted results remain open.
@@ -179,6 +179,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H1.3/H2.4 (partial) | Added `bucket_set_forall_hit` and `set_tree_collision_same_hash_wf`. A successful same-hash collision update preserves the hash/prefix and collision-key uniqueness invariant because the stored key representative is retained; miss insertion and recursive branch preservation remain open. |
 | 2026-09-13 | H2.4 (partial) | Added `set_tree_collision_miss_wf`: inserting into a same-hash collision preserves `wf` given a matching hash/prefix entry, symmetric key equivalence, reflected bucket miss and relation freshness. Recursive branch preservation and derivation of these premises from public callbacks remain open. |
 | 2026-09-13 | H1.2 (partial) | Added `Forall2_dense_replace`: valid dense-child replacement preserves a slot/child `Forall2` relation when the replacement meets the relation for its indexed slot. This supplies the paired-child component for future branch-update preservation. |
+| 2026-09-13 | H5.2 (partial) | Added `HashTableStringBenchmark.ml` with `hashtable-string-benchmark` and a 100-key smoke target. It checks build and lookup results for the reference wrapper, private-array backend, `Map.Make(String)` and imperative `Hashtbl`, and reports persistent retained-version heaps. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

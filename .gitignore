@@ -29,6 +29,7 @@
 /hashtable-native-array-native-test
 /hashtable-native-primitives-test
 /hashtable-benchmark
+/hashtable-string-benchmark
 /extracted/
 /reference_extracted/
 /hashtable_reference_extracted/

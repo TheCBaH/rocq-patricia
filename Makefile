@@ -27,7 +27,7 @@ HASHTABLE_VOFILES := $(HASHTABLE_VFILES:.v=.vo)
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
-.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-test hashtable-differential hashtable-test-native hashtable-native hashtable-native-model-extraction-audit hashtable-native-model-test hashtable-native-model-test-native hashtable-native-array-test hashtable-native-array-test-native hashtable-native-primitives-test hashtable-native-primitives-audit hashtable-native-array-audit hashtable-benchmark hashtable-benchmark-smoke hashtable-extraction-audit hashtable-assumptions
+.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-test hashtable-differential hashtable-test-native hashtable-native hashtable-native-model-extraction-audit hashtable-native-model-test hashtable-native-model-test-native hashtable-native-array-test hashtable-native-array-test-native hashtable-native-primitives-test hashtable-native-primitives-audit hashtable-native-array-audit hashtable-benchmark hashtable-benchmark-smoke hashtable-string-benchmark hashtable-string-benchmark-smoke hashtable-extraction-audit hashtable-assumptions
 
 .PHONY: string-primitive-profile
 .PHONY: string-worker-performance
@@ -173,11 +173,23 @@ hashtable-benchmark: hashtable-reference HashTableReference.mli HashTableReferen
 	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-benchmark $$objects ../HashTableReference.cmx ../HashMap.cmx ../HashTablePrimitives.cmx ../HashMapNative.cmx ../HashTableBenchmark.cmx
 	./hashtable-benchmark
 
-hashtable-benchmark-smoke: hashtable-benchmark
+hashtable-string-benchmark: hashtable-reference HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableStringBenchmark.ml
+	cd hashtable_reference_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
+	$(OCAMLOPT) -I hashtable_reference_extracted -c HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableStringBenchmark.ml
+	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-string-benchmark $$objects ../HashTableReference.cmx ../HashMap.cmx ../HashTablePrimitives.cmx ../HashMapNative.cmx ../HashTableStringBenchmark.cmx
+	./hashtable-string-benchmark
+
+hashtable-benchmark-smoke: hashtable-benchmark hashtable-string-benchmark
+
+hashtable-string-benchmark-smoke: hashtable-string-benchmark
 
 hashtable-benchmark-smoke: export HASHTABLE_BENCH_SIZE := 100
 hashtable-benchmark-smoke: export HASHTABLE_BENCH_SEED := 31
 hashtable-benchmark-smoke: export HASHTABLE_BENCH_PATTERN := ascending
+
+hashtable-string-benchmark-smoke: export HASHTABLE_BENCH_SIZE := 100
+hashtable-string-benchmark-smoke: export HASHTABLE_BENCH_SEED := 31
 
 hashtable-assumptions: hashtable-proof check-hashtable-assumptions.sh
 	sh ./check-hashtable-assumptions.sh $(ROCQ) $(ROCQFLAGS)
@@ -432,7 +444,7 @@ clean:
 	rm -f HashTablePrimitivesTest.cmi HashTablePrimitivesTest.cmo HashTablePrimitivesTest.cmx HashTablePrimitivesTest.o
 	rm -f HashMapNative.cmi HashMapNative.cmo HashMapNative.cmx HashMapNative.o
 	rm -f HashMapNativeTest.cmi HashMapNativeTest.cmo HashMapNativeTest.cmx HashMapNativeTest.o
-	rm -f hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-native-test hashtable-differential-test hashtable-differential-native-test hashtable-native-model-test hashtable-native-model-native-test hashtable-native-array-test hashtable-native-array-native-test hashtable-native-primitives-test hashtable-benchmark
+	rm -f hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-native-test hashtable-differential-test hashtable-differential-native-test hashtable-native-model-test hashtable-native-model-native-test hashtable-native-array-test hashtable-native-array-native-test hashtable-native-primitives-test hashtable-benchmark hashtable-string-benchmark
 	rm -f PatriciaReference.cmi PatriciaReference.cmo PatriciaReference.cmx PatriciaReference.o
 	rm -f PatriciaTest.cmi PatriciaTest.cmo PatriciaDifferentialTest.cmi \
 	  PatriciaDifferentialTest.cmo PatriciaUnionTest.cmi PatriciaUnionTest.cmo \
