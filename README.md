@@ -18,7 +18,8 @@ strategies and separate native-verification tracker are in
 Publication citations and local PDF provenance are indexed in
 [`papers/README.md`](papers/README.md).
 
-The planned persistent string hash table has a separate
+The planned persistent generic hash table accepts a key module supplying
+equality and hashing through `HashMap.Make(Key)`. It has a separate
 [design](hashtable-design.md), [implementation plan](hashtable-plan.md) and
 [tracker](hashtable-todo.md), based on [hashtable.md](hashtable.md). The design
 compares HAMT and CHAMP for OCaml runtime behavior and Rocq proof effort.

@@ -20,9 +20,20 @@ has different performance and proof tradeoffs.  It should be introduced as a
 new module rather than as an optimization or backend replacement for either
 Patricia map.
 
-## Preferred design for string lookup and update
+## Generic scope and initial string workload
 
-For the target workload—persistent lookup and point update over strings, with
+The public table is generic over a key type and supplied equality/hash functions,
+via `HashMap.Make(Key)`. Strings and native `int` (including zero and negative
+keys) are example instances and benchmark workloads. Equality
+must be an equivalence relation, equivalent keys must hash alike for every seed,
+and equality/hash-relevant key state must remain stable in every retained
+version. The selected design supports custom equivalences, such as record IDs,
+and normalizes supplied native hashes to 30 routing bits. See the
+[generic contract](hashtable-design.md#abstract-contract-and-public-api).
+
+## Preferred design for lookup and update
+
+For the original example workload—persistent lookup and point update over strings, with
 no merge or ordered traversal requirement—the preferred design is a 32-way
 bitmap HAMT.  “32-way” means that one node consumes a five-bit hash chunk and
 therefore has `2^5 = 32` logical slots; it does not mean that hashes are
@@ -103,11 +114,13 @@ not functional-correctness theorems.
 
 ## Implementation design
 
-For the initial string map, use `Hashtbl.seeded_hash seed key` and consume five
-bits at a time.  It returns a nonnegative OCaml `int` and has the required
+For the generic map, obtain hashing from the key module, normalize its native
+result with `land 0x3fffffff`, and consume five bits at a time. For the string
+example, use `Hashtbl.seeded_hash seed key`.  It returns a nonnegative OCaml `int` and has the required
 equality-congruence property.  The seed belongs to the persistent table and
-must be retained unchanged by every derived version.  This makes collision
-attacks harder without changing a table's routing after an update.
+must be retained unchanged by every derived version. Seed-dependent routing
+is available when the supplied hash uses the seed; no attack-resistance
+guarantee follows from merely providing a seed argument.
 
 Although a 64-bit OCaml `int` has a 62-bit nonnegative range, the configured
 OCaml 4.14 runtime deliberately folds `Hashtbl.hash` and `seeded_hash` to the
@@ -150,12 +163,13 @@ five at each branch.  A collision bucket is reached only after all hash chunks
 have been consumed, or immediately when two different keys have equal full
 hashes.
 
-`set` is purely functional.  It returns the old node when the key/value pair
-is observably unchanged; otherwise it returns a new leaf, bucket, or branch
-whose dense child list is copied only at the changed index.  Its key cases are:
+`set` is purely functional. It replaces the value for an equivalent key while
+retaining the stored key representative; it requires no value equality. It
+returns a new leaf, bucket, or branch whose dense child list is copied only
+at the changed index.  Its key cases are:
 
 1. In `Empty`, return a leaf.
-2. In a `Leaf` with an equal key, replace the value only when it changed.
+2. In a `Leaf` with an equivalent key, keep the stored key and replace the value.
 3. In a `Leaf` with a different key and equal full hash, create a collision
    bucket.
 4. In two different hashes, make a branch at the first five-bit chunk where
@@ -192,9 +206,12 @@ A generic implementation needs an abstract key contract with decidable
 equality and a hash that respects it:
 
 ```text
-equal k1 k2 = true  ->  hash k1 = hash k2
+equal k1 k2 = true  ->  hash seed k1 = hash seed k2
 ```
 
+Equality must reflect a specified equivalence relation; it need not coincide
+with structural equality. Enumeration returns one stored representative per
+class, and the supplied functions must remain stable while keys are retained.
 Rocq proofs should establish map semantics from that contract, including
 collision-bucket uniqueness, routing from each hash chunk, bitmap rank/index
 correctness, insertion/removal collapse, and persistence of unchanged
@@ -211,8 +228,8 @@ security and reproducibility decisions.
 The functional-correctness claim should be staged, with the simple immutable
 bitmap-HAMT as the proved reference implementation.
 
-1. Define the key interface in Rocq: a type of keys, equality reflecting key
-   equality, a bounded hash word, and the hash-congruence law.  Do not require
+1. Define the key interface in Rocq: a type of keys, equality reflecting a key
+   equivalence relation, a bounded hash word, and the hash-congruence law.  Do not require
    unequal keys to have different hashes.
 2. Specify list collision buckets and prove `find`, replacement, and removal
    correct, preserving the no-duplicate-key invariant.
@@ -234,7 +251,7 @@ bitmap-HAMT as the proved reference implementation.
    is returned.
 8. Extract the reference model first.  Only then refine list replacement to
    immutable compact arrays and, if desired, the bitmap node to CHAMP's
-   separate data/node maps.  Each native string-hash, word, bitmap, and array
+   separate data/node maps.  Each native key-equality/hash, word, bitmap, and array
    primitive needs a stated refinement contract.
 
 The height bound `ceil(hash_width / 5)` is a structural theorem.  Expected
@@ -252,6 +269,6 @@ remove, and collision-heavy inputs.  The existing Patricia benchmarks may
 continue to use `Stdlib.Hashtbl` as a mutable performance reference, but they
 do not establish a persistent hash-table comparison.
 
-Before work begins, select the string-hash contract, collision policy,
+Before work begins, select the generic key/hash contract, collision policy,
 branching width, and seed policy.  Those choices define a new specification
 and proof plan rather than extending `patricia-todo.md`.

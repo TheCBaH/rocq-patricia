@@ -1,4 +1,4 @@
-# Persistent string hash table: tracker
+# Persistent generic hash table: tracker
 
 Last updated: 2026-09-13.
 
@@ -29,12 +29,13 @@ planning documents are not evidence that code exists.
 - [x] **D4** Link documents from the investigation and README; check links and whitespace.
 
 - [x] **D5** Compare HAMT/CHAMP runtime tradeoffs and Rocq proof obligations; record source evidence and the HAMT-first decision.
+- [x] **D6** Generalize the public API to HashMap.Make(Key); specify equivalence/hash laws, normalization, representatives and stable-key requirements.
 
 ## H0 — Contract and skeleton
 
 Dependencies: documentation baseline.
 
-- [ ] **H0.1** Add generic key/seed/hash contracts and byte-string equality proof.
+- [ ] **H0.1** Add generic key-equivalence/seed/hash contracts, normalization proof and integer/string/record instances.
 - [ ] **H0.2** Demonstrate positive recursive types, join termination and extraction shape; record native container strategy.
 - [ ] **H0.3** Set up module dependencies and separate extraction directories; record actual Rocq/OCaml versions.
 - [ ] **H0.G** Gate: compiling skeleton with explicit hypotheses and no admitted obligations.
@@ -66,9 +67,9 @@ Dependencies: H2.G.
 
 - [ ] **H3.1** Add/prove singleton, emptiness, membership, first-wins of_list, elements and extensional equivalence.
 - [ ] **H3.2** Add pure bounded test hash; extract list reference with separately named modules.
-- [ ] **H3.3** Add abstract StringHashMap wrapper and explicit-seed native hash adapter; inventory foreign contracts.
-- [ ] **H3.4** Add oracle histories, controlled collisions, byte-string edge cases and retained-root tests.
-- [ ] **H3.5** Compile wrapper clients and verify that constructors, hashes, depth and fuel remain private.
+- [ ] **H3.3** Add abstract HashMap.Make(Key) wrapper, hash normalization and string/integer/record examples; inventory callback and foreign contracts.
+- [ ] **H3.4** Add equality-based oracle histories, controlled collisions, generic keys/custom equivalences, representative retention, normalized-hash edge cases, full native int boundaries and retained-root tests.
+- [ ] **H3.5** Compile wrapper clients and verify that constructors, per-operation hashes, depth and fuel remain private; supplied callbacks stay bound to their functor instance.
 - [ ] **H3.G** Gate: proved reference exports to OCaml; reference proof/audit/build/test subset passes from regenerated output.
 
 ## H4 — Compact-array backend
@@ -89,7 +90,7 @@ Dependencies: H3.G.
 Dependencies: H4.G; benchmark harness may begin after H3.G.
 
 - [ ] **H5.1** Integrate aggregate targets, assumption discovery, cleanup and CI without regressing Patricia.
-- [ ] **H5.2** Add checked benchmarks against list reference, StringPatriciaMap, Map.Make(String) and separately labeled Hashtbl baselines.
+- [ ] **H5.2** Add generic-key checked benchmarks against list reference, compatible Map.Make and Hashtbl instances; include StringPatriciaMap for string workloads.
 - [ ] **H5.3** Record timing/allocation/retained heap with compiler, seed, key distributions and version-retention policy.
 - [ ] **H5.4** Update supported API specification, theorem inventory, extraction boundary and README usage.
 - [ ] **H5.5** Run fresh full build and benchmark smoke; record local and hosted CI evidence separately.
@@ -98,7 +99,7 @@ Dependencies: H4.G; benchmark harness may begin after H3.G.
 ## Deferred scope
 
 CHAMP layout/refinement; skip/prefix nodes; custom 64-bit hashing; 32-bit OCaml
-port; generic public key functor; map/merge/union/fold extensions; ordered or
+port; map/merge/union/fold extensions; ordered or
 standard-library-compatible API; cryptographic collision protection; formal
 expected-cost/allocation proofs; full OCaml heap/compiler verification; mandatory
 physical identity reuse for unchanged updates. Each needs its own design and
@@ -110,6 +111,7 @@ acceptance criteria before adding it to the current release.
 | --- | --- | --- |
 | 2026-09-13 | D1–D3 | Reviewed hashtable.md, Patricia source/extractors, StringPatriciaMap.mli, Makefile and assumption audit; wrote design and staged plan. Confirmed local OCaml hash.c uses the 30-bit mask. No implementation/proof completion claimed. |
 | 2026-09-13 | D5 | Reviewed the original CHAMP paper; added the design comparison and benchmark-controlled revisit criteria. OCaml speed and proof-effort judgments are explicitly prospective. |
+| 2026-09-13 | D6 | Corrected scope to arbitrary lawful key types; updated design, plan, tracker, investigation and README. Documentation link/whitespace checks passed; implementation gates remain open. |
 | 2026-09-13 | D4 | Checked relative Markdown file links in the new documents and README/investigation additions; `git diff --check` passed. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact

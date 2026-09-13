@@ -1,4 +1,4 @@
-# Persistent string hash table: design
+# Persistent generic hash table: design
 
 Date: 2026-09-13. Status: specified, not implemented or proved.
 
@@ -11,8 +11,9 @@ The existing Patricia public specification continues to describe only Patricia.
 
 ## Scope and decisions
 
-Deliver a new persistent map for arbitrary byte strings, including empty
-strings, NUL bytes and non-ASCII bytes. Values are polymorphic. Prove the
+Deliver a new persistent map for any key type supplying lawful equality and
+hashing. Values are polymorphic. Strings, integers and structured records are
+example instances, not restrictions on the core or public API. Prove the
 functional bitmap HAMT in Rocq and extract its algorithm to OCaml. Deliver
 ordinary list-based extraction first; then a compact-array backend with explicit
 refinement contracts. Neither backend replaces either Patricia map.
@@ -21,7 +22,9 @@ refinement contracts. Neither backend replaces either Patricia map.
 | --- | --- |
 | Routing | One bitmap per branch, 32 slots, five hash bits per level, least significant chunk first |
 | Hash | A total, deterministic function of immutable seed and key, returning a 30-bit word |
-| String native hash | `Stdlib.Hashtbl.seeded_hash seed key`, behind a foreign contract |
+| Public key interface | OCaml functor parameter with `type t`, `equal` and seeded `hash` |
+| Hash adaptation | Normalize the supplied OCaml `int` to its low 30 bits before routing |
+| String example | `String.equal` and `Stdlib.Hashtbl.seeded_hash`; other instances supply their own functions |
 | Seed | Explicit OCaml `int` at construction; retained by every derived map; no hidden random state |
 | Collision policy | Full-key equality, unique-key list bucket for equal full hashes |
 | Deletion | Remove empty children; retain unary branches; bucket of size one becomes a leaf |
@@ -35,8 +38,11 @@ seeds for separate tables, but this API makes no collision-resistance or securit
 guarantee. Hashing must remain stable during a table's lifetime; portable
 serialization across runtime/hash versions is outside this API.
 
-The local OCaml 4.14.3 `runtime/hash.c` masks its result with `0x3FFFFFFFU`.
-Thus six chunks cover the selected hash domain. The branch bitmap is a
+The wrapper normalizes every supplied hash with `h land 0x3fffffff`, including
+negative results. In the Rocq adapter model use integer modulo `2^30`, prove
+its bound and congruence, and prove agreement with the native mask. Thus six
+chunks cover the selected routing domain for every key instance. The local
+OCaml 4.14.3 `runtime/hash.c` already applies that mask for the string example. The branch bitmap is a
 *different* 32-bit quantity: slot 31 requires `1 << 31` and a full bitmap is
 `2^32 - 1`. Both fit a nonnegative 63-bit OCaml integer on the selected
 platform. A future 32-bit port needs another bitmap representation and proofs.
@@ -104,43 +110,105 @@ until that decision has evidence.
 
 ## Abstract contract and public API
 
-The generic Rocq development takes `K : Type`, `eqb : K -> K -> bool`,
-`Seed : Type`, and `hash : Seed -> K -> N`, with explicit hypotheses:
+The generic Rocq development takes `K : Type`, `E : K -> K -> Prop`,
+`eqb : K -> K -> bool`, `Seed : Type`, and normalized
+`hash : Seed -> K -> N`, with explicit hypotheses:
 
 ```text
-eqb k q = true <-> k = q
+Equivalence E                         (* reflexive, symmetric, transitive *)
+eqb k q = true <-> E k q
 hash seed k < 2^30
-k = q -> hash seed k = hash seed q
+E k q -> hash seed k = hash seed q
 ```
 
-The last law follows from ordinary equality and a pure function but documents
-an essential foreign obligation. No injectivity, distribution, key ordering or
-value equality assumption is permitted. Pass contracts as section parameters
-or theorem hypotheses, rather than global axioms. Instantiate byte-string
-equality with a proved reflection lemma. The native hash implementation remains
-an explicitly trusted realization of this parameterized contract.
+Maps are over key equivalence classes: `E` need not be Rocq propositional
+equality. This supports case-insensitive strings or records compared by an ID.
+Ordinary equality is a simple instance. Hash congruence is a substantive proof
+obligation for custom equivalences; unequal keys may always share a hash. No
+injectivity, distribution, ordering or value equality assumption is permitted.
+Pass contracts as section parameters or theorem hypotheses, not global axioms.
+Prove equivalence/reflection and hash congruence for supplied Rocq instances.
+For user-written OCaml instances these laws are documented obligations, not
+properties that the functor type system can check.
 
-Proposed `StringHashMap.mli` (names and argument order follow Patricia):
+Both callbacks must be total, deterministic and observationally pure. Keys
+must retain the equality/hash-relevant state they had when stored, for as long
+as any persistent version retains them. Mutable fields irrelevant to both
+callbacks are allowed. Closure state affecting a callback must also stay stable.
+Normalization ensures bounds, but cannot repair inconsistent equality/hashing.
+
+Proposed `HashMap.mli` (operation names and argument order follow Patricia):
 
 ```ocaml
-type key = string
-type 'a t
-val empty : seed:int -> 'a t
-val singleton : seed:int -> key -> 'a -> 'a t
-val is_empty : 'a t -> bool
-val get : key -> 'a t -> 'a option
-val mem : key -> 'a t -> bool
-val set : key -> 'a -> 'a t -> 'a t
-val remove : key -> 'a t -> 'a t
-val of_list : seed:int -> (key * 'a) list -> 'a t
-val elements : 'a t -> (key * 'a) list
+module type KEY = sig
+  type t
+  val equal : t -> t -> bool
+  val hash : seed:int -> t -> int
+end
+
+module Make (Key : KEY) : sig
+  type key = Key.t
+  type 'a t
+  val empty : seed:int -> 'a t
+  val singleton : seed:int -> key -> 'a -> 'a t
+  val is_empty : 'a t -> bool
+  val get : key -> 'a t -> 'a option
+  val mem : key -> 'a t -> bool
+  val set : key -> 'a -> 'a t -> 'a t
+  val remove : key -> 'a t -> 'a t
+  val of_list : seed:int -> (key * 'a) list -> 'a t
+  val elements : 'a t -> (key * 'a) list
+end
 ```
 
+A string instance is just an application of the same public functor:
+
+```ocaml
+module StringHashMap = HashMap.Make (struct
+  type t = string
+  let equal = String.equal
+  let hash ~seed key = Hashtbl.seeded_hash seed key
+end)
+```
+
+An integer instance uses the full native `int` key domain, including zero and
+negative keys (unlike the positive-key Patricia wrapper):
+
+```ocaml
+module IntHashMap = HashMap.Make (struct
+  type t = int
+  let equal (x : int) (y : int) = x = y
+  let hash ~seed key = Hashtbl.seeded_hash seed key
+end)
+
+let numbers = IntHashMap.empty ~seed:0
+let numbers = IntHashMap.set (-7) "negative" numbers
+let numbers = IntHashMap.set 0 "zero" numbers
+let found = IntHashMap.get (-7) numbers  (* Some "negative" *)
+```
+
+Model integer keys with Rocq `Z`; relate the native instance to the OCaml
+`min_int .. max_int` domain. Only hashes are normalized to 30 bits, never keys:
+different full integers that share a normalized hash remain distinct bindings.
+Include `min_int`, `max_int`, zero and negative integers in the instance tests.
+These examples describe the planned API; its implementation is still open.
+
+An unseeded hash is also usable as `let hash ~seed:_ key = user_hash key`;
+this forfeits seed-dependent routing, not functional correctness. No ordering,
+serialization to strings or polymorphic equality is required of keys.
+
 `of_list` uses first occurrence wins, matching `StringPatriciaMap`. A table
-contains its seed and root; clients cannot supply hashes or change routing
-metadata. Constructors, depth, fuel, array storage and test hash injection stay
-private. Tests may instantiate the generic internal implementation with constant
-and controlled hashes. The public API cannot create malformed trees.
+contains its seed and root. Its key operations are fixed by the functor instance;
+clients cannot substitute callbacks or precomputed hashes on individual map
+operations. Constructors, depth, fuel, normalized hashes and arrays stay private.
+Constant and controlled hashes are ordinary lawful public functor instances.
+The API hides malformed trees; semantic guarantees also require lawful callbacks.
+
+`set` on an equivalent key retains the already stored key representative and
+replaces its value. `of_list` must preserve both the first representative and
+first value in each equivalence class; implement a first-to-last insert-if-absent
+fold, rather than blindly reusing a right-fold setter. `elements` returns these
+stored representatives, not every equivalent spelling of a key.
 
 For valid `m`, all keys `k`, `q`, and values `v`, prove:
 
@@ -149,8 +217,9 @@ get q (empty seed) = None
 get q (set k v m) = if eqb q k then Some v else get q m
 get q (remove k m) = if eqb q k then None else get q m
 mem k m = true <-> exists v, get k m = Some v
-In (k,v) (elements m) <-> get k m = Some v
-NoDup (map fst (elements m))
+(exists r, In (r,v) (elements m) /\ E k r) <-> get k m = Some v
+NoDupA E (map fst (elements m))
+E k q -> get k m = get q m
 is_empty m = true <-> forall k, get k m = None
 ```
 
@@ -187,13 +256,13 @@ correctness is not circular.
 
 - `0 <= d <= 6`; every stored hash is bounded and equals `hash seed key`.
 - Each stored hash has the chunks in `prefix` at depths below `d`.
-- Leaf has one binding. Collision has at least two entries with distinct keys
+- Leaf has one binding. Collision has at least two entries with pairwise non-equivalent keys
   and one common full hash; collision nodes may occur before depth six.
 - Branch requires `d < 6`, `bitmap < 2^32`, a nonzero bitmap, and
   `length children = popcount bitmap`. Its children are nonempty and ordered
   by increasing occupied slot. A child at slot `s` satisfies
   `wf seed (d+1) (prefix ++ [s])`.
-- Bindings have no duplicate keys. Prove this compositionally using disjoint
+- Bindings have no duplicate keys modulo `E`. Prove this compositionally using disjoint
   branch slots plus hash congruence and bucket uniqueness.
 
 The root invariant is `wf seed 0 [] root`. Empty is valid at any permitted
@@ -204,7 +273,7 @@ this does not bound collision-bucket size.
 ## Algorithms and termination
 
 `get` hashes the query once at the table boundary, then structurally descends.
-A leaf checks the full key; a bucket searches by full-key equality; a branch
+A leaf checks the full key using the supplied equality; a bucket searches by full-key equality; a branch
 tests the query slot bit and uses its rank to select the dense child.
 
 `set` replaces an equal key in a leaf or bucket. Distinct keys with equal
@@ -215,8 +284,7 @@ branch without recording all preceding equal chunks. Joining an existing
 collision node with a different hash uses the same procedure.
 
 At a branch, insert a leaf at rank if the bit is absent, or recursively replace
-the existing child. Bucket replacement preserves uniqueness. Updating an equal
-key always stores the supplied value; polymorphic structural equality must not
+the existing child. Bucket replacement preserves uniqueness. Updating an equivalent key retains its stored key and always stores the supplied value; polymorphic structural equality must not
 be used on payloads (which may be functions or cyclic objects).
 
 `remove` returns unchanged structure on a miss where convenient. It deletes the
@@ -257,8 +325,9 @@ explicit extraction bindings. Do not override entire `get`, `set`, `remove`
 or `join` algorithms with handwritten OCaml strings.
 
 The reference keeps executable Rocq lists, arithmetic and control flow. Supply
-a hash callback at the wrapper boundary; differential tests feed the same
-bounded hash function to both backends. A fully executable pure test instance
+key equality and hash callbacks once through `HashMap.Make`; differential tests
+feed the same key instance and normalization to both backends. Keep the source
+core generic through extraction; do not specialize it permanently to strings. A fully executable pure test instance
 also uses a simple bounded Rocq-defined hash, proving the abstract contract
 without an OCaml hash axiom. Agreement using a shared native hash does not
 independently validate that hash's foreign contract.
@@ -288,8 +357,8 @@ bounds, access and no-mutation behavior remain foreign obligations unless a
 separate target heap proof discharges them.
 
 Maintain a primitive inventory with source symbol, OCaml realizer, precondition,
-refinement theorem and remaining trust. It covers string equality/encoding,
-seeded hashing, native word operations, array operations, standard extraction,
+refinement theorem and remaining trust. It covers each key instance's equality,
+key representation and seeded hashing, hash normalization, native word operations, array operations, standard extraction,
 OCaml compilation and runtime behavior. Audit extraction directives and generated
 workers. Runtime differential tests support this boundary; they do not replace
 Rocq proofs or establish end-to-end verified compilation.
@@ -298,17 +367,20 @@ Rocq proofs or establish end-to-end verified compilation.
 
 Correctness gates require proofs, assumption audits, both extractions, abstract
 wrapper compilation, invariant checks and differential operation histories
-against `Map.Make(String)`. Include constant-hash collisions, all six divergence
+against an association-list oracle using the supplied equality (and, for
+instances with a compatible comparator, `Map.Make`). Include constant-hash collisions, all six divergence
 levels, slots 0/31, full branches, deletion normalization, re-insertion, duplicate
-bulk inputs, arbitrary byte strings, multiple seeds and retained old roots.
+bulk inputs, integers, tuples/records, arbitrary byte strings, custom key
+equivalences, negative/large raw hash results, multiple seeds and retained roots.
 Use function and reference payloads in targeted tests without polymorphic
 comparison. Recheck retained roots after later updates to detect array mutation.
 
-Benchmark the list reference, native HAMT, direct-string Patricia and
-`Map.Make(String)` on identical checked workloads. Label mutable `Hashtbl`
+Benchmark the list reference, native HAMT and comparator-compatible `Map.Make`
+instances on identical checked workloads for integer, string and structured keys.
+Include direct-string Patricia and `Map.Make(String)` in the string subset. Label mutable `Hashtbl`
 separately; a persistence comparison must copy it for each retained version.
 Measure lookup/update/remove, allocation and retained heap across short, long,
 prefix-related and collision-heavy keys. Record seed, runtime/compiler, input
 size and version-retention policy. No expected-time theorem or empirical
 speedup is a release prerequisite; publish measured results without assuming
-that the HAMT wins. String hashing and equality costs are part of the workload.
+that the HAMT wins. Supplied key hashing and equality costs are part of the workload.

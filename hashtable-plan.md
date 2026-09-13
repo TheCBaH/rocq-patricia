@@ -1,4 +1,4 @@
-# Persistent string hash table: implementation plan
+# Persistent generic hash table: implementation plan
 
 Date: 2026-09-13. Status: ready for implementation; all code/proof gates open.
 
@@ -17,8 +17,11 @@ JVM gains are not an OCaml acceptance result.
 
 ### H0 — Contracts and build skeleton
 
-Create `HashTableSpec.v` with key/hash parameters, abstract lookup laws and
-byte-string equality instance. Fix depth six, five-bit chunks, explicit seeds,
+Create `HashTableSpec.v` with key equivalence, equality reflection and hash
+congruence parameters, abstract lookup laws modulo equivalence, and integer,
+byte-string and record/custom-equivalence instances. Specify `HashMap.Make` and
+prove raw-hash normalization to 30 bits, including negative hashes. Fix depth
+six, five-bit chunks, explicit seeds,
 first-wins bulk loading and unspecified element order as in the design.
 Record the toolchain versions actually used. Establish separate generation
 paths `hashtable_reference_extracted/` and `hashtable_extracted/` to avoid
@@ -58,12 +61,19 @@ proofs still build.
 Implement derived operations and their proofs, then
 `HashTableReferenceExtract.v`. Add a pure executable test hash and a native hash
 adapter whose trust is documented. Package the reference under a distinct
-`HashTableReference` name; compile `StringHashMap.ml` / `.mli` initially against
-this backend. Hide generated constructors and hash injection from clients.
+`HashTableReference` name; compile `HashMap.ml` / `.mli` with a generic
+`Make(Key)` functor initially against this backend. Add string, integer and
+record examples through this public functor. Hide generated constructors and
+per-operation raw-hash access from clients;
+keep user-supplied equality/hashing available through the functor parameter.
 
 Add `HashTableTest.ml` and `HashTableDifferentialTest.ml` with deterministic
-operation histories checked against `Map.Make(String)`. Test the generic source
-instance with adversarial hashes and the public wrapper with its actual hash.
+operation histories checked against an equality-based association-list oracle
+and comparator-compatible `Map.Make` instances. Test adversarial hashes through
+the public functor, equivalent but structurally different keys, representative
+retention, first-wins bulk loading, and negative/large raw hash normalization.
+Use multiple simultaneous key modules to check that callbacks stay associated
+with the correct instance. Audit that no polymorphic key equality is introduced.
 
 Exit: a proved source map is exported as a usable OCaml library, with complete
 API theorems, passing wrapper/oracle tests and an explicit extraction boundary.
@@ -138,8 +148,11 @@ from `.v` sources, rather than depend on checked-in or stale generated files.
 | First difference at depths 0 through 5 | Correct unary chains and ordered child insertion |
 | Slot 31 and all 32 children | Correct rank, bounds, insertion and deletion at every dense position |
 | Delete to unary, then insert again | Remaining child's implicit depth stays valid |
-| Empty/NUL/high-byte/long/prefix strings | Exact byte-key identity |
-| Duplicate `of_list` input | First occurrence wins |
+| Integers, tuples/records, empty/NUL/high-byte/long/prefix strings | Generic API and each instance's key identity |
+| Case-insensitive or record-ID equality | Congruent hashes, class uniqueness, lookup congruence and retained representatives |
+| Native int keys: min_int, max_int, zero, negatives | Full keys preserved independently of normalized hashes |
+| Negative/large raw hashes; different key modules | Correct normalization and callback association |
+| Duplicate/equivalent `of_list` input | First representative and first value win |
 | Several seeds and branches from an old version | Independent routing; unchanged retained bindings |
 | Mutable references and functions as values | No payload comparison; shallow sharing contract |
 | Random deterministic operation histories | Every current and sampled retained version agrees with the oracle |
