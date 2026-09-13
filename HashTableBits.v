@@ -36,6 +36,18 @@ Definition popcount32 (bitmap : N) : nat := popcount_worker 32 bitmap.
 Definition rank (bitmap slot : N) : nat :=
   popcount32 (N.land bitmap (N.ones slot)).
 
+Fixpoint occupied_slots_from (fuel : nat) (bitmap slot : N) : list N :=
+  match fuel with
+  | O => []
+  | S fuel' =>
+      if bitmap_has bitmap slot
+      then slot :: occupied_slots_from fuel' bitmap (N.succ slot)
+      else occupied_slots_from fuel' bitmap (N.succ slot)
+  end.
+
+Definition occupied_slots (bitmap : N) : list N :=
+  occupied_slots_from 32 bitmap 0.
+
 Lemma chunk_bound :
   forall full_hash depth, (chunk full_hash depth < branch_width)%N.
 Proof.
@@ -87,7 +99,7 @@ Proof. intros. unfold rank, popcount32. now rewrite N.ones_0, N.land_0_r, popcou
 Lemma full_bitmap_has_slot_31 : bitmap_has full_bitmap 31 = true.
 Proof. now vm_compute. Qed.
 
-Fixpoint dense_get {A : Type} (index : nat) (children : list A) : option A :=
+Definition dense_get {A : Type} (index : nat) (children : list A) : option A :=
   nth_error children index.
 
 Fixpoint dense_insert {A : Type} (index : nat) (child : A) (children : list A)
@@ -142,3 +154,27 @@ Qed.
 Lemma dense_insert_empty :
   forall A (child : A) index, dense_insert index child [] = [child].
 Proof. intros A child [|index]; reflexivity. Qed.
+
+Lemma dense_get_insert_same :
+  forall A index (child : A) children,
+    index <= length children ->
+    dense_get index (dense_insert index child children) = Some child.
+Proof.
+  intros A index. induction index as [|index IH]; intros child children Hbound.
+  - destruct children; reflexivity.
+  - destruct children as [|head tail]; simpl in Hbound.
+    + lia.
+    + simpl. unfold dense_get in IH. apply IH. lia.
+Qed.
+
+Lemma dense_get_replace_same :
+  forall A index (child : A) children,
+    index < length children ->
+    dense_get index (dense_replace index child children) = Some child.
+Proof.
+  intros A index. induction index as [|index IH]; intros child children Hbound.
+  - destruct children; simpl in Hbound; try lia. reflexivity.
+  - destruct children as [|head tail]; simpl in Hbound.
+    + lia.
+    + simpl. unfold dense_get in IH. apply IH. lia.
+Qed.

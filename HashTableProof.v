@@ -4,12 +4,79 @@
     routing/invariant development can therefore build on stable operational
     equations without conflating specification and implementation. *)
 
-From Stdlib Require Import Bool List NArith.
+From Stdlib Require Import Bool Lia List NArith SetoidList.
 Import ListNotations.
 
-Require Import HashTable HashTableBucket.
+Require Import HashTableSpec HashTable HashTableBits HashTableBucket.
 
 Set Implicit Arguments.
+
+(** The invariant is parameterized by the key equivalence and normalized
+    source hash.  Prefixes are stored least-significant chunk first, matching
+    [chunk] and the runtime routing order. *)
+Section WellFormed.
+
+  Context {K Seed A : Type}.
+  Variable E : K -> K -> Prop.
+  Variable hash : Seed -> K -> N.
+  Variable seed : Seed.
+
+  Definition binding_equiv (left right : K * A) : Prop :=
+    E (fst left) (fst right).
+
+  Fixpoint prefix_matches (full_hash : N) (depth : nat) (prefix : list N) : Prop :=
+    match prefix with
+    | [] => True
+    | slot :: rest =>
+        chunk full_hash depth = slot /\ prefix_matches full_hash (S depth) rest
+    end.
+
+  Definition entry_matches (full_hash : N) (depth : nat) (prefix : list N)
+      (entry : K * A) : Prop :=
+    full_hash = hash seed (fst entry) /\
+    (full_hash < hash_space)%N /\
+    prefix_matches full_hash depth prefix.
+
+  Inductive wf : nat -> list N -> tree K A -> Prop :=
+  | wf_empty : forall depth prefix, wf depth prefix Empty
+  | wf_leaf : forall depth prefix full_hash key value,
+      full_hash = hash seed key ->
+      (full_hash < hash_space)%N ->
+      prefix_matches full_hash depth prefix ->
+      wf depth prefix (Leaf full_hash key value)
+  | wf_collision : forall depth prefix full_hash entries,
+      2 <= length entries ->
+      Forall (entry_matches full_hash depth prefix) entries ->
+      NoDupA binding_equiv entries ->
+      wf depth prefix (Collision full_hash entries)
+  | wf_branch : forall depth prefix bitmap children,
+      depth < branch_levels ->
+      (bitmap < bitmap_limit)%N ->
+      bitmap <> 0%N ->
+      length children = popcount32 bitmap ->
+      Forall2 (fun slot child => child <> Empty /\ wf (S depth) (prefix ++ [slot]) child)
+        (occupied_slots bitmap) children ->
+      NoDupA binding_equiv (bindings (Branch bitmap children)) ->
+      wf depth prefix (Branch bitmap children).
+
+End WellFormed.
+
+Lemma wf_empty_root :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed),
+    @wf K Seed A E hash seed 0 [] Empty.
+Proof. intros. constructor. Qed.
+
+Lemma wf_leaf_root :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) full_hash key (value : A),
+    full_hash = hash seed key ->
+    (full_hash < hash_space)%N ->
+    @wf K Seed A E hash seed 0 [] (Leaf full_hash key value).
+Proof.
+  intros K Seed A E hash seed full_hash key value Hhash Hbound.
+  apply wf_leaf; auto. exact I.
+Qed.
 
 Lemma get_tree_leaf_same :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key

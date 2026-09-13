@@ -45,7 +45,7 @@ Dependencies: documentation baseline.
 Dependencies: H0.G.
 
 - [ ] **H1.1** In progress: `HashTableBits.v` defines chunks and proves the per-chunk bound; six-chunk reconstruction/separation remains open.
-- [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary lemmas; rank/edit correspondence proofs remain open.
+- [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary lemmas and bounded same-index insertion/replacement lookup laws; bitmap-rank correspondence remains open.
 - [ ] **H1.3** In progress: `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with head replacement/removal lemmas; uniqueness and full pointwise laws remain open.
 - [ ] **H1.G** Gate: primitive proofs compile and theorem assumption audit passes.
 
@@ -53,7 +53,7 @@ Dependencies: H0.G.
 
 Dependencies: H1.G.
 
-- [ ] **H2.1** In progress: `HashTable.v` defines raw nodes, seeded tables and an independent flattened `bindings` view; the well-formedness invariant remains open.
+- [ ] **H2.1** In progress: `HashTable.v` defines raw nodes, seeded tables and an independent flattened `bindings` view; `HashTableProof.v` now defines the hash/prefix, collision-uniqueness and bitmap/dense-child well-formedness invariant. Its preservation proofs remain open.
 - [ ] **H2.2** In progress: `HashTable.v` implements bounded `join_worker`; validity/binding and unreachable-fallback proofs remain open.
 - [ ] **H2.3** In progress: `HashTable.v` implements fuelled bitmap-routed `get_tree`; `HashTableProof.v` proves leaf/collision base cases. Independent binding equivalence remains open.
 - [ ] **H2.4** In progress: `HashTable.v` implements persistent `set_tree` and the public seeded `set`; `HashTableProof.v` proves the leaf replacement/representative base case. Global pointwise and validity laws remain open.
@@ -120,6 +120,8 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H3.3–H3.5 (partial) | Added `HashMap.mli`, `HashMap.ml` and `HashMapTest.ml`; `make hashtable-wrapper-test` and `make hashtable-wrapper-test-native` passed. The abstract wrapper test covers negative normalized hashes, `min_int`/`max_int`, equivalent string and record-ID keys, first representative/value retention, retained versions, function/reference payloads, three simultaneous key modules, and a 500-step deterministic association-list-oracle history with sampled retained versions. It remains a reference-backend test, not the H3 proof/audit gate. |
 | 2026-09-13 | H2.1, H2.3–H2.5 (partial) | Added `HashTableProof.v`; `make hashtable-proof` passed. It kernel-checks collision-normalization binding preservation, empty-tree binding equations, matching/mismatching leaf lookup, collision dispatch, representative-preserving leaf replacement and leaf removal. Recursive routing and invariant proofs remain open. |
 | 2026-09-13 | H5.4 (partial) | Updated README and design status to describe the tested source-reference milestone and open proof/native gates; `git diff --check` passed. |
+| 2026-09-13 | H1.2 (partial) | Added bounded same-index `dense_get` laws for insertion and replacement in `HashTableBits.v`; `make hashtable-proof` passed. Bitmap/rank correspondence is still open. |
+| 2026-09-13 | H2.1 (partial) | Defined the parameterized `wf` invariant in `HashTableProof.v`, including occupied-slot ordering, bitmap/popcount density, prefix/hash routing, nonempty branch children and collision uniqueness. Empty/leaf root constructors are kernel-checked; `make hashtable-proof` passed. Preservation and lookup-refinement proofs remain open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
