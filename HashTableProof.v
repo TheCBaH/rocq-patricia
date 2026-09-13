@@ -279,6 +279,32 @@ Proof.
   apply wf_leaf; auto. exact I.
 Qed.
 
+Section EmptyOperationInvariant.
+
+  Context {K Seed A : Type}.
+  Variable E : K -> K -> Prop.
+  Variable hash : Seed -> K -> N.
+  Variable seed : Seed.
+
+Lemma set_tree_empty_wf :
+    forall fuel depth prefix full_hash key (value : A) (eqb : K -> K -> bool),
+      entry_matches hash seed full_hash depth prefix (key, value) ->
+      wf E hash seed depth prefix
+        (set_tree eqb fuel depth full_hash key value Empty).
+  Proof.
+    intros fuel depth prefix full_hash key value eqb Hentry.
+    destruct Hentry as [Hhash [Hbound Hprefix]].
+    destruct fuel; cbn [set_tree]; eapply wf_leaf; eauto.
+  Qed.
+
+Lemma remove_tree_empty_wf :
+    forall fuel depth prefix full_hash key (eqb : K -> K -> bool),
+      wf E hash seed depth prefix
+        (remove_tree eqb fuel depth full_hash key (@Empty K A)).
+  Proof. intros. destruct fuel; cbn [remove_tree]; apply wf_empty. Qed.
+
+End EmptyOperationInvariant.
+
 Lemma get_tree_leaf_same :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
          (value : A),
