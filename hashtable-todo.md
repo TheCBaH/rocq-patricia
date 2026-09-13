@@ -79,9 +79,9 @@ Dependencies: H3.G.
 - [ ] **H4.1** In progress: `HashTableNative.v` defines a source-modeled persistent sequence interface, fresh-update view laws and a native-tree/source relation with empty/leaf/collision refinement lemmas; `HashTableExtract.v` compiles a separately extracted modeled-native artifact. Array realization and recursive branch refinement remain open.
 - [ ] **H4.2** In progress: `HashTableNative.v` / `HashTableNativeProof.v` define modeled native get/set/remove and prove refinement for arbitrary related source/native trees; the separately extracted model passes a retained-version differential test against extracted source workers. Invariant/seed preservation and any array-realizer refinement remain open.
 - [ ] **H4.3** Prove bounded bitmap/scalar/popcount workers including all native intermediate and shift bounds.
-- [ ] **H4.4** In progress: `HashTablePrimitives.ml` / `.mli` provide private fresh-copy sequence primitives and `hashtable-native-primitives-test` validates views and storage freshness. Extraction bindings and their full target inventory remain open.
+- [ ] **H4.4** In progress: `HashTablePrimitives.ml` / `.mli` provide private fresh-copy sequence primitives and `HashMapNative.ml` uses them for a private-array HAMT; primitive and reference/native differential tests validate views, storage freshness and map behavior. Extraction bindings and their full target inventory remain open.
 - [ ] **H4.5** In progress: `hashtable-native-primitives-audit` inventories the current private sequence realizer and rejects map overrides/unsafe escapes; generated map-worker and extraction-binding audit remain open.
-- [ ] **H4.6** Run reference/native/oracle histories in bytecode and native code, including retained versions and function/reference payloads.
+- [ ] **H4.6** In progress: `hashtable-native-array-test` and `hashtable-native-array-test-native` run retained-version reference/native histories in bytecode/native code. Broader payload/custom-key coverage remains open.
 - [ ] **H4.7** Switch public wrapper to native backend after passing correctness and refinement gates.
 - [ ] **H4.G** Gate: modeled refinement proofs and all native checks pass; foreign/heap trust remains accurately stated.
 
@@ -151,6 +151,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H3.1 (partial) | Added enumeration laws for singleton removal and duplicate-singleton first-wins bulk loading in `HashTable.v`. `make hashtable-proof hashtable-assumptions` passed with 116 declarations closed. General pointwise first-wins and extensional laws remain open. |
 | 2026-09-13 | H4.1 (partial) | Added `HashTableExtract.v` and `make hashtable-native` to extract and compile the source-defined modeled native operations in `hashtable_extracted/`. No array binding, recursive native branch realization or OCaml heap claim is made. |
 | 2026-09-13 | H4.2 (partial) | Added `HashTableNativeModelTest.ml`, `make hashtable-native-model-test` and `make hashtable-native-model-test-native`. The regenerated extracted native model passed 750 deterministic set/remove steps in bytecode/native code, comparing source/native lookup results for current and sampled retained versions. This is model/extraction evidence only; it does not test an array-backed native map. |
+| 2026-09-13 | H4.4/H4.6 (partial) | Added private-array `HashMapNative.Make` and `HashMapNativeTest.ml`, plus bytecode/native differential targets. Bytecode passed 1,000 deterministic reference/native set/remove steps with retained versions, collision-heavy keys, `min_int`/`max_int` and first-wins bulk loading. The public wrapper is unchanged and no kernel proof of this OCaml heap implementation is claimed. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
