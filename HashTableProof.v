@@ -202,6 +202,16 @@ Proof.
   destruct fuel; simpl; apply N.eqb_neq in Hneq; now rewrite Hneq.
 Qed.
 
+Lemma get_tree_leaf_other_key :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash query stored
+         (value : A),
+    eqb query stored = false ->
+    get_tree eqb fuel depth full_hash query (Leaf full_hash stored value) = None.
+Proof.
+  intros K A eqb fuel depth full_hash query stored value Heqb.
+  destruct fuel; cbn [get_tree]; now rewrite N.eqb_refl, Heqb.
+Qed.
+
 Lemma set_tree_leaf_replaces_representative :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key stored
          (old value : A),
@@ -237,6 +247,17 @@ Lemma remove_tree_leaf_removes :
 Proof.
   intros K A eqb fuel depth full_hash key value Heqb.
   destruct fuel; simpl; now rewrite N.eqb_refl, Heqb.
+Qed.
+
+Lemma remove_tree_leaf_miss :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key stored
+         (value : A),
+    eqb key stored = false ->
+    remove_tree eqb fuel depth full_hash key (Leaf full_hash stored value) =
+    Leaf full_hash stored value.
+Proof.
+  intros K A eqb fuel depth full_hash key stored value Heqb.
+  destruct fuel; cbn [remove_tree]; now rewrite N.eqb_refl, Heqb.
 Qed.
 
 Lemma get_tree_collision_same_hash :
