@@ -46,7 +46,7 @@ Dependencies: H0.G.
 
 - [ ] **H1.1** Implemented: `HashTableBits.v` defines chunks, proves the per-chunk bound, proves a normalized 30-bit hash has zero chunk at depth six, reconstructs every normalized hash from its six routing chunks, and proves distinct normalized hashes differ at one of depths 0 through 5.
 - [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary calculations, full occupied-slot enumeration, bounded lookup laws before/at/after insertion plus replacement/removal lookup preservation, insertion/replacement/deletion membership laws, and exact valid-index removal cardinality; general bitmap-rank correspondence remains open.
-- [ ] **H1.3** In progress: `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with pointwise update/removal preservation for different equivalence classes, exact hit/miss insertion cardinality, and successful-removal cardinality lemmas; uniqueness remains open.
+- [ ] **H1.3** In progress: `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with pointwise update/removal preservation for different equivalence classes, exact hit/miss insertion cardinality, successful-removal cardinality, and relation-parametric uniqueness preservation for removal; update uniqueness remains open.
 - [ ] **H1.G** Gate: primitive proofs compile and theorem assumption audit passes.
 
 ## H2 — Source HAMT
@@ -166,6 +166,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H2.2 (partial) | Added `join_falls_back` and `join_worker_six_no_fallback`: the control-flow mirror reaches no fuel fallback for distinct normalized hashes with `branch_levels` fuel at depth zero, by the six-chunk separation theorem. Join validity remains open. |
 | 2026-09-13 | H3.4 (partial) | Extended `HashTableDifferentialTest.ml` with a 500-step retained-version `Map.Make` differential history for case-insensitive, collision-heavy string keys and functional payloads. It runs through the abstract public wrapper in bytecode and native targets. |
 | 2026-09-13 | H5.3 (partial) | Extended `HashTableBenchmark.ml` to retain every prefix root of each persistent implementation, force collection, report live-heap delta, and verify oldest/newest roots. The current workload is ascending integer keys with seed 31; compiler capture and broader distributions remain open. |
+| 2026-09-13 | H1.3 (partial) | Added `bucket_remove_nodup`: bucket deletion preserves `NoDupA` for any entry relation, supplying the uniqueness-preservation direction needed by collision removal. Update uniqueness remains open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

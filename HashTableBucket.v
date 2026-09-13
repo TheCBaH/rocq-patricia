@@ -4,7 +4,7 @@
     resident key representative; this is the representative-retention rule
     required by the public functor. *)
 
-From Stdlib Require Import Bool Lia List NArith.
+From Stdlib Require Import Bool Lia List NArith SetoidList.
 Import ListNotations.
 
 Set Implicit Arguments.
@@ -228,6 +228,40 @@ Proof.
       destruct tail as [|[next_key next_value] rest].
       * simpl in Hhit. contradiction.
       * simpl in IH. simpl. rewrite IH. reflexivity.
+Qed.
+
+Lemma bucket_remove_inA :
+  forall K A (R : K * A -> K * A -> Prop) (eqb : K -> K -> bool)
+         key (entries : list (K * A)) entry,
+    InA R entry (bucket_remove eqb key entries) -> InA R entry entries.
+Proof.
+  intros K A R eqb key entries.
+  induction entries as [|[stored value] tail IH]; intros entry Hin; simpl in Hin.
+  - inversion Hin.
+  - destruct (eqb key stored) eqn:Hstored.
+    + apply InA_cons_tl. exact Hin.
+    + apply (proj2 (InA_cons R entry (stored, value) tail)).
+      destruct (proj1
+        (InA_cons R entry (stored, value) (bucket_remove eqb key tail)) Hin)
+        as [Hhead|Htail].
+      * now left.
+      * right. now apply IH.
+Qed.
+
+Lemma bucket_remove_nodup :
+  forall K A (R : K * A -> K * A -> Prop) (eqb : K -> K -> bool)
+         key (entries : list (K * A)),
+    NoDupA R entries -> NoDupA R (bucket_remove eqb key entries).
+Proof.
+  intros K A R eqb key entries Hnodup.
+  induction entries as [|[stored value] tail IH]; simpl.
+  - constructor.
+  - inversion Hnodup as [|entry entries Hnotin Htail]; subst.
+    destruct (eqb key stored) eqn:Hstored.
+    + exact Htail.
+    + constructor.
+      * intro Hin. apply Hnotin. now apply bucket_remove_inA in Hin.
+      * now apply IH.
 Qed.
 
 Lemma normalize_bucket_empty :
