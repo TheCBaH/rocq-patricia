@@ -55,6 +55,40 @@ Proof.
   now rewrite N.land_0_l.
 Qed.
 
+Lemma bitmap_land_bit_zero_iff :
+  forall bitmap slot,
+    N.land bitmap (bitmap_bit slot) = 0%N <->
+    N.testbit bitmap slot = false.
+Proof.
+  intros bitmap slot. unfold bitmap_bit. rewrite N.shiftl_1_l.
+  split.
+  - intro Hland.
+    assert (Hbit : N.testbit (N.land bitmap (2 ^ slot)) slot = false).
+    { now rewrite Hland. }
+    rewrite N.land_spec, N.pow2_bits_true, andb_true_r in Hbit.
+    exact Hbit.
+  - intro Hbit. apply N.bits_inj. intro index.
+    rewrite N.land_spec, N.pow2_bits_eqb.
+    destruct (N.eqb slot index) eqn:Hequal; simpl.
+    + apply N.eqb_eq in Hequal. subst index. now rewrite Hbit.
+    + now rewrite andb_false_r.
+Qed.
+
+Lemma bitmap_has_spec :
+  forall bitmap slot,
+    bitmap_has bitmap slot = true <-> N.testbit bitmap slot = true.
+Proof.
+  intros bitmap slot. unfold bitmap_has.
+  destruct (N.testbit bitmap slot) eqn:Hbit.
+  - assert (Hnonzero : N.land bitmap (bitmap_bit slot) <> 0%N).
+    { intro Hzero. apply (proj1 (bitmap_land_bit_zero_iff bitmap slot)) in Hzero.
+      rewrite Hbit in Hzero. discriminate. }
+    apply N.eqb_neq in Hnonzero. rewrite Hnonzero. tauto.
+  - assert (Hzero : N.land bitmap (bitmap_bit slot) = 0%N).
+    { apply (proj2 (bitmap_land_bit_zero_iff bitmap slot)). exact Hbit. }
+    rewrite Hzero. tauto.
+Qed.
+
 Lemma occupied_slots_from_empty :
   forall fuel slot, occupied_slots_from fuel 0 slot = [].
 Proof.
@@ -265,13 +299,21 @@ Proof. intros. unfold rank, popcount32. now rewrite N.ones_0, N.land_0_r, popcou
 Lemma full_bitmap_has_slot_31 : bitmap_has full_bitmap 31 = true.
 Proof. now vm_compute. Qed.
 
+Lemma full_bitmap_has_slot :
+  forall slot,
+    (slot < branch_width)%N -> bitmap_has full_bitmap slot = true.
+Proof.
+  intros slot Hslot. apply (proj2 (bitmap_has_spec full_bitmap slot)).
+  change (N.testbit (N.ones 32) slot = true).
+  now apply N.ones_spec_low.
+Qed.
+
 Lemma full_bitmap_has_slot_nat :
   forall slot : nat,
     slot < 32 -> bitmap_has full_bitmap (N.of_nat slot) = true.
 Proof.
-  intros slot Hslot.
-  assert (slot = 0 \/ slot = 1 \/ slot = 2 \/ slot = 3 \/ slot = 4 \/ slot = 5 \/ slot = 6 \/ slot = 7 \/ slot = 8 \/ slot = 9 \/ slot = 10 \/ slot = 11 \/ slot = 12 \/ slot = 13 \/ slot = 14 \/ slot = 15 \/ slot = 16 \/ slot = 17 \/ slot = 18 \/ slot = 19 \/ slot = 20 \/ slot = 21 \/ slot = 22 \/ slot = 23 \/ slot = 24 \/ slot = 25 \/ slot = 26 \/ slot = 27 \/ slot = 28 \/ slot = 29 \/ slot = 30 \/ slot = 31) as Hcases by lia.
-  destruct Hcases as [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | ->]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]; vm_compute; reflexivity.
+  intros slot Hslot. apply full_bitmap_has_slot.
+  change (N.of_nat slot < N.of_nat 32)%N. lia.
 Qed.
 
 Lemma full_bitmap_popcount : popcount32 full_bitmap = 32.
