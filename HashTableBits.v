@@ -89,6 +89,22 @@ Proof.
     rewrite Hzero. tauto.
 Qed.
 
+Lemma bitmap_has_false_spec :
+  forall bitmap slot,
+    bitmap_has bitmap slot = false <-> N.testbit bitmap slot = false.
+Proof.
+  intros bitmap slot.
+  destruct (bitmap_has bitmap slot) eqn:Hhas.
+  - destruct (N.testbit bitmap slot) eqn:Hbit.
+    + tauto.
+    + exfalso. apply (proj1 (bitmap_has_spec bitmap slot)) in Hhas.
+      now rewrite Hbit in Hhas.
+  - destruct (N.testbit bitmap slot) eqn:Hbit.
+    + exfalso. apply (proj2 (bitmap_has_spec bitmap slot)) in Hbit.
+      now rewrite Hhas in Hbit.
+    + tauto.
+Qed.
+
 Lemma occupied_slots_from_empty :
   forall fuel slot, occupied_slots_from fuel 0 slot = [].
 Proof.
