@@ -77,6 +77,28 @@ Lemma prefix_matches_append_slot :
       NoDupA binding_equiv (bindings (Branch bitmap children)) ->
       wf depth prefix (Branch bitmap children).
 
+Lemma wf_unary_branch :
+    forall depth prefix full_hash (child : tree K A),
+      depth < branch_levels ->
+      child <> Empty ->
+      wf (S depth) (prefix ++ [chunk full_hash depth]) child ->
+      NoDupA binding_equiv (bindings child) ->
+      wf depth prefix (Branch (child_bit full_hash depth) [child]).
+Proof.
+  intros depth prefix full_hash child Hdepth Hnonempty Hchild Hnodup.
+  apply wf_branch.
+  - exact Hdepth.
+  - apply child_bit_bound.
+  - apply child_bit_nonzero.
+  - simpl. now rewrite child_bit_popcount.
+  - unfold child_bit. rewrite (occupied_slots_bitmap_bit (slot := chunk full_hash depth)
+      (chunk_bound full_hash depth)).
+    constructor.
+    + split; assumption.
+    + constructor.
+  - simpl. now rewrite app_nil_r.
+Qed.
+
 Lemma wf_normalize_collision :
     forall depth prefix full_hash entries,
       Forall (entry_matches full_hash depth prefix) entries ->
