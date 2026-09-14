@@ -69,6 +69,26 @@ Proof.
   apply bitmap_bit_bound. apply chunk_bound.
 Qed.
 
+Lemma child_bit_has_slot :
+  forall full_hash depth,
+    bitmap_has (child_bit full_hash depth) (chunk full_hash depth) = true.
+Proof.
+  intros full_hash depth. unfold child_bit, bitmap_bit.
+  apply (proj2 (bitmap_has_spec _ _)).
+  rewrite N.shiftl_1_l. apply N.pow2_bits_true.
+Qed.
+
+Lemma child_bit_has_no_other_slot :
+  forall full_hash depth slot,
+    slot <> chunk full_hash depth ->
+    bitmap_has (child_bit full_hash depth) slot = false.
+Proof.
+  intros full_hash depth slot Hdifferent. unfold child_bit, bitmap_bit.
+  apply (proj2 (bitmap_has_false_spec _ _)).
+  rewrite N.shiftl_1_l, N.pow2_bits_eqb.
+  apply N.eqb_neq. now apply not_eq_sym.
+Qed.
+
 Definition normalize_collision {K A : Type} (h : N) (entries : list (K * A))
     : tree K A :=
   match normalize_bucket entries with
