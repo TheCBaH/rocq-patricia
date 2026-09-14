@@ -3,7 +3,12 @@
 
 module type KEY = sig
   type t
+
+  (** [equal] must implement the map's key equivalence relation. *)
   val equal : t -> t -> bool
+
+  (** [hash] may return any OCaml [int].  The wrapper retains its low 30 bits.
+      Equivalent keys must return the same normalized hash for a fixed seed. *)
   val hash : seed:int -> t -> int
 end
 
@@ -11,6 +16,7 @@ module Make (Key : KEY) : sig
   type key = Key.t
   type 'a t
 
+  (** The seed is retained by all maps derived from this value. *)
   val empty : seed:int -> 'a t
   val singleton : seed:int -> key -> 'a -> 'a t
   val is_empty : 'a t -> bool

@@ -35,6 +35,11 @@ performs the same comparison for fixed-width string keys. Set `HASHTABLE_BENCH_S
 `root-slot-collision`) to record a local series; its timing and heap output is
 workload-specific evidence.
 
+`HashMap.Make` accepts an equality callback and a seeded hash callback. The
+wrapper retains the low 30 bits of every returned hash; equivalent keys must
+therefore return the same normalized hash for a given seed. Each map retains
+the seed supplied to `empty`, `singleton`, or `of_list`.
+
 Run:
 
 ```sh
