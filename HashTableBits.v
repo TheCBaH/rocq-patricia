@@ -265,6 +265,15 @@ Proof. intros. unfold rank, popcount32. now rewrite N.ones_0, N.land_0_r, popcou
 Lemma full_bitmap_has_slot_31 : bitmap_has full_bitmap 31 = true.
 Proof. now vm_compute. Qed.
 
+Lemma full_bitmap_has_slot_nat :
+  forall slot : nat,
+    slot < 32 -> bitmap_has full_bitmap (N.of_nat slot) = true.
+Proof.
+  intros slot Hslot.
+  assert (slot = 0 \/ slot = 1 \/ slot = 2 \/ slot = 3 \/ slot = 4 \/ slot = 5 \/ slot = 6 \/ slot = 7 \/ slot = 8 \/ slot = 9 \/ slot = 10 \/ slot = 11 \/ slot = 12 \/ slot = 13 \/ slot = 14 \/ slot = 15 \/ slot = 16 \/ slot = 17 \/ slot = 18 \/ slot = 19 \/ slot = 20 \/ slot = 21 \/ slot = 22 \/ slot = 23 \/ slot = 24 \/ slot = 25 \/ slot = 26 \/ slot = 27 \/ slot = 28 \/ slot = 29 \/ slot = 30 \/ slot = 31) as Hcases by lia.
+  destruct Hcases as [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | ->]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]; vm_compute; reflexivity.
+Qed.
+
 Lemma full_bitmap_popcount : popcount32 full_bitmap = 32.
 Proof. now vm_compute. Qed.
 
