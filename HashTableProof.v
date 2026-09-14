@@ -289,6 +289,33 @@ Proof.
  reflexivity.
 Qed.
 
+Lemma leaf_leaf_disjoint :
+ forall left_depth left_prefix left_hash (left_key : K) left_value
+        right_depth right_prefix right_hash (right_key : K) right_value,
+ left_hash <> right_hash ->
+ wf left_depth left_prefix (Leaf left_hash left_key left_value) ->
+ wf right_depth right_prefix (Leaf right_hash right_key right_value) ->
+ (forall first second, E first second -> hash seed first = hash seed second) ->
+ forall entry, InA binding_equiv entry [(left_key, left_value)] ->
+ InA binding_equiv entry [(right_key, right_value)] -> False.
+Proof.
+ intros left_depth left_prefix left_hash left_key left_value right_depth
+   right_prefix right_hash right_key right_value Hdifferent Hleft Hright
+   Hcongruent entry Hinleft Hinright.
+ destruct (inA_witness Hinleft) as [left_entry [Hinleft' Heleft]].
+ simpl in Hinleft'. destruct Hinleft' as [Heq|[]]. subst left_entry.
+ destruct (inA_witness Hinright) as [right_entry [Hinright' Heright]].
+ simpl in Hinright'. destruct Hinright' as [Heq|[]]. subst right_entry.
+ assert (Hleft_hash : left_hash = hash seed left_key).
+ { inversion Hleft; subst. reflexivity. }
+ assert (Hright_hash : right_hash = hash seed right_key).
+ { inversion Hright; subst. reflexivity. }
+ apply Hdifferent. rewrite Hleft_hash, Hright_hash.
+ rewrite <- (Hcongruent (fst entry) left_key Heleft).
+ rewrite <- (Hcongruent (fst entry) right_key Heright).
+ reflexivity.
+Qed.
+
 Lemma join_two_bindings_nodup :
  forall depth left_hash right_hash (left right : tree K A),
  Equivalence binding_equiv ->
@@ -358,6 +385,40 @@ Proof.
      (left_hash := left_hash) (left_key := left_key) (left_value := left_value)
      (right_depth := S depth) (right_prefix := prefix ++ [chunk right_hash depth])
      (right_hash := right_hash) (entries := entries)); auto.
+Qed.
+
+Lemma wf_join_two_leaf_leaf :
+ forall depth prefix left_hash (left_key : K) left_value
+        right_hash (right_key : K) right_value,
+ depth < branch_levels ->
+ left_hash <> right_hash ->
+ chunk left_hash depth <> chunk right_hash depth ->
+ wf (S depth) (prefix ++ [chunk left_hash depth])
+   (Leaf left_hash left_key left_value) ->
+ wf (S depth) (prefix ++ [chunk right_hash depth])
+   (Leaf right_hash right_key right_value) ->
+ Equivalence E ->
+ (forall first second, E first second -> hash seed first = hash seed second) ->
+ wf depth prefix
+   (join_two left_hash (Leaf left_hash left_key left_value)
+     right_hash (Leaf right_hash right_key right_value) depth).
+Proof.
+ intros depth prefix left_hash left_key left_value right_hash right_key right_value
+   Hdepth Hhashdifferent Hchunkdifferent Hleft Hright Hequiv Hcongruent.
+ eapply wf_join_two_disjoint.
+ - exact Hdepth.
+ - exact Hchunkdifferent.
+ - discriminate.
+ - discriminate.
+ - exact Hleft.
+ - exact Hright.
+ - apply binding_equiv_equiv. exact Hequiv.
+ - apply (leaf_leaf_disjoint
+     (left_depth := S depth) (left_prefix := prefix ++ [chunk left_hash depth])
+     (left_hash := left_hash) (left_key := left_key) (left_value := left_value)
+     (right_depth := S depth) (right_prefix := prefix ++ [chunk right_hash depth])
+     (right_hash := right_hash) (right_key := right_key)
+     (right_value := right_value)); auto.
 Qed.
 
 Lemma wf_normalize_collision :
