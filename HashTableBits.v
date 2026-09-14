@@ -445,6 +445,15 @@ Qed.
 Lemma full_bitmap_popcount : popcount32 full_bitmap = 32.
 Proof. now vm_compute. Qed.
 
+Lemma popcount_bitmap_bit :
+  forall slot,
+    (slot < branch_width)%N -> popcount32 (bitmap_bit slot) = 1.
+Proof.
+  intros slot Hslot.
+  assert (slot = 0%N \/ slot = 1%N \/ slot = 2%N \/ slot = 3%N \/ slot = 4%N \/ slot = 5%N \/ slot = 6%N \/ slot = 7%N \/ slot = 8%N \/ slot = 9%N \/ slot = 10%N \/ slot = 11%N \/ slot = 12%N \/ slot = 13%N \/ slot = 14%N \/ slot = 15%N \/ slot = 16%N \/ slot = 17%N \/ slot = 18%N \/ slot = 19%N \/ slot = 20%N \/ slot = 21%N \/ slot = 22%N \/ slot = 23%N \/ slot = 24%N \/ slot = 25%N \/ slot = 26%N \/ slot = 27%N \/ slot = 28%N \/ slot = 29%N \/ slot = 30%N \/ slot = 31%N) as Hcases by (unfold branch_width in Hslot; lia).
+  destruct Hcases as [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | ->]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]; vm_compute; reflexivity.
+Qed.
+
 Lemma full_bitmap_rank_slot_31 : rank full_bitmap 31 = 31.
 Proof. now vm_compute. Qed.
 

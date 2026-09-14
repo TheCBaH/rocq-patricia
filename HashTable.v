@@ -76,6 +76,14 @@ Proof.
   intros full_hash depth. unfold child_bit. apply bitmap_bit_has_slot.
 Qed.
 
+Lemma child_bit_popcount :
+  forall full_hash depth,
+    popcount32 (child_bit full_hash depth) = 1.
+Proof.
+  intros full_hash depth. unfold child_bit.
+  apply popcount_bitmap_bit. apply chunk_bound.
+Qed.
+
 Lemma child_bit_has_no_other_slot :
   forall full_hash depth slot,
     slot <> chunk full_hash depth ->
