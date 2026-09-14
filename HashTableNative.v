@@ -67,6 +67,28 @@ Proof.
   now apply dense_get_insert_same.
 Qed.
 
+Lemma pseq_get_insert_before :
+  forall A index before (item : A) items,
+    before < index ->
+    index <= length (pseq_view items) ->
+    pseq_get before (pseq_insert index item items) = pseq_get before items.
+Proof.
+  intros A index before item items Hbefore Hbound.
+  unfold pseq_get, pseq_insert, pseq_of_list.
+  now apply dense_get_insert_before.
+Qed.
+
+Lemma pseq_get_insert_after :
+  forall A index after (item : A) items,
+    index <= after ->
+    index <= length (pseq_view items) ->
+    pseq_get (S after) (pseq_insert index item items) = pseq_get after items.
+Proof.
+  intros A index after item items Hafter Hbound.
+  unfold pseq_get, pseq_insert, pseq_of_list.
+  now apply dense_get_insert_after.
+Qed.
+
 Lemma pseq_get_replace_same :
   forall A index (item : A) items,
     index < length (pseq_view items) ->
@@ -75,6 +97,16 @@ Proof.
   intros A index item items Hbound.
   unfold pseq_get, pseq_replace, pseq_of_list.
   now apply dense_get_replace_same.
+Qed.
+
+Lemma pseq_get_replace_other :
+  forall A index other (item : A) items,
+    other <> index ->
+    pseq_get other (pseq_replace index item items) = pseq_get other items.
+Proof.
+  intros A index other item items Hother.
+  unfold pseq_get, pseq_replace, pseq_of_list.
+  now apply dense_get_replace_other.
 Qed.
 
 Lemma pseq_get_remove_before :

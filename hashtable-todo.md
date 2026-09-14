@@ -193,6 +193,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H2.3 (partial) | Added `get_tree_empty` and `get_tree_collision_other_hash`, making empty and mismatching full-hash collision lookup behavior explicit for every fuel value. Recursive branch lookup refinement remains open. |
 | 2026-09-13 | H4.1 (partial) | Added `pseq_get_insert_same`, `pseq_get_replace_same`, `pseq_get_remove_before` and `pseq_get_remove_after`, lifting dense-list indexed update laws to the modeled native sequence interface. Array-realizer refinement remains open. |
 | 2026-09-14 | H4.1 (partial) | Added modeled native-sequence cardinality laws for insertion, replacement and removal, including exact valid-index deletion size. These lift the dense-list contracts used by future native branch refinement. |
+| 2026-09-14 | H4.1 (partial) | Added modeled native-sequence lookup preservation before/after insertion and away from replacement. Together with the prior same/remove laws, `pseq` now exposes the full indexed edit matrix needed for compact-child refinement. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
