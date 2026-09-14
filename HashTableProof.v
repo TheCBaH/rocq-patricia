@@ -131,6 +131,48 @@ Proof.
   eapply wf_join_worker_equal; eauto using join_worker_nonempty.
 Qed.
 
+Lemma wf_join_two :
+ forall depth prefix left_hash right_hash (left right : tree K A),
+ depth < branch_levels ->
+ chunk left_hash depth <> chunk right_hash depth ->
+ left <> Empty ->
+ right <> Empty ->
+ wf (S depth) (prefix ++ [chunk left_hash depth]) left ->
+ wf (S depth) (prefix ++ [chunk right_hash depth]) right ->
+ NoDupA binding_equiv (bindings (join_two left_hash left right_hash right depth)) ->
+ wf depth prefix (join_two left_hash left right_hash right depth).
+Proof.
+ intros depth prefix left_hash right_hash left right Hdepth Hdifferent Hleftne Hrightne Hleft Hright Hnodup.
+ unfold join_two in Hnodup.
+ destruct (N.ltb (chunk left_hash depth) (chunk right_hash depth)) eqn:Hlt.
+ - unfold join_two. rewrite Hlt. apply wf_branch.
+   + exact Hdepth.
+   + apply join_two_bitmap_bound_total.
+   + apply join_two_bitmap_nonzero.
+   + change (2 = popcount32 (N.lor (bitmap_bit (chunk left_hash depth)) (bitmap_bit (chunk right_hash depth)))). rewrite popcount_lor_bitmap_bits.
+     * reflexivity.
+     * apply chunk_bound.
+     * apply chunk_bound.
+     * apply N.ltb_lt in Hlt. lia.
+   + rewrite (occupied_slots_lor_bitmap_bits_lt (left := chunk left_hash depth) (right := chunk right_hash depth) (chunk_bound _ _) (chunk_bound _ _) Hlt).
+     constructor; [split; [exact Hleftne|exact Hleft]|constructor; [split; [exact Hrightne|exact Hright]|constructor]].
+   + exact Hnodup.
+ - unfold join_two. rewrite Hlt. apply wf_branch.
+   + exact Hdepth.
+   + apply join_two_bitmap_bound_total.
+   + apply join_two_bitmap_nonzero.
+   + change (2 = popcount32 (N.lor (bitmap_bit (chunk left_hash depth)) (bitmap_bit (chunk right_hash depth)))). rewrite popcount_lor_bitmap_bits.
+     * reflexivity.
+     * apply chunk_bound.
+     * apply chunk_bound.
+     * exact Hdifferent.
+   + assert (Hgt : N.ltb (chunk right_hash depth) (chunk left_hash depth) = true).
+     { apply N.ltb_ge in Hlt. apply N.ltb_lt. apply (proj2 (N.le_neq _ _)). split; [exact Hlt|]. intro Heq. apply Hdifferent. exact (eq_sym Heq). }
+     rewrite N.lor_comm. rewrite (occupied_slots_lor_bitmap_bits_lt (left := chunk right_hash depth) (right := chunk left_hash depth) (chunk_bound _ _) (chunk_bound _ _) Hgt).
+     constructor; [split; [exact Hrightne|exact Hright]|constructor; [split; [exact Hleftne|exact Hleft]|constructor]].
+   + exact Hnodup.
+Qed.
+
 Lemma wf_normalize_collision :
     forall depth prefix full_hash entries,
       Forall (entry_matches full_hash depth prefix) entries ->

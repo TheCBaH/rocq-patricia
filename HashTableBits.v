@@ -553,6 +553,20 @@ Proof.
   all: destruct Hr as [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | ->]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]; try contradiction; vm_compute; reflexivity.
 Qed.
 
+Lemma occupied_slots_lor_bitmap_bits_lt :
+  forall left right,
+    (left < branch_width)%N ->
+    (right < branch_width)%N ->
+    N.ltb left right = true ->
+    occupied_slots (N.lor (bitmap_bit left) (bitmap_bit right)) = [left; right].
+Proof.
+  intros left right Hleft Hright Hlt.
+  assert (left = 0%N \/ left = 1%N \/ left = 2%N \/ left = 3%N \/ left = 4%N \/ left = 5%N \/ left = 6%N \/ left = 7%N \/ left = 8%N \/ left = 9%N \/ left = 10%N \/ left = 11%N \/ left = 12%N \/ left = 13%N \/ left = 14%N \/ left = 15%N \/ left = 16%N \/ left = 17%N \/ left = 18%N \/ left = 19%N \/ left = 20%N \/ left = 21%N \/ left = 22%N \/ left = 23%N \/ left = 24%N \/ left = 25%N \/ left = 26%N \/ left = 27%N \/ left = 28%N \/ left = 29%N \/ left = 30%N \/ left = 31%N) as Hl by (unfold branch_width in Hleft; lia).
+  assert (right = 0%N \/ right = 1%N \/ right = 2%N \/ right = 3%N \/ right = 4%N \/ right = 5%N \/ right = 6%N \/ right = 7%N \/ right = 8%N \/ right = 9%N \/ right = 10%N \/ right = 11%N \/ right = 12%N \/ right = 13%N \/ right = 14%N \/ right = 15%N \/ right = 16%N \/ right = 17%N \/ right = 18%N \/ right = 19%N \/ right = 20%N \/ right = 21%N \/ right = 22%N \/ right = 23%N \/ right = 24%N \/ right = 25%N \/ right = 26%N \/ right = 27%N \/ right = 28%N \/ right = 29%N \/ right = 30%N \/ right = 31%N) as Hr by (unfold branch_width in Hright; lia).
+  destruct Hl as [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | ->]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]].
+  all: destruct Hr as [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | ->]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]; try discriminate; vm_compute; reflexivity.
+Qed.
+
 Lemma rank_bitmap_bit_self :
   forall slot,
     (slot < branch_width)%N -> rank (bitmap_bit slot) slot = 0.
