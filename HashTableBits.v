@@ -159,6 +159,61 @@ Lemma occupied_slots_length_le :
   forall bitmap, length (occupied_slots bitmap) <= 32.
 Proof. intros. apply occupied_slots_from_length_le. Qed.
 
+(** Enumeration is exact over the finite range scanned by the worker.  These
+    structural facts are deliberately separate from cardinality/rank: branch
+    routing can use them without unfolding the bounded popcount worker. *)
+Lemma occupied_slots_from_sound :
+  forall fuel bitmap start slot,
+    In slot (occupied_slots_from fuel bitmap start) ->
+    bitmap_has bitmap slot = true.
+Proof.
+  induction fuel as [|fuel IH]; intros bitmap start slot Hin; simpl in Hin.
+  - contradiction.
+  - destruct (bitmap_has bitmap start) eqn:Hstart; simpl in Hin.
+    + destruct Hin as [Hslot|Hin].
+      * subst slot. exact Hstart.
+      * now apply (IH bitmap (N.succ start) slot).
+    + now apply (IH bitmap (N.succ start) slot).
+Qed.
+
+Lemma occupied_slots_from_complete :
+  forall fuel bitmap start slot,
+    (start <= slot)%N ->
+    (slot < start + N.of_nat fuel)%N ->
+    bitmap_has bitmap slot = true ->
+    In slot (occupied_slots_from fuel bitmap start).
+Proof.
+  induction fuel as [|fuel IH]; intros bitmap start slot Hstart Hbound Hhas;
+    simpl in Hbound.
+  - lia.
+  - simpl. destruct (bitmap_has bitmap start) eqn:Hhere.
+    + destruct (N.eq_dec slot start) as [Hequal|Hdifferent].
+      * subst slot. simpl. now left.
+      * simpl. right. apply IH.
+        -- lia.
+        -- change (slot < N.succ start + N.of_nat fuel)%N. lia.
+        -- exact Hhas.
+    + simpl. apply IH.
+      * destruct (N.eq_dec slot start) as [Hequal|Hdifferent].
+        -- subst slot. rewrite Hhas in Hhere. discriminate.
+        -- lia.
+      * change (slot < N.succ start + N.of_nat fuel)%N. lia.
+      * exact Hhas.
+Qed.
+
+Lemma occupied_slots_complete :
+  forall bitmap slot,
+    (slot < branch_width)%N ->
+    bitmap_has bitmap slot = true ->
+    In slot (occupied_slots bitmap).
+Proof.
+  intros bitmap slot Hslot Hhas. unfold occupied_slots.
+  apply (occupied_slots_from_complete 32 bitmap).
+  - lia.
+  - change (slot < branch_width)%N. exact Hslot.
+  - exact Hhas.
+Qed.
+
 Lemma chunk_bound :
   forall full_hash depth, (chunk full_hash depth < branch_width)%N.
 Proof.
