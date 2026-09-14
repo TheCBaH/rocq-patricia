@@ -1,6 +1,6 @@
 # Persistent generic hash table: tracker
 
-Last updated: 2026-09-13.
+Last updated: 2026-09-14.
 
 Contract: [hashtable-design.md](hashtable-design.md). Delivery gates and proposed
 files/commands: [hashtable-plan.md](hashtable-plan.md). Background:
@@ -45,7 +45,7 @@ Dependencies: documentation baseline.
 Dependencies: H0.G.
 
 - [x] **H1.1** `HashTableBits.v` defines chunks, proves the per-chunk bound, proves a normalized 30-bit hash has zero chunk at depth six, reconstructs every normalized hash from its six routing chunks, and proves distinct normalized hashes differ at one of depths 0 through 5.
-- [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with slot-31/full-bitmap boundary calculations, empty and full occupied-slot enumeration, a 32-slot enumeration bound, bounded lookup laws before/at/after insertion plus replacement/removal lookup preservation, insertion/replacement/deletion membership laws, exact valid-index removal cardinality, and valid-index slot/child paired replacement preservation; general bitmap-rank correspondence remains open.
+- [ ] **H1.2** In progress: `HashTableBits.v` defines bounded popcount/rank and dense-list edits, with exact full-bitmap rank at every native slot, empty and full occupied-slot enumeration, a 32-slot enumeration bound, bounded lookup laws before/at/after insertion plus replacement/removal lookup preservation, insertion/replacement/deletion membership laws, exact valid-index removal cardinality, and valid-index slot/child paired replacement preservation; general bitmap-rank correspondence remains open.
 - [x] **H1.3** `HashTableBucket.v` defines lookup/set/remove and empty/singleton/many normalization with pointwise update/removal preservation for different equivalence classes, exact hit/miss insertion cardinality, successful-removal cardinality, and relation-parametric uniqueness preservation. `bucket_set_key_nodup` gives one all-cases update theorem for collision-key equivalence, requiring freshness only when lookup reports a miss.
 - [ ] **H1.G** Gate: primitive proofs compile and theorem assumption audit passes.
 
@@ -196,6 +196,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-14 | H4.1 (partial) | Added modeled native-sequence lookup preservation before/after insertion and away from replacement. Together with the prior same/remove laws, `pseq` now exposes the full indexed edit matrix needed for compact-child refinement. |
 | 2026-09-14 | H3.3 (partial) | Documented the public `HashMap.Make` callback contract in `HashMap.mli` and `README.md`: arbitrary raw hashes are normalized to 30 bits, equivalent keys require equal normalized hashes for a seed, and derived maps retain their seed. |
 | 2026-09-14 | H3.3 (partial) | Documented public representative retention for equivalent-key `set` and first-wins representative/value behavior for `of_list` in `HashMap.mli` and `README.md`, matching the wrapper tests and source laws. |
+| 2026-09-14 | H1.2 (partial) | Added `full_bitmap_rank_nat`: for every native slot from 0 through 31, the full bitmap’s rank equals its dense index. The finite proof reduces each valid slot by computation; general bitmap/rank correspondence remains open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
