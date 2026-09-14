@@ -97,6 +97,39 @@ Proof.
   now apply dense_get_remove_after.
 Qed.
 
+Lemma pseq_insert_length :
+  forall A index (item : A) items,
+    length (pseq_view (pseq_insert index item items)) = S (length (pseq_view items)).
+Proof.
+  intros A index item items.
+  rewrite pseq_insert_view. apply dense_insert_length.
+Qed.
+
+Lemma pseq_replace_length :
+  forall A index (item : A) items,
+    length (pseq_view (pseq_replace index item items)) = length (pseq_view items).
+Proof.
+  intros A index item items.
+  rewrite pseq_replace_view. apply dense_replace_length.
+Qed.
+
+Lemma pseq_remove_length_le :
+  forall A index (items : pseq A),
+    length (pseq_view (pseq_remove index items)) <= length (pseq_view items).
+Proof.
+  intros A index items.
+  rewrite pseq_remove_view. apply dense_remove_length_le.
+Qed.
+
+Lemma pseq_remove_length_hit :
+  forall A index (items : pseq A),
+    index < length (pseq_view items) ->
+    length (pseq_view (pseq_remove index items)) = Nat.pred (length (pseq_view items)).
+Proof.
+  intros A index items Hbound.
+  rewrite pseq_remove_view. now apply dense_remove_length_hit.
+Qed.
+
 Inductive native_tree (K A : Type) : Type :=
 | NativeEmpty
 | NativeLeaf (full_hash : N) (key : K) (value : A)

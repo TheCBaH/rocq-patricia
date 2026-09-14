@@ -76,7 +76,7 @@ Dependencies: H2.G.
 
 Dependencies: H3.G.
 
-- [ ] **H4.1** In progress: `HashTableNative.v` defines a source-modeled persistent sequence interface, fresh-update view and indexed lookup laws, and a native-tree/source relation with empty/leaf/collision refinement lemmas; `HashTableExtract.v` compiles a separately extracted modeled-native artifact. Array realization and recursive branch refinement remain open.
+- [ ] **H4.1** In progress: `HashTableNative.v` defines a source-modeled persistent sequence interface, fresh-update view, indexed lookup and cardinality laws, and a native-tree/source relation with empty/leaf/collision refinement lemmas; `HashTableExtract.v` compiles a separately extracted modeled-native artifact. Array realization and recursive branch refinement remain open.
 - [ ] **H4.2** In progress: `HashTableNative.v` / `HashTableNativeProof.v` define modeled native get/set/remove and prove refinement for arbitrary related source/native trees; the separately extracted model passes a retained-version differential test against extracted source workers. Invariant/seed preservation and any array-realizer refinement remain open.
 - [ ] **H4.3** Prove bounded bitmap/scalar/popcount workers including all native intermediate and shift bounds.
 - [ ] **H4.4** In progress: `HashTablePrimitives.ml` / `.mli` provide private fresh-copy sequence primitives and `HashMapNative.ml` uses them for a private-array HAMT; primitive and reference/native differential tests validate views, storage freshness and map behavior. Extraction bindings and their full target inventory remain open.
@@ -192,6 +192,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-13 | H2.5 (partial) | Added `remove_tree_collision_wf`, extending collision-removal invariant preservation to all queried full hashes: a mismatch is unchanged and a match uses normalized collision removal. Only recursive branch preservation remains open for removal. |
 | 2026-09-13 | H2.3 (partial) | Added `get_tree_empty` and `get_tree_collision_other_hash`, making empty and mismatching full-hash collision lookup behavior explicit for every fuel value. Recursive branch lookup refinement remains open. |
 | 2026-09-13 | H4.1 (partial) | Added `pseq_get_insert_same`, `pseq_get_replace_same`, `pseq_get_remove_before` and `pseq_get_remove_after`, lifting dense-list indexed update laws to the modeled native sequence interface. Array-realizer refinement remains open. |
+| 2026-09-14 | H4.1 (partial) | Added modeled native-sequence cardinality laws for insertion, replacement and removal, including exact valid-index deletion size. These lift the dense-list contracts used by future native branch refinement. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
