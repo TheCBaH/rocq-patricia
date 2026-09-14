@@ -263,23 +263,25 @@ Proof.
 Qed.
 
 Lemma leaf_collision_disjoint :
- forall depth prefix left_hash (left_key : K) left_value right_hash entries,
+ forall left_depth left_prefix left_hash (left_key : K) left_value
+        right_depth right_prefix right_hash entries,
  left_hash <> right_hash ->
- wf depth prefix (Leaf left_hash left_key left_value) ->
- wf depth prefix (Collision right_hash entries) ->
+ wf left_depth left_prefix (Leaf left_hash left_key left_value) ->
+ wf right_depth right_prefix (Collision right_hash entries) ->
  (forall first second, E first second -> hash seed first = hash seed second) ->
  forall entry, InA binding_equiv entry [(left_key, left_value)] ->
  InA binding_equiv entry entries -> False.
 Proof.
- intros depth prefix left_hash left_key left_value right_hash entries Hdifferent
-   Hleft Hright Hcongruent entry Hinleft Hinright.
+ intros left_depth left_prefix left_hash left_key left_value right_depth
+   right_prefix right_hash entries Hdifferent Hleft Hright Hcongruent entry
+   Hinleft Hinright.
  destruct (inA_witness Hinleft) as [left_entry [Hinleft' Heleft]].
  simpl in Hinleft'. destruct Hinleft' as [Heq|[]]. subst left_entry.
  destruct (inA_witness Hinright) as [right_entry [Hinright' Heright]].
  assert (Hleft_hash : left_hash = hash seed left_key).
  { inversion Hleft; subst. reflexivity. }
  assert (Hright_hash : right_hash = hash seed (fst right_entry)).
- { now apply collision_binding_hash with (depth := depth) (prefix := prefix)
+ { now apply collision_binding_hash with (depth := right_depth) (prefix := right_prefix)
      (entries := entries). }
  apply Hdifferent. rewrite Hleft_hash, Hright_hash.
  rewrite <- (Hcongruent (fst entry) left_key Heleft).
@@ -324,6 +326,38 @@ Proof.
       (prefix := prefix ++ [chunk left_hash depth]).
   - now apply wf_bindings_nodup with (depth := S depth)
       (prefix := prefix ++ [chunk right_hash depth]).
+Qed.
+
+Lemma wf_join_two_leaf_collision :
+ forall depth prefix left_hash (left_key : K) left_value right_hash entries,
+ depth < branch_levels ->
+ left_hash <> right_hash ->
+ chunk left_hash depth <> chunk right_hash depth ->
+ wf (S depth) (prefix ++ [chunk left_hash depth])
+   (Leaf left_hash left_key left_value) ->
+ wf (S depth) (prefix ++ [chunk right_hash depth])
+   (Collision right_hash entries) ->
+ Equivalence E ->
+ (forall first second, E first second -> hash seed first = hash seed second) ->
+ wf depth prefix
+   (join_two left_hash (Leaf left_hash left_key left_value)
+     right_hash (Collision right_hash entries) depth).
+Proof.
+ intros depth prefix left_hash left_key left_value right_hash entries Hdepth
+   Hhashdifferent Hchunkdifferent Hleft Hright Hequiv Hcongruent.
+ eapply wf_join_two_disjoint.
+ - exact Hdepth.
+ - exact Hchunkdifferent.
+ - discriminate.
+ - discriminate.
+ - exact Hleft.
+ - exact Hright.
+ - apply binding_equiv_equiv. exact Hequiv.
+ - apply (leaf_collision_disjoint
+     (left_depth := S depth) (left_prefix := prefix ++ [chunk left_hash depth])
+     (left_hash := left_hash) (left_key := left_key) (left_value := left_value)
+     (right_depth := S depth) (right_prefix := prefix ++ [chunk right_hash depth])
+     (right_hash := right_hash) (entries := entries)); auto.
 Qed.
 
 Lemma wf_normalize_collision :
