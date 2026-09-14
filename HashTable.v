@@ -121,6 +121,16 @@ Proof.
   - now apply bitmap_bit_has_no_other_slot.
 Qed.
 
+Lemma join_two_bitmap_nonzero :
+  forall left_hash right_hash depth,
+    N.lor (bitmap_bit (chunk left_hash depth))
+          (bitmap_bit (chunk right_hash depth)) <> 0%N.
+Proof.
+  intros left_hash right_hash depth Hzero.
+  pose proof (join_two_bitmap_has_left_slot left_hash right_hash depth) as Hslot.
+  rewrite Hzero, bitmap_has_empty in Hslot. discriminate.
+Qed.
+
 Definition normalize_collision {K A : Type} (h : N) (entries : list (K * A))
     : tree K A :=
   match normalize_bucket entries with
