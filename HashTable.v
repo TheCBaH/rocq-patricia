@@ -200,6 +200,27 @@ Fixpoint join_worker {K A : Type} (fuel depth : nat)
       else join_two left_hash left right_hash right depth
   end.
 
+Lemma join_two_nonempty :
+  forall K A depth left_hash right_hash (left right : tree K A),
+    join_two left_hash left right_hash right depth <> Empty.
+Proof.
+  intros K A depth left_hash right_hash left right.
+  unfold join_two. destruct (N.ltb (chunk left_hash depth) (chunk right_hash depth));
+    discriminate.
+Qed.
+
+Lemma join_worker_nonempty :
+  forall K A fuel depth left_hash right_hash (left right : tree K A),
+    join_worker fuel depth left_hash left right_hash right <> Empty.
+Proof.
+  intros K A fuel. induction fuel as [|fuel IH];
+    intros depth left_hash right_hash left right.
+  - apply join_two_nonempty.
+  - cbn [join_worker]. destruct (N.eqb (chunk left_hash depth) (chunk right_hash depth)).
+    + discriminate.
+    + apply join_two_nonempty.
+Qed.
+
 Fixpoint get_tree {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (query : K) (t : tree K A) : option A :=
   match fuel, t with
