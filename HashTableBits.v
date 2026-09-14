@@ -122,6 +122,17 @@ Proof.
     apply N.bits_above_log2. unfold branch_width in Hslot. lia.
 Qed.
 
+Lemma bitmap_empty_iff :
+  forall bitmap,
+    bitmap = 0%N <-> forall slot, bitmap_has bitmap slot = false.
+Proof.
+  intros bitmap. split.
+  - intro Hempty. subst bitmap. apply bitmap_has_empty.
+  - intro Habsent. apply N.bits_inj. intro slot.
+    rewrite N.bits_0.
+    apply (proj1 (bitmap_has_false_spec bitmap slot)). apply Habsent.
+Qed.
+
 Lemma occupied_slots_from_empty :
   forall fuel slot, occupied_slots_from fuel 0 slot = [].
 Proof.
