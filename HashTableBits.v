@@ -309,6 +309,46 @@ Proof.
   apply N.pow_lt_mono_r; lia.
 Qed.
 
+Lemma bitmap_bit_has_slot :
+  forall slot, bitmap_has (bitmap_bit slot) slot = true.
+Proof.
+  intros slot. unfold bitmap_bit.
+  apply (proj2 (bitmap_has_spec _ _)).
+  rewrite N.shiftl_1_l. apply N.pow2_bits_true.
+Qed.
+
+Lemma bitmap_bit_has_no_other_slot :
+  forall bit_slot slot,
+    slot <> bit_slot -> bitmap_has (bitmap_bit bit_slot) slot = false.
+Proof.
+  intros bit_slot slot Hdifferent. unfold bitmap_bit.
+  apply (proj2 (bitmap_has_false_spec _ _)).
+  rewrite N.shiftl_1_l, N.pow2_bits_eqb.
+  apply N.eqb_neq. now apply not_eq_sym.
+Qed.
+
+Lemma bitmap_has_lor_left :
+  forall left right slot,
+    bitmap_has left slot = true ->
+    bitmap_has (N.lor left right) slot = true.
+Proof.
+  intros left right slot Hleft.
+  apply (proj2 (bitmap_has_spec _ _)).
+  rewrite N.lor_spec. apply orb_true_intro. left.
+  now apply (proj1 (bitmap_has_spec left slot)).
+Qed.
+
+Lemma bitmap_has_lor_right :
+  forall left right slot,
+    bitmap_has right slot = true ->
+    bitmap_has (N.lor left right) slot = true.
+Proof.
+  intros left right slot Hright.
+  apply (proj2 (bitmap_has_spec _ _)).
+  rewrite N.lor_spec. apply orb_true_intro. right.
+  now apply (proj1 (bitmap_has_spec right slot)).
+Qed.
+
 Lemma full_bitmap_bound : (full_bitmap < bitmap_limit)%N.
 Proof. now vm_compute. Qed.
 

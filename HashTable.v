@@ -73,9 +73,7 @@ Lemma child_bit_has_slot :
   forall full_hash depth,
     bitmap_has (child_bit full_hash depth) (chunk full_hash depth) = true.
 Proof.
-  intros full_hash depth. unfold child_bit, bitmap_bit.
-  apply (proj2 (bitmap_has_spec _ _)).
-  rewrite N.shiftl_1_l. apply N.pow2_bits_true.
+  intros full_hash depth. unfold child_bit. apply bitmap_bit_has_slot.
 Qed.
 
 Lemma child_bit_has_no_other_slot :
@@ -83,10 +81,30 @@ Lemma child_bit_has_no_other_slot :
     slot <> chunk full_hash depth ->
     bitmap_has (child_bit full_hash depth) slot = false.
 Proof.
-  intros full_hash depth slot Hdifferent. unfold child_bit, bitmap_bit.
-  apply (proj2 (bitmap_has_false_spec _ _)).
-  rewrite N.shiftl_1_l, N.pow2_bits_eqb.
-  apply N.eqb_neq. now apply not_eq_sym.
+  intros full_hash depth slot Hdifferent. unfold child_bit.
+  now apply bitmap_bit_has_no_other_slot.
+Qed.
+
+Lemma join_two_bitmap_has_left_slot :
+  forall left_hash right_hash depth,
+    bitmap_has
+      (N.lor (bitmap_bit (chunk left_hash depth))
+             (bitmap_bit (chunk right_hash depth)))
+      (chunk left_hash depth) = true.
+Proof.
+  intros left_hash right_hash depth. apply bitmap_has_lor_left.
+  apply bitmap_bit_has_slot.
+Qed.
+
+Lemma join_two_bitmap_has_right_slot :
+  forall left_hash right_hash depth,
+    bitmap_has
+      (N.lor (bitmap_bit (chunk left_hash depth))
+             (bitmap_bit (chunk right_hash depth)))
+      (chunk right_hash depth) = true.
+Proof.
+  intros left_hash right_hash depth. apply bitmap_has_lor_right.
+  apply bitmap_bit_has_slot.
 Qed.
 
 Definition normalize_collision {K A : Type} (h : N) (entries : list (K * A))
