@@ -214,6 +214,36 @@ Proof.
   - exact Hhas.
 Qed.
 
+Lemma occupied_slots_from_lower :
+  forall fuel bitmap start slot,
+    In slot (occupied_slots_from fuel bitmap start) -> (start <= slot)%N.
+Proof.
+  induction fuel as [|fuel IH]; intros bitmap start slot Hin; simpl in Hin.
+  - contradiction.
+  - destruct (bitmap_has bitmap start) eqn:Hstart; simpl in Hin.
+    + destruct Hin as [Hslot|Hin].
+      * subst slot. lia.
+      * specialize (IH bitmap (N.succ start) slot Hin). lia.
+    + specialize (IH bitmap (N.succ start) slot Hin). lia.
+Qed.
+
+Lemma occupied_slots_from_nodup :
+  forall fuel bitmap start,
+    NoDup (occupied_slots_from fuel bitmap start).
+Proof.
+  induction fuel as [|fuel IH]; intros bitmap start; simpl.
+  - constructor.
+  - destruct (bitmap_has bitmap start) eqn:Hstart; simpl.
+    + constructor.
+      * intro Hin. pose proof (occupied_slots_from_lower fuel bitmap
+          (N.succ start) start Hin). lia.
+      * apply IH.
+    + apply IH.
+Qed.
+
+Lemma occupied_slots_nodup : forall bitmap, NoDup (occupied_slots bitmap).
+Proof. intros. apply occupied_slots_from_nodup. Qed.
+
 Lemma chunk_bound :
   forall full_hash depth, (chunk full_hash depth < branch_width)%N.
 Proof.
