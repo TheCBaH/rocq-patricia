@@ -105,6 +105,23 @@ Proof.
     + tauto.
 Qed.
 
+Lemma bitmap_has_above_limit :
+  forall bitmap slot,
+    (bitmap < bitmap_limit)%N ->
+    (branch_width <= slot)%N ->
+    bitmap_has bitmap slot = false.
+Proof.
+  intros bitmap slot Hbound Hslot.
+  apply (proj2 (bitmap_has_false_spec bitmap slot)).
+  destruct (N.eq_dec bitmap 0%N) as [Hzero|Hnonzero].
+  - subst bitmap. apply N.bits_0.
+  - assert (Hpositive : (0 < bitmap)%N) by lia.
+    assert (Hpow : (bitmap < 2 ^ 32)%N).
+    { change (bitmap < bitmap_limit)%N. exact Hbound. }
+    apply (proj1 (N.log2_lt_pow2 bitmap 32 Hpositive)) in Hpow.
+    apply N.bits_above_log2. unfold branch_width in Hslot. lia.
+Qed.
+
 Lemma occupied_slots_from_empty :
   forall fuel slot, occupied_slots_from fuel 0 slot = [].
 Proof.
