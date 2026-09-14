@@ -212,7 +212,7 @@ acceptance criteria before adding it to the current release.
 | 2026-09-14 | H2.2 (partial) | Added `join_two_bitmap_nonzero`, deriving the branch bitmap’s nonempty invariant directly from its proven left routing slot. Bitmap width and dense-child branch invariants remain open. |
 | 2026-09-14 | H1.2/H2.2 (partial) | Added disjoint-single-bit and no-carry bitmap-OR bounds, then `join_two_bitmap_bound`. When join routing chunks differ, its bitmap is proved below `2^32`; dense-child ordering and recursive branch validity remain open. |
 | 2026-09-14 | H2.2 (partial) | Added `join_two_bitmap_bound_total`, covering both distinct and equal chunk cases. Every `join_two` bitmap is now proved below `2^32`, including the worker’s fuel-zero fallback shape. |
-| 2026-09-14 | H1.2/H2.2 (partial) | Added `popcount_bitmap_bit` and lifted it as `child_bit_popcount`: each valid singleton bitmap has exactly one dense child. This supplies unary join cardinality evidence; general bitmap/rank correspondence and two-bit cardinality remain open. |
+| 2026-09-14 | H1.2/H2.2 (partial) | Added `popcount_bitmap_bit`/`child_bit_popcount` and `rank_bitmap_bit_self`/`child_bit_rank_self`: each valid singleton bitmap has exactly one dense child at index zero. This supplies unary join cardinality and placement evidence; general bitmap/rank correspondence and two-bit cardinality remain open. |
 
 Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its

@@ -84,6 +84,14 @@ Proof.
   apply popcount_bitmap_bit. apply chunk_bound.
 Qed.
 
+Lemma child_bit_rank_self :
+  forall full_hash depth,
+    rank (child_bit full_hash depth) (chunk full_hash depth) = 0.
+Proof.
+  intros full_hash depth. unfold child_bit.
+  apply rank_bitmap_bit_self. apply chunk_bound.
+Qed.
+
 Lemma child_bit_has_no_other_slot :
   forall full_hash depth slot,
     slot <> chunk full_hash depth ->
