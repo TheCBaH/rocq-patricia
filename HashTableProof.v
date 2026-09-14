@@ -142,6 +142,25 @@ Proof.
   apply prefix_matches_append_slot; assumption.
 Qed.
 
+Lemma wf_collision_descend :
+    forall depth prefix full_hash (entries : list (K * A)),
+      length prefix = depth ->
+      wf depth prefix (Collision full_hash entries) ->
+      wf (S depth) (prefix ++ [chunk full_hash depth])
+        (Collision full_hash entries).
+Proof.
+  intros depth prefix full_hash entries Hlength Hwf.
+  inversion Hwf as [| |d p h es Hsize Hall Hnodup|]; subst.
+  apply wf_collision; [exact Hsize| |exact Hnodup].
+  clear Hwf Hsize Hnodup.
+  induction Hall as [|entry entries Hentry Hall IH].
+  - constructor.
+  - destruct Hentry as [Hhash [Hbound Hprefix]]. constructor.
+    + repeat split; auto.
+      apply prefix_matches_append_slot; [reflexivity|exact Hprefix].
+    + exact IH.
+Qed.
+
 Lemma wf_join_worker_equal :
     forall fuel depth prefix left_hash right_hash (left right : tree K A),
       depth < branch_levels ->
@@ -1125,6 +1144,39 @@ Lemma set_tree_collision_wf :
       rewrite Hget. discriminate.
     - eapply set_tree_collision_miss_wf; eauto.
       now apply bucket_get_none_miss.
+Qed.
+
+Lemma set_tree_collision_distinct_wf :
+    forall fuel depth prefix full_hash key stored_hash entries (value : A)
+           (eqb : K -> K -> bool),
+      depth < branch_levels ->
+      length prefix = depth ->
+      wf E hash seed depth prefix (Collision stored_hash entries) ->
+      entry_matches hash seed full_hash depth prefix (key, value) ->
+      full_hash <> stored_hash ->
+      chunk full_hash depth <> chunk stored_hash depth ->
+      Equivalence E ->
+      (forall first second, E first second -> hash seed first = hash seed second) ->
+      wf E hash seed depth prefix
+        (set_tree eqb fuel depth full_hash key value
+          (Collision stored_hash entries)).
+  Proof.
+    intros fuel depth prefix full_hash key stored_hash entries value eqb Hdepth
+      Hlength Hwf Hentry Hhash Hchunk Hequiv Hcongruent.
+    assert (Hnew := wf_leaf_from_entry_descend E (depth := depth)
+      (prefix := prefix) (full_hash := full_hash) (key := key) (value := value)
+      Hlength Hentry).
+    assert (Hold := wf_collision_descend (depth := depth) (prefix := prefix)
+      (full_hash := stored_hash) (entries := entries) Hlength Hwf).
+    assert (Hhashb : N.eqb full_hash stored_hash = false) by
+      (apply N.eqb_neq; exact Hhash).
+    destruct fuel as [|fuel]; cbn [set_tree]; rewrite Hhashb.
+    - eapply wf_join_two_leaf_collision; eauto.
+    - assert (Hchunkb : N.eqb (chunk full_hash depth)
+          (chunk stored_hash depth) = false) by
+        (apply N.eqb_neq; exact Hchunk).
+      cbn [join_worker]. rewrite Hchunkb.
+      eapply wf_join_two_leaf_collision; eauto.
   Qed.
 
 End CollisionUpdateInvariant.
