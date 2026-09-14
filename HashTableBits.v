@@ -349,6 +349,19 @@ Proof.
   now apply (proj1 (bitmap_has_spec right slot)).
 Qed.
 
+Lemma bitmap_has_lor_false :
+  forall left right slot,
+    bitmap_has left slot = false ->
+    bitmap_has right slot = false ->
+    bitmap_has (N.lor left right) slot = false.
+Proof.
+  intros left right slot Hleft Hright.
+  apply (proj2 (bitmap_has_false_spec _ _)).
+  rewrite N.lor_spec, orb_false_iff. split.
+  - now apply (proj1 (bitmap_has_false_spec left slot)).
+  - now apply (proj1 (bitmap_has_false_spec right slot)).
+Qed.
+
 Lemma full_bitmap_bound : (full_bitmap < bitmap_limit)%N.
 Proof. now vm_compute. Qed.
 

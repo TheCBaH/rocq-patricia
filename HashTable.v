@@ -107,6 +107,20 @@ Proof.
   apply bitmap_bit_has_slot.
 Qed.
 
+Lemma join_two_bitmap_has_no_other_slot :
+  forall left_hash right_hash depth slot,
+    slot <> chunk left_hash depth ->
+    slot <> chunk right_hash depth ->
+    bitmap_has
+      (N.lor (bitmap_bit (chunk left_hash depth))
+             (bitmap_bit (chunk right_hash depth))) slot = false.
+Proof.
+  intros left_hash right_hash depth slot Hleft Hright.
+  apply bitmap_has_lor_false.
+  - now apply bitmap_bit_has_no_other_slot.
+  - now apply bitmap_bit_has_no_other_slot.
+Qed.
+
 Definition normalize_collision {K A : Type} (h : N) (entries : list (K * A))
     : tree K A :=
   match normalize_bucket entries with
