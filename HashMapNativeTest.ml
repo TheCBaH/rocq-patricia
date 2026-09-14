@@ -8,6 +8,15 @@ end
 module Reference = HashMap.Make (Key)
 module Native = HashMapNative.Make (Key)
 
+module Slot_key = struct
+  type t = int
+  let equal (left : int) right = left = right
+  let hash ~seed key = seed lxor key
+end
+
+module Slot_reference = HashMap.Make (Slot_key)
+module Slot_native = HashMapNative.Make (Slot_key)
+
 module Folded_key = struct
   type t = string
   let canonical = String.lowercase_ascii
@@ -60,6 +69,48 @@ let check_custom_key_and_payload () =
   check_functional "custom removal" removed_reference removed_native "gamma" None;
   check_functional "custom retained replacement" replaced_reference replaced_native "gamma" (Some 12)
 
+let check_every_root_slot () =
+  let reference = Slot_reference.empty ~seed:0 in
+  let native = Slot_native.empty ~seed:0 in
+  let reference, native =
+    Stdlib.List.fold_left
+      (fun (reference, native) slot ->
+         (Slot_reference.set slot (string_of_int slot) reference,
+          Slot_native.set slot (string_of_int slot) native))
+      (reference, native) (Stdlib.List.init 32 Fun.id)
+  in
+  Stdlib.List.iter
+    (fun slot ->
+       let expected = Some (string_of_int slot) in
+       check ("all slots reference " ^ string_of_int slot)
+         (Slot_reference.get slot reference = expected);
+       check ("all slots native " ^ string_of_int slot)
+         (Slot_native.get slot native = expected))
+    (Stdlib.List.init 32 Fun.id);
+  let deleted_reference = Slot_reference.remove 31 reference in
+  let deleted_native = Slot_native.remove 31 native in
+  check "slot 31 removed from reference" (Slot_reference.get 31 deleted_reference = None);
+  check "slot 31 removed from native" (Slot_native.get 31 deleted_native = None);
+  Stdlib.List.iter
+    (fun slot ->
+       if slot <> 31 then begin
+         let expected = Some (string_of_int slot) in
+         check ("slot delete reference " ^ string_of_int slot)
+           (Slot_reference.get slot deleted_reference = expected);
+         check ("slot delete native " ^ string_of_int slot)
+           (Slot_native.get slot deleted_native = expected)
+       end)
+    (Stdlib.List.init 32 Fun.id);
+  let reinserted_reference = Slot_reference.set 31 "reinserted" deleted_reference in
+  let reinserted_native = Slot_native.set 31 "reinserted" deleted_native in
+  check "slot 31 reinserted into reference"
+    (Slot_reference.get 31 reinserted_reference = Some "reinserted");
+  check "slot 31 reinserted into native"
+    (Slot_native.get 31 reinserted_native = Some "reinserted");
+  check "all-slot reference retained"
+    (Slot_reference.get 31 reference = Some "31");
+  check "all-slot native retained" (Slot_native.get 31 native = Some "31")
+
 let () =
   let random = Random.State.make [| 0x41525241; 0x59544553 |] in
   let rec loop step reference native retained =
@@ -95,4 +146,5 @@ let () =
   check_agreement "bulk load" reference native;
   loop 0 reference native [ (reference, native) ];
   check_custom_key_and_payload ();
+  check_every_root_slot ();
   print_endline "HashMap native array differential test passed"
