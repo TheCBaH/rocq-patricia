@@ -173,6 +173,57 @@ Proof.
    + exact Hnodup.
 Qed.
 
+Lemma wf_bindings_nodup :
+  forall depth prefix (t : tree K A),
+    wf depth prefix t ->
+    NoDupA binding_equiv (bindings t).
+Proof.
+  intros depth prefix t Hwf. induction Hwf; simpl.
+  - constructor.
+  - constructor; [intro Hin; inversion Hin|constructor].
+  - exact H1.
+  - exact H4.
+Qed.
+
+Lemma join_two_bindings_nodup :
+ forall depth left_hash right_hash (left right : tree K A),
+ Equivalence binding_equiv ->
+ NoDupA binding_equiv (bindings left) ->
+ NoDupA binding_equiv (bindings right) ->
+ (forall entry, InA binding_equiv entry (bindings left) ->
+   InA binding_equiv entry (bindings right) -> False) ->
+ NoDupA binding_equiv (bindings (join_two left_hash left right_hash right depth)).
+Proof.
+ intros depth left_hash right_hash left right Hequiv Hleft Hright Hdisjoint.
+ unfold join_two. destruct (N.ltb (chunk left_hash depth) (chunk right_hash depth)).
+ - simpl. rewrite app_nil_r. apply NoDupA_app; auto.
+ - simpl. rewrite app_nil_r. apply NoDupA_app; auto.
+   intros entry Hinright Hinleft. apply (Hdisjoint entry Hinleft Hinright).
+Qed.
+
+Lemma wf_join_two_disjoint :
+ forall depth prefix left_hash right_hash (left right : tree K A),
+ depth < branch_levels ->
+ chunk left_hash depth <> chunk right_hash depth ->
+ left <> Empty ->
+ right <> Empty ->
+ wf (S depth) (prefix ++ [chunk left_hash depth]) left ->
+ wf (S depth) (prefix ++ [chunk right_hash depth]) right ->
+ Equivalence binding_equiv ->
+ (forall entry, InA binding_equiv entry (bindings left) ->
+   InA binding_equiv entry (bindings right) -> False) ->
+ wf depth prefix (join_two left_hash left right_hash right depth).
+Proof.
+  intros depth prefix left_hash right_hash left right Hdepth Hdifferent Hleftne Hrightne
+    Hleft Hright Hequiv Hdisjoint.
+  eapply wf_join_two; eauto.
+  apply join_two_bindings_nodup; auto.
+  - now apply wf_bindings_nodup with (depth := S depth)
+      (prefix := prefix ++ [chunk left_hash depth]).
+  - now apply wf_bindings_nodup with (depth := S depth)
+      (prefix := prefix ++ [chunk right_hash depth]).
+Qed.
+
 Lemma wf_normalize_collision :
     forall depth prefix full_hash entries,
       Forall (entry_matches full_hash depth prefix) entries ->
