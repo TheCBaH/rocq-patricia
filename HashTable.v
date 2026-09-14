@@ -144,6 +144,17 @@ Proof.
   - apply bitmap_bits_disjoint. exact Hdifferent.
 Qed.
 
+Lemma join_two_bitmap_bound_total :
+  forall left_hash right_hash depth,
+    (N.lor (bitmap_bit (chunk left_hash depth))
+           (bitmap_bit (chunk right_hash depth)) < bitmap_limit)%N.
+Proof.
+  intros left_hash right_hash depth.
+  destruct (N.eq_dec (chunk left_hash depth) (chunk right_hash depth)) as [Hequal|Hdifferent].
+  - rewrite Hequal, N.lor_diag. apply bitmap_bit_bound. apply chunk_bound.
+  - now apply join_two_bitmap_bound.
+Qed.
+
 Definition normalize_collision {K A : Type} (h : N) (entries : list (K * A))
     : tree K A :=
   match normalize_bucket entries with
