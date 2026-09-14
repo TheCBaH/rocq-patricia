@@ -24,29 +24,46 @@ Section WellFormed.
   Definition binding_equiv (left right : K * A) : Prop :=
     E (fst left) (fst right).
 
-  Fixpoint prefix_matches (full_hash : N) (depth : nat) (prefix : list N) : Prop :=
+  (** A prefix records chunks from the root.  The current routing depth is
+      tracked separately by [wf]; scanning a prefix always begins at chunk 0. *)
+  Fixpoint prefix_matches_from (full_hash : N) (start : nat)
+      (prefix : list N) : Prop :=
     match prefix with
     | [] => True
     | slot :: rest =>
-        chunk full_hash depth = slot /\ prefix_matches full_hash (S depth) rest
+        chunk full_hash start = slot /\
+        prefix_matches_from full_hash (S start) rest
     end.
 
-Lemma prefix_matches_append_slot :
-    forall full_hash depth prefix slot,
-      prefix_matches full_hash depth prefix ->
-      chunk full_hash (depth + length prefix) = slot ->
-      prefix_matches full_hash depth (prefix ++ [slot]).
+  Definition prefix_matches (full_hash : N) (_depth : nat)
+      (prefix : list N) : Prop :=
+    prefix_matches_from full_hash 0 prefix.
+
+Lemma prefix_matches_from_append_slot :
+    forall full_hash start prefix,
+      prefix_matches_from full_hash start prefix ->
+      prefix_matches_from full_hash start
+        (prefix ++ [chunk full_hash (start + length prefix)]).
   Proof.
-    intros full_hash depth prefix. revert depth.
-    induction prefix as [|head tail IH]; intros depth slot Hprefix Hslot.
-    - simpl in Hprefix. simpl in Hslot.
-      replace (depth + 0) with depth in Hslot by lia.
-      simpl. split; [exact Hslot|exact I].
+    intros full_hash start prefix Hprefix. revert start Hprefix.
+    induction prefix as [|head tail IH]; intros start Hprefix.
+    - simpl. replace (start + 0) with start by lia.
+      split; [reflexivity|exact I].
     - simpl in Hprefix. destruct Hprefix as [Hhead Htail]. simpl.
-      split; auto.
-      apply IH with (slot := slot); auto.
-      replace (S depth + length tail) with (depth + S (length tail)) by lia.
-      exact Hslot.
+      split; [exact Hhead|].
+      replace (start + S (length tail)) with (S start + length tail) by lia.
+      apply IH. exact Htail.
+  Qed.
+
+Lemma prefix_matches_append_slot :
+    forall full_hash depth prefix,
+      length prefix = depth ->
+      prefix_matches full_hash depth prefix ->
+      prefix_matches full_hash (S depth) (prefix ++ [chunk full_hash depth]).
+  Proof.
+    intros full_hash depth prefix Hlength Hprefix.
+    unfold prefix_matches in *. rewrite <- Hlength.
+    apply prefix_matches_from_append_slot. exact Hprefix.
   Qed.
 
   Definition entry_matches (full_hash : N) (depth : nat) (prefix : list N)
