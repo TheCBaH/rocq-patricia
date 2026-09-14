@@ -40,6 +40,10 @@ wrapper retains the low 30 bits of every returned hash; equivalent keys must
 therefore return the same normalized hash for a given seed. Each map retains
 the seed supplied to `empty`, `singleton`, or `of_list`.
 
+For equivalent keys, `set` keeps the resident key representative while
+replacing its value. `of_list` is first-wins for both the value and the key
+representative.
+
 Run:
 
 ```sh
