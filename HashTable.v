@@ -17,6 +17,32 @@ Inductive tree (K A : Type) : Type :=
 | Collision (full_hash : N) (entries : list (K * A))
 | Branch (bitmap : N) (children : list (tree K A)).
 
+(** The generated induction principle does not recurse through the list of
+    branch children.  This nested structural principle carries properties to
+    every descendant. *)
+Fixpoint tree_ind_nested {K A} (P : tree K A -> Prop)
+  (Hempty : P (@Empty K A))
+  (Hleaf : forall full_hash key value, P (@Leaf K A full_hash key value))
+  (Hcollision : forall full_hash entries, P (@Collision K A full_hash entries))
+  (Hbranch : forall bitmap children, Forall P children -> P (@Branch K A bitmap children))
+  (t : tree K A) {struct t} : P t :=
+  match t with
+  | @Empty _ _ => Hempty
+  | @Leaf _ _ full_hash key value => Hleaf full_hash key value
+  | @Collision _ _ full_hash entries => Hcollision full_hash entries
+  | @Branch _ _ bitmap children =>
+      Hbranch bitmap children
+        ((fix children_ind (children : list (tree K A)) {struct children} :
+            Forall P children :=
+            match children with
+            | [] => Forall_nil _
+            | child :: rest =>
+                Forall_cons child
+                  (@tree_ind_nested K A P Hempty Hleaf Hcollision Hbranch child)
+                  (children_ind rest)
+            end) children)
+  end.
+
 Arguments Empty {K A}.
 Arguments Leaf {K A} _ _ _.
 Arguments Collision {K A} _ _.

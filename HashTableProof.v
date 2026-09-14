@@ -185,6 +185,51 @@ Proof.
   - exact H4.
 Qed.
 
+Lemma forall2_child_wf :
+ forall depth prefix slots children,
+ Forall2 (fun slot (child : tree K A) =>
+   child <> Empty /\ wf (S depth) (prefix ++ [slot]) child) slots children ->
+ forall child, In child children ->
+   exists slot, child <> Empty /\ wf (S depth) (prefix ++ [slot]) child.
+Proof.
+ intros depth prefix slots children Hpaired child Hin. induction Hpaired.
+ - contradiction.
+ - simpl in Hin. destruct Hin as [->|Hin].
+   + exists x. exact H.
+   + apply IHHpaired. exact Hin.
+Qed.
+
+Lemma wf_binding_hash :
+ forall (t : tree K A) depth prefix, wf depth prefix t ->
+ forall entry, In entry (bindings t) ->
+ exists full_hash,
+   full_hash = hash seed (fst entry) /\ (full_hash < hash_space)%N.
+Proof.
+ refine (@tree_ind_nested K A
+   (fun t => forall depth prefix, wf depth prefix t -> forall entry,
+      In entry (bindings t) -> exists full_hash,
+        full_hash = hash seed (fst entry) /\ (full_hash < hash_space)%N)
+   _ _ _ _).
+ - intros depth prefix Hwf entry Hin. contradiction.
+ - intros stored_hash key value depth prefix Hwf entry Hin.
+   simpl in Hin. destruct Hin as [Heq|[]]. subst entry.
+   inversion Hwf as [|d p h k v Hhash Hbound Hprefix| |]; subst.
+   exists (hash seed key). simpl. auto.
+ - intros stored_hash entries depth prefix Hwf entry Hin.
+   inversion Hwf; subst. change (In entry entries) in Hin.
+   apply Forall_forall with (x := entry) in H4; auto.
+   destruct H4 as [Hhash [Hbound _]]. exists stored_hash. auto.
+ - intros bitmap children IH depth prefix Hwf entry Hin.
+   inversion Hwf as [| | | depth' prefix' bitmap' children' Hd Hb Hn Hl Hp Hdup];
+     subst.
+   simpl in Hin. apply in_flat_map in Hin.
+   destruct Hin as [child [Hchild Hin]].
+   destruct (forall2_child_wf (depth := depth) prefix Hp child Hchild)
+     as [slot [_ Hwfchild]].
+   apply Forall_forall with (x := child) in IH; auto.
+   exact (IH (S depth) (prefix ++ [slot]) Hwfchild entry Hin).
+Qed.
+
 Lemma join_two_bindings_nodup :
  forall depth left_hash right_hash (left right : tree K A),
  Equivalence binding_equiv ->
