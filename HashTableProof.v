@@ -116,6 +116,32 @@ Proof.
   - simpl. now rewrite app_nil_r.
 Qed.
 
+Lemma wf_leaf_descend :
+    forall depth prefix full_hash key (value : A),
+      length prefix = depth ->
+      wf depth prefix (Leaf full_hash key value) ->
+      wf (S depth) (prefix ++ [chunk full_hash depth])
+        (Leaf full_hash key value).
+Proof.
+  intros depth prefix full_hash key value Hlength Hwf.
+  inversion Hwf as [|d p h k v Hhash Hbound Hprefix| |]; subst.
+  apply wf_leaf; auto.
+  apply prefix_matches_append_slot; [reflexivity|exact Hprefix].
+Qed.
+
+Lemma wf_leaf_from_entry_descend :
+    forall depth prefix full_hash key (value : A),
+      length prefix = depth ->
+      entry_matches full_hash depth prefix (key, value) ->
+      wf (S depth) (prefix ++ [chunk full_hash depth])
+        (Leaf full_hash key value).
+Proof.
+  intros depth prefix full_hash key value Hlength Hentry.
+  destruct Hentry as [Hhash [Hbound Hprefix]].
+  apply wf_leaf; auto.
+  apply prefix_matches_append_slot; assumption.
+Qed.
+
 Lemma wf_join_worker_equal :
     forall fuel depth prefix left_hash right_hash (left right : tree K A),
       depth < branch_levels ->
@@ -881,6 +907,41 @@ Lemma set_tree_leaf_collision_wf :
           (key, value) [])) in Hin.
         destruct Hin as [Hrelated|Htail]; [exact Hrelated|inversion Htail].
       + constructor; [intro Hin; inversion Hin|constructor].
+  Qed.
+
+Lemma set_tree_leaf_distinct_wf :
+    forall fuel depth prefix full_hash key stored_hash stored
+           (old_value value : A) (eqb : K -> K -> bool),
+      depth < branch_levels ->
+      length prefix = depth ->
+      wf E hash seed depth prefix (Leaf stored_hash stored old_value) ->
+      entry_matches hash seed full_hash depth prefix (key, value) ->
+      eqb key stored = false ->
+      full_hash <> stored_hash ->
+      chunk full_hash depth <> chunk stored_hash depth ->
+      Equivalence E ->
+      (forall first second, E first second -> hash seed first = hash seed second) ->
+      wf E hash seed depth prefix
+        (set_tree eqb fuel depth full_hash key value
+          (Leaf stored_hash stored old_value)).
+  Proof.
+    intros fuel depth prefix full_hash key stored_hash stored old_value value eqb
+      Hdepth Hlength Hwf Hentry Heqb Hhash Hchunk Hequiv Hcongruent.
+    assert (Hnew := wf_leaf_from_entry_descend E (depth := depth)
+      (prefix := prefix) (full_hash := full_hash) (key := key) (value := value)
+      Hlength Hentry).
+    assert (Hold := wf_leaf_descend (depth := depth) (prefix := prefix)
+      (full_hash := stored_hash) (key := stored) (value := old_value)
+      Hlength Hwf).
+    assert (Hhashb : N.eqb full_hash stored_hash = false) by
+      (apply N.eqb_neq; exact Hhash).
+    destruct fuel as [|fuel]; cbn [set_tree]; rewrite Heqb, Hhashb.
+    - eapply wf_join_two_leaf_leaf; eauto.
+    - assert (Hchunkb : N.eqb (chunk full_hash depth)
+          (chunk stored_hash depth) = false) by
+        (apply N.eqb_neq; exact Hchunk).
+      cbn [join_worker]. rewrite Hchunkb.
+      eapply wf_join_two_leaf_leaf; eauto.
   Qed.
 
 End LeafUpdateInvariant.
