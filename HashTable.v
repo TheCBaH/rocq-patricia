@@ -55,6 +55,20 @@ Fixpoint representative_hash {K A : Type} (t : tree K A) : option N :=
 
 Definition child_bit (h : N) (depth : nat) : N := bitmap_bit (chunk h depth).
 
+Lemma child_bit_nonzero :
+  forall full_hash depth, child_bit full_hash depth <> 0%N.
+Proof.
+  intros full_hash depth. unfold child_bit. apply bitmap_bit_nonzero.
+Qed.
+
+Lemma child_bit_bound :
+  forall full_hash depth,
+    (child_bit full_hash depth < bitmap_limit)%N.
+Proof.
+  intros full_hash depth. unfold child_bit.
+  apply bitmap_bit_bound. apply chunk_bound.
+Qed.
+
 Definition normalize_collision {K A : Type} (h : N) (entries : list (K * A))
     : tree K A :=
   match normalize_bucket entries with
