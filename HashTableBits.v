@@ -362,6 +362,35 @@ Proof.
   - now apply (proj1 (bitmap_has_false_spec right slot)).
 Qed.
 
+Lemma bitmap_bits_disjoint :
+  forall left_slot right_slot,
+    left_slot <> right_slot ->
+    N.land (bitmap_bit left_slot) (bitmap_bit right_slot) = 0%N.
+Proof.
+  intros left_slot right_slot Hdifferent.
+  unfold bitmap_bit. rewrite !N.shiftl_1_l.
+  apply N.bits_inj. intro index.
+  rewrite N.land_spec, !N.pow2_bits_eqb.
+  destruct (N.eqb left_slot index) eqn:Hleft;
+    destruct (N.eqb right_slot index) eqn:Hright; simpl; auto.
+  apply N.eqb_eq in Hleft. apply N.eqb_eq in Hright.
+  exfalso. apply Hdifferent. etransitivity; eauto.
+Qed.
+
+Lemma bitmap_lor_bound_disjoint :
+  forall left right,
+    (left < bitmap_limit)%N ->
+    (right < bitmap_limit)%N ->
+    N.land left right = 0%N ->
+    (N.lor left right < bitmap_limit)%N.
+Proof.
+  intros left right Hleft Hright Hdisjoint.
+  rewrite <- (N.lxor_lor left right Hdisjoint).
+  rewrite <- (N.add_nocarry_lxor left right Hdisjoint).
+  apply N.add_nocarry_lt_pow2 with (n := 32%N); auto.
+  all: change (_ < 2 ^ 32)%N; assumption.
+Qed.
+
 Lemma full_bitmap_bound : (full_bitmap < bitmap_limit)%N.
 Proof. now vm_compute. Qed.
 

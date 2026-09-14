@@ -131,6 +131,19 @@ Proof.
   rewrite Hzero, bitmap_has_empty in Hslot. discriminate.
 Qed.
 
+Lemma join_two_bitmap_bound :
+  forall left_hash right_hash depth,
+    chunk left_hash depth <> chunk right_hash depth ->
+    (N.lor (bitmap_bit (chunk left_hash depth))
+           (bitmap_bit (chunk right_hash depth)) < bitmap_limit)%N.
+Proof.
+  intros left_hash right_hash depth Hdifferent.
+  apply bitmap_lor_bound_disjoint.
+  - apply bitmap_bit_bound. apply chunk_bound.
+  - apply bitmap_bit_bound. apply chunk_bound.
+  - apply bitmap_bits_disjoint. exact Hdifferent.
+Qed.
+
 Definition normalize_collision {K A : Type} (h : N) (entries : list (K * A))
     : tree K A :=
   match normalize_bucket entries with
