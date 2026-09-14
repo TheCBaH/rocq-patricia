@@ -213,6 +213,24 @@ Proof. reflexivity. Qed.
 Lemma bitmap_bit_31 : bitmap_bit 31 = 2147483648%N.
 Proof. now vm_compute. Qed.
 
+Lemma bitmap_bit_nonzero :
+  forall slot, bitmap_bit slot <> 0%N.
+Proof.
+  intros slot. unfold bitmap_bit.
+  rewrite N.shiftl_1_l. now apply N.pow_nonzero.
+Qed.
+
+Lemma bitmap_bit_bound :
+  forall slot,
+    (slot < branch_width)%N ->
+    (bitmap_bit slot < bitmap_limit)%N.
+Proof.
+  intros slot Hslot. unfold bitmap_bit, branch_width, bitmap_limit in *.
+  rewrite N.shiftl_1_l.
+  change (2 ^ slot < 2 ^ 32)%N.
+  apply N.pow_lt_mono_r; lia.
+Qed.
+
 Lemma full_bitmap_bound : (full_bitmap < bitmap_limit)%N.
 Proof. now vm_compute. Qed.
 
