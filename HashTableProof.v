@@ -230,6 +230,63 @@ Proof.
    exact (IH (S depth) (prefix ++ [slot]) Hwfchild entry Hin).
 Qed.
 
+Lemma collision_binding_hash :
+ forall depth prefix full_hash (entries : list (K * A)) (entry : K * A),
+ wf depth prefix (Collision full_hash entries) ->
+ In entry entries -> full_hash = hash seed (fst entry).
+Proof.
+ intros depth prefix full_hash entries entry Hwf Hin.
+ inversion Hwf as [| | d p h es Hlen Hall Hnodup|]; subst.
+ apply Forall_forall with (x := entry) in Hall; auto.
+ exact (proj1 Hall).
+Qed.
+
+Lemma binding_equiv_equiv :
+ Equivalence E -> Equivalence (fun (left right : K * A) =>
+   E (fst left) (fst right)).
+Proof.
+ intros [Href Hsym Htrans]. split.
+ - intro entry. unfold binding_equiv. apply Href.
+ - intros left right Hleft. unfold binding_equiv in *. apply Hsym. exact Hleft.
+ - intros left middle right Hleft Hright. unfold binding_equiv in *.
+   eapply Htrans; eauto.
+Qed.
+
+Lemma inA_witness :
+ forall (R : (K * A) -> (K * A) -> Prop) entry entries,
+ InA R entry entries -> exists stored, In stored entries /\ R entry stored.
+Proof.
+ intros R entry entries Hin. induction Hin.
+ - exists y. split; [now left|assumption].
+ - destruct IHHin as [stored [Hstored HR]]. exists stored.
+   split; [now right|assumption].
+Qed.
+
+Lemma leaf_collision_disjoint :
+ forall depth prefix left_hash (left_key : K) left_value right_hash entries,
+ left_hash <> right_hash ->
+ wf depth prefix (Leaf left_hash left_key left_value) ->
+ wf depth prefix (Collision right_hash entries) ->
+ (forall first second, E first second -> hash seed first = hash seed second) ->
+ forall entry, InA binding_equiv entry [(left_key, left_value)] ->
+ InA binding_equiv entry entries -> False.
+Proof.
+ intros depth prefix left_hash left_key left_value right_hash entries Hdifferent
+   Hleft Hright Hcongruent entry Hinleft Hinright.
+ destruct (inA_witness Hinleft) as [left_entry [Hinleft' Heleft]].
+ simpl in Hinleft'. destruct Hinleft' as [Heq|[]]. subst left_entry.
+ destruct (inA_witness Hinright) as [right_entry [Hinright' Heright]].
+ assert (Hleft_hash : left_hash = hash seed left_key).
+ { inversion Hleft; subst. reflexivity. }
+ assert (Hright_hash : right_hash = hash seed (fst right_entry)).
+ { now apply collision_binding_hash with (depth := depth) (prefix := prefix)
+     (entries := entries). }
+ apply Hdifferent. rewrite Hleft_hash, Hright_hash.
+ rewrite <- (Hcongruent (fst entry) left_key Heleft).
+ rewrite <- (Hcongruent (fst entry) (fst right_entry) Heright).
+ reflexivity.
+Qed.
+
 Lemma join_two_bindings_nodup :
  forall depth left_hash right_hash (left right : tree K A),
  Equivalence binding_equiv ->
