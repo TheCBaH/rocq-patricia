@@ -303,6 +303,23 @@ Proof.
    + apply IHHpaired. exact Hin.
 Qed.
 
+Lemma forall2_slot_child_wf :
+ forall depth prefix slots children,
+ Forall2 (fun slot (child : tree K A) =>
+   child <> Empty /\ wf (S depth) (prefix ++ [slot]) child) slots children ->
+ forall slot, In slot slots ->
+   exists child, In child children /\ child <> Empty /\
+     wf (S depth) (prefix ++ [slot]) child.
+Proof.
+ intros depth prefix slots children Hpaired slot Hin.
+ induction Hpaired as [|head_slot head_child slots children Hhead Htail IH].
+ - contradiction.
+ - simpl in Hin. destruct Hin as [Hslot|Hin].
+   + subst head_slot. exists head_child. simpl. tauto.
+   + destruct (IH Hin) as [child [Hchild [Hnonempty Hwf]]].
+     exists child. simpl. tauto.
+Qed.
+
 Lemma wf_branch_depth :
  forall depth prefix bitmap children,
  wf depth prefix (Branch bitmap children) -> depth < branch_levels.
@@ -332,6 +349,33 @@ Proof.
  inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hlength Hchildren Hnodup];
    subst.
  eapply forall2_child_wf; eauto.
+Qed.
+
+Lemma wf_branch_occupied_child :
+ forall depth prefix bitmap children slot,
+ wf depth prefix (Branch bitmap children) ->
+ In slot (occupied_slots bitmap) ->
+ exists child, In child children /\ child <> Empty /\
+   wf (S depth) (prefix ++ [slot]) child.
+Proof.
+ intros depth prefix bitmap children slot Hwf Hin.
+ inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hlength Hchildren Hnodup];
+   subst.
+ eapply forall2_slot_child_wf; eauto.
+Qed.
+
+Lemma wf_branch_bitmap_child :
+ forall depth prefix bitmap children slot,
+ wf depth prefix (Branch bitmap children) ->
+ (slot < branch_width)%N ->
+ bitmap_has bitmap slot = true ->
+ exists child, In child children /\ child <> Empty /\
+   wf (S depth) (prefix ++ [slot]) child.
+Proof.
+ intros depth prefix bitmap children slot Hwf Hslot Hhas.
+ apply wf_branch_occupied_child with (bitmap := bitmap).
+ - exact Hwf.
+ - now apply occupied_slots_complete.
 Qed.
 
 Inductive branch_path_depth : tree K A -> nat -> Prop :=
