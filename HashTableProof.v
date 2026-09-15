@@ -1251,6 +1251,17 @@ Proof.
   now rewrite N.eqb_refl.
 Qed.
 
+Lemma get_singleton_query :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         seed query stored (value : A),
+    hash seed query = hash seed stored ->
+    get eqb hash query (singleton eqb hash seed stored value) =
+    if eqb query stored then Some value else None.
+Proof.
+  intros K Seed A eqb hash seed query stored value Hhash.
+  unfold singleton. now apply get_set_empty.
+Qed.
+
 Lemma get_remove_empty :
   forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
          seed query key,
