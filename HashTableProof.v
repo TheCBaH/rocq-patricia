@@ -753,6 +753,39 @@ Lemma wf_collision_remove :
 
 End WellFormed.
 
+Section TableWellFormed.
+
+  Context {K Seed A : Type}.
+  Variable E : K -> K -> Prop.
+  Variable hash : Seed -> K -> N.
+
+  Definition table_wf (m : table K Seed A) : Prop :=
+    wf E hash (table_seed m) 0 [] (table_root m).
+
+  Lemma table_wf_empty :
+    forall seed, table_wf (empty (K := K) (A := A) seed).
+  Proof.
+    intro seed. unfold table_wf, empty. apply wf_empty.
+  Qed.
+
+  Lemma table_wf_root :
+    forall m, table_wf m ->
+      wf E hash (table_seed m) 0 [] (table_root m).
+  Proof. intros m Hwf. exact Hwf. Qed.
+
+  Lemma table_wf_leaf :
+    forall seed full_hash key (value : A),
+      full_hash = hash seed key ->
+      (full_hash < hash_space)%N ->
+      table_wf {| table_seed := seed;
+                  table_root := Leaf full_hash key value |}.
+  Proof.
+    intros seed full_hash key value Hhash Hbound.
+    unfold table_wf. apply wf_leaf; [exact Hhash|exact Hbound|exact I].
+  Qed.
+
+End TableWellFormed.
+
 Lemma bindings_join_two :
   forall (K A : Type) depth left_hash right_hash (left right : tree K A)
          (entry : K * A),
