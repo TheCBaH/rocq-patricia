@@ -1402,6 +1402,21 @@ Proof.
   cbn [remove_tree]. now rewrite Habsent.
 Qed.
 
+Lemma remove_tree_branch_slot_absent_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) fuel depth prefix full_hash (key : K)
+         bitmap (children : list (tree K A)) (eqb : K -> K -> bool),
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    bitmap_has bitmap (chunk full_hash depth) = false ->
+    wf E hash seed depth prefix
+      (remove_tree eqb (S fuel) depth full_hash key (Branch bitmap children)).
+Proof.
+  intros K Seed A E hash seed fuel depth prefix full_hash key bitmap children eqb
+    Hwf Habsent.
+  rewrite remove_tree_branch_slot_absent by exact Habsent.
+  exact Hwf.
+Qed.
+
 Lemma remove_tree_branch_child :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
          bitmap (children : list (tree K A)) (child : tree K A),
