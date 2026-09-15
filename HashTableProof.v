@@ -1261,6 +1261,15 @@ Proof.
   cbv [branch_levels]. reflexivity.
 Qed.
 
+Lemma get_of_list_empty :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         seed query,
+    get eqb hash query (@of_list K Seed A eqb hash seed []) = None.
+Proof.
+  intros K Seed A eqb hash seed query.
+  unfold of_list. simpl. apply get_empty.
+Qed.
+
 Lemma set_tree_zero_branch :
   forall (K A : Type) (eqb : K -> K -> bool) depth full_hash (key : K)
          (value : A) bitmap (children : list (tree K A)),
