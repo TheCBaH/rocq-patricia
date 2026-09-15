@@ -247,6 +247,23 @@ Proof.
   - exact H4.
 Qed.
 
+Lemma wf_join_worker_equal_wf :
+    forall fuel depth prefix left_hash right_hash (left right : tree K A),
+      depth < branch_levels ->
+      N.eqb (chunk left_hash depth) (chunk right_hash depth) = true ->
+      wf (S depth) (prefix ++ [chunk left_hash depth])
+        (join_worker fuel (S depth) left_hash left right_hash right) ->
+      wf depth prefix
+        (join_worker (S fuel) depth left_hash left right_hash right).
+Proof.
+  intros fuel depth prefix left_hash right_hash left right Hdepth Hequal Hchild.
+  apply wf_join_worker_equal_recursive with
+    (fuel := fuel) (left_hash := left_hash) (right_hash := right_hash);
+    auto.
+  apply wf_bindings_nodup with (depth := S depth)
+    (prefix := prefix ++ [chunk left_hash depth]). exact Hchild.
+Qed.
+
 Lemma forall2_child_wf :
  forall depth prefix slots children,
  Forall2 (fun slot (child : tree K A) =>
