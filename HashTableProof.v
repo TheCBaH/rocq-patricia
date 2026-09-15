@@ -1676,6 +1676,20 @@ Lemma set_tree_leaf_distinct_root_wf :
 
 End LeafUpdateInvariant.
 
+Lemma table_wf_set_singleton_replace :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) key stored (old_value value : A),
+    (hash seed stored < hash_space)%N ->
+    eqb key stored = true ->
+    table_wf E hash (set eqb hash key value
+      (singleton eqb hash seed stored old_value)).
+Proof.
+  intros K Seed A E hash seed eqb key stored old_value value Hbound Hmatch.
+  unfold table_wf, singleton, set, empty.
+  cbn.
+  rewrite Hmatch. apply wf_leaf; [reflexivity|exact Hbound|exact I].
+Qed.
+
 Section LeafRemovalInvariant.
 
   Context {K Seed A : Type}.
