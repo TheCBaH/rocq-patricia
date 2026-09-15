@@ -59,6 +59,15 @@ Definition empty {K Seed A : Type} (seed : Seed) : table K Seed A :=
 Definition is_empty {K Seed A : Type} (m : table K Seed A) : bool :=
   match table_root m with Empty => true | _ => false end.
 
+Lemma is_empty_root_iff :
+  forall (K Seed A : Type) (seed : Seed) (root : tree K A),
+    is_empty {| table_seed := seed; table_root := root |} = true <->
+    root = Empty.
+Proof.
+  intros K Seed A seed [|full_hash key value|full_hash entries|bitmap children];
+    simpl; split; intro H; try reflexivity; discriminate.
+Qed.
+
 Fixpoint bindings {K A : Type} (t : tree K A) : list (K * A) :=
   match t with
   | Empty => []
