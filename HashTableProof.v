@@ -1235,6 +1235,22 @@ Lemma get_tree_zero_branch :
     get_tree eqb 0 depth full_hash key (Branch bitmap children) = None.
 Proof. reflexivity. Qed.
 
+Lemma get_set_empty :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         seed query key (value : A),
+    hash seed query = hash seed key ->
+    get eqb hash query (set eqb hash key value (empty seed)) =
+    if eqb query key then Some value else None.
+Proof.
+  intros K Seed A eqb hash seed query key value Hhash.
+  unfold get, set, empty. cbn [set_tree get_tree].
+  change (get_tree eqb branch_levels 0 (hash seed query) query
+    (Leaf (hash seed key) key value) =
+    (if eqb query key then Some value else None)).
+  rewrite Hhash. cbv [branch_levels]. cbn [get_tree].
+  now rewrite N.eqb_refl.
+Qed.
+
 Lemma set_tree_zero_branch :
   forall (K A : Type) (eqb : K -> K -> bool) depth full_hash (key : K)
          (value : A) bitmap (children : list (tree K A)),
