@@ -784,6 +784,16 @@ Section TableWellFormed.
     unfold table_wf. apply wf_leaf; [exact Hhash|exact Hbound|exact I].
   Qed.
 
+  Lemma table_wf_set_empty :
+    forall (eqb : K -> K -> bool) seed key (value : A),
+      (hash seed key < hash_space)%N ->
+      table_wf (set eqb hash key value (empty seed)).
+  Proof.
+    intros eqb seed key value Hbound.
+    unfold set, empty, table_wf. cbn [set_tree].
+    apply wf_leaf; [reflexivity|exact Hbound|exact I].
+  Qed.
+
 End TableWellFormed.
 
 Lemma bindings_join_two :
