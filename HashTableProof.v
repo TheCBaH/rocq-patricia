@@ -1262,6 +1262,22 @@ Proof.
   unfold singleton. now apply get_set_empty.
 Qed.
 
+Lemma get_set_singleton_replace :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         seed key stored (old_value value : A),
+    hash seed key = hash seed stored ->
+    eqb key stored = true ->
+    get eqb hash key
+      (set eqb hash key value (singleton eqb hash seed stored old_value)) =
+    Some value.
+Proof.
+  intros K Seed A eqb hash seed key stored old_value value Hhash Hmatch.
+  unfold get, set, singleton, empty. cbn [set_tree get_tree].
+  cbn.
+  rewrite Hmatch. cbn [get_tree].
+  now rewrite Hhash, N.eqb_refl, Hmatch.
+Qed.
+
 Lemma get_remove_empty :
   forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
          seed query key,
