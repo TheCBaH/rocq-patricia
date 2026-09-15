@@ -802,6 +802,15 @@ Section TableWellFormed.
     unfold remove, empty, table_wf. cbn [remove_tree]. apply wf_empty.
   Qed.
 
+  Lemma table_wf_singleton :
+    forall (eqb : K -> K -> bool) seed key (value : A),
+      (hash seed key < hash_space)%N ->
+      table_wf (singleton eqb hash seed key value).
+  Proof.
+    intros eqb seed key value Hbound.
+    unfold singleton. now apply table_wf_set_empty.
+  Qed.
+
 End TableWellFormed.
 
 Lemma bindings_join_two :
