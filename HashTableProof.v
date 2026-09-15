@@ -811,6 +811,13 @@ Section TableWellFormed.
     unfold singleton. now apply table_wf_set_empty.
   Qed.
 
+  Lemma table_wf_of_list_empty :
+    forall (eqb : K -> K -> bool) seed,
+      table_wf (of_list eqb hash seed []).
+  Proof.
+    intros eqb seed. unfold of_list. simpl. apply table_wf_empty.
+  Qed.
+
 End TableWellFormed.
 
 Lemma bindings_join_two :
