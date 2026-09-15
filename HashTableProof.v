@@ -261,6 +261,17 @@ Proof.
   - exact H4.
 Qed.
 
+Lemma wf_branch_children_occupied_length :
+  forall depth prefix bitmap children,
+    wf depth prefix (Branch bitmap children) ->
+    length children = length (occupied_slots bitmap).
+Proof.
+  intros depth prefix bitmap children Hwf.
+  inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hlength Hchildren Hnodup];
+    subst.
+  rewrite Hlength, occupied_slots_length_popcount. reflexivity.
+Qed.
+
 Lemma wf_join_worker_equal_wf :
     forall fuel depth prefix left_hash right_hash (left right : tree K A),
       depth < branch_levels ->
