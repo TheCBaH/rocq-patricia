@@ -1453,6 +1453,23 @@ Proof.
   cbn [remove_tree]. now rewrite Hpresent, Hmissing.
 Qed.
 
+Lemma remove_tree_branch_dense_missing_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) fuel depth prefix full_hash (key : K)
+         bitmap (children : list (tree K A)) (eqb : K -> K -> bool),
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    bitmap_has bitmap (chunk full_hash depth) = true ->
+    dense_get (rank bitmap (chunk full_hash depth)) children = None ->
+    wf E hash seed depth prefix
+      (remove_tree eqb (S fuel) depth full_hash key (Branch bitmap children)).
+Proof.
+  intros K Seed A E hash seed fuel depth prefix full_hash key bitmap children eqb
+    Hwf Hpresent Hmissing.
+  rewrite (remove_tree_branch_dense_missing eqb fuel depth full_hash key
+    bitmap children Hpresent Hmissing).
+  exact Hwf.
+Qed.
+
 Lemma bindings_dense_insert :
   forall (K A : Type) index (child : tree K A) children (entry : K * A),
     In entry (flat_map bindings (dense_insert index child children)) <->
