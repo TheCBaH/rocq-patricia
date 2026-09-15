@@ -794,6 +794,14 @@ Section TableWellFormed.
     apply wf_leaf; [reflexivity|exact Hbound|exact I].
   Qed.
 
+  Lemma table_wf_remove_empty :
+    forall (eqb : K -> K -> bool) seed key,
+      table_wf (remove eqb hash key (empty seed)).
+  Proof.
+    intros eqb seed key.
+    unfold remove, empty, table_wf. cbn [remove_tree]. apply wf_empty.
+  Qed.
+
 End TableWellFormed.
 
 Lemma bindings_join_two :
