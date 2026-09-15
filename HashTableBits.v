@@ -231,6 +231,70 @@ Proof.
       rewrite IH, shiftr_succ; reflexivity.
 Qed.
 
+Lemma occupied_slots_from_split :
+  forall left right bitmap start,
+    occupied_slots_from (left + right) bitmap start =
+    occupied_slots_from left bitmap start ++
+    occupied_slots_from right bitmap (start + N.of_nat left).
+Proof.
+  induction left as [|left IH]; intros right bitmap start; simpl.
+  - now rewrite N.add_0_r.
+  - destruct (bitmap_has bitmap start) eqn:Hhas; simpl.
+    + rewrite IH.
+      assert (Hoffset : (start + N.of_nat (S left))%N =
+        (N.succ start + N.of_nat left)%N).
+      { now rewrite Nat2N.inj_succ, N.add_succ_r, N.add_succ_l. }
+      rewrite <- Hoffset. reflexivity.
+    + rewrite IH.
+      assert (Hoffset : (start + N.of_nat (S left))%N =
+        (N.succ start + N.of_nat left)%N).
+      { now rewrite Nat2N.inj_succ, N.add_succ_r, N.add_succ_l. }
+      rewrite <- Hoffset. reflexivity.
+Qed.
+
+Lemma occupied_slots_from_mask_before_cutoff :
+  forall fuel bitmap cutoff start,
+    (start + N.of_nat fuel <= cutoff)%N ->
+    occupied_slots_from fuel (N.land bitmap (N.ones cutoff)) start =
+    occupied_slots_from fuel bitmap start.
+Proof.
+  induction fuel as [|fuel IH]; intros bitmap cutoff start Hbound; simpl.
+  - reflexivity.
+  - assert (Hlt : N.ltb start cutoff = true) by
+      (apply N.ltb_lt; lia).
+    rewrite bitmap_has_land_ones_bool, Hlt. simpl.
+    destruct (bitmap_has bitmap start) eqn:Hhas; simpl;
+      rewrite (IH bitmap cutoff (N.succ start)) by lia; reflexivity.
+Qed.
+
+Lemma occupied_slots_from_mask_after_cutoff :
+  forall fuel bitmap cutoff start,
+    (cutoff <= start)%N ->
+    occupied_slots_from fuel (N.land bitmap (N.ones cutoff)) start = [].
+Proof.
+  induction fuel as [|fuel IH]; intros bitmap cutoff start Hstart; simpl.
+  - reflexivity.
+  - destruct (bitmap_has (N.land bitmap (N.ones cutoff)) start) eqn:Hhas.
+    + apply (proj1 (bitmap_has_land_ones bitmap cutoff start)) in Hhas.
+      lia.
+    + apply IH. lia.
+Qed.
+
+Lemma occupied_slots_prefix :
+  forall cutoff bitmap,
+    cutoff <= 32 ->
+    occupied_slots bitmap =
+    occupied_slots_from cutoff bitmap 0 ++
+    occupied_slots_from (32 - cutoff) bitmap (N.of_nat cutoff).
+Proof.
+  intros cutoff bitmap Hcutoff. unfold occupied_slots.
+  replace 32 with (cutoff + (32 - cutoff)) by lia.
+  rewrite (occupied_slots_from_split cutoff (32 - cutoff) bitmap 0).
+  rewrite N.add_0_l.
+  replace (cutoff + (32 - cutoff) - cutoff)%nat with (32 - cutoff) by lia.
+  reflexivity.
+Qed.
+
 Lemma occupied_slots_length_popcount :
   forall bitmap,
     length (occupied_slots bitmap) = popcount32 bitmap.
