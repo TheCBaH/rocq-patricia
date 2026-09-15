@@ -818,6 +818,15 @@ Section TableWellFormed.
     intros eqb seed. unfold of_list. simpl. apply table_wf_empty.
   Qed.
 
+  Lemma table_wf_of_list_singleton :
+    forall (eqb : K -> K -> bool) seed key (value : A),
+      (hash seed key < hash_space)%N ->
+      table_wf (of_list eqb hash seed [(key, value)]).
+  Proof.
+    intros eqb seed key value Hbound.
+    rewrite of_list_singleton. now apply table_wf_singleton.
+  Qed.
+
 End TableWellFormed.
 
 Lemma bindings_join_two :
