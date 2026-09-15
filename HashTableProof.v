@@ -292,6 +292,65 @@ Proof.
    + apply IHHpaired. exact Hin.
 Qed.
 
+Lemma wf_branch_depth :
+ forall depth prefix bitmap children,
+ wf depth prefix (Branch bitmap children) -> depth < branch_levels.
+Proof.
+ intros depth prefix bitmap children Hwf.
+ inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hlength Hchildren Hnodup];
+   exact Hdepth.
+Qed.
+
+Lemma wf_branch_impossible_at_or_beyond_limit :
+ forall depth prefix bitmap children,
+ branch_levels <= depth ->
+ wf depth prefix (Branch bitmap children) -> False.
+Proof.
+ intros depth prefix bitmap children Hlimit Hwf.
+ pose proof (wf_branch_depth Hwf). lia.
+Qed.
+
+Lemma wf_branch_child :
+ forall depth prefix bitmap children child,
+ wf depth prefix (Branch bitmap children) ->
+ In child children ->
+ exists slot, child <> Empty /\
+   wf (S depth) (prefix ++ [slot]) child.
+Proof.
+ intros depth prefix bitmap children child Hwf Hin.
+ inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hlength Hchildren Hnodup];
+   subst.
+ eapply forall2_child_wf; eauto.
+Qed.
+
+Inductive branch_path_depth : tree K A -> nat -> Prop :=
+| branch_path_here : forall bitmap children,
+    branch_path_depth (Branch bitmap children) 0
+| branch_path_child : forall bitmap children child steps,
+    In child children ->
+    branch_path_depth child steps ->
+    branch_path_depth (Branch bitmap children) (S steps).
+
+Lemma wf_branch_path_bound :
+ forall depth prefix (t : tree K A) steps,
+ wf depth prefix t ->
+ branch_path_depth t steps ->
+ depth + steps < branch_levels.
+Proof.
+ intros depth prefix t steps Hwf Hpath.
+ revert depth prefix Hwf.
+ induction Hpath as [bitmap children|bitmap children child steps Hin Hpath IH];
+   intros depth prefix Hwf.
+ - pose proof (wf_branch_depth Hwf). lia.
+ - inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hlength Hchildren Hnodup];
+     subst.
+   assert (Hchild_details : exists slot, child <> Empty /\
+     wf (S depth) (prefix ++ [slot]) child).
+   { eapply forall2_child_wf; eauto. }
+   destruct Hchild_details as [slot [Hnonempty Hchild]].
+   specialize (IH (S depth) (prefix ++ [slot]) Hchild). lia.
+Qed.
+
 Lemma wf_binding_hash :
  forall (t : tree K A) depth prefix, wf depth prefix t ->
  forall entry, In entry (bindings t) ->
