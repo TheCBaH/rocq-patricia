@@ -423,6 +423,25 @@ Proof.
   symmetry. apply rank_occupied_slots_prefix_nat. lia.
 Qed.
 
+Lemma occupied_slots_rank_split_N :
+  forall slot bitmap,
+    (slot < branch_width)%N ->
+    bitmap_has bitmap slot = true ->
+    exists before after,
+      occupied_slots bitmap = before ++ slot :: after /\
+      length before = rank bitmap slot.
+Proof.
+  intros slot bitmap Hslot Hhas.
+  assert (Hnat : S (N.to_nat slot) <= 32) by
+    (unfold branch_width in Hslot; lia).
+  rewrite <- (N2Nat.id slot) in Hhas |-.
+  destruct (@occupied_slots_rank_split (N.to_nat slot) bitmap Hnat Hhas)
+    as [after [Hsplit Hrank]].
+  rewrite N2Nat.id in Hsplit, Hrank.
+  exists (occupied_slots_from (N.to_nat slot) bitmap 0), after.
+  split; assumption.
+Qed.
+
 (** Enumeration is exact over the finite range scanned by the worker.  These
     structural facts are deliberately separate from cardinality/rank: branch
     routing can use them without unfolding the bounded popcount worker. *)
