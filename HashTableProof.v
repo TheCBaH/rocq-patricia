@@ -594,6 +594,98 @@ Proof.
     apply N.eqb_eq; assumption.
 Qed.
 
+Section RecursiveLeafJoin.
+
+Context {K Seed A : Type}.
+Variable E : K -> K -> Prop.
+Variable hash : Seed -> K -> N.
+Variable seed : Seed.
+
+Lemma wf_join_worker_leaf_leaf :
+ forall fuel depth prefix left_hash (left_key : K) (left_value : A)
+        right_hash (right_key : K) (right_value : A),
+ depth + fuel <= branch_levels ->
+ length prefix = depth ->
+ left_hash <> right_hash ->
+ wf E hash seed depth prefix (Leaf left_hash left_key left_value) ->
+ wf E hash seed depth prefix (Leaf right_hash right_key right_value) ->
+ Equivalence E ->
+ (forall first second, E first second -> hash seed first = hash seed second) ->
+ join_falls_back fuel depth left_hash right_hash = false ->
+ wf E hash seed depth prefix
+   (join_worker fuel depth left_hash (Leaf left_hash left_key left_value)
+    right_hash (Leaf right_hash right_key right_value)).
+Proof.
+ induction fuel as [|fuel IH]; intros depth prefix left_hash left_key left_value
+   right_hash right_key right_value Hfuel Hlength Hdifferent Hleft Hright
+   Hequiv Hcongruent Hfallback.
+ - simpl in Hfallback. discriminate.
+ - cbn [join_worker join_falls_back] in Hfallback |-.
+   destruct (N.eqb (chunk left_hash depth) (chunk right_hash depth)) eqn:Hequal.
+   + apply wf_join_worker_equal_wf.
+     * lia.
+     * exact Hequal.
+     * apply IH with (left_key := left_key) (left_value := left_value)
+         (right_key := right_key) (right_value := right_value).
+       -- lia.
+       -- simpl. rewrite app_length. simpl. lia.
+       -- exact Hdifferent.
+       -- apply (wf_leaf_descend (full_hash := left_hash)
+            (key := left_key) (value := left_value)); auto.
+       -- apply N.eqb_eq in Hequal. rewrite Hequal.
+          apply (wf_leaf_descend (full_hash := right_hash)
+            (key := right_key) (value := right_value)); auto.
+       -- exact Hequiv.
+       -- exact Hcongruent.
+       -- exact Hfallback.
+   + apply N.eqb_neq in Hequal.
+     cbn [join_worker].
+     assert (Hdifferentb : N.eqb (chunk left_hash depth)
+       (chunk right_hash depth) = false) by (apply N.eqb_neq; exact Hequal).
+     rewrite Hdifferentb.
+     apply wf_join_two_leaf_leaf.
+     * lia.
+     * exact Hdifferent.
+     * exact Hequal.
+     * apply (wf_leaf_descend (full_hash := left_hash)
+          (key := left_key) (value := left_value)); auto.
+     * apply (wf_leaf_descend (full_hash := right_hash)
+          (key := right_key) (value := right_value)); auto.
+     * exact Hequiv.
+     * exact Hcongruent.
+Qed.
+
+Lemma wf_join_worker_leaf_leaf_root :
+ forall left_hash (left_key : K) (left_value : A)
+        right_hash (right_key : K) (right_value : A),
+ left_hash <> right_hash ->
+ wf E hash seed 0 [] (Leaf left_hash left_key left_value) ->
+ wf E hash seed 0 [] (Leaf right_hash right_key right_value) ->
+ Equivalence E ->
+ (forall first second, E first second -> hash seed first = hash seed second) ->
+ wf E hash seed 0 []
+   (join_worker branch_levels 0 left_hash (Leaf left_hash left_key left_value)
+    right_hash (Leaf right_hash right_key right_value)).
+Proof.
+ intros left_hash left_key left_value right_hash right_key right_value
+   Hdifferent Hleft Hright Hequiv Hcongruent.
+ assert (Hleft_bound : (left_hash < hash_space)%N).
+ { inversion Hleft; subst. assumption. }
+ assert (Hright_bound : (right_hash < hash_space)%N).
+ { inversion Hright; subst. assumption. }
+ apply wf_join_worker_leaf_leaf.
+ - cbv [branch_levels]. lia.
+ - reflexivity.
+ - exact Hdifferent.
+ - exact Hleft.
+ - exact Hright.
+ - exact Hequiv.
+ - exact Hcongruent.
+ - apply join_worker_six_no_fallback; assumption.
+Qed.
+
+End RecursiveLeafJoin.
+
 Lemma get_tree_zero_branch :
   forall (K A : Type) (eqb : K -> K -> bool) depth full_hash (key : K)
          bitmap (children : list (tree K A)),
