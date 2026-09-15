@@ -1251,6 +1251,16 @@ Proof.
   now rewrite N.eqb_refl.
 Qed.
 
+Lemma get_remove_empty :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         seed query key,
+    get eqb hash query (remove eqb hash key (empty (A := A) seed)) = None.
+Proof.
+  intros K Seed A eqb hash seed query key.
+  unfold get, remove, empty. cbn [remove_tree].
+  cbv [branch_levels]. reflexivity.
+Qed.
+
 Lemma set_tree_zero_branch :
   forall (K A : Type) (eqb : K -> K -> bool) depth full_hash (key : K)
          (value : A) bitmap (children : list (tree K A)),
