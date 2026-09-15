@@ -1713,6 +1713,23 @@ Lemma remove_tree_leaf_wf :
 
 End LeafRemovalInvariant.
 
+Lemma table_wf_remove_singleton :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) query stored (value : A),
+    (hash seed stored < hash_space)%N ->
+    table_wf E hash
+      (remove eqb hash query (singleton eqb hash seed stored value)).
+Proof.
+  intros K Seed A E hash seed eqb query stored value Hbound.
+  unfold table_wf, singleton, remove, set, empty.
+  cbn. destruct (N.eqb (hash seed query) (hash seed stored));
+    destruct (eqb query stored).
+  - apply wf_empty.
+  - apply wf_leaf; [reflexivity|exact Hbound|exact I].
+  - apply wf_leaf; [reflexivity|exact Hbound|exact I].
+  - apply wf_leaf; [reflexivity|exact Hbound|exact I].
+Qed.
+
 Lemma bindings_set_tree_leaf_other_hash :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash stored_hash
          key stored (old value : A) (entry : K * A),
