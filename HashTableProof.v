@@ -827,6 +827,17 @@ Section TableWellFormed.
     rewrite of_list_singleton. now apply table_wf_singleton.
   Qed.
 
+  Lemma table_wf_of_list_first_wins_same_key :
+    forall (eqb : K -> K -> bool) seed key (first second : A),
+      (forall key, eqb key key = true) ->
+      (hash seed key < hash_space)%N ->
+      table_wf (of_list eqb hash seed [(key, first); (key, second)]).
+  Proof.
+    intros eqb seed key first second Heqb Hbound.
+    rewrite of_list_first_wins_same_key by exact Heqb.
+    now apply table_wf_singleton.
+  Qed.
+
 End TableWellFormed.
 
 Lemma bindings_join_two :
