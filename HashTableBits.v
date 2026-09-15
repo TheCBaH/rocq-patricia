@@ -334,6 +334,26 @@ Proof.
   intros bitmap cutoff. apply occupied_slots_from_mask_filter.
 Qed.
 
+Lemma occupied_slots_prefix_filter :
+  forall cutoff bitmap,
+    cutoff <= 32 ->
+    filter (fun slot => N.ltb slot (N.of_nat cutoff)) (occupied_slots bitmap) =
+    occupied_slots_from cutoff bitmap 0.
+Proof.
+  intros cutoff bitmap Hcutoff.
+  rewrite <- (occupied_slots_mask_filter bitmap (N.of_nat cutoff)).
+  unfold occupied_slots.
+  replace 32 with (cutoff + (32 - cutoff)) by lia.
+  rewrite (occupied_slots_from_split cutoff (32 - cutoff)
+    (N.land bitmap (N.ones (N.of_nat cutoff))) 0).
+  rewrite (@occupied_slots_from_mask_before_cutoff cutoff bitmap
+    (N.of_nat cutoff) 0) by lia.
+  rewrite N.add_0_l.
+  rewrite (@occupied_slots_from_mask_after_cutoff (32 - cutoff) bitmap
+    (N.of_nat cutoff) (N.of_nat cutoff)) by lia.
+  now rewrite app_nil_r.
+Qed.
+
 Lemma rank_occupied_slots_prefix :
   forall bitmap slot,
     rank bitmap slot =
@@ -342,6 +362,65 @@ Lemma rank_occupied_slots_prefix :
 Proof.
   intros bitmap slot. rewrite rank_occupied_slots_mask.
   now rewrite occupied_slots_mask_filter.
+Qed.
+
+Lemma rank_occupied_slots_prefix_nat :
+  forall bitmap slot,
+    slot <= 32 ->
+    rank bitmap (N.of_nat slot) =
+    length (occupied_slots_from slot bitmap 0).
+Proof.
+  intros bitmap slot Hslot.
+  rewrite rank_occupied_slots_prefix.
+  now rewrite occupied_slots_prefix_filter.
+Qed.
+
+Lemma occupied_slots_from_at :
+  forall slot bitmap,
+    bitmap_has bitmap (N.of_nat slot) = true ->
+    occupied_slots_from (S slot) bitmap 0 =
+    occupied_slots_from slot bitmap 0 ++ [N.of_nat slot].
+Proof.
+  intros slot bitmap Hhas.
+  replace (S slot) with (slot + 1) by lia.
+  rewrite (occupied_slots_from_split slot 1 bitmap 0).
+  rewrite N.add_0_l. simpl. now rewrite Hhas.
+Qed.
+
+Lemma occupied_slots_slot_split :
+  forall slot bitmap,
+    S slot <= 32 ->
+    bitmap_has bitmap (N.of_nat slot) = true ->
+    exists after,
+      occupied_slots bitmap =
+      occupied_slots_from slot bitmap 0 ++ N.of_nat slot :: after.
+Proof.
+  intros slot bitmap Hslot Hhas.
+  exists (occupied_slots_from (32 - S slot) bitmap (N.of_nat (S slot))).
+  rewrite (@occupied_slots_prefix (S slot) bitmap) by lia.
+  rewrite occupied_slots_from_at by exact Hhas.
+  change ((occupied_slots_from slot bitmap 0 ++ [N.of_nat slot]) ++
+    occupied_slots_from (32 - S slot) bitmap (N.of_nat (S slot)) =
+    occupied_slots_from slot bitmap 0 ++
+    ([N.of_nat slot] ++
+      occupied_slots_from (32 - S slot) bitmap (N.of_nat (S slot)))).
+  symmetry. apply app_assoc.
+Qed.
+
+Lemma occupied_slots_rank_split :
+  forall slot bitmap,
+    S slot <= 32 ->
+    bitmap_has bitmap (N.of_nat slot) = true ->
+    exists after,
+      occupied_slots bitmap =
+      occupied_slots_from slot bitmap 0 ++ N.of_nat slot :: after /\
+      length (occupied_slots_from slot bitmap 0) =
+      rank bitmap (N.of_nat slot).
+Proof.
+  intros slot bitmap Hslot Hhas.
+  destruct (@occupied_slots_slot_split slot bitmap Hslot Hhas) as [after Hsplit].
+  exists after. split; [exact Hsplit|].
+  symmetry. apply rank_occupied_slots_prefix_nat. lia.
 Qed.
 
 (** Enumeration is exact over the finite range scanned by the worker.  These
