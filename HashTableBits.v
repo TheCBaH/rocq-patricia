@@ -111,6 +111,12 @@ Proof.
   intros [|word]; [reflexivity|destruct word; reflexivity].
 Qed.
 
+Lemma even_odd :
+  forall word, N.even word = negb (N.odd word).
+Proof.
+  intro word. rewrite even_testbit_zero, N.bit0_odd. reflexivity.
+Qed.
+
 Lemma bitmap_has_shiftr_even :
   forall bitmap start,
     bitmap_has bitmap start = negb (N.even (N.shiftr bitmap start)).
@@ -155,6 +161,17 @@ Proof.
   - intro Habsent. apply N.bits_inj. intro slot.
     rewrite N.bits_0.
     apply (proj1 (bitmap_has_false_spec bitmap slot)). apply Habsent.
+Qed.
+
+Lemma bitmap_has_land_ones :
+  forall bitmap cutoff slot,
+    bitmap_has (N.land bitmap (N.ones cutoff)) slot = true <->
+    bitmap_has bitmap slot = true /\ (slot < cutoff)%N.
+Proof.
+  intros bitmap cutoff slot.
+  repeat rewrite bitmap_has_spec.
+  rewrite N.land_spec, andb_true_iff, N.ones_spec_iff.
+  reflexivity.
 Qed.
 
 Lemma occupied_slots_from_empty :
@@ -210,6 +227,15 @@ Lemma occupied_slots_length_popcount :
 Proof.
   intro bitmap. unfold occupied_slots, popcount32.
   rewrite occupied_slots_from_length_popcount. now rewrite N.shiftr_0_r.
+Qed.
+
+Lemma rank_occupied_slots_mask :
+  forall bitmap slot,
+    rank bitmap slot =
+    length (occupied_slots (N.land bitmap (N.ones slot))).
+Proof.
+  intros bitmap slot. unfold rank.
+  now rewrite <- occupied_slots_length_popcount.
 Qed.
 
 (** Enumeration is exact over the finite range scanned by the worker.  These
@@ -278,6 +304,22 @@ Proof.
       * subst slot. lia.
       * specialize (IH bitmap (N.succ start) slot Hin). lia.
     + specialize (IH bitmap (N.succ start) slot Hin). lia.
+Qed.
+
+Lemma occupied_slots_from_upper :
+  forall fuel bitmap start slot,
+    In slot (occupied_slots_from fuel bitmap start) ->
+    (slot < start + N.of_nat fuel)%N.
+Proof.
+  induction fuel as [|fuel IH]; intros bitmap start slot Hin; simpl in Hin.
+  - contradiction.
+  - destruct (bitmap_has bitmap start) eqn:Hstart; simpl in Hin.
+    + destruct Hin as [Hslot|Hin].
+      * subst slot. simpl. lia.
+      * specialize (IH bitmap (N.succ start) slot Hin).
+        simpl in IH. lia.
+    + specialize (IH bitmap (N.succ start) slot Hin).
+      simpl in IH. lia.
 Qed.
 
 Lemma occupied_slots_from_nodup :
