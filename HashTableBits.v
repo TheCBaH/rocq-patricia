@@ -105,6 +105,30 @@ Proof.
     + tauto.
 Qed.
 
+Lemma even_testbit_zero :
+  forall word, N.even word = negb (N.testbit word 0).
+Proof.
+  intros [|word]; [reflexivity|destruct word; reflexivity].
+Qed.
+
+Lemma bitmap_has_shiftr_even :
+  forall bitmap start,
+    bitmap_has bitmap start = negb (N.even (N.shiftr bitmap start)).
+Proof.
+  intros bitmap start. apply eq_true_iff_eq. split; intro H.
+  - apply (proj2 (negb_true_iff _)).
+    rewrite even_testbit_zero.
+    apply (proj2 (negb_false_iff _)).
+    rewrite N.shiftr_spec by lia. replace (0 + start)%N with start by lia.
+    now apply (proj1 (bitmap_has_spec bitmap start)).
+  - apply (proj2 (bitmap_has_spec bitmap start)).
+    replace start with (0 + start)%N by lia.
+    rewrite <- (N.shiftr_spec bitmap start 0) by lia.
+    apply (proj1 (negb_false_iff _)).
+    rewrite <- even_testbit_zero.
+    apply (proj1 (negb_true_iff _)). exact H.
+Qed.
+
 Lemma bitmap_has_above_limit :
   forall bitmap slot,
     (bitmap < bitmap_limit)%N ->
@@ -158,6 +182,35 @@ Qed.
 Lemma occupied_slots_length_le :
   forall bitmap, length (occupied_slots bitmap) <= 32.
 Proof. intros. apply occupied_slots_from_length_le. Qed.
+
+Lemma shiftr_succ :
+  forall bitmap start,
+    N.shiftr bitmap (N.succ start) =
+    N.shiftr (N.shiftr bitmap start) 1.
+Proof.
+  intros bitmap start. rewrite N.shiftr_shiftr.
+  replace (start + 1)%N with (N.succ start) by lia. reflexivity.
+Qed.
+
+Lemma occupied_slots_from_length_popcount :
+  forall fuel bitmap start,
+    length (occupied_slots_from fuel bitmap start) =
+    popcount_worker fuel (N.shiftr bitmap start).
+Proof.
+  induction fuel as [|fuel IH]; intros bitmap start; simpl.
+  - reflexivity.
+  - rewrite bitmap_has_shiftr_even.
+    destruct (N.even (N.shiftr bitmap start)) eqn:Heven; simpl;
+      rewrite IH, shiftr_succ; reflexivity.
+Qed.
+
+Lemma occupied_slots_length_popcount :
+  forall bitmap,
+    length (occupied_slots bitmap) = popcount32 bitmap.
+Proof.
+  intro bitmap. unfold occupied_slots, popcount32.
+  rewrite occupied_slots_from_length_popcount. now rewrite N.shiftr_0_r.
+Qed.
 
 (** Enumeration is exact over the finite range scanned by the worker.  These
     structural facts are deliberately separate from cardinality/rank: branch
