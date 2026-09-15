@@ -684,6 +684,94 @@ Proof.
  - apply join_worker_six_no_fallback; assumption.
 Qed.
 
+Lemma wf_join_worker_leaf_collision :
+ forall fuel depth prefix left_hash (left_key : K) (left_value : A)
+        right_hash (right_entries : list (K * A)),
+ depth + fuel <= branch_levels ->
+ length prefix = depth ->
+ left_hash <> right_hash ->
+ wf E hash seed depth prefix (Leaf left_hash left_key left_value) ->
+ wf E hash seed depth prefix (Collision right_hash right_entries) ->
+ Equivalence E ->
+ (forall first second, E first second -> hash seed first = hash seed second) ->
+ join_falls_back fuel depth left_hash right_hash = false ->
+ wf E hash seed depth prefix
+   (join_worker fuel depth left_hash (Leaf left_hash left_key left_value)
+    right_hash (Collision right_hash right_entries)).
+Proof.
+ induction fuel as [|fuel IH]; intros depth prefix left_hash left_key left_value
+   right_hash right_entries Hfuel Hlength Hdifferent Hleft Hright Hequiv
+   Hcongruent Hfallback.
+ - simpl in Hfallback. discriminate.
+ - cbn [join_worker join_falls_back] in Hfallback |-.
+   destruct (N.eqb (chunk left_hash depth) (chunk right_hash depth)) eqn:Hequal.
+   + apply wf_join_worker_equal_wf.
+     * lia.
+     * exact Hequal.
+     * apply IH with (left_key := left_key) (left_value := left_value).
+       -- lia.
+       -- simpl. rewrite app_length. simpl. lia.
+       -- exact Hdifferent.
+       -- apply (wf_leaf_descend (full_hash := left_hash)
+            (key := left_key) (value := left_value)); auto.
+       -- apply N.eqb_eq in Hequal. rewrite Hequal.
+          apply (wf_collision_descend (full_hash := right_hash)
+            (entries := right_entries)); auto.
+       -- exact Hequiv.
+       -- exact Hcongruent.
+       -- exact Hfallback.
+   + apply N.eqb_neq in Hequal.
+     cbn [join_worker].
+     assert (Hdifferentb : N.eqb (chunk left_hash depth)
+       (chunk right_hash depth) = false) by (apply N.eqb_neq; exact Hequal).
+     rewrite Hdifferentb.
+     apply wf_join_two_leaf_collision.
+     * lia.
+     * exact Hdifferent.
+     * exact Hequal.
+     * apply (wf_leaf_descend (full_hash := left_hash)
+          (key := left_key) (value := left_value)); auto.
+     * apply (wf_collision_descend (full_hash := right_hash)
+          (entries := right_entries)); auto.
+     * exact Hequiv.
+     * exact Hcongruent.
+Qed.
+
+Lemma wf_join_worker_leaf_collision_root :
+ forall left_hash (left_key : K) (left_value : A)
+        right_hash (right_entries : list (K * A)),
+ left_hash <> right_hash ->
+ wf E hash seed 0 [] (Leaf left_hash left_key left_value) ->
+ wf E hash seed 0 [] (Collision right_hash right_entries) ->
+ Equivalence E ->
+ (forall first second, E first second -> hash seed first = hash seed second) ->
+ wf E hash seed 0 []
+   (join_worker branch_levels 0 left_hash (Leaf left_hash left_key left_value)
+    right_hash (Collision right_hash right_entries)).
+Proof.
+ intros left_hash left_key left_value right_hash right_entries Hdifferent Hleft
+   Hright Hequiv Hcongruent.
+ assert (Hleft_bound : (left_hash < hash_space)%N).
+ { inversion Hleft; subst. assumption. }
+ assert (Hright_bound : (right_hash < hash_space)%N).
+ { destruct right_entries as [|entry entries].
+   - inversion Hright as [| |d p h es Hsize Hall Hnodup|].
+     simpl in Hsize. lia.
+   - inversion Hright as [| |d p h es Hsize Hall Hnodup|].
+     apply Forall_forall with (x := entry) in Hall; [|now left].
+     exact (proj1 (proj2 Hall)). }
+ apply wf_join_worker_leaf_collision.
+ - cbv [branch_levels]. lia.
+ - reflexivity.
+ - exact Hdifferent.
+ - exact Hleft.
+ - exact Hright.
+ - exact Hequiv.
+ - exact Hcongruent.
+ - apply join_worker_six_no_fallback; assumption.
+Qed.
+
+
 End RecursiveLeafJoin.
 
 Lemma get_tree_zero_branch :
@@ -1310,6 +1398,29 @@ Lemma set_tree_collision_distinct_wf :
         (apply N.eqb_neq; exact Hchunk).
       cbn [join_worker]. rewrite Hchunkb.
       eapply wf_join_two_leaf_collision; eauto.
+  Qed.
+
+Lemma set_tree_collision_distinct_root_wf :
+    forall full_hash key stored_hash entries (value : A)
+           (eqb : K -> K -> bool),
+      wf E hash seed 0 [] (Collision stored_hash entries) ->
+      entry_matches hash seed full_hash 0 [] (key, value) ->
+      full_hash <> stored_hash ->
+      Equivalence E ->
+      (forall first second, E first second -> hash seed first = hash seed second) ->
+      wf E hash seed 0 []
+        (set_tree eqb branch_levels 0 full_hash key value
+          (Collision stored_hash entries)).
+  Proof.
+    intros full_hash key stored_hash entries value eqb Hstored Hentry Hhash
+      Hequiv Hcongruent.
+    destruct Hentry as [Hnew_hash [Hnew_bound Hnew_prefix]].
+    assert (Hnew : wf E hash seed 0 [] (Leaf full_hash key value)).
+    { apply wf_leaf; [exact Hnew_hash|exact Hnew_bound|exact I]. }
+    assert (Hhashb : N.eqb full_hash stored_hash = false) by
+      (apply N.eqb_neq; exact Hhash).
+    unfold set_tree. cbn. rewrite Hhashb.
+    eapply wf_join_worker_leaf_collision_root; eauto.
   Qed.
 
 End CollisionUpdateInvariant.
