@@ -1072,6 +1072,30 @@ Lemma set_tree_leaf_distinct_wf :
       eapply wf_join_two_leaf_leaf; eauto.
   Qed.
 
+Lemma set_tree_leaf_distinct_root_wf :
+    forall full_hash key stored_hash stored (old_value value : A)
+           (eqb : K -> K -> bool),
+      wf E hash seed 0 [] (Leaf stored_hash stored old_value) ->
+      entry_matches hash seed full_hash 0 [] (key, value) ->
+      eqb key stored = false ->
+      full_hash <> stored_hash ->
+      Equivalence E ->
+      (forall first second, E first second -> hash seed first = hash seed second) ->
+      wf E hash seed 0 []
+        (set_tree eqb branch_levels 0 full_hash key value
+          (Leaf stored_hash stored old_value)).
+  Proof.
+    intros full_hash key stored_hash stored old_value value eqb Hstored Hentry
+      Heqb Hhash Hequiv Hcongruent.
+    destruct Hentry as [Hnew_hash [Hnew_bound Hnew_prefix]].
+    assert (Hnew : wf E hash seed 0 [] (Leaf full_hash key value)).
+    { apply wf_leaf; [exact Hnew_hash|exact Hnew_bound|exact I]. }
+    assert (Hhashb : N.eqb full_hash stored_hash = false) by
+      (apply N.eqb_neq; exact Hhash).
+    unfold set_tree. cbn. rewrite Heqb, Hhashb.
+    eapply wf_join_worker_leaf_leaf_root; eauto.
+  Qed.
+
 End LeafUpdateInvariant.
 
 Section LeafRemovalInvariant.
