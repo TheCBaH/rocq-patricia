@@ -174,6 +174,16 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma bitmap_has_land_ones_bool :
+  forall bitmap cutoff slot,
+    bitmap_has (N.land bitmap (N.ones cutoff)) slot =
+    (bitmap_has bitmap slot && N.ltb slot cutoff).
+Proof.
+  intros bitmap cutoff slot.
+  apply eq_true_iff_eq. rewrite bitmap_has_land_ones.
+  now rewrite andb_true_iff, N.ltb_lt.
+Qed.
+
 Lemma occupied_slots_from_empty :
   forall fuel slot, occupied_slots_from fuel 0 slot = [].
 Proof.
@@ -236,6 +246,38 @@ Lemma rank_occupied_slots_mask :
 Proof.
   intros bitmap slot. unfold rank.
   now rewrite <- occupied_slots_length_popcount.
+Qed.
+
+Lemma occupied_slots_from_mask_filter :
+  forall fuel bitmap cutoff start,
+    occupied_slots_from fuel (N.land bitmap (N.ones cutoff)) start =
+    filter (fun slot => N.ltb slot cutoff)
+      (occupied_slots_from fuel bitmap start).
+Proof.
+  induction fuel as [|fuel IH]; intros bitmap cutoff start; simpl.
+  - reflexivity.
+  - rewrite bitmap_has_land_ones_bool.
+    destruct (bitmap_has bitmap start) eqn:Hhas;
+      destruct (N.ltb start cutoff) eqn:Hlt;
+      simpl; rewrite IH; try rewrite Hlt; reflexivity.
+Qed.
+
+Lemma occupied_slots_mask_filter :
+  forall bitmap cutoff,
+    occupied_slots (N.land bitmap (N.ones cutoff)) =
+    filter (fun slot => N.ltb slot cutoff) (occupied_slots bitmap).
+Proof.
+  intros bitmap cutoff. apply occupied_slots_from_mask_filter.
+Qed.
+
+Lemma rank_occupied_slots_prefix :
+  forall bitmap slot,
+    rank bitmap slot =
+    length (filter (fun occupied => N.ltb occupied slot)
+      (occupied_slots bitmap)).
+Proof.
+  intros bitmap slot. rewrite rank_occupied_slots_mask.
+  now rewrite occupied_slots_mask_filter.
 Qed.
 
 (** Enumeration is exact over the finite range scanned by the worker.  These
