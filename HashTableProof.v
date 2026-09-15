@@ -1570,12 +1570,57 @@ Proof.
   destruct fuel; cbn [remove_tree]; now rewrite N.eqb_refl, Heqb.
 Qed.
 
+Lemma get_tree_leaf_query_equiv :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         fuel depth full_hash stored (value : A) left right,
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    E left right ->
+    get_tree eqb fuel depth full_hash left (Leaf full_hash stored value) =
+    get_tree eqb fuel depth full_hash right (Leaf full_hash stored value).
+Proof.
+  intros K A E eqb fuel depth full_hash stored value left right
+    [Href Hsym Htrans] Heqb Hrelated.
+  cbn [get_tree].
+  assert (Hsame : eqb left stored = eqb right stored).
+  { destruct (eqb left stored) eqn:Hleft;
+      destruct (eqb right stored) eqn:Hright; try reflexivity.
+    - exfalso.
+      apply (proj1 (Heqb left stored)) in Hleft.
+      assert (Hright_stored : E right stored).
+      { eapply Htrans; [apply Hsym; exact Hrelated|exact Hleft]. }
+      apply (proj2 (Heqb right stored)) in Hright_stored.
+      rewrite Hright in Hright_stored. exact (diff_false_true Hright_stored).
+    - exfalso.
+      apply (proj1 (Heqb right stored)) in Hright.
+      assert (Hleft_stored : E left stored).
+      { eapply Htrans; [exact Hrelated|exact Hright]. }
+      apply (proj2 (Heqb left stored)) in Hleft_stored.
+      rewrite Hleft in Hleft_stored. exact (diff_false_true Hleft_stored). }
+  destruct fuel; cbn [get_tree]; rewrite N.eqb_refl;
+    now rewrite Hsame.
+Qed.
+
 Lemma get_tree_collision_same_hash :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash query
          (entries : list (K * A)),
     get_tree eqb fuel depth full_hash query (Collision full_hash entries) =
     bucket_get eqb query entries.
 Proof. intros. destruct fuel; cbn [get_tree]; now rewrite N.eqb_refl. Qed.
+
+Lemma get_tree_collision_query_equiv :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         fuel depth full_hash left right (entries : list (K * A)),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    E left right ->
+    get_tree eqb fuel depth full_hash left (Collision full_hash entries) =
+    get_tree eqb fuel depth full_hash right (Collision full_hash entries).
+Proof.
+  intros K A E eqb fuel depth full_hash left right entries Hequiv Heqb Hrelated.
+  repeat rewrite get_tree_collision_same_hash.
+  eapply bucket_get_equiv; eauto.
+Qed.
 
 Lemma get_tree_collision_other_hash :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash stored_hash

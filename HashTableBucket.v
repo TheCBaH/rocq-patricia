@@ -360,6 +360,32 @@ Proof.
       * now apply (IH Hnone stored' value').
 Qed.
 
+Lemma bucket_get_equiv :
+  forall K A (E : K -> K -> Prop) (eqb : K -> K -> bool),
+    Equivalence E ->
+    (forall left right, eqb left right = true <-> E left right) ->
+    forall left right (entries : list (K * A)),
+      E left right ->
+      bucket_get eqb left entries = bucket_get eqb right entries.
+Proof.
+  intros K A E eqb [Href Hsym Htrans] Heqb left right entries Hrelated.
+  induction entries as [|[stored value] entries IH]; simpl; auto.
+  destruct (eqb left stored) eqn:Hleft;
+    destruct (eqb right stored) eqn:Hright; auto.
+  - exfalso.
+    apply (proj1 (Heqb left stored)) in Hleft.
+    assert (Hright_stored : E right stored).
+    { eapply Htrans; [apply Hsym; exact Hrelated|exact Hleft]. }
+    apply (proj2 (Heqb right stored)) in Hright_stored.
+    rewrite Hright in Hright_stored. discriminate.
+  - exfalso.
+    apply (proj1 (Heqb right stored)) in Hright.
+    assert (Hleft_stored : E left stored).
+    { eapply Htrans; [exact Hrelated|exact Hright]. }
+    apply (proj2 (Heqb left stored)) in Hleft_stored.
+    rewrite Hleft in Hleft_stored. discriminate.
+Qed.
+
 Lemma bucket_set_key_nodup :
   forall K A (E : K -> K -> Prop) (eqb : K -> K -> bool)
          key (value : A) (entries : list (K * A)),
