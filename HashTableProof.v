@@ -3177,3 +3177,62 @@ Proof.
     (bindings (remove_tree eqb branch_levels 0 (hash seed key) key root))).
   now apply bindings_remove_tree_nodup.
 Qed.
+
+Lemma get_tree_query_equiv :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         fuel depth full_hash (left right : K) (t : tree K A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    E left right ->
+    get_tree eqb fuel depth full_hash left t =
+    get_tree eqb fuel depth full_hash right t.
+Proof.
+  intros K A E eqb fuel.
+  induction fuel as [|fuel IH]; intros depth full_hash left right t
+    Hequiv Heqb Hrelated; destruct t as
+    [|stored_hash stored value|stored_hash entries|bitmap children].
+  - reflexivity.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + apply N.eqb_eq in Hhash. subst stored_hash.
+      exact (@get_tree_leaf_query_equiv K A E eqb _ depth full_hash stored
+        value left right Hequiv Heqb Hrelated).
+    + cbn [get_tree]. now rewrite Hhash.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + apply N.eqb_eq in Hhash. subst stored_hash.
+      exact (@get_tree_collision_query_equiv K A E eqb _ depth full_hash
+        left right entries Hequiv Heqb Hrelated).
+    + cbn [get_tree]. now rewrite Hhash.
+  - reflexivity.
+  - reflexivity.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + apply N.eqb_eq in Hhash. subst stored_hash.
+      exact (@get_tree_leaf_query_equiv K A E eqb _ depth full_hash stored
+        value left right Hequiv Heqb Hrelated).
+    + cbn [get_tree]. now rewrite Hhash.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + apply N.eqb_eq in Hhash. subst stored_hash.
+      exact (@get_tree_collision_query_equiv K A E eqb _ depth full_hash
+        left right entries Hequiv Heqb Hrelated).
+    + cbn [get_tree]. now rewrite Hhash.
+  - cbn [get_tree].
+    destruct (bitmap_has bitmap (chunk full_hash depth));
+      [destruct (dense_get (rank bitmap (chunk full_hash depth)) children)
+       as [child|]; [apply IH|reflexivity]|reflexivity]; assumption.
+Qed.
+
+Lemma get_query_equiv :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         (hash : Seed -> K -> N) (left right : K) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    E left right ->
+    get eqb hash left m = get eqb hash right m.
+Proof.
+  intros K Seed A E eqb hash left right [seed root]
+    Hequiv Heqb Hhash Hrelated.
+  unfold get. simpl.
+  rewrite (Hhash seed left right Hrelated).
+  apply get_tree_query_equiv; assumption.
+Qed.
