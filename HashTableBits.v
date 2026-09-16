@@ -993,6 +993,15 @@ Proof.
   left. unfold slot_nat. rewrite N.add_0_l, N2Nat.id. lia.
 Qed.
 
+Lemma rank_le_popcount32 :
+  forall bitmap slot,
+    rank bitmap slot <= popcount32 bitmap.
+Proof.
+  intros bitmap slot.
+  rewrite rank_occupied_slots_prefix, <- occupied_slots_length_popcount.
+  apply filter_length_le.
+Qed.
+
 Lemma bitmap_bits_disjoint :
   forall left_slot right_slot,
     left_slot <> right_slot ->
@@ -1134,6 +1143,35 @@ Proof.
   assert (right = 0%N \/ right = 1%N \/ right = 2%N \/ right = 3%N \/ right = 4%N \/ right = 5%N \/ right = 6%N \/ right = 7%N \/ right = 8%N \/ right = 9%N \/ right = 10%N \/ right = 11%N \/ right = 12%N \/ right = 13%N \/ right = 14%N \/ right = 15%N \/ right = 16%N \/ right = 17%N \/ right = 18%N \/ right = 19%N \/ right = 20%N \/ right = 21%N \/ right = 22%N \/ right = 23%N \/ right = 24%N \/ right = 25%N \/ right = 26%N \/ right = 27%N \/ right = 28%N \/ right = 29%N \/ right = 30%N \/ right = 31%N) as Hr by (unfold branch_width in Hright; lia).
   destruct Hl as [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | ->]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]].
   all: destruct Hr as [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | ->]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]; try discriminate; vm_compute; reflexivity.
+Qed.
+
+Lemma rank_lor_bitmap_bits_lt_left :
+  forall left right,
+    (left < branch_width)%N ->
+    (right < branch_width)%N ->
+    N.ltb left right = true ->
+    rank (N.lor (bitmap_bit left) (bitmap_bit right)) left = 0.
+Proof.
+  intros left right Hleft Hright Hlt.
+  rewrite rank_occupied_slots_prefix.
+  rewrite (@occupied_slots_lor_bitmap_bits_lt left right Hleft Hright Hlt).
+  simpl. rewrite N.ltb_irrefl.
+  assert (Hright_left : N.ltb right left = false).
+  { apply N.ltb_ge. apply N.ltb_lt in Hlt. lia. }
+  now rewrite Hright_left.
+Qed.
+
+Lemma rank_lor_bitmap_bits_lt_right :
+  forall left right,
+    (left < branch_width)%N ->
+    (right < branch_width)%N ->
+    N.ltb left right = true ->
+    rank (N.lor (bitmap_bit left) (bitmap_bit right)) right = 1.
+Proof.
+  intros left right Hleft Hright Hlt.
+  rewrite rank_occupied_slots_prefix.
+  rewrite (@occupied_slots_lor_bitmap_bits_lt left right Hleft Hright Hlt).
+  simpl. now rewrite Hlt, N.ltb_irrefl.
 Qed.
 
 Lemma rank_bitmap_bit_self :

@@ -3551,6 +3551,25 @@ Proof.
   now apply get_tree_branch_insert_self.
 Qed.
 
+Lemma get_tree_after_set_branch_slot_absent_self_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (key : K) (value : A) bitmap (children : list (tree K A)),
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    eqb key key = true ->
+    bitmap_has bitmap (chunk full_hash depth) = false ->
+    get_tree eqb (S fuel) depth full_hash key
+      (set_tree eqb (S fuel) depth full_hash key value
+        (Branch bitmap children)) = Some value.
+Proof.
+  intros K Seed A E hash seed eqb fuel depth prefix full_hash key value
+    bitmap children Hwf Heqb Habsent.
+  apply get_tree_after_set_branch_slot_absent_self; try assumption.
+  inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hlength
+    Hchildren Hnodup]; subst.
+  rewrite Hlength. apply rank_le_popcount32.
+Qed.
+
 Lemma get_tree_after_set_branch_child_self :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
          (value : A) bitmap (children : list (tree K A)) child,
@@ -3571,6 +3590,150 @@ Proof.
     (set_tree eqb fuel (S depth) full_hash key value child)
     Hpresent Hchild).
   exact Hrecursive.
+Qed.
+
+Lemma get_tree_join_two_right_leaf :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth left_hash right_hash
+         (left : tree K A) (key : K) (value : A),
+    eqb key key = true ->
+    chunk left_hash depth <> chunk right_hash depth ->
+    get_tree eqb (S fuel) depth right_hash key
+      (join_two left_hash left right_hash (Leaf right_hash key value) depth) =
+    Some value.
+Proof.
+  intros K A eqb fuel depth left_hash right_hash left key value Heqb Hdifferent.
+  unfold join_two.
+  destruct (N.ltb (chunk left_hash depth) (chunk right_hash depth)) eqn:Hleft.
+  - cbn [get_tree].
+    assert (Hpresent : bitmap_has
+        (N.lor (bitmap_bit (chunk left_hash depth))
+          (bitmap_bit (chunk right_hash depth)))
+        (chunk right_hash depth) = true).
+    { apply bitmap_has_lor_right. apply bitmap_bit_has_slot. }
+    rewrite Hpresent.
+    rewrite (@rank_lor_bitmap_bits_lt_right
+      (chunk left_hash depth) (chunk right_hash depth)
+      (chunk_bound left_hash depth) (chunk_bound right_hash depth) Hleft).
+    cbn [dense_get]. now apply get_tree_leaf_same.
+  - assert (Hright : N.ltb (chunk right_hash depth) (chunk left_hash depth) = true).
+    { apply N.ltb_lt. apply N.ltb_ge in Hleft.
+      destruct (N.eq_dec (chunk right_hash depth) (chunk left_hash depth))
+        as [Hequal|Hunequal].
+      - exfalso. apply Hdifferent. now symmetry.
+      - lia. }
+    cbn [get_tree].
+    assert (Hpresent : bitmap_has
+        (N.lor (bitmap_bit (chunk left_hash depth))
+          (bitmap_bit (chunk right_hash depth)))
+        (chunk right_hash depth) = true).
+    { apply bitmap_has_lor_right. apply bitmap_bit_has_slot. }
+    rewrite Hpresent.
+    rewrite (N.lor_comm (bitmap_bit (chunk left_hash depth))
+      (bitmap_bit (chunk right_hash depth))).
+    rewrite (@rank_lor_bitmap_bits_lt_left
+      (chunk right_hash depth) (chunk left_hash depth)
+      (chunk_bound right_hash depth) (chunk_bound left_hash depth) Hright).
+    cbn [dense_get]. now apply get_tree_leaf_same.
+Qed.
+
+Lemma get_tree_join_worker_right_leaf :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth left_hash right_hash
+         (left : tree K A) (key : K) (value : A),
+    eqb key key = true ->
+    join_falls_back fuel depth left_hash right_hash = false ->
+    get_tree eqb fuel depth right_hash key
+      (join_worker fuel depth left_hash left right_hash
+        (Leaf right_hash key value)) = Some value.
+Proof.
+  intros K A eqb fuel.
+  induction fuel as [|fuel IH]; intros depth left_hash right_hash left key value
+    Heqb Hfallback.
+  - discriminate Hfallback.
+  - cbn [join_worker join_falls_back] in Hfallback |-.
+    destruct (N.eqb (chunk left_hash depth) (chunk right_hash depth))
+      eqn:Hchunks.
+    + assert (Hsame : chunk left_hash depth = chunk right_hash depth).
+      { now apply N.eqb_eq. }
+      cbn [join_worker]. rewrite Hchunks.
+      cbn [get_tree]. rewrite <- Hsame.
+      rewrite child_bit_has_slot, child_bit_rank_self.
+      cbn [dense_get].
+      apply IH. exact Heqb. exact Hfallback.
+    + cbn [join_worker]. rewrite Hchunks.
+      apply get_tree_join_two_right_leaf; [exact Heqb|].
+      now apply N.eqb_neq.
+Qed.
+
+Lemma get_tree_join_two_left_leaf :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth left_hash right_hash
+         (right : tree K A) (key : K) (value : A),
+    eqb key key = true ->
+    chunk left_hash depth <> chunk right_hash depth ->
+    get_tree eqb (S fuel) depth left_hash key
+      (join_two left_hash (Leaf left_hash key value) right_hash right depth) =
+    Some value.
+Proof.
+  intros K A eqb fuel depth left_hash right_hash right key value Heqb Hdifferent.
+  unfold join_two.
+  destruct (N.ltb (chunk left_hash depth) (chunk right_hash depth)) eqn:Hleft.
+  - cbn [get_tree].
+    assert (Hpresent : bitmap_has
+        (N.lor (bitmap_bit (chunk left_hash depth))
+          (bitmap_bit (chunk right_hash depth)))
+        (chunk left_hash depth) = true).
+    { apply bitmap_has_lor_left. apply bitmap_bit_has_slot. }
+    rewrite Hpresent.
+    rewrite (@rank_lor_bitmap_bits_lt_left
+      (chunk left_hash depth) (chunk right_hash depth)
+      (chunk_bound left_hash depth) (chunk_bound right_hash depth) Hleft).
+    cbn [dense_get]. now apply get_tree_leaf_same.
+  - assert (Hright : N.ltb (chunk right_hash depth) (chunk left_hash depth) = true).
+    { apply N.ltb_lt. apply N.ltb_ge in Hleft.
+      destruct (N.eq_dec (chunk right_hash depth) (chunk left_hash depth))
+        as [Hequal|Hunequal].
+      - exfalso. apply Hdifferent. now symmetry.
+      - lia. }
+    cbn [get_tree].
+    assert (Hpresent : bitmap_has
+        (N.lor (bitmap_bit (chunk left_hash depth))
+          (bitmap_bit (chunk right_hash depth)))
+        (chunk left_hash depth) = true).
+    { apply bitmap_has_lor_left. apply bitmap_bit_has_slot. }
+    rewrite Hpresent.
+    rewrite (N.lor_comm (bitmap_bit (chunk left_hash depth))
+      (bitmap_bit (chunk right_hash depth))).
+    rewrite (@rank_lor_bitmap_bits_lt_right
+      (chunk right_hash depth) (chunk left_hash depth)
+      (chunk_bound right_hash depth) (chunk_bound left_hash depth) Hright).
+    cbn [dense_get]. now apply get_tree_leaf_same.
+Qed.
+
+Lemma get_tree_join_worker_left_leaf :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth left_hash right_hash
+         (right : tree K A) (key : K) (value : A),
+    eqb key key = true ->
+    join_falls_back fuel depth left_hash right_hash = false ->
+    get_tree eqb fuel depth left_hash key
+      (join_worker fuel depth left_hash (Leaf left_hash key value) right_hash
+        right) = Some value.
+Proof.
+  intros K A eqb fuel.
+  induction fuel as [|fuel IH]; intros depth left_hash right_hash right key value
+    Heqb Hfallback.
+  - discriminate Hfallback.
+  - cbn [join_worker join_falls_back] in Hfallback |-.
+    destruct (N.eqb (chunk left_hash depth) (chunk right_hash depth))
+      eqn:Hchunks.
+    + assert (Hsame : chunk left_hash depth = chunk right_hash depth).
+      { now apply N.eqb_eq. }
+      cbn [join_worker]. rewrite Hchunks.
+      cbn [get_tree].
+      rewrite child_bit_has_slot, child_bit_rank_self.
+      cbn [dense_get].
+      apply IH. exact Heqb. exact Hfallback.
+    + cbn [join_worker]. rewrite Hchunks.
+      apply get_tree_join_two_left_leaf; [exact Heqb|].
+      now apply N.eqb_neq.
 Qed.
 
 Lemma get_tree_after_remove_self_wf :
