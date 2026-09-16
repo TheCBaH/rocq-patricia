@@ -1772,6 +1772,51 @@ Proof.
   all: apply wf_branch_replace; assumption || apply chunk_bound.
 Qed.
 
+Lemma branch_remove_wf_singleton_empty :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) depth prefix bitmap (children : list (tree K A)) slot,
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    length children = 1 ->
+    (slot < branch_width)%N ->
+    bitmap_has bitmap slot = true ->
+    branch_remove bitmap slot children = Empty.
+Proof.
+  intros K Seed A E hash seed depth prefix bitmap children slot Hwf Hlength
+    Hslot Hpresent.
+  destruct (wf_branch_ranked_child Hwf Hslot Hpresent)
+    as [child [Hget [Hnonempty Hchild]]].
+  assert (Hindex : rank bitmap slot < length children).
+  { apply (proj1 (nth_error_Some children (rank bitmap slot))).
+    unfold dense_get in Hget. rewrite Hget. discriminate. }
+  assert (Hremoved_length : length (dense_remove (rank bitmap slot) children) = 0).
+  { rewrite dense_remove_length_hit by exact Hindex.
+    rewrite Hlength. reflexivity. }
+  apply length_zero_iff_nil in Hremoved_length.
+  unfold branch_remove. now rewrite Hremoved_length.
+Qed.
+
+Lemma remove_tree_branch_child_wf_singleton_empty :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) fuel depth prefix full_hash (key : K)
+         bitmap (children : list (tree K A)) (eqb : K -> K -> bool) child,
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    length children = 1 ->
+    bitmap_has bitmap (chunk full_hash depth) = true ->
+    dense_get (rank bitmap (chunk full_hash depth)) children = Some child ->
+    remove_tree eqb fuel (S depth) full_hash key child = Empty ->
+    wf E hash seed depth prefix
+      (remove_tree eqb (S fuel) depth full_hash key (Branch bitmap children)).
+Proof.
+  intros K Seed A E hash seed fuel depth prefix full_hash key bitmap children
+    eqb child Hwf Hlength Hpresent Hchild Hremove.
+  rewrite (remove_tree_branch_child eqb fuel depth full_hash key bitmap
+    children Hpresent Hchild).
+  rewrite Hremove.
+  rewrite (@branch_remove_wf_singleton_empty K Seed A E hash seed depth prefix
+    bitmap children (chunk full_hash depth) Hwf Hlength (chunk_bound _ _) Hpresent).
+  apply wf_empty.
+Qed.
+
 Lemma remove_tree_branch_dense_missing :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
          bitmap (children : list (tree K A)),
