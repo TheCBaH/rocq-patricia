@@ -3800,6 +3800,30 @@ Proof.
   apply join_worker_six_no_fallback; assumption.
 Qed.
 
+Lemma get_after_set_collision_distinct_root :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
+         stored_hash (entries : list (K * A)),
+    eqb key key = true ->
+    (hash seed key < hash_space)%N ->
+    hash seed key <> stored_hash ->
+    wf E hash seed 0 [] (Collision stored_hash entries) ->
+    get eqb hash key
+      (set eqb hash key value
+        {| table_seed := seed;
+           table_root := Collision stored_hash entries |}) = Some value.
+Proof.
+  intros K Seed A E hash seed eqb key value stored_hash entries
+    Heqb Hkey_bound Hdifferent Hwf.
+  change (get_tree eqb branch_levels 0 (hash seed key) key
+    (set_tree eqb branch_levels 0 (hash seed key) key value
+      (Collision stored_hash entries)) = Some value).
+  apply get_tree_after_set_collision_distinct_self; try assumption.
+  apply join_worker_six_no_fallback; try assumption.
+  exact (@wf_collision_hash_bound K Seed A E hash seed 0 [] stored_hash
+    entries Hwf).
+Qed.
+
 Lemma get_tree_after_remove_self_wf :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
