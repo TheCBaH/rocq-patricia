@@ -3982,6 +3982,32 @@ Proof.
     now rewrite Hfalse in Htrue.
 Qed.
 
+Lemma get_after_set_empty_root :
+  forall (K Seed A : Type) (hash : Seed -> K -> N) (seed : Seed)
+         (eqb : K -> K -> bool) (key : K) (value : A),
+    eqb key key = true ->
+    get eqb hash key
+      (set eqb hash key value (empty (A := A) seed)) = Some value.
+Proof.
+  intros K Seed A hash seed eqb key value Heqb.
+  unfold get, set, empty.
+  cbn [set_tree get_tree].
+  exact (get_tree_leaf_same eqb branch_levels 0 (hash seed key) key value Heqb).
+Qed.
+
+Lemma table_wf_set_empty_root :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A),
+    (hash seed key < hash_space)%N ->
+    table_wf E hash
+      (set eqb hash key value (empty (A := A) seed)).
+Proof.
+  intros K Seed A E hash seed eqb key value Hbound.
+  unfold table_wf, set, empty.
+  cbn.
+  apply wf_leaf; [reflexivity|exact Hbound|exact I].
+Qed.
+
 Lemma get_tree_after_remove_self_wf :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
