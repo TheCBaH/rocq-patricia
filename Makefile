@@ -27,7 +27,7 @@ HASHTABLE_VOFILES := $(HASHTABLE_VFILES:.v=.vo)
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
-.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-test hashtable-differential hashtable-test-native hashtable-native hashtable-native-model-extraction-audit hashtable-native-model-test hashtable-native-model-test-native hashtable-native-array-test hashtable-native-array-test-native hashtable-native-primitives-test hashtable-native-primitives-audit hashtable-native-array-audit hashtable-benchmark hashtable-benchmark-smoke hashtable-string-benchmark hashtable-string-benchmark-smoke hashtable-extraction-audit hashtable-assumptions
+.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-test hashtable-differential hashtable-test-native hashtable-native hashtable-native-model-extraction-audit hashtable-native-model-test hashtable-native-model-test-native hashtable-native-array-test hashtable-native-array-test-native hashtable-native-primitives-test hashtable-native-primitives-audit hashtable-native-array-audit hashtable-benchmark hashtable-benchmark-smoke hashtable-string-benchmark hashtable-string-benchmark-smoke hashtable-extraction-audit hashtable-generated-interface-audit hashtable-assumptions
 
 .PHONY: string-primitive-profile
 .PHONY: string-worker-performance
@@ -156,7 +156,10 @@ hashtable-test-native: hashtable-wrapper-test-native HashTableReference.mli Hash
 	  $(OCAMLOPT) -I . -I .. -o ../hashtable-differential-native-test $$objects ../HashTableReference.cmx ../HashMap.cmx ../HashTableDifferentialTest.ml
 	./hashtable-differential-native-test
 
-hashtable-extraction-audit: HashMap.mli HashMap.ml check-hashtable-extraction-boundary.sh
+hashtable-generated-interface-audit: hashtable-reference check-hashtable-generated-interface.sh
+	sh ./check-hashtable-generated-interface.sh hashtable_reference_extracted/HashTable.mli
+
+hashtable-extraction-audit: hashtable-generated-interface-audit HashMap.mli HashMap.ml check-hashtable-extraction-boundary.sh
 	sh ./check-hashtable-extraction-boundary.sh HashMap.mli HashMap.ml
 
 hashtable-native-primitives-test: HashTablePrimitives.mli HashTablePrimitives.ml HashTablePrimitivesTest.ml
