@@ -972,6 +972,27 @@ Proof.
   repeat rewrite app_length. simpl. lia.
 Qed.
 
+Lemma rank_lor_bit :
+  forall bitmap slot,
+    (slot < branch_width)%N ->
+    rank (N.lor bitmap (bitmap_bit slot)) slot = rank bitmap slot.
+Proof.
+  intros bitmap slot Hslot.
+  set (slot_nat := N.to_nat slot).
+  assert (Hslot_nat : slot_nat <= 32).
+  { unfold slot_nat, branch_width in Hslot. lia. }
+  assert (Hslot_id : N.of_nat slot_nat = slot).
+  { unfold slot_nat. apply N2Nat.id. }
+  rewrite <- Hslot_id.
+  rewrite (@rank_occupied_slots_prefix_nat
+    (N.lor bitmap (bitmap_bit (N.of_nat slot_nat))) slot_nat Hslot_nat).
+  rewrite (@rank_occupied_slots_prefix_nat bitmap slot_nat Hslot_nat).
+  apply f_equal.
+  apply (@occupied_slots_from_lor_bit_away slot_nat bitmap
+    (N.of_nat slot_nat) 0).
+  left. unfold slot_nat. rewrite N.add_0_l, N2Nat.id. lia.
+Qed.
+
 Lemma bitmap_bits_disjoint :
   forall left_slot right_slot,
     left_slot <> right_slot ->

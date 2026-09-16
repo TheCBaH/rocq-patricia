@@ -3507,6 +3507,72 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma get_tree_branch_insert_self :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
+         (value : A) bitmap (children : list (tree K A)),
+    eqb key key = true ->
+    rank bitmap (chunk full_hash depth) <= length children ->
+    get_tree eqb (S fuel) depth full_hash key
+      (branch_insert bitmap (chunk full_hash depth)
+        (Leaf full_hash key value) children) = Some value.
+Proof.
+  intros K A eqb fuel depth full_hash key value bitmap children
+    Heqb Hindex.
+  unfold branch_insert. cbn [get_tree].
+  assert (Hpresent : bitmap_has
+      (N.lor bitmap (bitmap_bit (chunk full_hash depth)))
+      (chunk full_hash depth) = true).
+  { apply bitmap_has_lor_right. apply bitmap_bit_has_slot. }
+  rewrite Hpresent.
+  assert (Hrank : rank (N.lor bitmap (bitmap_bit (chunk full_hash depth)))
+      (chunk full_hash depth) = rank bitmap (chunk full_hash depth)).
+  { apply rank_lor_bit. apply chunk_bound. }
+  rewrite Hrank.
+  rewrite (@dense_get_insert_same (tree K A)
+    (rank bitmap (chunk full_hash depth))
+    (Leaf full_hash key value) children Hindex).
+  now apply get_tree_leaf_same.
+Qed.
+
+Lemma get_tree_after_set_branch_slot_absent_self :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
+         (value : A) bitmap (children : list (tree K A)),
+    eqb key key = true ->
+    bitmap_has bitmap (chunk full_hash depth) = false ->
+    rank bitmap (chunk full_hash depth) <= length children ->
+    get_tree eqb (S fuel) depth full_hash key
+      (set_tree eqb (S fuel) depth full_hash key value
+        (Branch bitmap children)) = Some value.
+Proof.
+  intros K A eqb fuel depth full_hash key value bitmap children
+    Heqb Habsent Hindex.
+  rewrite (set_tree_branch_slot_absent eqb fuel depth full_hash key value
+    bitmap children Habsent).
+  now apply get_tree_branch_insert_self.
+Qed.
+
+Lemma get_tree_after_set_branch_child_self :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
+         (value : A) bitmap (children : list (tree K A)) child,
+    bitmap_has bitmap (chunk full_hash depth) = true ->
+    dense_get (rank bitmap (chunk full_hash depth)) children = Some child ->
+    get_tree eqb fuel (S depth) full_hash key
+      (set_tree eqb fuel (S depth) full_hash key value child) = Some value ->
+    get_tree eqb (S fuel) depth full_hash key
+      (set_tree eqb (S fuel) depth full_hash key value
+        (Branch bitmap children)) = Some value.
+Proof.
+  intros K A eqb fuel depth full_hash key value bitmap children child
+    Hpresent Hchild Hrecursive.
+  rewrite (set_tree_branch_child eqb fuel depth full_hash key value bitmap
+    children Hpresent Hchild).
+  rewrite (@get_tree_branch_replace_same K A eqb fuel depth full_hash key
+    bitmap children child
+    (set_tree eqb fuel (S depth) full_hash key value child)
+    Hpresent Hchild).
+  exact Hrecursive.
+Qed.
+
 Lemma get_tree_after_remove_self_wf :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
