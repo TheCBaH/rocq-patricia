@@ -3415,3 +3415,22 @@ Proof.
     + cbn [bucket_get]. rewrite Hkey_stored.
       apply IH. exact Htail.
 Qed.
+
+Lemma get_tree_after_remove_collision_self :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (key : K) (entries : list (K * A)),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    wf E hash seed depth prefix (Collision full_hash entries) ->
+    get_tree eqb fuel depth full_hash key
+      (remove_tree eqb fuel depth full_hash key
+        (Collision full_hash entries)) = None.
+Proof.
+  intros K Seed A E hash seed eqb fuel depth prefix full_hash key entries
+    Hequiv Heqb Hwf.
+  inversion Hwf as [| |d p h es Hlength Hall Hnodup|]; subst.
+  rewrite remove_tree_collision_same_hash.
+  rewrite get_tree_normalize_collision_same_hash.
+  now apply (@bucket_get_after_remove_self K A E eqb key entries).
+Qed.
