@@ -3025,3 +3025,35 @@ Proof.
   - apply bindings_remove_tree_subseq.
   - exact Hnodup.
 Qed.
+
+Lemma remove_tree_branch_child_wf_nonempty_auto :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) fuel depth prefix full_hash (key : K)
+         bitmap (children : list (tree K A)) (eqb : K -> K -> bool)
+         child child',
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    bitmap_has bitmap (chunk full_hash depth) = true ->
+    dense_get (rank bitmap (chunk full_hash depth)) children = Some child ->
+    remove_tree eqb fuel (S depth) full_hash key child = child' ->
+    child' <> Empty ->
+    wf E hash seed (S depth) (prefix ++ [chunk full_hash depth]) child' ->
+    wf E hash seed depth prefix
+      (remove_tree eqb (S fuel) depth full_hash key (Branch bitmap children)).
+Proof.
+  intros K Seed A E hash seed fuel depth prefix full_hash key bitmap children
+    eqb child child' Hwf Hpresent Hchild Hremove Hnonempty Hchildwf.
+  rewrite (remove_tree_branch_child eqb fuel depth full_hash key bitmap
+    children Hpresent Hchild).
+  rewrite Hremove.
+  destruct child'; try contradiction.
+  all: apply wf_branch_replace with (slot := chunk full_hash depth);
+    try assumption || apply chunk_bound.
+  all: pose proof (@bindings_remove_tree_nodup K A (binding_equiv E) eqb
+    (S fuel) depth full_hash key (Branch bitmap children)) as Hnodup.
+  all: rewrite (remove_tree_branch_child eqb fuel depth full_hash key bitmap
+    children Hpresent Hchild) in Hnodup.
+  all: rewrite Hremove in Hnodup.
+  all: apply Hnodup.
+  all: exact (@wf_bindings_nodup K Seed A E hash seed depth prefix
+    (Branch bitmap children) Hwf).
+Qed.
