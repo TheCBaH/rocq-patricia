@@ -40,6 +40,11 @@ wrapper retains the low 30 bits of every returned hash; equivalent keys must
 therefore return the same normalized hash for a given seed. Each map retains
 the seed supplied to `empty`, `singleton`, or `of_list`.
 
+`HashTableTestHash` provides deterministic 30-bit integer, string, and
+constant-collision hashes for direct reference-backend tests. It is intended
+for reproducible test workloads; applications supply their own callback via
+`HashMap.Make`.
+
 For equivalent keys, `set` keeps the resident key representative while
 replacing its value. `of_list` is first-wins for both the value and the key
 representative.

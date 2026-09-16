@@ -126,9 +126,10 @@ hashtable-native-array-audit: HashMapNative.ml HashMap.ml check-hashtable-native
 hashtable-reference-ocaml: hashtable-reference HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml
 	$(OCAMLC) -I hashtable_reference_extracted -c HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml
 
-hashtable-reference-test: hashtable-reference HashTableReferenceTest.ml
+hashtable-reference-test: hashtable-reference HashTableTestHash.mli HashTableTestHash.ml HashTableReferenceTest.ml
+	$(OCAMLC) -c HashTableTestHash.mli HashTableTestHash.ml
 	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
-	  $(OCAMLC) -I . -I .. -o ../hashtable-reference-test $$objects ../HashTableReferenceTest.ml
+	  $(OCAMLC) -I . -I .. -o ../hashtable-reference-test $$objects ../HashTableTestHash.cmo ../HashTableReferenceTest.ml
 	./hashtable-reference-test
 
 hashtable-wrapper-test: hashtable-reference-ocaml HashMapTest.ml

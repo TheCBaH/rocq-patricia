@@ -4,19 +4,26 @@
    directly while H2 proofs and H3 packaging are under construction. *)
 
 module M = HashTable
+module Test_hash = HashTableTestHash
 
 let fail message = failwith ("HashTable reference test: " ^ message)
 let check message condition = if not condition then fail message
 
 let equal (left : int) right = left = right
-let hash seed key = (key lxor seed) land 0x3fffffff
-let constant_hash _ _ = 0
+let hash seed key = Test_hash.int ~seed key
+let constant_hash seed key = Test_hash.constant ~seed key
 
 let expect_get hash key expected table =
   check ("lookup " ^ string_of_int key)
     (M.get equal hash key table = expected)
 
 let () =
+  check "test hash lower bound" (Test_hash.normalize min_int >= 0);
+  check "test hash upper bound"
+    (Test_hash.normalize max_int < Test_hash.bound);
+  check "test hash string determinism"
+    (Test_hash.string ~seed:17 "reference\000hash" =
+     Test_hash.string ~seed:17 "reference\000hash");
   let empty = M.empty 17 in
   expect_get hash 1 None empty;
   check "empty" (M.is_empty empty);
