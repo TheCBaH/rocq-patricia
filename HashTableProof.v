@@ -3902,6 +3902,42 @@ Proof.
     apply (proj2 (Heqb key key)). apply Href.
 Qed.
 
+Lemma table_wf_set_leaf_same_root :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
+         stored_hash stored (old_value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    hash seed key = stored_hash ->
+    table_wf E hash
+      {| table_seed := seed;
+         table_root := Leaf stored_hash stored old_value |} ->
+    table_wf E hash
+      (set eqb hash key value
+        {| table_seed := seed;
+           table_root := Leaf stored_hash stored old_value |}).
+Proof.
+  intros K Seed A E hash seed eqb key value stored_hash stored old_value
+    [Href Hsym Htrans] Heqb Hhash Hwf.
+  unfold table_wf, set in Hwf |-.
+  cbn in Hwf.
+  change (wf E hash seed 0 []
+    (set_tree eqb branch_levels 0 (hash seed key) key value
+      (Leaf stored_hash stored old_value))).
+  rewrite Hhash.
+  destruct (eqb key stored) eqn:Hkey.
+  - eapply set_tree_leaf_replacement_wf; eauto.
+  - eapply set_tree_leaf_collision_wf; [exact Hwf| |exact Hkey|].
+    + unfold entry_matches. split; [now symmetry|].
+      split; [|exact I].
+      inversion Hwf as [|d p h k v Hstored_hash Hbound Hprefix| |]; subst.
+      exact Hbound.
+    + intro Hrelated.
+      assert (Htrue : eqb key stored = true).
+      { apply (proj2 (Heqb key stored)). apply Hsym. exact Hrelated. }
+      now rewrite Hkey in Htrue.
+Qed.
+
 Lemma get_tree_after_remove_self_wf :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
