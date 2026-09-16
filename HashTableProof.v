@@ -3775,6 +3775,31 @@ Proof.
   all: apply get_tree_join_worker_left_leaf; assumption.
 Qed.
 
+Lemma get_after_set_leaf_distinct_root :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
+         stored_hash stored (old_value : A),
+    eqb key key = true ->
+    (hash seed key < hash_space)%N ->
+    eqb key stored = false ->
+    hash seed key <> stored_hash ->
+    wf E hash seed 0 [] (Leaf stored_hash stored old_value) ->
+    get eqb hash key
+      (set eqb hash key value
+        {| table_seed := seed;
+           table_root := Leaf stored_hash stored old_value |}) = Some value.
+Proof.
+  intros K Seed A E hash seed eqb key value stored_hash stored old_value
+    Heqb Hkey_bound Hmiss Hdifferent Hwf.
+  inversion Hwf as [|d p h s v Hstored_hash Hstored_bound Hprefix| |];
+    subst stored_hash.
+  change (get_tree eqb branch_levels 0 (hash seed key) key
+    (set_tree eqb branch_levels 0 (hash seed key) key value
+      (Leaf (hash seed stored) stored old_value)) = Some value).
+  apply get_tree_after_set_leaf_distinct_self; try assumption.
+  apply join_worker_six_no_fallback; assumption.
+Qed.
+
 Lemma get_tree_after_remove_self_wf :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
