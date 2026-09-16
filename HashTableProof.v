@@ -3938,6 +3938,50 @@ Proof.
       now rewrite Hkey in Htrue.
 Qed.
 
+Lemma table_wf_set_collision_same_root :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
+         stored_hash (entries : list (K * A)),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    hash seed key = stored_hash ->
+    table_wf E hash
+      {| table_seed := seed;
+         table_root := Collision stored_hash entries |} ->
+    table_wf E hash
+      (set eqb hash key value
+        {| table_seed := seed;
+           table_root := Collision stored_hash entries |}).
+Proof.
+  intros K Seed A E hash seed eqb key value stored_hash entries
+    [Href Hsym Htrans] Heqb Hhash Hwf.
+  unfold table_wf, set in Hwf |-.
+  cbn in Hwf.
+  change (wf E hash seed 0 []
+    (set_tree eqb branch_levels 0 (hash seed key) key value
+      (Collision stored_hash entries))).
+  rewrite Hhash.
+  eapply set_tree_collision_wf.
+  - exact Hwf.
+  - intro Hmiss.
+    unfold entry_matches.
+    split.
+    + symmetry. exact Hhash.
+    + split.
+      * exact (@wf_collision_hash_bound K Seed A E hash seed 0 [] stored_hash
+          entries Hwf).
+      * exact I.
+  - exact Hsym.
+  - intros Hnone Hin.
+    apply (proj1 (InA_alt (binding_equiv E) (key, value) entries)) in Hin.
+    destruct Hin as [[stored old_value] [Hrelated Hin]].
+    assert (Hfalse : eqb key stored = false).
+    { now apply (bucket_get_none_miss eqb key entries Hnone stored old_value). }
+    assert (Htrue : eqb key stored = true).
+    { apply (proj2 (Heqb key stored)). exact Hrelated. }
+    now rewrite Hfalse in Htrue.
+Qed.
+
 Lemma get_tree_after_remove_self_wf :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
