@@ -3232,9 +3232,11 @@ Lemma get_query_equiv :
 Proof.
   intros K Seed A E eqb hash left right [seed root]
     Hequiv Heqb Hhash Hrelated.
-  unfold get. simpl.
+  change (get_tree eqb branch_levels 0 (hash seed left) left root =
+    get_tree eqb branch_levels 0 (hash seed right) right root).
   rewrite (Hhash seed left right Hrelated).
-  apply get_tree_query_equiv; assumption.
+  exact (@get_tree_query_equiv K A E eqb branch_levels 0 (hash seed right)
+    left right root Hequiv Heqb Hrelated).
 Qed.
 
 Lemma mem_query_equiv :
@@ -3252,4 +3254,45 @@ Proof.
   rewrite (@get_query_equiv K Seed A E eqb hash left right m
     Hequiv Heqb Hhash Hrelated).
   reflexivity.
+Qed.
+
+Lemma eqb_equiv_same_right :
+  forall (K : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         left right stored,
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    E left right ->
+    eqb left stored = eqb right stored.
+Proof.
+  intros K E eqb left right stored [Href Hsym Htrans] Heqb Hrelated.
+  destruct (eqb left stored) eqn:Hleft;
+    destruct (eqb right stored) eqn:Hright; try reflexivity.
+  - exfalso. apply (proj1 (Heqb left stored)) in Hleft.
+    assert (Hright_stored : E right stored).
+    { eapply Htrans; [apply Hsym; exact Hrelated|exact Hleft]. }
+    apply (proj2 (Heqb right stored)) in Hright_stored.
+    rewrite Hright in Hright_stored. discriminate.
+  - exfalso. apply (proj1 (Heqb right stored)) in Hright.
+    assert (Hleft_stored : E left stored).
+    { eapply Htrans; [exact Hrelated|exact Hright]. }
+    apply (proj2 (Heqb left stored)) in Hleft_stored.
+    rewrite Hleft in Hleft_stored. discriminate.
+Qed.
+
+Lemma bucket_remove_query_equiv :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         left right (entries : list (K * A)),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    E left right ->
+    bucket_remove eqb left entries = bucket_remove eqb right entries.
+Proof.
+  intros K A E eqb left right entries Hequiv Heqb Hrelated.
+  induction entries as [|[stored value] tail IH]; simpl.
+  - reflexivity.
+  - rewrite (@eqb_equiv_same_right K E eqb left right stored
+      Hequiv Heqb Hrelated).
+    destruct (eqb right stored); simpl.
+    + reflexivity.
+    + now rewrite IH.
 Qed.
