@@ -3122,3 +3122,42 @@ Proof.
     (remove_tree eqb branch_levels 0 (hash seed key) key root)).
   apply remove_tree_wf. exact Hwf.
 Qed.
+
+Lemma elements_remove_in :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         key (m : table K Seed A) entry,
+    In entry (elements (remove eqb hash key m)) ->
+    In entry (elements m).
+Proof.
+  intros K Seed A eqb hash key [seed root] entry Hin.
+  change (In entry
+    (bindings (remove_tree eqb branch_levels 0 (hash seed key) key root))) in Hin.
+  change (In entry (bindings root)).
+  now apply bindings_remove_tree_in in Hin.
+Qed.
+
+Lemma elements_remove_subseq :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         key (m : table K Seed A),
+    list_subseq (elements (remove eqb hash key m)) (elements m).
+Proof.
+  intros K Seed A eqb hash key [seed root].
+  change (list_subseq
+    (bindings (remove_tree eqb branch_levels 0 (hash seed key) key root))
+    (bindings root)).
+  apply bindings_remove_tree_subseq.
+Qed.
+
+Lemma elements_remove_nodup :
+  forall (K Seed A : Type) (R : (K * A) -> (K * A) -> Prop)
+         (eqb : K -> K -> bool) (hash : Seed -> K -> N) key
+         (m : table K Seed A),
+    NoDupA R (elements m) ->
+    NoDupA R (elements (remove eqb hash key m)).
+Proof.
+  intros K Seed A R eqb hash key [seed root] Hnodup.
+  change (NoDupA R (bindings root)) in Hnodup.
+  change (NoDupA R
+    (bindings (remove_tree eqb branch_levels 0 (hash seed key) key root))).
+  now apply bindings_remove_tree_nodup.
+Qed.
