@@ -1795,6 +1795,105 @@ Proof.
   unfold branch_remove. now rewrite Hremoved_length.
 Qed.
 
+Lemma wf_branch_remove_present_nonempty :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (depth : nat) (prefix : list N) (bitmap : N)
+         (children : list (tree K A)) (slot : N),
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    (slot < branch_width)%N ->
+    bitmap_has bitmap slot = true ->
+    dense_remove (rank bitmap slot) children <> [] ->
+    NoDupA (binding_equiv E)
+      (bindings (Branch (N.ldiff bitmap (bitmap_bit slot))
+        (dense_remove (rank bitmap slot) children))) ->
+    wf E hash seed depth prefix
+      (Branch (N.ldiff bitmap (bitmap_bit slot))
+        (dense_remove (rank bitmap slot) children)).
+Proof.
+  intros K Seed A E hash seed depth prefix bitmap children slot Hwf Hslot
+    Hpresent Hremaining Hnodup.
+  inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hlength Hchildren
+    Holdnodup]; subst.
+  destruct (@occupied_slots_ldiff_bit_present_split bitmap slot Hslot Hpresent)
+    as [before [after [Hslots [Hrank Hnew]]]].
+  rewrite Hslots in Hchildren.
+  destruct (@Forall2_app_inv_l N (tree K A)
+    (fun routed inserted => inserted <> Empty /\
+      wf E hash seed (S depth) (prefix ++ [routed]) inserted)
+    before (slot :: after) children Hchildren)
+    as [children_before [remaining
+      [Hbefore [Hrest Hchildren_eq]]]].
+  inversion Hrest as [|routed removed_child after_slots children_after
+    Hremoved Hafter]; subst routed remaining.
+  assert (Hbefore_length : length children_before = length before).
+  { symmetry. exact (@Forall2_length N (tree K A)
+      (fun routed inserted => inserted <> Empty /\
+        wf E hash seed (S depth) (prefix ++ [routed]) inserted)
+      before children_before Hbefore). }
+  assert (Hdense : dense_remove (rank bitmap slot) children =
+    children_before ++ children_after).
+  { rewrite Hchildren_eq, <- Hrank, <- Hbefore_length.
+    apply dense_remove_at_append. }
+  assert (Hdense_nonempty : children_before ++ children_after <> []).
+  { intro Hempty. apply Hremaining. now rewrite Hdense, Hempty. }
+  unfold branch_remove in Hnodup.
+  destruct (dense_remove (rank bitmap slot) children) as [|head tail] eqn:Hremove;
+    simpl in Hnodup; [contradiction|].
+  apply wf_branch.
+  - exact Hdepth.
+  - eapply N.le_lt_trans; [apply N.ldiff_le_l|exact Hbound].
+  - intro Hzero.
+    assert (Hpairs : Forall2
+      (fun routed inserted => inserted <> Empty /\
+        wf E hash seed (S depth) (prefix ++ [routed]) inserted)
+      (before ++ after) (children_before ++ children_after)).
+    { now apply Forall2_app. }
+    assert (Hoccupied : occupied_slots (N.ldiff bitmap (bitmap_bit slot)) <> []).
+    { intro Hempty. rewrite Hnew in Hempty. rewrite Hempty in Hpairs.
+      inversion Hpairs. now apply Hdense_nonempty. }
+    rewrite Hzero, occupied_slots_empty in Hoccupied. contradiction.
+  - rewrite <- Hremove, dense_remove_length_hit.
+    + rewrite Hlength, (@popcount_ldiff_bit_present bitmap slot Hslot Hpresent).
+      reflexivity.
+    + rewrite Hchildren_eq, <- Hrank, <- Hbefore_length.
+      rewrite length_app. simpl. lia.
+  - rewrite Hnew, Hdense. now apply Forall2_app.
+  - change (NoDupA (binding_equiv E) (bindings head ++ flat_map bindings tail)).
+    exact Hnodup.
+Qed.
+
+Lemma remove_tree_branch_child_wf_removed_nonempty :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) fuel depth prefix full_hash (key : K)
+         bitmap (children : list (tree K A)) (eqb : K -> K -> bool) child,
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    bitmap_has bitmap (chunk full_hash depth) = true ->
+    dense_get (rank bitmap (chunk full_hash depth)) children = Some child ->
+    remove_tree eqb fuel (S depth) full_hash key child = Empty ->
+    dense_remove (rank bitmap (chunk full_hash depth)) children <> [] ->
+    NoDupA (binding_equiv E)
+      (bindings (Branch
+        (N.ldiff bitmap (bitmap_bit (chunk full_hash depth)))
+        (dense_remove (rank bitmap (chunk full_hash depth)) children))) ->
+    wf E hash seed depth prefix
+      (remove_tree eqb (S fuel) depth full_hash key (Branch bitmap children)).
+Proof.
+  intros K Seed A E hash seed fuel depth prefix full_hash key bitmap children
+    eqb child Hwf Hpresent Hchild Hremove Hremaining Hnodup.
+  rewrite (remove_tree_branch_child eqb fuel depth full_hash key bitmap
+    children Hpresent Hchild).
+  rewrite Hremove.
+  unfold branch_remove.
+  destruct (dense_remove (rank bitmap (chunk full_hash depth)) children)
+    as [|head tail] eqn:Hdense; [contradiction|].
+  rewrite <- Hdense.
+  apply wf_branch_remove_present_nonempty with
+    (slot := chunk full_hash depth); try assumption.
+  - apply chunk_bound.
+  - now rewrite Hdense.
+  - rewrite Hdense. exact Hnodup.
+Qed.
+
 Lemma remove_tree_branch_child_wf_singleton_empty :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) fuel depth prefix full_hash (key : K)
