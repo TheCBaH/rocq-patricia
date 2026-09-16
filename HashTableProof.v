@@ -3775,6 +3775,22 @@ Proof.
   all: apply get_tree_join_worker_left_leaf; assumption.
 Qed.
 
+Lemma get_tree_after_set_leaf_same_hash_miss_self :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
+         (value : A) stored (old_value : A),
+    eqb key key = true ->
+    eqb key stored = false ->
+    get_tree eqb fuel depth full_hash key
+      (set_tree eqb fuel depth full_hash key value
+        (Leaf full_hash stored old_value)) = Some value.
+Proof.
+  intros K A eqb fuel depth full_hash key value stored old_value Heqb Hmiss.
+  destruct fuel; cbn [set_tree].
+  all: rewrite Hmiss, N.eqb_refl; cbn [get_tree bucket_get].
+  all: rewrite Hmiss, Heqb.
+  all: now rewrite N.eqb_refl.
+Qed.
+
 Lemma get_after_set_leaf_distinct_root :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
