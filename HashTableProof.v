@@ -4008,6 +4008,29 @@ Proof.
   apply wf_leaf; [reflexivity|exact Hbound|exact I].
 Qed.
 
+Lemma get_after_set_branch_slot_absent_root :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
+         bitmap (children : list (tree K A)),
+    table_wf E hash
+      {| table_seed := seed; table_root := Branch bitmap children |} ->
+    eqb key key = true ->
+    bitmap_has bitmap (chunk (hash seed key) 0) = false ->
+    get eqb hash key
+      (set eqb hash key value
+        {| table_seed := seed; table_root := Branch bitmap children |}) = Some value.
+Proof.
+  intros K Seed A E hash seed eqb key value bitmap children Hwf Heqb Habsent.
+  unfold table_wf in Hwf.
+  change (get_tree eqb branch_levels 0 (hash seed key) key
+    (set_tree eqb branch_levels 0 (hash seed key) key value
+      (Branch bitmap children)) = Some value).
+  change (get_tree eqb (S 5) 0 (hash seed key) key
+    (set_tree eqb (S 5) 0 (hash seed key) key value
+      (Branch bitmap children)) = Some value).
+  eapply get_tree_after_set_branch_slot_absent_self_wf; eauto.
+Qed.
+
 Lemma get_tree_after_remove_self_wf :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
