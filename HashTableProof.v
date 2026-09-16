@@ -3338,3 +3338,31 @@ Proof.
        ; [rewrite (@IH (S depth) full_hash left right child Hequiv Heqb Hrelated);
           reflexivity|reflexivity]|reflexivity].
 Qed.
+
+Lemma table_root_eq :
+  forall (K Seed A : Type) (seed : Seed) (left right : tree K A),
+    left = right ->
+    {| table_seed := seed; table_root := left |} =
+    {| table_seed := seed; table_root := right |}.
+Proof. intros K Seed A seed left right Hroot. now subst right. Qed.
+
+Lemma remove_query_equiv :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         (hash : Seed -> K -> N) (left right : K) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    E left right ->
+    remove eqb hash left m = remove eqb hash right m.
+Proof.
+  intros K Seed A E eqb hash left right [seed root]
+    Hequiv Heqb Hhash Hrelated.
+  unfold remove.
+  apply table_root_eq.
+  change (remove_tree eqb branch_levels 0 (hash seed left) left root =
+    remove_tree eqb branch_levels 0 (hash seed right) right root).
+  rewrite (Hhash seed left right Hrelated).
+  apply (@remove_tree_query_equiv K A E eqb branch_levels 0
+    (hash seed right) left right root Hequiv Heqb Hrelated).
+Qed.
