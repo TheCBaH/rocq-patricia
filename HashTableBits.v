@@ -1133,3 +1133,24 @@ Proof.
     intros slot' old_child' Hslot Hchild.
     apply (Hnew slot' old_child'); simpl; exact Hslot || exact Hchild.
 Qed.
+
+Lemma Forall2_dense_insert :
+  forall A B (R : A -> B -> Prop) slots_before slots_after
+         children_before children_after (slot : A) (child : B),
+    Forall2 R slots_before children_before ->
+    R slot child ->
+    Forall2 R slots_after children_after ->
+    Forall2 R (slots_before ++ slot :: slots_after)
+      (dense_insert (length children_before) child
+        (children_before ++ children_after)).
+Proof.
+  intros A B R slots_before slots_after children_before children_after slot child
+    Hbefore Hslot Hafter.
+  revert children_before Hbefore.
+  induction slots_before as [|head slots_before IH];
+    intros children_before Hbefore.
+  - inversion Hbefore; subst. simpl. constructor; assumption.
+  - inversion Hbefore as [|slot' child' slots' children' Hhead Htail]; subst.
+    simpl. constructor; [exact Hhead|].
+    apply IH; exact Htail.
+Qed.

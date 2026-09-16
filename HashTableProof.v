@@ -462,6 +462,39 @@ Proof.
  - exact Hnodup.
 Qed.
 
+Lemma wf_branch_insert :
+ forall depth prefix bitmap children slot (child : tree K A),
+ wf depth prefix (Branch bitmap children) ->
+ (slot < branch_width)%N ->
+ bitmap_has bitmap slot = false ->
+ child <> Empty ->
+ wf (S depth) (prefix ++ [slot]) child ->
+ (N.lor bitmap (bitmap_bit slot) < bitmap_limit)%N ->
+ popcount32 (N.lor bitmap (bitmap_bit slot)) = S (popcount32 bitmap) ->
+ Forall2 (fun routed inserted => inserted <> Empty /\
+   wf (S depth) (prefix ++ [routed]) inserted)
+   (occupied_slots (N.lor bitmap (bitmap_bit slot)))
+   (dense_insert (rank bitmap slot) child children) ->
+ NoDupA binding_equiv (bindings (branch_insert bitmap slot child children)) ->
+ wf depth prefix (branch_insert bitmap slot child children).
+Proof.
+ intros depth prefix bitmap children slot child Hwf Hslot Habsent Hnonempty
+   Hchild Hbound Hpop Hchildren Hnodup.
+ inversion Hwf as [| | |d p b cs Hdepth Holdbound Holdnonzero Hlength
+   Holdchildren Holdnodup]; subst.
+ unfold branch_insert. apply wf_branch.
+ - exact Hdepth.
+ - exact Hbound.
+ - intro Hzero.
+   assert (Hhas : bitmap_has (N.lor bitmap (bitmap_bit slot)) slot = true).
+   { apply bitmap_has_lor_right.
+     now apply bitmap_bit_has_slot. }
+   rewrite Hzero, bitmap_has_empty in Hhas. discriminate.
+ - rewrite dense_insert_length, Hlength, Hpop. reflexivity.
+ - exact Hchildren.
+ - exact Hnodup.
+Qed.
+
 Inductive branch_path_depth : tree K A -> nat -> Prop :=
 | branch_path_here : forall bitmap children,
     branch_path_depth (Branch bitmap children) 0
