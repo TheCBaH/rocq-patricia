@@ -3057,3 +3057,55 @@ Proof.
   all: exact (@wf_bindings_nodup K Seed A E hash seed depth prefix
     (Branch bitmap children) Hwf).
 Qed.
+
+Lemma remove_tree_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (key : K) (t : tree K A),
+    wf E hash seed depth prefix t ->
+    wf E hash seed depth prefix
+      (remove_tree eqb fuel depth full_hash key t).
+Proof.
+  intros K Seed A E hash seed eqb fuel.
+  induction fuel as [|fuel IH]; intros depth prefix full_hash key t Hwf.
+  - destruct t as [|stored_hash stored value|stored_hash entries|bitmap children].
+    + apply remove_tree_empty_wf.
+    + apply remove_tree_leaf_wf. exact Hwf.
+    + apply remove_tree_collision_wf. exact Hwf.
+    + exact Hwf.
+  - destruct t as [|stored_hash stored value|stored_hash entries|bitmap children].
+    + apply remove_tree_empty_wf.
+    + apply remove_tree_leaf_wf. exact Hwf.
+    + apply remove_tree_collision_wf. exact Hwf.
+    + destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
+      * destruct (wf_branch_ranked_child Hwf (chunk_bound full_hash depth)
+          Hpresent) as [child [Hchild [Hnonempty Hchildwf]]].
+        destruct (remove_tree eqb fuel (S depth) full_hash key child)
+          as [|child_hash child_key child_value|child_hash child_entries|child_bitmap child_children]
+          eqn:Hremove.
+        -- destruct (dense_remove (rank bitmap (chunk full_hash depth)) children)
+             as [|head tail] eqn:Hdense.
+           ++ rewrite (remove_tree_branch_child eqb fuel depth full_hash key
+                bitmap children Hpresent Hchild).
+              rewrite Hremove. unfold branch_remove. rewrite Hdense.
+              apply wf_empty.
+           ++ apply remove_tree_branch_child_wf_removed_nonempty_wf with
+                (child := child); try assumption.
+              now rewrite Hdense.
+        -- apply remove_tree_branch_child_wf_nonempty_auto with
+             (child := child) (child' := Leaf child_hash child_key child_value);
+             try assumption.
+           ++ discriminate.
+           ++ rewrite <- Hremove. apply IH. exact Hchildwf.
+        -- apply remove_tree_branch_child_wf_nonempty_auto with
+             (child := child) (child' := Collision child_hash child_entries);
+             try assumption.
+           ++ discriminate.
+           ++ rewrite <- Hremove. apply IH. exact Hchildwf.
+        -- apply remove_tree_branch_child_wf_nonempty_auto with
+             (child := child) (child' := Branch child_bitmap child_children);
+             try assumption.
+           ++ discriminate.
+           ++ rewrite <- Hremove. apply IH. exact Hchildwf.
+      * apply remove_tree_branch_slot_absent_wf; assumption.
+Qed.
