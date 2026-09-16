@@ -1387,6 +1387,27 @@ Proof.
   cbn [get_tree]. now rewrite Hpresent, Hchild.
 Qed.
 
+Lemma get_tree_branch_wf_child :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) fuel depth prefix full_hash (key : K)
+         bitmap (children : list (tree K A)) (eqb : K -> K -> bool),
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    bitmap_has bitmap (chunk full_hash depth) = true ->
+    exists child,
+      get_tree eqb (S fuel) depth full_hash key (Branch bitmap children) =
+      get_tree eqb fuel (S depth) full_hash key child /\
+      child <> Empty /\ wf E hash seed (S depth)
+        (prefix ++ [chunk full_hash depth]) child.
+Proof.
+  intros K Seed A E hash seed fuel depth prefix full_hash key bitmap children eqb
+    Hwf Hpresent.
+  destruct (wf_branch_ranked_child Hwf (chunk_bound full_hash depth) Hpresent)
+    as [child [Hchild [Hnonempty Hchildwf]]].
+  exists child. split.
+  - now apply get_tree_branch_child.
+  - split; assumption.
+Qed.
+
 Lemma get_tree_branch_dense_missing :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
          bitmap (children : list (tree K A)),
