@@ -3447,3 +3447,184 @@ Proof.
   rewrite (remove_tree_leaf_removes eqb fuel depth full_hash key value Heqb).
   apply get_tree_empty.
 Qed.
+
+Lemma get_tree_after_remove_leaf_miss :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash stored_hash
+         key stored (value : A),
+    eqb key stored = false ->
+    get_tree eqb fuel depth full_hash key
+      (remove_tree eqb fuel depth full_hash key
+        (Leaf stored_hash stored value)) = None.
+Proof.
+  intros K A eqb fuel depth full_hash stored_hash key stored value Hmiss.
+  destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+  - apply N.eqb_eq in Hhash. subst stored_hash.
+    rewrite (remove_tree_leaf_miss eqb fuel depth full_hash key stored value
+      Hmiss).
+    apply get_tree_leaf_other_key. exact Hmiss.
+  - assert (Hremove :
+        remove_tree eqb fuel depth full_hash key
+          (Leaf stored_hash stored value) = Leaf stored_hash stored value).
+    { destruct fuel; cbn [remove_tree]; now rewrite Hhash. }
+    rewrite Hremove.
+    apply get_tree_leaf_other_hash.
+    now apply N.eqb_neq.
+Qed.
+
+Lemma get_tree_branch_remove_slot_none :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
+         bitmap (children : list (tree K A)),
+    get_tree eqb (S fuel) depth full_hash key
+      (branch_remove bitmap (chunk full_hash depth) children) = None.
+Proof.
+  intros K A eqb fuel depth full_hash key bitmap children.
+  unfold branch_remove.
+  destruct (dense_remove (rank bitmap (chunk full_hash depth)) children)
+    as [|child remaining]; simpl.
+  - reflexivity.
+  - apply get_tree_branch_slot_absent.
+    apply bitmap_has_ldiff_bit.
+Qed.
+
+Lemma get_tree_branch_replace_same :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
+         bitmap (children : list (tree K A)) old child,
+    bitmap_has bitmap (chunk full_hash depth) = true ->
+    dense_get (rank bitmap (chunk full_hash depth)) children = Some old ->
+    get_tree eqb (S fuel) depth full_hash key
+      (branch_replace bitmap (chunk full_hash depth) child children) =
+    get_tree eqb fuel (S depth) full_hash key child.
+Proof.
+  intros K A eqb fuel depth full_hash key bitmap children old child
+    Hpresent Hget.
+  assert (Hindex : rank bitmap (chunk full_hash depth) < length children).
+  { apply (proj1 (nth_error_Some children
+      (rank bitmap (chunk full_hash depth)))).
+    unfold dense_get in Hget. rewrite Hget. discriminate. }
+  unfold branch_replace. cbn [get_tree]. rewrite Hpresent.
+  rewrite (@dense_get_replace_same (tree K A)
+    (rank bitmap (chunk full_hash depth)) child children Hindex).
+  reflexivity.
+Qed.
+
+Lemma get_tree_after_remove_self_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (key : K) (t : tree K A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    full_hash = hash seed key ->
+    (forall first second, E first second ->
+      hash seed first = hash seed second) ->
+    wf E hash seed depth prefix t ->
+    get_tree eqb fuel depth full_hash key
+      (remove_tree eqb fuel depth full_hash key t) = None.
+Proof.
+  intros K Seed A E hash seed eqb fuel.
+  induction fuel as [|fuel IH]; intros depth prefix full_hash key t
+    Hequiv Heqb Hkey_hash Hcongruent Hwf; destruct t as
+    [|stored_hash stored value|stored_hash entries|bitmap children].
+  - reflexivity.
+  - inversion Hwf as [|d p h s v Hstored_hash Hbound Hprefix| |];
+      subst stored_hash.
+    destruct (eqb key stored) eqn:Hkey_stored.
+    + assert (Hhash : full_hash = hash seed stored).
+      { rewrite Hkey_hash. apply Hcongruent.
+        exact (proj1 (Heqb key stored) Hkey_stored). }
+      cbn [remove_tree get_tree]. rewrite Hhash, N.eqb_refl, Hkey_stored.
+      reflexivity.
+    + apply get_tree_after_remove_leaf_miss. exact Hkey_stored.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + apply N.eqb_eq in Hhash. subst stored_hash.
+      apply (@get_tree_after_remove_collision_self K Seed A E hash seed eqb
+        0 depth prefix full_hash key entries Hequiv Heqb Hwf).
+    + assert (Hremove :
+          remove_tree eqb 0 depth full_hash key
+            (Collision stored_hash entries) = Collision stored_hash entries).
+      { cbn [remove_tree]. now rewrite Hhash. }
+      rewrite Hremove.
+      apply get_tree_collision_other_hash.
+      now apply N.eqb_neq.
+  - reflexivity.
+  - reflexivity.
+  - inversion Hwf as [|d p h s v Hstored_hash Hbound Hprefix| |];
+      subst stored_hash.
+    destruct (eqb key stored) eqn:Hkey_stored.
+    + assert (Hhash : full_hash = hash seed stored).
+      { rewrite Hkey_hash. apply Hcongruent.
+        exact (proj1 (Heqb key stored) Hkey_stored). }
+      cbn [remove_tree get_tree]. rewrite Hhash, N.eqb_refl, Hkey_stored.
+      reflexivity.
+    + apply get_tree_after_remove_leaf_miss. exact Hkey_stored.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + apply N.eqb_eq in Hhash. subst stored_hash.
+      apply (@get_tree_after_remove_collision_self K Seed A E hash seed eqb
+        (S fuel) depth prefix full_hash key entries Hequiv Heqb Hwf).
+    + assert (Hremove :
+          remove_tree eqb (S fuel) depth full_hash key
+            (Collision stored_hash entries) = Collision stored_hash entries).
+      { cbn [remove_tree]. now rewrite Hhash. }
+      rewrite Hremove.
+      apply get_tree_collision_other_hash.
+      now apply N.eqb_neq.
+  - destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
+    + destruct (wf_branch_ranked_child Hwf (chunk_bound full_hash depth)
+        Hpresent) as [child [Hchild [Hnonempty Hchildwf]]].
+      destruct (remove_tree eqb fuel (S depth) full_hash key child)
+        as [|child_hash child_key child_value|child_hash child_entries|child_bitmap child_children]
+        eqn:Hremove.
+      * rewrite (remove_tree_branch_child eqb fuel depth full_hash key bitmap
+          children Hpresent Hchild).
+        rewrite Hremove.
+        apply get_tree_branch_remove_slot_none.
+      * rewrite (remove_tree_branch_child eqb fuel depth full_hash key bitmap
+          children Hpresent Hchild).
+        rewrite Hremove.
+        rewrite (@get_tree_branch_replace_same K A eqb fuel depth full_hash key
+          bitmap children child (Leaf child_hash child_key child_value)
+          Hpresent Hchild).
+        rewrite <- Hremove.
+        exact (IH (S depth) (prefix ++ [chunk full_hash depth]) full_hash key child
+          Hequiv Heqb Hkey_hash Hcongruent Hchildwf).
+      * rewrite (remove_tree_branch_child eqb fuel depth full_hash key bitmap
+          children Hpresent Hchild).
+        rewrite Hremove.
+        rewrite (@get_tree_branch_replace_same K A eqb fuel depth full_hash key
+          bitmap children child (Collision child_hash child_entries)
+          Hpresent Hchild).
+        rewrite <- Hremove.
+        exact (IH (S depth) (prefix ++ [chunk full_hash depth]) full_hash key child
+          Hequiv Heqb Hkey_hash Hcongruent Hchildwf).
+      * rewrite (remove_tree_branch_child eqb fuel depth full_hash key bitmap
+          children Hpresent Hchild).
+        rewrite Hremove.
+        rewrite (@get_tree_branch_replace_same K A eqb fuel depth full_hash key
+          bitmap children child (Branch child_bitmap child_children)
+          Hpresent Hchild).
+        rewrite <- Hremove.
+        exact (IH (S depth) (prefix ++ [chunk full_hash depth]) full_hash key child
+          Hequiv Heqb Hkey_hash Hcongruent Hchildwf).
+    + rewrite (remove_tree_branch_slot_absent eqb fuel depth full_hash key
+        bitmap children Hpresent).
+      now apply get_tree_branch_slot_absent.
+Qed.
+
+Lemma get_after_remove_self :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (key : K) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    table_wf E hash m ->
+    get eqb hash key (remove eqb hash key m) = None.
+Proof.
+  intros K Seed A E hash eqb key [seed root] Hequiv Heqb Hcongruent Hwf.
+  change (get_tree eqb branch_levels 0 (hash seed key) key
+    (remove_tree eqb branch_levels 0 (hash seed key) key root) = None).
+  apply (@get_tree_after_remove_self_wf K Seed A E hash seed eqb
+    branch_levels 0 [] (hash seed key) key root Hequiv Heqb).
+  - reflexivity.
+  - intros first second Hrelated. apply Hcongruent. exact Hrelated.
+  - exact Hwf.
+Qed.
