@@ -3236,3 +3236,20 @@ Proof.
   rewrite (Hhash seed left right Hrelated).
   apply get_tree_query_equiv; assumption.
 Qed.
+
+Lemma mem_query_equiv :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         (hash : Seed -> K -> N) (left right : K) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    E left right ->
+    mem eqb hash left m = mem eqb hash right m.
+Proof.
+  intros K Seed A E eqb hash left right m Hequiv Heqb Hhash Hrelated.
+  unfold mem.
+  rewrite (@get_query_equiv K Seed A E eqb hash left right m
+    Hequiv Heqb Hhash Hrelated).
+  reflexivity.
+Qed.
