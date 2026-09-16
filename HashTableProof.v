@@ -2052,6 +2052,13 @@ Proof.
   - apply list_subseq_drop. exact IHHsub.
 Qed.
 
+Lemma list_subseq_length_le :
+  forall A (kept source : list A),
+    list_subseq kept source -> length kept <= length source.
+Proof.
+  intros A kept source Hsub. induction Hsub; simpl; lia.
+Qed.
+
 Lemma NoDupA_list_subseq :
   forall A (R : A -> A -> Prop) kept source,
     list_subseq kept source -> NoDupA R source -> NoDupA R kept.
@@ -3146,6 +3153,15 @@ Proof.
     (bindings (remove_tree eqb branch_levels 0 (hash seed key) key root))
     (bindings root)).
   apply bindings_remove_tree_subseq.
+Qed.
+
+Lemma elements_remove_length_le :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         key (m : table K Seed A),
+    length (elements (remove eqb hash key m)) <= length (elements m).
+Proof.
+  intros K Seed A eqb hash key m.
+  apply list_subseq_length_le. apply elements_remove_subseq.
 Qed.
 
 Lemma elements_remove_nodup :
