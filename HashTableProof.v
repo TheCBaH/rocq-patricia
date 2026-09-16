@@ -3878,6 +3878,30 @@ Proof.
   intro query. apply (proj2 (Heqb query query)). apply Href.
 Qed.
 
+Lemma get_after_set_leaf_same_root :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
+         stored_hash stored (old_value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    hash seed key = stored_hash ->
+    get eqb hash key
+      (set eqb hash key value
+        {| table_seed := seed;
+           table_root := Leaf stored_hash stored old_value |}) = Some value.
+Proof.
+  intros K Seed A E hash seed eqb key value stored_hash stored old_value
+    [Href Hsym Htrans] Heqb Hhash.
+  change (get_tree eqb branch_levels 0 (hash seed key) key
+    (set_tree eqb branch_levels 0 (hash seed key) key value
+      (Leaf stored_hash stored old_value)) = Some value).
+  rewrite Hhash.
+  destruct (eqb key stored) eqn:Hkey.
+  - apply get_tree_after_set_leaf_hit_self. exact Hkey.
+  - apply get_tree_after_set_leaf_same_hash_miss_self; [|exact Hkey].
+    apply (proj2 (Heqb key key)). apply Href.
+Qed.
+
 Lemma get_tree_after_remove_self_wf :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
