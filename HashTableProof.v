@@ -3366,3 +3366,52 @@ Proof.
   apply (@remove_tree_query_equiv K A E eqb branch_levels 0
     (hash seed right) left right root Hequiv Heqb Hrelated).
 Qed.
+
+Lemma bucket_remove_head_miss :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         key stored (value : A) tail,
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    E key stored ->
+    NoDupA (binding_equiv E) ((stored, value) :: tail) ->
+    forall stored' value', In (stored', value') tail ->
+      eqb key stored' = false.
+Proof.
+  intros K A E eqb key stored value tail [Href Hsym Htrans] Heqb
+    Hkey_stored Hnodup stored' value' Hin.
+  destruct (eqb key stored') eqn:Hkey_stored'.
+  - exfalso.
+    inversion Hnodup as [|head entries Hnot Htail]; subst.
+    apply Hnot.
+    apply (proj2 (InA_alt (binding_equiv E) (stored, value) tail)).
+    exists (stored', value'). split.
+    + unfold binding_equiv.
+      eapply Htrans; [apply Hsym; exact Hkey_stored|].
+      now apply (proj1 (Heqb key stored')).
+    + exact Hin.
+  - reflexivity.
+Qed.
+
+Lemma bucket_get_after_remove_self :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         key (entries : list (K * A)),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    NoDupA (binding_equiv E) entries ->
+    bucket_get eqb key (bucket_remove eqb key entries) = None.
+Proof.
+  intros K A E eqb key entries Hequiv Heqb Hnodup.
+  induction entries as [|[stored value] tail IH]; simpl.
+  - reflexivity.
+  - inversion Hnodup as [|head entries Hnot Htail]; subst.
+    destruct (eqb key stored) eqn:Hkey_stored.
+    + apply bucket_get_miss.
+      intros stored' value' Hin.
+      assert (Hfull : NoDupA (binding_equiv E) ((stored, value) :: tail)).
+      { constructor; assumption. }
+      exact (@bucket_remove_head_miss K A E eqb key stored value tail
+        Hequiv Heqb (proj1 (Heqb key stored) Hkey_stored)
+        Hfull stored' value' Hin).
+    + cbn [bucket_get]. rewrite Hkey_stored.
+      apply IH. exact Htail.
+Qed.
