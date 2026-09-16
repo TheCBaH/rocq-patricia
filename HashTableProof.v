@@ -1506,6 +1506,30 @@ Proof.
   - split; assumption.
 Qed.
 
+Lemma set_tree_branch_child_wf_nonempty :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) fuel depth prefix full_hash (key : K) (value : A)
+         bitmap (children : list (tree K A)) (eqb : K -> K -> bool)
+         child child',
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    bitmap_has bitmap (chunk full_hash depth) = true ->
+    dense_get (rank bitmap (chunk full_hash depth)) children = Some child ->
+    set_tree eqb fuel (S depth) full_hash key value child = child' ->
+    child' <> Empty ->
+    wf E hash seed (S depth) (prefix ++ [chunk full_hash depth]) child' ->
+    NoDupA (binding_equiv E)
+      (bindings (branch_replace bitmap (chunk full_hash depth) child' children)) ->
+    wf E hash seed depth prefix
+      (set_tree eqb (S fuel) depth full_hash key value (Branch bitmap children)).
+Proof.
+  intros K Seed A E hash seed fuel depth prefix full_hash key value bitmap
+    children eqb child child' Hwf Hpresent Hchild Hset Hnonempty Hchildwf Hnodup.
+  rewrite (set_tree_branch_child eqb fuel depth full_hash key value bitmap
+    children Hpresent Hchild).
+  rewrite Hset.
+  apply wf_branch_replace; assumption || apply chunk_bound.
+Qed.
+
 Lemma set_tree_branch_dense_missing :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
          (value : A) bitmap (children : list (tree K A)),
