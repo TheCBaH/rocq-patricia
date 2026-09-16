@@ -49,6 +49,27 @@ For equivalent keys, `set` keeps the resident key representative while
 replacing its value. `of_list` is first-wins for both the value and the key
 representative.
 
+The kernel-checked hash-table fragment is recorded in `HashTableBits.v`,
+`HashTableBucket.v`, `HashTable.v`, `HashTableProof.v`, and
+`HashTableNativeProof.v`. It includes six-chunk 30-bit routing separation,
+bounded bitmap rank/popcount and dense-child edits, collision-bucket update
+and removal laws, well-formed removal preservation (`table_wf_remove`),
+equivalent-query lookup/removal congruence (`get_query_equiv` and
+`remove_query_equiv`), and valid-table self-removal absence for both `get`
+and `mem` (`get_after_remove_self` and `mem_after_remove_self`). The modeled
+native operations have source-relation refinement laws
+(`native_get_refines_related`, `native_set_refines_related`, and
+`native_remove_refines_related`). The tracker identifies the remaining global
+set, join, array-realizer, and release proof gaps.
+
+The list-backed `HashTableReference` package is generated from Rocq source.
+`HashMap.Make` is a handwritten abstract wrapper around that package. The
+private-array `HashMapNative` backend has deterministic bytecode/native
+differential tests and implementation audits, but it is not the public
+backend and its OCaml array realization is outside the kernel proof. The
+generated-interface, wrapper-boundary, primitive, and native-array audits
+make those boundaries executable build checks.
+
 Run:
 
 ```sh
