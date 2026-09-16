@@ -3791,6 +3791,21 @@ Proof.
   all: now rewrite N.eqb_refl.
 Qed.
 
+Lemma get_tree_after_set_leaf_hit_self :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
+         (value : A) stored (old_value : A),
+    eqb key stored = true ->
+    get_tree eqb fuel depth full_hash key
+      (set_tree eqb fuel depth full_hash key value
+        (Leaf full_hash stored old_value)) = Some value.
+Proof.
+  intros K A eqb fuel depth full_hash key value stored old_value Hhit.
+  destruct fuel; cbn [set_tree].
+  all: rewrite Hhit.
+  all: cbn [get_tree].
+  all: now rewrite N.eqb_refl, Hhit.
+Qed.
+
 Lemma get_after_set_leaf_distinct_root :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
