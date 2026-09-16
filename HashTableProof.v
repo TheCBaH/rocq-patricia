@@ -3296,3 +3296,45 @@ Proof.
     + reflexivity.
     + now rewrite IH.
 Qed.
+
+Lemma remove_tree_query_equiv :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         fuel depth full_hash (left right : K) (t : tree K A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    E left right ->
+    remove_tree eqb fuel depth full_hash left t =
+    remove_tree eqb fuel depth full_hash right t.
+Proof.
+  intros K A E eqb fuel.
+  induction fuel as [|fuel IH]; intros depth full_hash left right t
+    Hequiv Heqb Hrelated; destruct t as
+    [|stored_hash stored value|stored_hash entries|bitmap children].
+  - reflexivity.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hhash; cbn [remove_tree].
+    + rewrite (@eqb_equiv_same_right K E eqb left right stored
+        Hequiv Heqb Hrelated). reflexivity.
+    + now rewrite Hhash.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hhash; cbn [remove_tree].
+    + rewrite Hhash.
+      now rewrite (@bucket_remove_query_equiv K A E eqb left right entries
+        Hequiv Heqb Hrelated).
+    + now rewrite Hhash.
+  - reflexivity.
+  - reflexivity.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hhash; cbn [remove_tree].
+    + rewrite (@eqb_equiv_same_right K E eqb left right stored
+        Hequiv Heqb Hrelated). reflexivity.
+    + now rewrite Hhash.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hhash; cbn [remove_tree].
+    + rewrite Hhash.
+      now rewrite (@bucket_remove_query_equiv K A E eqb left right entries
+        Hequiv Heqb Hrelated).
+    + now rewrite Hhash.
+  - cbn [remove_tree].
+    destruct (bitmap_has bitmap (chunk full_hash depth));
+      [destruct (dense_get (rank bitmap (chunk full_hash depth)) children)
+       as [child|]
+       ; [rewrite (@IH (S depth) full_hash left right child Hequiv Heqb Hrelated);
+          reflexivity|reflexivity]|reflexivity].
+Qed.
