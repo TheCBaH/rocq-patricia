@@ -1443,6 +1443,28 @@ Proof.
   cbn [set_tree]. now rewrite Hpresent, Hchild.
 Qed.
 
+Lemma set_tree_branch_wf_child :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) fuel depth prefix full_hash (key : K) (value : A)
+         bitmap (children : list (tree K A)) (eqb : K -> K -> bool),
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    bitmap_has bitmap (chunk full_hash depth) = true ->
+    exists child,
+      set_tree eqb (S fuel) depth full_hash key value (Branch bitmap children) =
+      branch_replace bitmap (chunk full_hash depth)
+        (set_tree eqb fuel (S depth) full_hash key value child) children /\
+      child <> Empty /\ wf E hash seed (S depth)
+        (prefix ++ [chunk full_hash depth]) child.
+Proof.
+  intros K Seed A E hash seed fuel depth prefix full_hash key value bitmap
+    children eqb Hwf Hpresent.
+  destruct (wf_branch_ranked_child Hwf (chunk_bound full_hash depth) Hpresent)
+    as [child [Hchild [Hnonempty Hchildwf]]].
+  exists child. split.
+  - now apply set_tree_branch_child.
+  - split; assumption.
+Qed.
+
 Lemma set_tree_branch_dense_missing :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
          (value : A) bitmap (children : list (tree K A)),
@@ -1503,6 +1525,38 @@ Proof.
   intros K A eqb fuel depth full_hash key bitmap children child Hpresent Hchild.
   cbn [remove_tree]. rewrite Hpresent, Hchild.
   destruct (remove_tree eqb fuel (S depth) full_hash key child); reflexivity.
+Qed.
+
+Lemma remove_tree_branch_wf_child :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) fuel depth prefix full_hash (key : K)
+         bitmap (children : list (tree K A)) (eqb : K -> K -> bool),
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    bitmap_has bitmap (chunk full_hash depth) = true ->
+    exists child,
+      remove_tree eqb (S fuel) depth full_hash key (Branch bitmap children) =
+      match remove_tree eqb fuel (S depth) full_hash key child with
+      | Empty => branch_remove bitmap (chunk full_hash depth) children
+      | Leaf child_hash child_key child_value =>
+          branch_replace bitmap (chunk full_hash depth)
+            (Leaf child_hash child_key child_value) children
+      | Collision child_hash child_entries =>
+          branch_replace bitmap (chunk full_hash depth)
+            (Collision child_hash child_entries) children
+      | Branch child_bitmap child_children =>
+          branch_replace bitmap (chunk full_hash depth)
+            (Branch child_bitmap child_children) children
+      end /\
+      child <> Empty /\ wf E hash seed (S depth)
+        (prefix ++ [chunk full_hash depth]) child.
+Proof.
+  intros K Seed A E hash seed fuel depth prefix full_hash key bitmap children eqb
+    Hwf Hpresent.
+  destruct (wf_branch_ranked_child Hwf (chunk_bound full_hash depth) Hpresent)
+    as [child [Hchild [Hnonempty Hchildwf]]].
+  exists child. split.
+  - now apply remove_tree_branch_child.
+  - split; assumption.
 Qed.
 
 Lemma remove_tree_branch_dense_missing :
