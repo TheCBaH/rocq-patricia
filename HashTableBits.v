@@ -746,6 +746,109 @@ Proof.
   - now apply (proj1 (bitmap_has_false_spec right slot)).
 Qed.
 
+Lemma bitmap_has_lor_bit_other :
+  forall bitmap bit_slot slot,
+    slot <> bit_slot ->
+    bitmap_has (N.lor bitmap (bitmap_bit bit_slot)) slot =
+    bitmap_has bitmap slot.
+Proof.
+  intros bitmap bit_slot slot Hdifferent.
+  destruct (bitmap_has bitmap slot) eqn:Hhas.
+  - now apply bitmap_has_lor_left.
+  - assert (Hbit : bitmap_has (bitmap_bit bit_slot) slot = false)
+      by (now apply bitmap_bit_has_no_other_slot).
+    now apply bitmap_has_lor_false.
+Qed.
+
+Lemma occupied_slots_from_lor_bit_away :
+  forall fuel bitmap bit_slot start,
+    (start + N.of_nat fuel <= bit_slot)%N \/ (bit_slot < start)%N ->
+    occupied_slots_from fuel (N.lor bitmap (bitmap_bit bit_slot)) start =
+    occupied_slots_from fuel bitmap start.
+Proof.
+  induction fuel as [|fuel IH]; intros bitmap bit_slot start Haway; simpl.
+  - reflexivity.
+  - assert (Hdifferent : start <> bit_slot) by
+      (destruct Haway as [Hbefore|Hafter]; lia).
+    rewrite (@bitmap_has_lor_bit_other bitmap bit_slot start Hdifferent).
+    destruct (bitmap_has bitmap start) eqn:Hhas; simpl;
+      rewrite (IH bitmap bit_slot (N.succ start)) by
+        (destruct Haway as [Hbefore|Hafter]; [left|right]; lia);
+      reflexivity.
+Qed.
+
+Lemma occupied_slots_lor_bit_absent_split :
+  forall bitmap slot,
+    (slot < branch_width)%N ->
+    bitmap_has bitmap slot = false ->
+    exists before after,
+      occupied_slots bitmap = before ++ after /\
+      length before = rank bitmap slot /\
+      occupied_slots (N.lor bitmap (bitmap_bit slot)) =
+        before ++ slot :: after.
+Proof.
+  intros bitmap slot Hslot Habsent.
+  set (slot_nat := N.to_nat slot).
+  assert (Hslot_nat : S slot_nat <= 32) by
+    (unfold slot_nat; unfold branch_width in Hslot; lia).
+  set (before := occupied_slots_from slot_nat bitmap 0).
+  set (after := occupied_slots_from (32 - S slot_nat) bitmap
+    (N.of_nat (S slot_nat))).
+  exists before, after.
+  assert (Hold_prefix :
+    occupied_slots_from (S slot_nat) bitmap 0 = before).
+  { unfold before. replace (S slot_nat) with (slot_nat + 1) by lia.
+    rewrite (occupied_slots_from_split slot_nat 1 bitmap 0).
+    rewrite N.add_0_l. simpl.
+    unfold slot_nat. rewrite N2Nat.id, Habsent, app_nil_r. reflexivity. }
+  assert (Hnew_present :
+    bitmap_has (N.lor bitmap (bitmap_bit slot)) slot = true).
+  { apply bitmap_has_lor_right. apply bitmap_bit_has_slot. }
+  assert (Hbefore :
+    occupied_slots_from slot_nat (N.lor bitmap (bitmap_bit slot)) 0 = before).
+  { unfold before. apply occupied_slots_from_lor_bit_away. left.
+    unfold slot_nat. rewrite N.add_0_l, N2Nat.id. lia. }
+  assert (Hafter :
+    occupied_slots_from (32 - S slot_nat)
+      (N.lor bitmap (bitmap_bit slot)) (N.of_nat (S slot_nat)) = after).
+  { unfold after. apply occupied_slots_from_lor_bit_away. right.
+    unfold slot_nat. rewrite <- (N2Nat.id slot). lia. }
+  split.
+  - rewrite (@occupied_slots_prefix (S slot_nat) bitmap) by lia.
+    rewrite Hold_prefix. exact eq_refl.
+  - split.
+    + unfold before, slot_nat.
+      pose proof (@rank_occupied_slots_prefix_nat bitmap (N.to_nat slot)
+        ltac:(lia)) as Hrank.
+      now rewrite N2Nat.id in Hrank.
+    + rewrite (@occupied_slots_prefix (S slot_nat)
+        (N.lor bitmap (bitmap_bit slot))) by lia.
+      rewrite (occupied_slots_from_at slot_nat
+        (N.lor bitmap (bitmap_bit slot))).
+      * assert (Hslot_id : N.of_nat slot_nat = slot) by
+          (unfold slot_nat; apply N2Nat.id).
+        rewrite Hbefore, Hafter, Hslot_id.
+        change ((before ++ [slot]) ++ after = before ++ [slot] ++ after).
+        symmetry. apply app_assoc.
+      * assert (Hslot_id : N.of_nat slot_nat = slot) by
+          (unfold slot_nat; apply N2Nat.id).
+        now rewrite Hslot_id.
+Qed.
+
+Lemma popcount_lor_bit_absent :
+  forall bitmap slot,
+    (slot < branch_width)%N ->
+    bitmap_has bitmap slot = false ->
+    popcount32 (N.lor bitmap (bitmap_bit slot)) = S (popcount32 bitmap).
+Proof.
+  intros bitmap slot Hslot Habsent.
+  destruct (@occupied_slots_lor_bit_absent_split bitmap slot Hslot Habsent)
+    as [before [after [Hold [Hrank Hnew]]]].
+  rewrite <- !occupied_slots_length_popcount.
+  rewrite Hold, Hnew.
+  repeat rewrite app_length. simpl. lia.
+Qed.
+
 Lemma bitmap_bits_disjoint :
   forall left_slot right_slot,
     left_slot <> right_slot ->

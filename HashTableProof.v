@@ -495,6 +495,49 @@ Proof.
  - exact Hnodup.
 Qed.
 
+Lemma wf_branch_insert_absent :
+ forall depth prefix bitmap children slot (child : tree K A),
+ wf depth prefix (Branch bitmap children) ->
+ (slot < branch_width)%N ->
+ bitmap_has bitmap slot = false ->
+ child <> Empty ->
+ wf (S depth) (prefix ++ [slot]) child ->
+ NoDupA binding_equiv (bindings (branch_insert bitmap slot child children)) ->
+ wf depth prefix (branch_insert bitmap slot child children).
+Proof.
+ intros depth prefix bitmap children slot child Hwf Hslot Habsent Hnonempty
+   Hchild Hnodup.
+ inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hlength Hchildren
+   Holdnodup]; subst.
+ destruct (@occupied_slots_lor_bit_absent_split bitmap slot Hslot Habsent)
+   as [before [after [Hslots [Hrank Hnew]]]].
+ rewrite Hslots in Hchildren.
+ destruct (@Forall2_app_inv_l N (tree K A)
+   (fun routed inserted => inserted <> Empty /\
+     wf (S depth) (prefix ++ [routed]) inserted)
+   before after children Hchildren)
+   as [children_before [children_after
+     [Hbefore [Hafter Hchildren_eq]]]].
+ unfold branch_insert. apply wf_branch.
+ - exact Hdepth.
+ - now apply bitmap_lor_bit_bound_absent.
+ - intro Hzero.
+   assert (Hpresent : bitmap_has (N.lor bitmap (bitmap_bit slot)) slot = true).
+   { apply bitmap_has_lor_right. apply bitmap_bit_has_slot. }
+   rewrite Hzero, bitmap_has_empty in Hpresent. discriminate.
+ - rewrite dense_insert_length, Hlength.
+   symmetry. now apply popcount_lor_bit_absent.
+ - assert (Hbefore_length : length children_before = length before).
+   { symmetry. exact (@Forall2_length N (tree K A)
+       (fun routed inserted => inserted <> Empty /\
+         wf (S depth) (prefix ++ [routed]) inserted)
+       before children_before Hbefore). }
+   rewrite Hnew, Hchildren_eq, <- Hrank, <- Hbefore_length.
+   apply Forall2_dense_insert; try assumption.
+   split; assumption.
+ - exact Hnodup.
+Qed.
+
 Inductive branch_path_depth : tree K A -> nat -> Prop :=
 | branch_path_here : forall bitmap children,
     branch_path_depth (Branch bitmap children) 0
@@ -1502,6 +1545,28 @@ Lemma set_tree_branch_slot_absent :
 Proof.
   intros K A eqb fuel depth full_hash key value bitmap children Habsent.
   cbn [set_tree]. now rewrite Habsent.
+Qed.
+
+Lemma set_tree_branch_slot_absent_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) fuel depth prefix full_hash (key : K) (value : A)
+         bitmap (children : list (tree K A)) (eqb : K -> K -> bool),
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    bitmap_has bitmap (chunk full_hash depth) = false ->
+    wf E hash seed (S depth) (prefix ++ [chunk full_hash depth])
+      (Leaf full_hash key value) ->
+    NoDupA (binding_equiv E)
+      (bindings (branch_insert bitmap (chunk full_hash depth)
+        (Leaf full_hash key value) children)) ->
+    wf E hash seed depth prefix
+      (set_tree eqb (S fuel) depth full_hash key value (Branch bitmap children)).
+Proof.
+  intros K Seed A E hash seed fuel depth prefix full_hash key value bitmap
+    children eqb Hwf Habsent Hleaf Hnodup.
+  rewrite set_tree_branch_slot_absent by exact Habsent.
+  apply wf_branch_insert_absent; try assumption.
+  - apply chunk_bound.
+  - discriminate.
 Qed.
 
 Lemma set_tree_branch_child :
