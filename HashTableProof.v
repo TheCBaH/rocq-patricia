@@ -3756,6 +3756,25 @@ Proof.
   all: apply get_tree_join_worker_left_leaf; assumption.
 Qed.
 
+Lemma get_tree_after_set_collision_distinct_self :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
+         (value : A) stored_hash (entries : list (K * A)),
+    eqb key key = true ->
+    full_hash <> stored_hash ->
+    join_falls_back fuel depth full_hash stored_hash = false ->
+    get_tree eqb fuel depth full_hash key
+      (set_tree eqb fuel depth full_hash key value
+        (Collision stored_hash entries)) = Some value.
+Proof.
+  intros K A eqb fuel depth full_hash key value stored_hash entries
+    Heqb Hdifferent Hfallback.
+  assert (Hhash : N.eqb full_hash stored_hash = false).
+  { now apply N.eqb_neq. }
+  destruct fuel as [|fuel]; cbn [set_tree].
+  all: rewrite Hhash.
+  all: apply get_tree_join_worker_left_leaf; assumption.
+Qed.
+
 Lemma get_tree_after_remove_self_wf :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
