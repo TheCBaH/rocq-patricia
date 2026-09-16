@@ -3434,3 +3434,16 @@ Proof.
   rewrite get_tree_normalize_collision_same_hash.
   now apply (@bucket_get_after_remove_self K A E eqb key entries).
 Qed.
+
+Lemma get_tree_after_remove_leaf_self :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
+         (value : A),
+    eqb key key = true ->
+    get_tree eqb fuel depth full_hash key
+      (remove_tree eqb fuel depth full_hash key
+        (Leaf full_hash key value)) = None.
+Proof.
+  intros K A eqb fuel depth full_hash key value Heqb.
+  rewrite (remove_tree_leaf_removes eqb fuel depth full_hash key value Heqb).
+  apply get_tree_empty.
+Qed.
