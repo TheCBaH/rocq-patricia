@@ -3628,3 +3628,20 @@ Proof.
   - intros first second Hrelated. apply Hcongruent. exact Hrelated.
   - exact Hwf.
 Qed.
+
+Lemma mem_after_remove_self :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (key : K) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    table_wf E hash m ->
+    mem eqb hash key (remove eqb hash key m) = false.
+Proof.
+  intros K Seed A E hash eqb key m Hequiv Heqb Hcongruent Hwf.
+  unfold mem.
+  rewrite (@get_after_remove_self K Seed A E hash eqb key m
+    Hequiv Heqb Hcongruent Hwf).
+  reflexivity.
+Qed.
