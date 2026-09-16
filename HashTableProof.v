@@ -320,6 +320,23 @@ Proof.
      exists child. simpl. tauto.
 Qed.
 
+Lemma forall2_nth :
+ forall X Y (R : X -> Y -> Prop) slots children index slot,
+ Forall2 R slots children ->
+ nth_error slots index = Some slot ->
+ exists child, nth_error children index = Some child /\ R slot child.
+Proof.
+ intros X Y R slots children index slot Hpaired Hslot.
+ revert index slot Hslot.
+ induction Hpaired as [|head_slot head_child slots children Hhead Htail IH];
+   intros index slot Hslot.
+ - destruct index; discriminate.
+ - destruct index as [|index].
+   + simpl in Hslot. inversion Hslot; subst slot.
+     exists head_child. split; [reflexivity|exact Hhead].
+   + simpl in Hslot. eapply IH; eauto.
+Qed.
+
 Lemma wf_branch_depth :
  forall depth prefix bitmap children,
  wf depth prefix (Branch bitmap children) -> depth < branch_levels.
@@ -375,7 +392,33 @@ Proof.
  intros depth prefix bitmap children slot Hwf Hslot Hhas.
  apply wf_branch_occupied_child with (bitmap := bitmap).
  - exact Hwf.
- - now apply occupied_slots_complete.
+  - now apply occupied_slots_complete.
+Qed.
+
+Lemma wf_branch_ranked_child :
+ forall depth prefix bitmap children slot,
+ wf depth prefix (Branch bitmap children) ->
+ (slot < branch_width)%N ->
+ bitmap_has bitmap slot = true ->
+ exists child,
+ dense_get (rank bitmap slot) children = Some child /\ child <> Empty /\
+   wf (S depth) (prefix ++ [slot]) child.
+Proof.
+ intros depth prefix bitmap children slot Hwf Hslot Hhas.
+ inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hlength Hchildren Hnodup];
+   subst.
+ destruct (@occupied_slots_rank_split_N slot bitmap Hslot Hhas)
+   as [before [after [Hslots Hrank]]].
+ assert (Hnth : nth_error (occupied_slots bitmap) (rank bitmap slot) = Some slot).
+ { rewrite Hslots, <- Hrank.
+   rewrite nth_error_app2 by lia.
+   replace (length before - length before) with 0 by lia.
+   reflexivity. }
+ destruct (forall2_nth (rank bitmap slot) Hchildren Hnth)
+   as [child [Hchild Hrelated]].
+ exists child. split.
+ - exact Hchild.
+ - exact Hrelated.
 Qed.
 
 Inductive branch_path_depth : tree K A -> nat -> Prop :=
