@@ -2041,6 +2041,17 @@ Proof.
   - apply list_subseq_keep. now apply IH.
 Qed.
 
+Lemma list_subseq_app_r_lift :
+  forall A (kept source right : list A),
+    list_subseq kept source ->
+    list_subseq (kept ++ right) (source ++ right).
+Proof.
+  intros A kept source right Hsub. induction Hsub; simpl.
+  - apply list_subseq_refl.
+  - apply list_subseq_keep. exact IHHsub.
+  - apply list_subseq_drop. exact IHHsub.
+Qed.
+
 Lemma NoDupA_list_subseq :
   forall A (R : A -> A -> Prop) kept source,
     list_subseq kept source -> NoDupA R source -> NoDupA R kept.
@@ -2067,6 +2078,38 @@ Proof.
   - destruct children as [|child children]; simpl.
     + constructor.
     + apply list_subseq_app_l. apply IH.
+Qed.
+
+Lemma flat_map_dense_replace_subseq :
+  forall (K A : Type) index (old child : tree K A) children,
+    dense_get index children = Some old ->
+    list_subseq (bindings child) (bindings old) ->
+    list_subseq (flat_map bindings (dense_replace index child children))
+      (flat_map bindings children).
+Proof.
+  intros K A index. induction index as [|index IH];
+    intros old child children Hget Hsub.
+  - destruct children as [|head tail]; simpl in Hget.
+    + discriminate.
+    + inversion Hget; subst old. simpl.
+      apply list_subseq_app_r_lift. exact Hsub.
+  - destruct children as [|head tail]; simpl in Hget.
+    + discriminate.
+    + simpl. apply list_subseq_app_l.
+      apply IH with (old := old); assumption.
+Qed.
+
+Lemma bucket_remove_subseq :
+  forall (K A : Type) (eqb : K -> K -> bool) key
+         (entries : list (K * A)),
+    list_subseq (bucket_remove eqb key entries) entries.
+Proof.
+  intros K A eqb key entries.
+  induction entries as [|[stored value] tail IH]; simpl.
+  - constructor.
+  - destruct (eqb key stored) eqn:Hstored.
+    + exact (@list_subseq_app_r (K * A) [(stored, value)] tail).
+    + apply list_subseq_keep. exact IH.
 Qed.
 
 Lemma bindings_branch_remove_nodup :
@@ -2899,4 +2942,86 @@ Proof.
           (full_hash := full_hash) (key := key) in Hnew.
         apply in_flat_map. now exists child.
       * exact Hold.
+Qed.
+
+Lemma bindings_remove_tree_subseq :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
+         (t : tree K A),
+    list_subseq (bindings (remove_tree eqb fuel depth full_hash key t))
+      (bindings t).
+Proof.
+  intros K A eqb fuel.
+  induction fuel as [|fuel IH]; intros depth full_hash key t;
+    destruct t as [|stored_hash stored value|stored_hash entries|bitmap children].
+  - constructor.
+  - cbn [remove_tree].
+    destruct (N.eqb full_hash stored_hash);
+      destruct (eqb key stored); simpl.
+    + apply list_subseq_drop. constructor.
+    + apply list_subseq_refl.
+    + apply list_subseq_refl.
+    + apply list_subseq_refl.
+  - cbn [remove_tree].
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + rewrite bindings_normalize_collision.
+      apply bucket_remove_subseq.
+    + apply list_subseq_refl.
+  - apply list_subseq_refl.
+  - constructor.
+  - cbn [remove_tree].
+    destruct (N.eqb full_hash stored_hash);
+      destruct (eqb key stored); simpl.
+    + apply list_subseq_drop. constructor.
+    + apply list_subseq_refl.
+    + apply list_subseq_refl.
+    + apply list_subseq_refl.
+  - cbn [remove_tree].
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + rewrite bindings_normalize_collision.
+      apply bucket_remove_subseq.
+    + apply list_subseq_refl.
+  - destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
+    2: { rewrite (remove_tree_branch_slot_absent eqb fuel depth full_hash key
+      bitmap children Hpresent). apply list_subseq_refl. }
+    destruct (dense_get (rank bitmap (chunk full_hash depth)) children)
+      as [child|] eqn:Hchild.
+    2: { rewrite (remove_tree_branch_dense_missing eqb fuel depth full_hash key
+      bitmap children Hpresent Hchild). apply list_subseq_refl. }
+    rewrite (remove_tree_branch_child eqb fuel depth full_hash key bitmap
+      children Hpresent Hchild).
+    destruct (remove_tree eqb fuel (S depth) full_hash key child)
+      as [|child_hash child_key child_value|child_hash child_entries|child_bitmap child_children]
+      eqn:Hremove.
+    + unfold branch_remove.
+      destruct (dense_remove (rank bitmap (chunk full_hash depth)) children)
+        as [|head tail] eqn:Hremaining; simpl.
+      * pose proof (@flat_map_dense_remove_subseq K A
+          (rank bitmap (chunk full_hash depth)) children) as Hsub.
+        rewrite Hremaining in Hsub. exact Hsub.
+      * change (list_subseq (flat_map bindings (head :: tail))
+          (flat_map bindings children)).
+        pose proof (@flat_map_dense_remove_subseq K A
+          (rank bitmap (chunk full_hash depth)) children) as Hsub.
+        rewrite Hremaining in Hsub. exact Hsub.
+    + apply flat_map_dense_replace_subseq with (old := child).
+      * exact Hchild.
+      * rewrite <- Hremove. apply IH.
+    + apply flat_map_dense_replace_subseq with (old := child).
+      * exact Hchild.
+      * rewrite <- Hremove. apply IH.
+    + apply flat_map_dense_replace_subseq with (old := child).
+      * exact Hchild.
+      * rewrite <- Hremove. apply IH.
+Qed.
+
+Lemma bindings_remove_tree_nodup :
+  forall (K A : Type) (R : (K * A) -> (K * A) -> Prop)
+         (eqb : K -> K -> bool) fuel depth full_hash key (t : tree K A),
+    NoDupA R (bindings t) ->
+    NoDupA R (bindings (remove_tree eqb fuel depth full_hash key t)).
+Proof.
+  intros K A R eqb fuel depth full_hash key t Hnodup.
+  apply NoDupA_list_subseq with (source := bindings t).
+  - apply bindings_remove_tree_subseq.
+  - exact Hnodup.
 Qed.
