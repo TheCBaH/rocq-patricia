@@ -1986,6 +1986,161 @@ Proof.
   apply in_flat_map. now exists node.
 Qed.
 
+Inductive list_subseq {A : Type} : list A -> list A -> Prop :=
+| list_subseq_nil : list_subseq [] []
+| list_subseq_keep : forall item kept source,
+    list_subseq kept source -> list_subseq (item :: kept) (item :: source)
+| list_subseq_drop : forall item kept source,
+    list_subseq kept source -> list_subseq kept (item :: source).
+
+Lemma list_subseq_in :
+  forall A (kept source : list A) item,
+    list_subseq kept source -> In item kept -> In item source.
+Proof.
+  intros A kept source item Hsub. induction Hsub; intro Hin; simpl in *.
+  - contradiction.
+  - destruct Hin as [Hin|Hin]; [now left|now right; apply IHHsub].
+  - now right; apply IHHsub.
+Qed.
+
+Lemma list_subseq_InA :
+  forall A (R : A -> A -> Prop) kept source item,
+    list_subseq kept source -> InA R item kept -> InA R item source.
+Proof.
+  intros A R kept source item Hsub. induction Hsub; intro Hin.
+  - inversion Hin.
+  - inversion Hin; subst.
+    + constructor. assumption.
+    + constructor 2. now apply IHHsub.
+  - constructor 2. now apply IHHsub.
+Qed.
+
+Lemma list_subseq_refl :
+  forall A (items : list A), list_subseq items items.
+Proof.
+  intros A items. induction items as [|item items IH].
+  - constructor.
+  - apply list_subseq_keep. exact IH.
+Qed.
+
+Lemma list_subseq_app_r :
+  forall A (left right : list A), list_subseq right (left ++ right).
+Proof.
+  intros A left. induction left as [|item left IH]; intro right; simpl.
+  - apply list_subseq_refl.
+  - apply list_subseq_drop. apply IH.
+Qed.
+
+Lemma list_subseq_app_l :
+  forall A (left kept source : list A),
+    list_subseq kept source -> list_subseq (left ++ kept) (left ++ source).
+Proof.
+  intros A left. induction left as [|item left IH]; intros kept source Hsub;
+    simpl.
+  - exact Hsub.
+  - apply list_subseq_keep. now apply IH.
+Qed.
+
+Lemma NoDupA_list_subseq :
+  forall A (R : A -> A -> Prop) kept source,
+    list_subseq kept source -> NoDupA R source -> NoDupA R kept.
+Proof.
+  intros A R kept source Hsub. induction Hsub; intro Hnodup.
+  - constructor.
+  - inversion Hnodup as [|item' source' Hnot Htail]; subst.
+    constructor.
+    + intro Hin. apply Hnot. now apply list_subseq_InA with (kept := kept).
+    + now apply IHHsub.
+  - inversion Hnodup as [|item' source' Hnot Htail]; subst.
+    now apply IHHsub.
+Qed.
+
+Lemma flat_map_dense_remove_subseq :
+  forall (K A : Type) index (children : list (tree K A)),
+    list_subseq (flat_map bindings (dense_remove index children))
+      (flat_map bindings children).
+Proof.
+  intros K A index. induction index as [|index IH]; intros children.
+  - destruct children as [|child children]; simpl.
+    + constructor.
+    + apply list_subseq_app_r.
+  - destruct children as [|child children]; simpl.
+    + constructor.
+    + apply list_subseq_app_l. apply IH.
+Qed.
+
+Lemma bindings_branch_remove_nodup :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) depth prefix bitmap (children : list (tree K A)) slot,
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    NoDupA (binding_equiv E) (bindings (branch_remove bitmap slot children)).
+Proof.
+  intros K Seed A E hash seed depth prefix bitmap children slot Hwf.
+  inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hlength Hchildren
+    Hnodup]; subst.
+  change (NoDupA (binding_equiv E) (flat_map bindings children)) in Hnodup.
+  unfold branch_remove.
+  destruct (dense_remove (rank bitmap slot) children) as [|child remaining]
+    eqn:Hremove; simpl.
+  - constructor.
+  - apply NoDupA_list_subseq with (source := flat_map bindings children).
+    + change (list_subseq (flat_map bindings (child :: remaining))
+        (flat_map bindings children)).
+      rewrite <- Hremove. apply flat_map_dense_remove_subseq.
+    + exact Hnodup.
+Qed.
+
+Lemma wf_branch_remove_present_nonempty_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (depth : nat) (prefix : list N) (bitmap : N)
+         (children : list (tree K A)) (slot : N),
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    (slot < branch_width)%N ->
+    bitmap_has bitmap slot = true ->
+    dense_remove (rank bitmap slot) children <> [] ->
+    wf E hash seed depth prefix
+      (Branch (N.ldiff bitmap (bitmap_bit slot))
+        (dense_remove (rank bitmap slot) children)).
+Proof.
+  intros K Seed A E hash seed depth prefix bitmap children slot Hwf Hslot
+    Hpresent Hremaining.
+  apply wf_branch_remove_present_nonempty with (slot := slot);
+    try assumption.
+  pose proof (@bindings_branch_remove_nodup K Seed A E hash seed depth prefix
+    bitmap children slot Hwf) as Hnodup.
+  unfold branch_remove in Hnodup.
+  destruct (dense_remove (rank bitmap slot) children) as [|head tail] eqn:Hremove;
+    simpl in Hnodup; [contradiction|].
+  exact Hnodup.
+Qed.
+
+Lemma remove_tree_branch_child_wf_removed_nonempty_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) fuel depth prefix full_hash (key : K)
+         bitmap (children : list (tree K A)) (eqb : K -> K -> bool) child,
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    bitmap_has bitmap (chunk full_hash depth) = true ->
+    dense_get (rank bitmap (chunk full_hash depth)) children = Some child ->
+    remove_tree eqb fuel (S depth) full_hash key child = Empty ->
+    dense_remove (rank bitmap (chunk full_hash depth)) children <> [] ->
+    wf E hash seed depth prefix
+      (remove_tree eqb (S fuel) depth full_hash key (Branch bitmap children)).
+Proof.
+  intros K Seed A E hash seed fuel depth prefix full_hash key bitmap children
+    eqb child Hwf Hpresent Hchild Hremove Hremaining.
+  rewrite (remove_tree_branch_child eqb fuel depth full_hash key bitmap
+    children Hpresent Hchild).
+  rewrite Hremove.
+  unfold branch_remove.
+  destruct (dense_remove (rank bitmap (chunk full_hash depth)) children)
+    as [|head tail] eqn:Hdense; [contradiction|].
+  rewrite <- Hdense.
+  apply wf_branch_remove_present_nonempty_wf with
+    (slot := chunk full_hash depth); try assumption.
+  - apply chunk_bound.
+  - now rewrite Hdense.
+Qed.
+
 Lemma bindings_branch_remove_in :
   forall (K A : Type) bitmap slot children (entry : K * A),
     In entry (bindings (branch_remove bitmap slot children)) ->
