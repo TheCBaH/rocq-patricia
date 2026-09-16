@@ -1569,6 +1569,31 @@ Proof.
   - discriminate.
 Qed.
 
+Lemma set_tree_branch_slot_absent_wf_leaf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) fuel depth prefix full_hash (key : K) (value : A)
+         bitmap (children : list (tree K A)) (eqb : K -> K -> bool),
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    bitmap_has bitmap (chunk full_hash depth) = false ->
+    length prefix = depth ->
+    full_hash = hash seed key ->
+    (full_hash < hash_space)%N ->
+    prefix_matches full_hash depth prefix ->
+    NoDupA (binding_equiv E)
+      (bindings (branch_insert bitmap (chunk full_hash depth)
+        (Leaf full_hash key value) children)) ->
+    wf E hash seed depth prefix
+      (set_tree eqb (S fuel) depth full_hash key value (Branch bitmap children)).
+Proof.
+  intros K Seed A E hash seed fuel depth prefix full_hash key value bitmap
+    children eqb Hwf Habsent Hprefix_len Hhash Hhash_bound Hprefix Hnodup.
+  apply set_tree_branch_slot_absent_wf with
+    (full_hash := full_hash) (key := key) (value := value);
+    try assumption.
+  apply wf_leaf; try assumption.
+  now apply prefix_matches_append_slot.
+Qed.
+
 Lemma set_tree_branch_child :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
          (value : A) bitmap (children : list (tree K A)) (child : tree K A),
