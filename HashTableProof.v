@@ -418,7 +418,48 @@ Proof.
    as [child [Hchild Hrelated]].
  exists child. split.
  - exact Hchild.
- - exact Hrelated.
+  - exact Hrelated.
+Qed.
+
+Lemma wf_branch_replace :
+ forall depth prefix bitmap children slot (child : tree K A),
+ wf depth prefix (Branch bitmap children) ->
+ (slot < branch_width)%N ->
+ bitmap_has bitmap slot = true ->
+ child <> Empty ->
+ wf (S depth) (prefix ++ [slot]) child ->
+ NoDupA binding_equiv
+   (bindings (branch_replace bitmap slot child children)) ->
+ wf depth prefix (branch_replace bitmap slot child children).
+Proof.
+ intros depth prefix bitmap children slot child Hwf Hslot Hpresent Hnonempty
+   Hchild Hnodup.
+ destruct (wf_branch_ranked_child Hwf Hslot Hpresent)
+   as [old_child [Hget [Holdnonempty Holdwf]]].
+ inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hlength Hchildren Holdnodup];
+   subst.
+ assert (Hindex : rank bitmap slot < length children).
+ { apply (proj1 (nth_error_Some children (rank bitmap slot))).
+   unfold dense_get in Hget. rewrite Hget. discriminate. }
+ assert (Hnth : nth_error (occupied_slots bitmap) (rank bitmap slot) = Some slot).
+ { destruct (@occupied_slots_rank_split_N slot bitmap Hslot Hpresent)
+     as [before [after [Hslots Hrank]]].
+   rewrite Hslots, <- Hrank.
+   rewrite nth_error_app2 by lia.
+   replace (length before - length before) with 0 by lia.
+   reflexivity. }
+ unfold branch_replace. apply wf_branch.
+ - exact Hdepth.
+ - exact Hbound.
+ - exact Hnonzero.
+ - rewrite dense_replace_length. exact Hlength.
+ - eapply Forall2_dense_replace.
+   + exact Hchildren.
+   + exact Hindex.
+   + intros routed old Hroute Hold.
+     rewrite Hnth in Hroute. inversion Hroute; subst routed.
+     split; assumption.
+ - exact Hnodup.
 Qed.
 
 Inductive branch_path_depth : tree K A -> nat -> Prop :=
