@@ -3109,3 +3109,16 @@ Proof.
            ++ rewrite <- Hremove. apply IH. exact Hchildwf.
       * apply remove_tree_branch_slot_absent_wf; assumption.
 Qed.
+
+Lemma table_wf_remove :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) key (m : table K Seed A),
+    @table_wf K Seed A E hash m ->
+    @table_wf K Seed A E hash (remove eqb hash key m).
+Proof.
+  intros K Seed A E hash eqb key [seed root] Hwf.
+  change (wf E hash seed 0 [] root) in Hwf.
+  change (wf E hash seed 0 []
+    (remove_tree eqb branch_levels 0 (hash seed key) key root)).
+  apply remove_tree_wf. exact Hwf.
+Qed.
