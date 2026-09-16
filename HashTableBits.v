@@ -775,6 +775,29 @@ Proof.
   all: change (_ < 2 ^ 32)%N; assumption.
 Qed.
 
+Lemma bitmap_absent_bit_disjoint :
+  forall bitmap slot,
+    bitmap_has bitmap slot = false ->
+    N.land bitmap (bitmap_bit slot) = 0%N.
+Proof.
+  intros bitmap slot Habsent.
+  apply (proj2 (bitmap_land_bit_zero_iff bitmap slot)).
+  now apply (proj1 (bitmap_has_false_spec bitmap slot)).
+Qed.
+
+Lemma bitmap_lor_bit_bound_absent :
+  forall bitmap slot,
+    (bitmap < bitmap_limit)%N ->
+    (slot < branch_width)%N ->
+    bitmap_has bitmap slot = false ->
+    (N.lor bitmap (bitmap_bit slot) < bitmap_limit)%N.
+Proof.
+  intros bitmap slot Hbound Hslot Habsent.
+  apply bitmap_lor_bound_disjoint; try assumption.
+  - now apply bitmap_bit_bound.
+  - now apply bitmap_absent_bit_disjoint.
+Qed.
+
 Lemma full_bitmap_bound : (full_bitmap < bitmap_limit)%N.
 Proof. now vm_compute. Qed.
 
