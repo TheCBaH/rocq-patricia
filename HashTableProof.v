@@ -2808,3 +2808,95 @@ Lemma remove_tree_empty_bindings :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key,
     @bindings K A (remove_tree eqb fuel depth full_hash key Empty) = [].
 Proof. intros. destruct fuel; reflexivity. Qed.
+
+Lemma bucket_remove_in :
+  forall (K A : Type) (eqb : K -> K -> bool) key
+         (entries : list (K * A)) entry,
+    In entry (bucket_remove eqb key entries) -> In entry entries.
+Proof.
+  intros K A eqb key entries.
+  induction entries as [|[stored value] tail IH]; intros entry Hin; simpl in *.
+  - contradiction.
+  - destruct (eqb key stored) eqn:Hstored.
+    + now right.
+    + destruct Hin as [Hin|Hin].
+      * now left.
+      * now right; apply IH.
+Qed.
+
+Lemma bindings_remove_tree_in :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
+         (t : tree K A) entry,
+    In entry (bindings (remove_tree eqb fuel depth full_hash key t)) ->
+    In entry (bindings t).
+Proof.
+  intros K A eqb fuel.
+  induction fuel as [|fuel IH]; intros depth full_hash key t entry Hin;
+    destruct t as [|stored_hash stored value|stored_hash entries|bitmap children].
+  - cbn [remove_tree] in Hin. contradiction.
+  - cbn [remove_tree] in Hin.
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + destruct (eqb key stored) eqn:Hkey;
+        cbn in Hin |- *;
+        try contradiction; exact Hin.
+    + cbn in Hin. exact Hin.
+  - cbn [remove_tree] in Hin.
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash; cbn in Hin |- *.
+    + rewrite bindings_normalize_collision in Hin.
+      now apply bucket_remove_in in Hin.
+    + exact Hin.
+  - cbn [remove_tree] in Hin |- *. exact Hin.
+  - cbn [remove_tree] in Hin. contradiction.
+  - cbn [remove_tree] in Hin.
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + destruct (eqb key stored) eqn:Hkey;
+        cbn in Hin |- *;
+        try contradiction; exact Hin.
+    + cbn in Hin. exact Hin.
+  - cbn [remove_tree] in Hin.
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash; cbn in Hin |- *.
+    + rewrite bindings_normalize_collision in Hin.
+      now apply bucket_remove_in in Hin.
+    + exact Hin.
+  - destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
+    2: { rewrite (remove_tree_branch_slot_absent eqb fuel depth full_hash key
+      bitmap children Hpresent) in Hin. exact Hin. }
+    destruct (dense_get (rank bitmap (chunk full_hash depth)) children)
+      as [child|] eqn:Hchild.
+    2: { rewrite (remove_tree_branch_dense_missing eqb fuel depth full_hash key
+      bitmap children Hpresent Hchild) in Hin. exact Hin. }
+    assert (Hindex : rank bitmap (chunk full_hash depth) < length children).
+    { apply (proj1 (nth_error_Some children
+        (rank bitmap (chunk full_hash depth)))).
+      unfold dense_get in Hchild. rewrite Hchild. discriminate. }
+    assert (Hchildin : In child children).
+    { apply nth_error_In with (n := rank bitmap (chunk full_hash depth)).
+      exact Hchild. }
+    rewrite (remove_tree_branch_child eqb fuel depth full_hash key bitmap
+      children Hpresent Hchild) in Hin.
+    destruct (remove_tree eqb fuel (S depth) full_hash key child)
+      as [|child_hash child_key child_value|child_hash child_entries|child_bitmap child_children]
+      eqn:Hremove; simpl in Hin.
+    + now apply bindings_branch_remove_in in Hin.
+    + destruct (bindings_branch_replace_in bitmap (chunk full_hash depth)
+        _ children entry Hindex Hin) as [Hnew|Hold].
+      * rewrite <- Hremove in Hnew.
+        apply IH with (t := child) (depth := S depth)
+          (full_hash := full_hash) (key := key) in Hnew.
+        apply in_flat_map. now exists child.
+      * exact Hold.
+    + destruct (bindings_branch_replace_in bitmap (chunk full_hash depth)
+        _ children entry Hindex Hin) as [Hnew|Hold].
+      * rewrite <- Hremove in Hnew.
+        apply IH with (t := child) (depth := S depth)
+          (full_hash := full_hash) (key := key) in Hnew.
+        apply in_flat_map. now exists child.
+      * exact Hold.
+    + destruct (bindings_branch_replace_in bitmap (chunk full_hash depth)
+        _ children entry Hindex Hin) as [Hnew|Hold].
+      * rewrite <- Hremove in Hnew.
+        apply IH with (t := child) (depth := S depth)
+          (full_hash := full_hash) (key := key) in Hnew.
+        apply in_flat_map. now exists child.
+      * exact Hold.
+Qed.
