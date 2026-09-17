@@ -878,6 +878,39 @@ Proof.
  reflexivity.
 Qed.
 
+Lemma wf_sibling_key_fresh :
+ forall depth prefix selected_slot sibling_slot (sibling : tree K A)
+        full_hash key (value : A),
+   (forall first second, E first second ->
+     hash seed first = hash seed second) ->
+   length prefix = depth ->
+   selected_slot <> sibling_slot ->
+   full_hash = hash seed key ->
+   chunk full_hash depth = selected_slot ->
+   wf (S depth) (prefix ++ [sibling_slot]) sibling ->
+   ~ InA binding_equiv (key, value) (bindings sibling).
+Proof.
+ intros depth prefix selected_slot sibling_slot sibling full_hash key value
+   Hcongruent Hlength Hslots Hhash Hroute Hwf Hin.
+ destruct (inA_witness binding_equiv (key, value) (bindings sibling) Hin)
+   as [entry [Hentry Hrelated]].
+ assert (Hprefix : prefix_matches (hash seed (fst entry)) (S depth)
+   (prefix ++ [sibling_slot])).
+ { eapply (@wf_binding_prefix_matches K Seed A E hash seed sibling (S depth)
+     (prefix ++ [sibling_slot])).
+   - rewrite app_length, Hlength. simpl. lia.
+   - exact Hwf.
+   - exact Hentry. }
+ assert (Hsibling : chunk (hash seed (fst entry)) depth = sibling_slot).
+ { unfold prefix_matches in Hprefix.
+   pose proof (prefix_matches_from_app_last
+     (hash seed (fst entry)) 0 prefix sibling_slot Hprefix) as Hslot.
+   replace (0 + length prefix) with depth in Hslot by lia.
+   exact Hslot. }
+ apply Hslots. rewrite <- Hroute, <- Hsibling.
+ rewrite Hhash, (Hcongruent key (fst entry) Hrelated). reflexivity.
+Qed.
+
 Lemma leaf_collision_disjoint :
  forall left_depth left_prefix left_hash (left_key : K) left_value
         right_depth right_prefix right_hash entries,
