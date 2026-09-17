@@ -4,7 +4,7 @@
     routing/invariant development can therefore build on stable operational
     equations without conflating specification and implementation. *)
 
-From Stdlib Require Import Bool Lia List NArith SetoidList.
+From Stdlib Require Import Arith Bool Lia List NArith SetoidList.
 Import ListNotations.
 
 Require Import HashTableSpec HashTable HashTableBits HashTableBucket.
@@ -64,6 +64,39 @@ Lemma prefix_matches_append_slot :
     intros full_hash depth prefix Hlength Hprefix.
     unfold prefix_matches in *. rewrite <- Hlength.
     apply prefix_matches_from_append_slot. exact Hprefix.
+  Qed.
+
+Lemma prefix_matches_from_agree :
+    forall start prefix left_hash right_hash index,
+      prefix_matches_from left_hash start prefix ->
+      prefix_matches_from right_hash start prefix ->
+      index < length prefix ->
+      chunk left_hash (start + index) = chunk right_hash (start + index).
+  Proof.
+    intros start prefix. revert start.
+    induction prefix as [|slot prefix IH]; intros start left_hash right_hash index
+      Hleft Hright Hindex.
+    - simpl in Hindex. lia.
+    - simpl in Hleft, Hright. destruct Hleft as [Hleft Hleft_tail].
+      destruct Hright as [Hright Hright_tail]. destruct index as [|index].
+      + replace (start + 0) with start by lia. now rewrite Hleft, Hright.
+      + cbn in Hindex. replace (start + S index) with (S start + index) by lia.
+        eapply IH; [exact Hleft_tail|exact Hright_tail|lia].
+  Qed.
+
+Lemma prefix_matches_agree :
+    forall depth prefix left_hash right_hash prior,
+      length prefix = depth ->
+      prefix_matches left_hash depth prefix ->
+      prefix_matches right_hash depth prefix ->
+      prior < depth ->
+      chunk left_hash prior = chunk right_hash prior.
+  Proof.
+    intros depth prefix left_hash right_hash prior Hlength Hleft Hright Hprior.
+    unfold prefix_matches in Hleft, Hright.
+    replace prior with (0 + prior) by lia.
+    apply prefix_matches_from_agree with (prefix := prefix); try assumption.
+    now rewrite Hlength.
   Qed.
 
   Definition entry_matches (full_hash : N) (depth : nat) (prefix : list N)
@@ -3844,6 +3877,44 @@ Proof.
   destruct fuel as [|fuel]; cbn [set_tree].
   all: rewrite Hmiss, Hhash.
   all: apply get_tree_join_worker_left_leaf; assumption.
+Qed.
+
+Lemma get_tree_after_set_leaf_distinct_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (key : K) (value : A) stored_hash stored (old_value : A),
+    depth + fuel = branch_levels ->
+    length prefix = depth ->
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    wf E hash seed depth prefix (Leaf stored_hash stored old_value) ->
+    entry_matches hash seed full_hash depth prefix (key, value) ->
+    eqb key stored = false ->
+    full_hash <> stored_hash ->
+    get_tree eqb fuel depth full_hash key
+      (set_tree eqb fuel depth full_hash key value
+        (Leaf stored_hash stored old_value)) = Some value.
+Proof.
+  intros K Seed A E hash seed eqb fuel depth prefix full_hash key value
+    stored_hash stored old_value Hfuel Hlength [Href Hsym Htrans] Heqb Hwf
+    Hentry Hmiss Hdifferent.
+  inversion Hwf as [|d p h s v Hstored_hash Hstored_bound Hstored_prefix| |];
+    subst stored_hash.
+  destruct Hentry as [Hkey_hash [Hkey_bound Hkey_prefix]].
+  assert (Hself : eqb key key = true).
+  { apply (proj2 (Heqb key key)). apply Href. }
+  assert (Hprefix_agree : forall prior, prior < depth ->
+      chunk full_hash prior = chunk (hash seed stored) prior).
+  { intros prior Hprior.
+    eapply prefix_matches_agree; eauto. }
+  assert (Hfallback : join_falls_back fuel depth full_hash (hash seed stored) = false).
+  { assert (Hfuel' : fuel = branch_levels - depth).
+    { symmetry. apply Nat.add_sub_eq_l. exact Hfuel. }
+    rewrite Hfuel'.
+    apply join_worker_suffix_no_fallback; try assumption.
+    - rewrite <- Hfuel. lia.
+    }
+  eapply get_tree_after_set_leaf_distinct_self; eauto.
 Qed.
 
 Lemma get_tree_after_set_collision_distinct_self :
