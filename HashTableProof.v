@@ -828,6 +828,50 @@ Proof.
  now rewrite Habsent in Hroute.
 Qed.
 
+Lemma wf_sibling_bindings_disjoint :
+ forall depth prefix left_slot right_slot (left right : tree K A),
+   Equivalence E ->
+   (forall first second, E first second ->
+     hash seed first = hash seed second) ->
+   length prefix = depth ->
+   left_slot <> right_slot ->
+   wf (S depth) (prefix ++ [left_slot]) left ->
+   wf (S depth) (prefix ++ [right_slot]) right ->
+ forall entry, InA binding_equiv entry (bindings left) ->
+   InA binding_equiv entry (bindings right) -> False.
+Proof.
+ intros depth prefix left_slot right_slot left right Hequiv Hcongruent Hlength
+   Hslots entry Hinleft Hinright.
+ destruct (inA_witness binding_equiv entry (bindings left) Hinleft)
+   as [left_entry [Hleft_entry Hleft_related]].
+ destruct (inA_witness binding_equiv entry (bindings right) Hinright)
+   as [right_entry [Hright_entry Hright_related]].
+ assert (Hleft_prefix : prefix_matches (hash seed (fst left_entry))
+   (S depth) (prefix ++ [left_slot])).
+ { eapply wf_binding_prefix_matches; eauto.
+   rewrite app_length, Hlength. simpl. lia. }
+ assert (Hright_prefix : prefix_matches (hash seed (fst right_entry))
+   (S depth) (prefix ++ [right_slot])).
+ { eapply wf_binding_prefix_matches; eauto.
+   rewrite app_length, Hlength. simpl. lia. }
+ assert (Hleft_slot : chunk (hash seed (fst left_entry)) depth = left_slot).
+ { unfold prefix_matches in Hleft_prefix.
+   pose proof (prefix_matches_from_app_last
+     (hash seed (fst left_entry)) 0 prefix left_slot Hleft_prefix) as Hslot.
+   replace (0 + length prefix) with depth in Hslot by lia.
+   exact Hslot. }
+ assert (Hright_slot : chunk (hash seed (fst right_entry)) depth = right_slot).
+ { unfold prefix_matches in Hright_prefix.
+   pose proof (prefix_matches_from_app_last
+     (hash seed (fst right_entry)) 0 prefix right_slot Hright_prefix) as Hslot.
+   replace (0 + length prefix) with depth in Hslot by lia.
+   exact Hslot. }
+ apply Hslots. rewrite <- Hleft_slot, <- Hright_slot.
+ rewrite <- (Hcongruent (fst entry) (fst left_entry) Hleft_related).
+ rewrite <- (Hcongruent (fst entry) (fst right_entry) Hright_related).
+ reflexivity.
+Qed.
+
 Lemma leaf_collision_disjoint :
  forall left_depth left_prefix left_hash (left_key : K) left_value
         right_depth right_prefix right_hash entries,
