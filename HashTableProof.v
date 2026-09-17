@@ -99,6 +99,46 @@ Lemma prefix_matches_agree :
     now rewrite Hlength.
   Qed.
 
+Lemma prefix_matches_from_app_prefix :
+    forall full_hash start prefix suffix,
+      prefix_matches_from full_hash start (prefix ++ suffix) ->
+      prefix_matches_from full_hash start prefix.
+  Proof.
+    intros full_hash start prefix. revert start.
+    induction prefix as [|slot prefix IH]; intros start suffix Hmatches.
+    - exact I.
+    - simpl in Hmatches. destruct Hmatches as [Hslot Htail]. simpl.
+      split; [exact Hslot|].
+      apply IH with (suffix := suffix). exact Htail.
+  Qed.
+
+Lemma prefix_matches_from_app_last :
+    forall full_hash start prefix slot,
+      prefix_matches_from full_hash start (prefix ++ [slot]) ->
+      chunk full_hash (start + length prefix) = slot.
+  Proof.
+    intros full_hash start prefix. revert start.
+    induction prefix as [|head prefix IH]; intros start slot Hmatches.
+    - simpl in Hmatches. destruct Hmatches as [Hslot _].
+      rewrite Nat.add_0_r. exact Hslot.
+    - simpl in Hmatches. destruct Hmatches as [_ Htail].
+      assert (Hindex : start + length (head :: prefix) =
+        S start + length prefix).
+      { simpl. lia. }
+      rewrite Hindex.
+      apply IH. exact Htail.
+  Qed.
+
+Lemma prefix_matches_app_prefix :
+    forall full_hash depth prefix suffix,
+      prefix_matches full_hash (depth + length suffix) (prefix ++ suffix) ->
+      prefix_matches full_hash depth prefix.
+  Proof.
+    intros full_hash depth prefix suffix Hmatches.
+    unfold prefix_matches in *. now apply prefix_matches_from_app_prefix with
+      (suffix := suffix).
+  Qed.
+
   Definition entry_matches (full_hash : N) (depth : nat) (prefix : list N)
       (entry : K * A) : Prop :=
     full_hash = hash seed (fst entry) /\
@@ -348,6 +388,23 @@ Proof.
  - simpl in Hin. destruct Hin as [->|Hin].
    + exists x. exact H.
    + apply IHHpaired. exact Hin.
+Qed.
+
+Lemma forall2_child_wf_in :
+ forall depth prefix slots children,
+ Forall2 (fun slot (child : tree K A) =>
+   child <> Empty /\ wf (S depth) (prefix ++ [slot]) child) slots children ->
+ forall child, In child children ->
+   exists slot, In slot slots /\ child <> Empty /\
+     wf (S depth) (prefix ++ [slot]) child.
+Proof.
+ intros depth prefix slots children Hpaired child Hin.
+ induction Hpaired.
+ - contradiction.
+ - simpl in Hin. destruct Hin as [->|Hin].
+   + exists x. split; [now left|exact H].
+   + destruct IHHpaired as [slot [Hslot [Hnonempty Hwf]]]; auto.
+     exists slot. split; [now right|split; assumption].
 Qed.
 
 Lemma forall2_slot_child_wf :
@@ -644,6 +701,74 @@ Proof.
    exact (IH (S depth) (prefix ++ [slot]) Hwfchild entry Hin).
 Qed.
 
+Lemma wf_binding_prefix_matches :
+ forall (t : tree K A) depth prefix,
+   length prefix = depth -> wf depth prefix t ->
+ forall entry, In entry (bindings t) ->
+   prefix_matches (hash seed (fst entry)) depth prefix.
+Proof.
+ refine (@tree_ind_nested K A
+   (fun t => forall depth prefix, length prefix = depth -> wf depth prefix t ->
+      forall entry, In entry (bindings t) ->
+        prefix_matches (hash seed (fst entry)) depth prefix)
+   _ _ _ _).
+ - intros depth prefix Hlength Hwf entry Hin. contradiction.
+ - intros stored_hash key value depth prefix Hlength Hwf entry Hin.
+   simpl in Hin. destruct Hin as [Heq|[]]. subst entry.
+   inversion Hwf; subst; eauto 3.
+ - intros stored_hash entries depth prefix Hlength Hwf entry Hin.
+   inversion Hwf; subst.
+   match goal with
+   | Hentries : Forall _ _ |- _ =>
+       apply Forall_forall with (x := entry) in Hentries; auto;
+       destruct Hentries as [Hhash [_ Hprefix]]; now rewrite <- Hhash
+   end.
+ - intros bitmap children IH depth prefix Hlength Hwf entry Hin.
+   inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hchildren_len
+     Hchildren Hnodup].
+   simpl in Hin. apply in_flat_map in Hin.
+   destruct Hin as [child [Hchild Hin]].
+   destruct (forall2_child_wf (depth := depth) prefix Hchildren child Hchild)
+     as [slot [_ Hchildwf]].
+   pose proof ((proj1 (Forall_forall _ _)) IH child Hchild) as Hih.
+   assert (Hchild_length : length (prefix ++ [slot]) = S depth).
+   { rewrite app_length, Hlength. simpl. lia. }
+   specialize (Hih (S depth) (prefix ++ [slot]) Hchild_length Hchildwf entry Hin).
+   + apply prefix_matches_app_prefix with (suffix := [slot]).
+     exact Hih.
+Qed.
+
+Lemma wf_branch_binding_routes :
+ forall depth prefix bitmap children,
+   length prefix = depth ->
+   wf depth prefix (Branch bitmap children) ->
+ forall entry, In entry (bindings (Branch bitmap children)) ->
+   bitmap_has bitmap (chunk (hash seed (fst entry)) depth) = true.
+Proof.
+ intros depth prefix bitmap children Hlength Hwf entry Hin.
+ inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hchildren_len
+   Hchildren Hnodup].
+ simpl in Hin. apply in_flat_map in Hin.
+ destruct Hin as [child [Hchild Hin]].
+ destruct (forall2_child_wf_in (depth := depth) prefix Hchildren child Hchild)
+   as [slot [Hslot_in [_ Hchildwf]]].
+ assert (Hprefix : prefix_matches (hash seed (fst entry)) (S depth)
+     (prefix ++ [slot])).
+ { apply wf_binding_prefix_matches with (t := child).
+   - rewrite app_length, Hlength. simpl. lia.
+   - exact Hchildwf.
+   - exact Hin. }
+ assert (Hslot : chunk (hash seed (fst entry)) depth = slot).
+ { unfold prefix_matches in Hprefix.
+   pose proof (prefix_matches_from_app_last
+     (hash seed (fst entry)) 0 prefix slot Hprefix) as Hroute.
+   replace (0 + length prefix) with depth in Hroute by lia.
+   exact Hroute. }
+ rewrite Hslot.
+ apply occupied_slots_from_sound with (fuel := 32) (start := 0%N).
+ exact Hslot_in.
+Qed.
+
 Lemma collision_binding_hash :
  forall depth prefix full_hash (entries : list (K * A)) (entry : K * A),
  wf depth prefix (Collision full_hash entries) ->
@@ -674,6 +799,33 @@ Proof.
  - exists y. split; [now left|assumption].
  - destruct IHHin as [stored [Hstored HR]]. exists stored.
    split; [now right|assumption].
+Qed.
+
+Lemma wf_branch_slot_absent_fresh :
+ forall depth prefix bitmap children full_hash key (value : A),
+   Equivalence E ->
+   (forall first second, E first second ->
+     hash seed first = hash seed second) ->
+   length prefix = depth ->
+   full_hash = hash seed key ->
+   wf depth prefix (Branch bitmap children) ->
+   bitmap_has bitmap (chunk full_hash depth) = false ->
+   ~ InA binding_equiv (key, value) (bindings (Branch bitmap children)).
+Proof.
+ intros depth prefix bitmap children full_hash key value Hequiv Hcongruent
+   Hlength Hhash Hwf Habsent Hin.
+ destruct (inA_witness (binding_equiv E) (key, value)
+   (bindings (Branch bitmap children)) Hin) as [entry [Hentry Hrelated]].
+ assert (Hroute : bitmap_has bitmap
+   (chunk (hash seed (fst entry)) depth) = true).
+ { eapply wf_branch_binding_routes.
+   - exact Hlength.
+   - exact Hwf.
+   - exact Hentry. }
+ assert (Hsame : full_hash = hash seed (fst entry)).
+ { rewrite Hhash. apply Hcongruent. exact Hrelated. }
+ rewrite <- Hsame in Hroute.
+ now rewrite Habsent in Hroute.
 Qed.
 
 Lemma leaf_collision_disjoint :
