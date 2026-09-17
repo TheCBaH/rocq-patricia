@@ -4113,8 +4113,8 @@ Lemma get_after_set_self :
          (t : tree K A),
     Equivalence E ->
     (forall first second, eqb first second = true <-> E first second) ->
-    (forall first second, E first second ->
-      hash seed first = hash seed second) ->
+    (forall actual_seed first second, E first second ->
+      hash actual_seed first = hash actual_seed second) ->
     (hash seed key < hash_space)%N ->
     wf E hash seed 0 [] t ->
     get eqb hash key
@@ -4143,11 +4143,32 @@ Proof.
   intros K Seed A E hash eqb key value [seed t] Hequiv Heqb Hcongruent Hbound Hwf.
   unfold mem.
   rewrite (@get_after_set_self K Seed A E hash seed eqb key value t
-    Hequiv Heqb).
-  - reflexivity.
-  - intros first second Hrelated. apply Hcongruent. exact Hrelated.
-  - exact Hbound.
-  - exact Hwf.
+    Hequiv Heqb Hcongruent Hbound Hwf).
+  reflexivity.
+Qed.
+
+Lemma get_after_set_equiv :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (query key : K) (value : A)
+         (t : tree K A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall actual_seed first second, E first second ->
+      hash actual_seed first = hash actual_seed second) ->
+    E query key ->
+    (hash seed key < hash_space)%N ->
+    wf E hash seed 0 [] t ->
+    get eqb hash query
+      (set eqb hash key value
+        {| table_seed := seed; table_root := t |}) = Some value.
+Proof.
+  intros K Seed A E hash seed eqb query key value t Hequiv Heqb Hcongruent
+    Hrelated Hbound Hwf.
+  rewrite (@get_query_equiv K Seed A E eqb hash query key
+    (set eqb hash key value {| table_seed := seed; table_root := t |})
+    Hequiv Heqb Hcongruent Hrelated).
+  exact (@get_after_set_self K Seed A E hash seed eqb key value t
+    Hequiv Heqb Hcongruent Hbound Hwf).
 Qed.
 
 Lemma get_tree_after_set_leaf_same_hash_miss_self :
