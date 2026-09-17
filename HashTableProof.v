@@ -4129,6 +4129,27 @@ Proof.
   - exact I.
 Qed.
 
+Lemma mem_after_set_self :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (key : K) (value : A) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    (hash (table_seed m) key < hash_space)%N ->
+    table_wf E hash m ->
+    mem eqb hash key (set eqb hash key value m) = true.
+Proof.
+  intros K Seed A E hash eqb key value [seed t] Hequiv Heqb Hcongruent Hbound Hwf.
+  unfold mem.
+  rewrite (@get_after_set_self K Seed A E hash seed eqb key value t
+    Hequiv Heqb).
+  - reflexivity.
+  - intros first second Hrelated. apply Hcongruent. exact Hrelated.
+  - exact Hbound.
+  - exact Hwf.
+Qed.
+
 Lemma get_tree_after_set_leaf_same_hash_miss_self :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
          (value : A) stored (old_value : A),
