@@ -54,11 +54,13 @@ The kernel-checked hash-table fragment is recorded in `HashTableBits.v`,
 `HashTableBucket.v`, `HashTable.v`, `HashTableProof.v`, and
 `HashTableNativeProof.v`. It includes six-chunk 30-bit routing separation,
 bounded bitmap rank/popcount and dense-child edits, collision-bucket update
-and removal laws, well-formed removal preservation (`table_wf_remove`),
-equivalent-query lookup/removal congruence (`get_query_equiv` and
-`remove_query_equiv`), and valid-table self-removal absence for both `get`
-and `mem` (`get_after_remove_self` and `mem_after_remove_self`). The modeled
-native operations have source-relation refinement laws
+and removal laws, valid-table update lookup and membership for the set key and
+relation-equivalent queries (`get_after_set_self`, `get_after_set_equiv`,
+`mem_after_set_self`, and `mem_after_set_equiv`), well-formed removal
+preservation (`table_wf_remove`), equivalent-query lookup/removal congruence
+(`get_query_equiv` and `remove_query_equiv`), and valid-table self-removal
+absence for both `get` and `mem` (`get_after_remove_self` and
+`mem_after_remove_self`). The modeled native operations have source-relation refinement laws
 (`native_get_refines_related`, `native_set_refines_related`, and
 `native_remove_refines_related`). The tracker identifies the remaining global
 set, join, array-realizer, and release proof gaps.
