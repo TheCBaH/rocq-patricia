@@ -2362,6 +2362,151 @@ Proof.
     now apply IHHsub.
 Qed.
 
+Lemma InA_transport_left :
+  forall A (R : A -> A -> Prop) x y items,
+    Equivalence R -> R x y -> InA R y items -> InA R x items.
+Proof.
+ intros A R x y items [_ Hsym Htrans] Hxy Hin.
+ apply (proj2 (InA_alt R x items)).
+ apply (proj1 (InA_alt R y items)) in Hin.
+ destruct Hin as [stored [Hy Hin]].
+ exists stored. split; [eapply Htrans; eauto|exact Hin].
+Qed.
+
+Lemma NoDupA_app_inv :
+  forall A (R : A -> A -> Prop) left right,
+    Equivalence R -> NoDupA R (left ++ right) ->
+    NoDupA R left /\ NoDupA R right /\
+      (forall item, InA R item left -> InA R item right -> False).
+Proof.
+ intros A R left. induction left as [|head left IH]; intros right
+   Hequiv Hnodup.
+ - destruct Hequiv as [Href Hsym Htrans].
+   pose proof (Build_Equivalence R Href Hsym Htrans) as Hequiv.
+   simpl in Hnodup. split; [constructor|]. split; [exact Hnodup|].
+   intros item Hin. inversion Hin.
+ - simpl in Hnodup. inversion Hnodup as [|head' remaining Hfresh Htail]; subst.
+   destruct Hequiv as [Href Hsym Htrans].
+   pose proof (Build_Equivalence R Href Hsym Htrans) as Hequiv.
+   destruct (IH right Hequiv Htail) as [Hleft [Hright Hcross]].
+   split.
+   + apply NoDupA_cons.
+     * intro Hin. apply Hfresh.
+       apply (proj2 (InA_app_iff R left right head)). now left.
+     * exact Hleft.
+   + split; [exact Hright|].
+     intros item Hinleft Hinright.
+     apply (proj1 (InA_cons R item head left)) in Hinleft.
+     destruct Hinleft as [Hhead|Hinleft].
+     * apply Hfresh.
+       apply (proj2 (InA_app_iff R left right head)). right.
+       exact (InA_transport_left A R head item right Hequiv
+         (Hsym _ _ Hhead) Hinright).
+     * eapply Hcross; eauto.
+Qed.
+
+Lemma NoDupA_insert_between :
+  forall A (R : A -> A -> Prop) left right item,
+    Equivalence R -> NoDupA R (left ++ right) ->
+    ~ InA R item (left ++ right) ->
+    NoDupA R (left ++ [item] ++ right).
+Proof.
+ intros A R left right item Hequiv Hnodup Hfresh.
+ destruct Hequiv as [Href Hsym Htrans].
+ pose proof (Build_Equivalence R Href Hsym Htrans) as Hequiv.
+ destruct (NoDupA_app_inv A R left right Hequiv Hnodup)
+   as [Hleft [Hright Hcross]].
+ apply NoDupA_app; [exact Hequiv|exact Hleft| |].
+ apply NoDupA_cons.
+ - intro Hin. apply Hfresh.
+   apply (proj2 (InA_app_iff R left right item)). right. exact Hin.
+ - exact Hright.
+ - intros candidate Hcandidate Htail.
+   apply (proj1 (InA_cons R candidate item right)) in Htail.
+   destruct Htail as [Hitem|Hright_candidate].
+   + apply Hfresh.
+     apply (proj2 (InA_app_iff R left right item)). left.
+     exact (InA_transport_left A R item candidate left Hequiv
+       (Hsym _ _ Hitem) Hcandidate).
+   + eapply Hcross; eauto.
+Qed.
+
+Lemma bindings_dense_insert_split :
+  forall (K A : Type) index (child : tree K A) children,
+    exists before after,
+      flat_map bindings children = before ++ after /\
+      flat_map bindings (dense_insert index child children) =
+        before ++ bindings child ++ after.
+Proof.
+ intros K A index. induction index as [|index IH]; intros child children.
+ - exists [], (flat_map bindings children). simpl. split; reflexivity.
+ - destruct children as [|head tail].
+   + exists [], []. simpl. split; reflexivity.
+   + destruct (IH child tail) as [before [after [Hbefore Hinsert]]].
+     exists (bindings head ++ before), after. simpl.
+     rewrite Hbefore, Hinsert. repeat rewrite app_assoc. split; reflexivity.
+Qed.
+
+Lemma bindings_branch_insert_leaf_nodup :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) depth prefix bitmap children slot full_hash key (value : A),
+    Equivalence E ->
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    ~ InA (binding_equiv E) (key, value)
+        (bindings (Branch bitmap children)) ->
+    NoDupA (binding_equiv E)
+      (bindings (branch_insert bitmap slot (Leaf full_hash key value) children)).
+Proof.
+ intros K Seed A E hash seed depth prefix bitmap children slot full_hash key value
+   Hequiv Hwf Hfresh.
+ destruct (bindings_dense_insert_split K A (rank bitmap slot)
+   (Leaf full_hash key value) children) as [before [after [Hbefore Hinsert]]].
+ pose proof (@wf_bindings_nodup K Seed A E hash seed depth prefix
+   (Branch bitmap children) Hwf) as Hnodup.
+ unfold branch_insert. simpl.
+ rewrite Hinsert.
+ apply NoDupA_insert_between with (R := binding_equiv E).
+ - now apply binding_equiv_equiv.
+ - rewrite <- Hbefore. exact Hnodup.
+ - rewrite <- Hbefore. exact Hfresh.
+Qed.
+
+Lemma set_tree_branch_slot_absent_wf_leaf_fresh :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) fuel depth prefix full_hash (key : K) (value : A)
+         bitmap (children : list (tree K A)) (eqb : K -> K -> bool),
+    Equivalence E ->
+    (forall first second, E first second ->
+      hash seed first = hash seed second) ->
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    bitmap_has bitmap (chunk full_hash depth) = false ->
+    length prefix = depth ->
+    full_hash = hash seed key ->
+    (full_hash < hash_space)%N ->
+    prefix_matches full_hash depth prefix ->
+    wf E hash seed depth prefix
+      (set_tree eqb (S fuel) depth full_hash key value
+        (Branch bitmap children)).
+Proof.
+ intros K Seed A E hash seed fuel depth prefix full_hash key value bitmap
+   children eqb Hequiv Hcongruent Hwf Habsent Hlength Hhash Hbound Hprefix.
+ eapply (@set_tree_branch_slot_absent_wf_leaf K Seed A E hash seed fuel depth
+   prefix full_hash key value bitmap children eqb);
+   try assumption.
+ eapply (@bindings_branch_insert_leaf_nodup K Seed A E hash seed depth prefix
+   bitmap children (chunk full_hash depth) full_hash key value).
+ - exact Hequiv.
+ - exact Hwf.
+ - eapply (@wf_branch_slot_absent_fresh K Seed A E hash seed depth prefix
+     bitmap children full_hash key value).
+   + exact Hequiv.
+   + exact Hcongruent.
+   + exact Hlength.
+   + exact Hhash.
+   + exact Hwf.
+   + exact Habsent.
+Qed.
+
 Lemma flat_map_dense_remove_subseq :
   forall (K A : Type) index (children : list (tree K A)),
     list_subseq (flat_map bindings (dense_remove index children))
