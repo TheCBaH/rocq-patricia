@@ -4031,6 +4031,29 @@ Proof.
   eapply get_tree_after_set_branch_slot_absent_self_wf; eauto.
 Qed.
 
+Lemma get_after_set_branch_child_root :
+  forall (K Seed A : Type) (hash : Seed -> K -> N) (seed : Seed)
+         (eqb : K -> K -> bool) (key : K) (value : A)
+         bitmap (children : list (tree K A)) child,
+    bitmap_has bitmap (chunk (hash seed key) 0) = true ->
+    dense_get (rank bitmap (chunk (hash seed key) 0)) children = Some child ->
+    get_tree eqb 5 1 (hash seed key) key
+      (set_tree eqb 5 1 (hash seed key) key value child) = Some value ->
+    get eqb hash key
+      (set eqb hash key value
+        {| table_seed := seed; table_root := Branch bitmap children |}) = Some value.
+Proof.
+  intros K Seed A hash seed eqb key value bitmap children child
+    Hpresent Hchild Hrecursive.
+  change (get_tree eqb branch_levels 0 (hash seed key) key
+    (set_tree eqb branch_levels 0 (hash seed key) key value
+      (Branch bitmap children)) = Some value).
+  change (get_tree eqb (S 5) 0 (hash seed key) key
+    (set_tree eqb (S 5) 0 (hash seed key) key value
+      (Branch bitmap children)) = Some value).
+  eapply get_tree_after_set_branch_child_self; eauto.
+Qed.
+
 Lemma get_tree_after_remove_self_wf :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
