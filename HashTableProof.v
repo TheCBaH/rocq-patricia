@@ -208,6 +208,20 @@ Proof.
     exact (proj1 (proj2 Hall)).
 Qed.
 
+Lemma wf_collision_prefix_matches :
+    forall depth prefix full_hash (entries : list (K * A)),
+      wf depth prefix (Collision full_hash entries) ->
+      prefix_matches full_hash depth prefix.
+Proof.
+  intros depth prefix full_hash entries Hwf.
+  destruct entries as [|entry entries].
+  - inversion Hwf as [| |d p h es Hsize Hall Hnodup|].
+    simpl in Hsize. lia.
+  - inversion Hwf as [| |d p h es Hsize Hall Hnodup|].
+    inversion Hall as [|head tail Hentry Htail]; subst.
+    exact (proj2 (proj2 Hentry)).
+Qed.
+
 Lemma wf_join_worker_equal :
     forall fuel depth prefix left_hash right_hash (left right : tree K A),
       depth < branch_levels ->
@@ -3934,6 +3948,46 @@ Proof.
   destruct fuel as [|fuel]; cbn [set_tree].
   all: rewrite Hhash.
   all: apply get_tree_join_worker_left_leaf; assumption.
+Qed.
+
+Lemma get_tree_after_set_collision_distinct_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (key : K) (value : A) stored_hash (entries : list (K * A)),
+    depth + fuel = branch_levels ->
+    length prefix = depth ->
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    wf E hash seed depth prefix (Collision stored_hash entries) ->
+    entry_matches hash seed full_hash depth prefix (key, value) ->
+    full_hash <> stored_hash ->
+    get_tree eqb fuel depth full_hash key
+      (set_tree eqb fuel depth full_hash key value
+        (Collision stored_hash entries)) = Some value.
+Proof.
+  intros K Seed A E hash seed eqb fuel depth prefix full_hash key value
+    stored_hash entries Hfuel Hlength [Href Hsym Htrans] Heqb Hwf Hentry
+    Hdifferent.
+  destruct Hentry as [Hkey_hash [Hkey_bound Hkey_prefix]].
+  assert (Hself : eqb key key = true).
+  { apply (proj2 (Heqb key key)). apply Href. }
+  assert (Hprefix_agree : forall prior, prior < depth ->
+      chunk full_hash prior = chunk stored_hash prior).
+  { intros prior Hprior.
+    eapply prefix_matches_agree; eauto using wf_collision_prefix_matches. }
+  assert (Hfallback : join_falls_back fuel depth full_hash stored_hash = false).
+  { assert (Hfuel' : fuel = branch_levels - depth).
+    { symmetry. apply Nat.add_sub_eq_l. exact Hfuel. }
+    rewrite Hfuel'.
+    apply join_worker_suffix_no_fallback.
+    - rewrite <- Hfuel. lia.
+    - exact Hprefix_agree.
+    - exact Hkey_bound.
+    - exact (@wf_collision_hash_bound K Seed A E hash seed depth prefix
+        stored_hash entries Hwf).
+    - exact Hdifferent.
+    }
+  eapply get_tree_after_set_collision_distinct_self; eauto.
 Qed.
 
 Lemma get_tree_after_set_leaf_same_hash_miss_self :
