@@ -29,8 +29,9 @@ compact-array backend and release integration remain open. Run
 `make hashtable` for the implemented proof, extraction, audit and differential
 test aggregate. `make hashtable-benchmark` compares the reference wrapper,
 the experimental private-array backend, `Map.Make`, and OCaml's imperative
-`Hashtbl` on checked integer workloads; `make hashtable-string-benchmark`
-performs the same comparison for fixed-width string keys. Set `HASHTABLE_BENCH_SIZE`,
+`Hashtbl` on checked integer build, lookup, update and removal workloads;
+`make hashtable-string-benchmark` performs the same comparison for fixed-width
+string keys. Set `HASHTABLE_BENCH_SIZE`,
 `HASHTABLE_BENCH_SEED`, and `HASHTABLE_BENCH_PATTERN` (`ascending` or
 `root-slot-collision`) to record a local series; its timing and heap output is
 workload-specific evidence.

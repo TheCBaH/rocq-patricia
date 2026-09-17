@@ -105,4 +105,53 @@ let () =
     (fun () -> check "Map.Make(String)" (fun key -> Ordered_map.find_opt key ordered));
   time "OCaml Hashtbl (imperative) checked string lookup"
     (fun () -> check "Hashtbl" (fun key -> Hashtbl.find_opt standard key));
+  let updated_value key = "updated-" ^ key in
+  let updated = time "HashMap.Make string update" (fun () ->
+      Stdlib.List.fold_left
+        (fun map (key, _) -> Hash_map.set key (updated_value key) map)
+        hashed bindings)
+  in
+  let native_updated = time "HashMapNative.Make string update" (fun () ->
+      Stdlib.List.fold_left
+        (fun map (key, _) -> Native_hash_map.set key (updated_value key) map)
+        native_hashed bindings)
+  in
+  let ordered_updated = time "Map.Make(String) update" (fun () ->
+      Stdlib.List.fold_left
+        (fun map (key, _) -> Ordered_map.add key (updated_value key) map)
+        ordered bindings)
+  in
+  let standard_updated = time "OCaml Hashtbl (imperative) string update" (fun () ->
+      Stdlib.List.iter
+        (fun (key, _) -> Hashtbl.replace standard key (updated_value key)) bindings;
+      standard)
+  in
+  Stdlib.List.iter (fun (key, _) ->
+      let expected = Some (updated_value key) in
+      if Hash_map.get key updated <> expected
+         || Native_hash_map.get key native_updated <> expected
+         || Ordered_map.find_opt key ordered_updated <> expected
+         || Hashtbl.find_opt standard_updated key <> expected then
+        fail "update lookup mismatch") bindings;
+  let removed = time "HashMap.Make string remove" (fun () ->
+      Stdlib.List.fold_left (fun map (key, _) -> Hash_map.remove key map) updated bindings)
+  in
+  let native_removed = time "HashMapNative.Make string remove" (fun () ->
+      Stdlib.List.fold_left (fun map (key, _) -> Native_hash_map.remove key map)
+        native_updated bindings)
+  in
+  let ordered_removed = time "Map.Make(String) remove" (fun () ->
+      Stdlib.List.fold_left (fun map (key, _) -> Ordered_map.remove key map)
+        ordered_updated bindings)
+  in
+  let standard_removed = time "OCaml Hashtbl (imperative) string remove" (fun () ->
+      Stdlib.List.iter (fun (key, _) -> Hashtbl.remove standard_updated key) bindings;
+      standard_updated)
+  in
+  Stdlib.List.iter (fun (key, _) ->
+      if Hash_map.get key removed <> None
+         || Native_hash_map.get key native_removed <> None
+         || Ordered_map.find_opt key ordered_removed <> None
+         || Hashtbl.find_opt standard_removed key <> None then
+        fail "remove lookup mismatch") bindings;
   Printf.printf "HashTable checked string benchmark passed (%d bindings)\n%!" size
