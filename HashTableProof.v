@@ -848,12 +848,18 @@ Proof.
    as [right_entry [Hright_entry Hright_related]].
  assert (Hleft_prefix : prefix_matches (hash seed (fst left_entry))
    (S depth) (prefix ++ [left_slot])).
- { eapply wf_binding_prefix_matches; eauto.
-   rewrite app_length, Hlength. simpl. lia. }
+ { eapply (@wf_binding_prefix_matches K Seed A E hash seed left (S depth)
+     (prefix ++ [left_slot])).
+   - rewrite app_length, Hlength. simpl. lia.
+   - exact Hleft.
+   - exact Hleft_entry. }
  assert (Hright_prefix : prefix_matches (hash seed (fst right_entry))
    (S depth) (prefix ++ [right_slot])).
- { eapply wf_binding_prefix_matches; eauto.
-   rewrite app_length, Hlength. simpl. lia. }
+ { eapply (@wf_binding_prefix_matches K Seed A E hash seed right (S depth)
+     (prefix ++ [right_slot])).
+   - rewrite app_length, Hlength. simpl. lia.
+   - exact Hright.
+   - exact Hright_entry. }
  assert (Hleft_slot : chunk (hash seed (fst left_entry)) depth = left_slot).
  { unfold prefix_matches in Hleft_prefix.
    pose proof (prefix_matches_from_app_last
