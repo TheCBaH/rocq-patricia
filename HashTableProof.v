@@ -3990,6 +3990,145 @@ Proof.
   eapply get_tree_after_set_collision_distinct_self; eauto.
 Qed.
 
+Lemma get_tree_after_set_self_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (key : K) (value : A) (t : tree K A),
+    depth + fuel = branch_levels ->
+    length prefix = depth ->
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall first second, E first second ->
+      hash seed first = hash seed second) ->
+    full_hash = hash seed key ->
+    (full_hash < hash_space)%N ->
+    prefix_matches full_hash depth prefix ->
+    wf E hash seed depth prefix t ->
+    get_tree eqb fuel depth full_hash key
+      (set_tree eqb fuel depth full_hash key value t) = Some value.
+Proof.
+  intros K Seed A E hash seed eqb fuel.
+  induction fuel as [|fuel IH]; intros depth prefix full_hash key value t
+    Hfuel Hlength Hequiv Heqb Hcongruent Hhash Hbound Hprefixmatch Hwf;
+    pose proof Hequiv as [Href Hsym Htrans];
+    destruct t as [|stored_hash stored old_value|stored_hash entries|bitmap children].
+  - cbn [set_tree]. apply get_tree_leaf_same.
+    apply (proj2 (Heqb key key)). apply Href.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hstored_hash.
+    + apply N.eqb_eq in Hstored_hash. subst stored_hash.
+      destruct (eqb key stored) eqn:Hkey.
+      * rewrite (@set_tree_leaf_replaces_representative K A eqb 0 depth
+          full_hash key stored old_value value Hkey).
+        cbn [get_tree]. now rewrite N.eqb_refl, Hkey.
+      * assert (Hself : eqb key key = true).
+        { apply (proj2 (Heqb key key)). apply Href. }
+        assert (Hset : set_tree eqb 0 depth full_hash key value
+            (Leaf full_hash stored old_value) =
+          Collision full_hash [(stored, old_value); (key, value)]).
+        { cbn [set_tree]. now rewrite Hkey, N.eqb_refl. }
+        rewrite Hset.
+        rewrite get_tree_collision_same_hash.
+        cbn [bucket_get]. now rewrite Hkey, Hself.
+    + apply N.eqb_neq in Hstored_hash.
+      assert (Hstored : stored_hash = hash seed stored).
+      { inversion Hwf; assumption. }
+      assert (Hmiss : eqb key stored = false).
+      { destruct (eqb key stored) eqn:Hkey; auto.
+        exfalso. apply Hstored_hash.
+        rewrite Hstored, Hhash. apply Hcongruent.
+        apply (proj1 (Heqb key stored)). exact Hkey. }
+      assert (Hentry : entry_matches hash seed full_hash depth prefix (key, value)).
+      { unfold entry_matches. repeat split; assumption. }
+      eapply get_tree_after_set_leaf_distinct_wf; eauto.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hstored_hash.
+    + apply N.eqb_eq in Hstored_hash. subst stored_hash.
+      rewrite set_tree_collision_same_hash.
+      rewrite get_tree_normalize_collision_same_hash.
+      apply bucket_get_after_set.
+      intro query. apply (proj2 (Heqb query query)). apply Href.
+    + apply N.eqb_neq in Hstored_hash.
+      assert (Hentry : entry_matches hash seed full_hash depth prefix (key, value)).
+      { unfold entry_matches. repeat split; assumption. }
+      eapply get_tree_after_set_collision_distinct_wf; eauto.
+  - exfalso.
+    eapply (@wf_branch_impossible_at_or_beyond_limit K Seed A E hash seed
+      depth prefix bitmap children).
+    + rewrite <- Hfuel. lia.
+    + exact Hwf.
+  - cbn [set_tree]. apply get_tree_leaf_same.
+    apply (proj2 (Heqb key key)). apply Href.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hstored_hash.
+    + apply N.eqb_eq in Hstored_hash. subst stored_hash.
+      destruct (eqb key stored) eqn:Hkey.
+      * rewrite (@set_tree_leaf_replaces_representative K A eqb (S fuel) depth
+          full_hash key stored old_value value Hkey).
+        cbn [get_tree]. now rewrite N.eqb_refl, Hkey.
+      * assert (Hself : eqb key key = true).
+        { apply (proj2 (Heqb key key)). apply Href. }
+        assert (Hset : set_tree eqb (S fuel) depth full_hash key value
+            (Leaf full_hash stored old_value) =
+          Collision full_hash [(stored, old_value); (key, value)]).
+        { cbn [set_tree]. now rewrite Hkey, N.eqb_refl. }
+        rewrite Hset.
+        rewrite get_tree_collision_same_hash.
+        cbn [bucket_get]. now rewrite Hkey, Hself.
+    + apply N.eqb_neq in Hstored_hash.
+      assert (Hstored : stored_hash = hash seed stored).
+      { inversion Hwf; assumption. }
+      assert (Hmiss : eqb key stored = false).
+      { destruct (eqb key stored) eqn:Hkey; auto.
+        exfalso. apply Hstored_hash.
+        rewrite Hstored, Hhash. apply Hcongruent.
+        apply (proj1 (Heqb key stored)). exact Hkey. }
+      assert (Hentry : entry_matches hash seed full_hash depth prefix (key, value)).
+      { unfold entry_matches. repeat split; assumption. }
+      eapply get_tree_after_set_leaf_distinct_wf; eauto.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hstored_hash.
+    + apply N.eqb_eq in Hstored_hash. subst stored_hash.
+      rewrite set_tree_collision_same_hash.
+      rewrite get_tree_normalize_collision_same_hash.
+      apply bucket_get_after_set.
+      intro query. apply (proj2 (Heqb query query)). apply Href.
+    + apply N.eqb_neq in Hstored_hash.
+      assert (Hentry : entry_matches hash seed full_hash depth prefix (key, value)).
+      { unfold entry_matches. repeat split; assumption. }
+      eapply get_tree_after_set_collision_distinct_wf; eauto.
+  - destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hroute.
+    + destruct (wf_branch_ranked_child Hwf (chunk_bound full_hash depth) Hroute)
+        as [child [Hchild [Hnonempty Hchildwf]]].
+      eapply get_tree_after_set_branch_child_self; eauto.
+      eapply IH with (prefix := prefix ++ [chunk full_hash depth]); eauto.
+      * rewrite <- Hfuel. lia.
+      * rewrite app_length, Hlength. cbn. lia.
+      * apply prefix_matches_append_slot; assumption.
+    + eapply get_tree_after_set_branch_slot_absent_self_wf.
+      * exact Hwf.
+      * apply (proj2 (Heqb key key)). apply Href.
+      * exact Hroute.
+Qed.
+
+Lemma get_after_set_self :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
+         (t : tree K A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall first second, E first second ->
+      hash seed first = hash seed second) ->
+    (hash seed key < hash_space)%N ->
+    wf E hash seed 0 [] t ->
+    get eqb hash key
+      (set eqb hash key value
+        {| table_seed := seed; table_root := t |}) = Some value.
+Proof.
+  intros K Seed A E hash seed eqb key value t Hequiv Heqb Hcongruent Hbound Hwf.
+  change (get_tree eqb branch_levels 0 (hash seed key) key
+    (set_tree eqb branch_levels 0 (hash seed key) key value t) = Some value).
+  eapply get_tree_after_set_self_wf; eauto.
+  - reflexivity.
+  - exact I.
+Qed.
+
 Lemma get_tree_after_set_leaf_same_hash_miss_self :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash (key : K)
          (value : A) stored (old_value : A),
