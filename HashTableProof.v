@@ -1061,6 +1061,96 @@ Proof.
     apply N.eqb_eq; assumption.
 Qed.
 
+Lemma join_worker_suffix_no_fallback :
+  forall depth left_hash right_hash,
+    depth <= branch_levels ->
+    (forall prior, prior < depth ->
+      chunk left_hash prior = chunk right_hash prior) ->
+    (left_hash < hash_space)%N ->
+    (right_hash < hash_space)%N ->
+    left_hash <> right_hash ->
+    join_falls_back (branch_levels - depth) depth left_hash right_hash = false.
+Proof.
+  intros depth left_hash right_hash Hdepth Hprefix Hleft Hright Hdifferent.
+  destruct depth as [|[|[|[|[|[|depth]]]]]].
+  - exact (@join_worker_six_no_fallback left_hash right_hash Hleft Hright Hdifferent).
+  - cbn [branch_levels join_falls_back] in Hdepth |-.
+    change (join_falls_back 5 1 left_hash right_hash = false).
+    cbn [join_falls_back].
+    destruct (N.eqb (chunk left_hash 1) (chunk right_hash 1)) eqn:H1; auto.
+    destruct (N.eqb (chunk left_hash 2) (chunk right_hash 2)) eqn:H2; auto.
+    destruct (N.eqb (chunk left_hash 3) (chunk right_hash 3)) eqn:H3; auto.
+    destruct (N.eqb (chunk left_hash 4) (chunk right_hash 4)) eqn:H4; auto.
+    destruct (N.eqb (chunk left_hash 5) (chunk right_hash 5)) eqn:H5; auto.
+    assert (H0 : chunk left_hash 0 = chunk right_hash 0) by (apply Hprefix; lia).
+    assert (H1' : chunk left_hash 1 = chunk right_hash 1) by now apply N.eqb_eq.
+    assert (H2' : chunk left_hash 2 = chunk right_hash 2) by now apply N.eqb_eq.
+    assert (H3' : chunk left_hash 3 = chunk right_hash 3) by now apply N.eqb_eq.
+    assert (H4' : chunk left_hash 4 = chunk right_hash 4) by now apply N.eqb_eq.
+    assert (H5' : chunk left_hash 5 = chunk right_hash 5) by now apply N.eqb_eq.
+    exfalso. apply Hdifferent. eapply chunk_six_ext; eauto.
+  - cbn [branch_levels join_falls_back] in Hdepth |-.
+    change (join_falls_back 4 2 left_hash right_hash = false).
+    cbn [join_falls_back].
+    destruct (N.eqb (chunk left_hash 2) (chunk right_hash 2)) eqn:H2; auto.
+    destruct (N.eqb (chunk left_hash 3) (chunk right_hash 3)) eqn:H3; auto.
+    destruct (N.eqb (chunk left_hash 4) (chunk right_hash 4)) eqn:H4; auto.
+    destruct (N.eqb (chunk left_hash 5) (chunk right_hash 5)) eqn:H5; auto.
+    assert (H0 : chunk left_hash 0 = chunk right_hash 0) by (apply Hprefix; lia).
+    assert (H1' : chunk left_hash 1 = chunk right_hash 1) by (apply Hprefix; lia).
+    assert (H2' : chunk left_hash 2 = chunk right_hash 2) by now apply N.eqb_eq.
+    assert (H3' : chunk left_hash 3 = chunk right_hash 3) by now apply N.eqb_eq.
+    assert (H4' : chunk left_hash 4 = chunk right_hash 4) by now apply N.eqb_eq.
+    assert (H5' : chunk left_hash 5 = chunk right_hash 5) by now apply N.eqb_eq.
+    exfalso. apply Hdifferent. eapply chunk_six_ext; eauto.
+  - cbn [branch_levels join_falls_back] in Hdepth |-.
+    change (join_falls_back 3 3 left_hash right_hash = false).
+    cbn [join_falls_back].
+    destruct (N.eqb (chunk left_hash 3) (chunk right_hash 3)) eqn:H3; auto.
+    destruct (N.eqb (chunk left_hash 4) (chunk right_hash 4)) eqn:H4; auto.
+    destruct (N.eqb (chunk left_hash 5) (chunk right_hash 5)) eqn:H5; auto.
+    assert (H0 : chunk left_hash 0 = chunk right_hash 0) by (apply Hprefix; lia).
+    assert (H1' : chunk left_hash 1 = chunk right_hash 1) by (apply Hprefix; lia).
+    assert (H2' : chunk left_hash 2 = chunk right_hash 2) by (apply Hprefix; lia).
+    assert (H3' : chunk left_hash 3 = chunk right_hash 3) by now apply N.eqb_eq.
+    assert (H4' : chunk left_hash 4 = chunk right_hash 4) by now apply N.eqb_eq.
+    assert (H5' : chunk left_hash 5 = chunk right_hash 5) by now apply N.eqb_eq.
+    exfalso. apply Hdifferent. eapply chunk_six_ext; eauto.
+  - cbn [branch_levels join_falls_back] in Hdepth |-.
+    change (join_falls_back 2 4 left_hash right_hash = false).
+    cbn [join_falls_back].
+    destruct (N.eqb (chunk left_hash 4) (chunk right_hash 4)) eqn:H4; auto.
+    destruct (N.eqb (chunk left_hash 5) (chunk right_hash 5)) eqn:H5; auto.
+    assert (H0 : chunk left_hash 0 = chunk right_hash 0) by (apply Hprefix; lia).
+    assert (H1' : chunk left_hash 1 = chunk right_hash 1) by (apply Hprefix; lia).
+    assert (H2' : chunk left_hash 2 = chunk right_hash 2) by (apply Hprefix; lia).
+    assert (H3' : chunk left_hash 3 = chunk right_hash 3) by (apply Hprefix; lia).
+    assert (H4' : chunk left_hash 4 = chunk right_hash 4) by now apply N.eqb_eq.
+    assert (H5' : chunk left_hash 5 = chunk right_hash 5) by now apply N.eqb_eq.
+    exfalso. apply Hdifferent. eapply chunk_six_ext; eauto.
+  - cbn [branch_levels join_falls_back] in Hdepth |-.
+    change (join_falls_back 1 5 left_hash right_hash = false).
+    cbn [join_falls_back].
+    destruct (N.eqb (chunk left_hash 5) (chunk right_hash 5)) eqn:H5; auto.
+    assert (H0 : chunk left_hash 0 = chunk right_hash 0) by (apply Hprefix; lia).
+    assert (H1' : chunk left_hash 1 = chunk right_hash 1) by (apply Hprefix; lia).
+    assert (H2' : chunk left_hash 2 = chunk right_hash 2) by (apply Hprefix; lia).
+    assert (H3' : chunk left_hash 3 = chunk right_hash 3) by (apply Hprefix; lia).
+    assert (H4' : chunk left_hash 4 = chunk right_hash 4) by (apply Hprefix; lia).
+    assert (H5' : chunk left_hash 5 = chunk right_hash 5) by now apply N.eqb_eq.
+    exfalso. apply Hdifferent. eapply chunk_six_ext; eauto.
+  - cbn [branch_levels join_falls_back] in Hdepth |-.
+    change (join_falls_back 0 6 left_hash right_hash = false).
+    cbn [join_falls_back].
+    assert (H0 : chunk left_hash 0 = chunk right_hash 0) by (apply Hprefix; lia).
+    assert (H1' : chunk left_hash 1 = chunk right_hash 1) by (apply Hprefix; lia).
+    assert (H2' : chunk left_hash 2 = chunk right_hash 2) by (apply Hprefix; lia).
+    assert (H3' : chunk left_hash 3 = chunk right_hash 3) by (apply Hprefix; lia).
+    assert (H4' : chunk left_hash 4 = chunk right_hash 4) by (apply Hprefix; lia).
+    assert (H5' : chunk left_hash 5 = chunk right_hash 5) by (apply Hprefix; lia).
+    exfalso. apply Hdifferent. eapply chunk_six_ext; eauto.
+Qed.
+
 Section RecursiveLeafJoin.
 
 Context {K Seed A : Type}.
