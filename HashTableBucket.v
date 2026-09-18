@@ -69,6 +69,28 @@ Lemma bucket_set_retains_head_representative :
     bucket_set eqb key value ((stored, old) :: tail) = (stored, value) :: tail.
 Proof. intros. simpl. now rewrite H. Qed.
 
+Lemma bucket_set_key_origin :
+  forall K A (eqb : K -> K -> bool) key (value : A) entries entry,
+    In entry (bucket_set eqb key value entries) ->
+    (exists old_value, In (fst entry, old_value) entries) \/
+    fst entry = key.
+Proof.
+  intros K A eqb key value entries.
+  induction entries as [|[stored old_value] tail IH]; intros entry Hin; simpl in Hin.
+  - destruct Hin as [Hin|[]]. subst entry. now right.
+  - destruct (eqb key stored) eqn:Hmatch.
+    + simpl in Hin.
+      destruct Hin as [Hin|Hin].
+      * subst entry. left. exists old_value. now left.
+      * left. destruct entry as [entry_key entry_value]. simpl in Hin |-.
+        exists entry_value. now right.
+    + destruct Hin as [Hin|Hin].
+      * subst entry. left. exists old_value. now left.
+      * destruct (IH entry Hin) as [[prior Hprior]|Hkey].
+        -- left. exists prior. now right.
+        -- now right.
+Qed.
+
 Lemma bucket_remove_head :
   forall K A (eqb : K -> K -> bool) key stored (value : A) tail,
     eqb key stored = true ->
