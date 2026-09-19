@@ -3744,6 +3744,34 @@ Proof.
         left. exists entry_value. exact Hin.
 Qed.
 
+Lemma bindings_branch_replace_set_tree_key_origin :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
+         (value : A) bitmap slot children child entry,
+    dense_get (rank bitmap slot) children = Some child ->
+    In entry (bindings (branch_replace bitmap slot
+      (set_tree eqb fuel depth full_hash key value child) children)) ->
+    (exists old_value, In (fst entry, old_value)
+      (bindings (Branch bitmap children))) \/
+    fst entry = key.
+Proof.
+  intros K A eqb fuel depth full_hash key value bitmap slot children child entry
+    Hchild Hin.
+  assert (Hindex : rank bitmap slot < length children).
+  { apply (proj1 (nth_error_Some children (rank bitmap slot))).
+    unfold dense_get in Hchild. rewrite Hchild. discriminate. }
+  assert (Hchildin : In child children).
+  { apply nth_error_In with (n := rank bitmap slot). exact Hchild. }
+  destruct (bindings_branch_replace_in bitmap slot
+    (set_tree eqb fuel depth full_hash key value child) children entry Hindex Hin)
+    as [Hnew|Hold].
+  - destruct (@bindings_set_tree_key_origin K A eqb fuel depth full_hash key value
+      child entry Hnew) as [[prior Hprior]|Hkey].
+    + left. exists prior. apply in_flat_map. now exists child.
+    + now right.
+  - destruct entry as [entry_key entry_value].
+    left. exists entry_value. exact Hold.
+Qed.
+
 Lemma elements_remove_in :
   forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
          key (m : table K Seed A) entry,
