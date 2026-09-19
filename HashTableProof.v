@@ -3772,6 +3772,54 @@ Proof.
     left. exists entry_value. exact Hold.
 Qed.
 
+Lemma wf_sibling_set_tree_bindings_disjoint :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix selected_slot
+         sibling_slot full_hash (key : K) (value : A) child sibling entry,
+    Equivalence E ->
+    (forall first second, E first second ->
+      hash seed first = hash seed second) ->
+    length prefix = depth ->
+    selected_slot <> sibling_slot ->
+    full_hash = hash seed key ->
+    chunk full_hash depth = selected_slot ->
+    wf E hash seed (S depth) (prefix ++ [selected_slot]) child ->
+    wf E hash seed (S depth) (prefix ++ [sibling_slot]) sibling ->
+    InA (binding_equiv E) entry
+      (bindings (set_tree eqb fuel (S depth) full_hash key value child)) ->
+    InA (binding_equiv E) entry (bindings sibling) -> False.
+Proof.
+  intros K Seed A E hash seed eqb fuel depth prefix selected_slot sibling_slot
+    full_hash key value child sibling entry Hequiv Hcongruent Hlength Hslots
+    Hhash Hroute Hchild Hsibling Hupdated Hsiblingin.
+  destruct Hequiv as [Href Hsym Htrans].
+  pose proof (Build_Equivalence E Href Hsym Htrans) as Hequiv.
+  destruct (inA_witness Hupdated) as [updated [Hupdatedin Hentryupdated]].
+  destruct (inA_witness Hsiblingin) as [sibling_entry
+    [Hsibling_entry Hentrysibling]].
+  destruct (@bindings_set_tree_key_origin K A eqb fuel (S depth) full_hash key
+    value child updated Hupdatedin) as [[prior Hprior]|Hnew].
+  - eapply (@wf_sibling_bindings_disjoint K Seed A E hash seed depth prefix
+      selected_slot sibling_slot child sibling Hequiv Hcongruent Hlength Hslots
+      Hchild Hsibling entry).
+    + apply (proj2 (InA_alt (binding_equiv E) entry (bindings child))).
+      exists (fst updated, prior). split.
+      * unfold binding_equiv in Hentryupdated |-.
+        exact Hentryupdated.
+      * exact Hprior.
+    + exact Hsiblingin.
+  - apply (@wf_sibling_key_fresh K Seed A E hash seed depth prefix
+      selected_slot sibling_slot sibling full_hash key value Hcongruent Hlength
+      Hslots Hhash Hroute Hsibling).
+    apply (proj2 (InA_alt (binding_equiv E) (key, value) (bindings sibling))).
+    exists sibling_entry. split.
+    + unfold binding_equiv in Hentryupdated, Hentrysibling |-.
+      rewrite <- Hnew.
+      eapply Htrans; [|exact Hentrysibling].
+      now apply Hsym.
+    + exact Hsibling_entry.
+Qed.
+
 Lemma elements_remove_in :
   forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
          key (m : table K Seed A) entry,
