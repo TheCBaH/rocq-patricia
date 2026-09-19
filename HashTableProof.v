@@ -2573,6 +2573,25 @@ Proof.
     rewrite Hbefore, Hreplace. repeat rewrite app_assoc. split; reflexivity.
 Qed.
 
+Lemma dense_replace_split :
+  forall A index (replacement child : A) children,
+    dense_get index children = Some child ->
+    exists before after,
+      children = before ++ child :: after /\
+      dense_replace index replacement children = before ++ replacement :: after.
+Proof.
+  intros A index. induction index as [|index IH]; intros replacement child
+    children Hget; destruct children as [|head tail].
+  - unfold dense_get in Hget. discriminate.
+  - unfold dense_get in Hget. simpl in Hget. inversion Hget; subst child.
+    exists [], tail. simpl. split; reflexivity.
+  - unfold dense_get in Hget. discriminate.
+  - unfold dense_get in Hget. simpl in Hget.
+    destruct (IH replacement child tail Hget) as [before [after [Hchildren Hreplace]]].
+    exists (head :: before), after. simpl. rewrite Hreplace, Hchildren.
+    split; reflexivity.
+Qed.
+
 Lemma bindings_branch_insert_leaf_nodup :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) depth prefix bitmap children slot full_hash key (value : A),
