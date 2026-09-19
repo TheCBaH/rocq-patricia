@@ -459,6 +459,18 @@ Proof.
     + now apply (IH bitmap (N.succ start) slot).
 Qed.
 
+(** Public soundness fact for the fixed-width enumeration.  Its statement
+    keeps clients from converting [occupied_slots] to the recursive worker. *)
+Lemma occupied_slots_sound :
+  forall bitmap slot,
+    In slot (occupied_slots bitmap) ->
+    bitmap_has bitmap slot = true.
+Proof.
+  intros bitmap slot.
+  unfold occupied_slots.
+  apply occupied_slots_from_sound.
+Qed.
+
 Lemma occupied_slots_from_complete :
   forall fuel bitmap start slot,
     (start <= slot)%N ->

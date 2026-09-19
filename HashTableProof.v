@@ -765,7 +765,7 @@ Proof.
    replace (0 + length prefix) with depth in Hroute by lia.
    exact Hroute. }
  rewrite Hslot.
- apply occupied_slots_from_sound with (fuel := 32) (start := 0%N).
+ apply occupied_slots_sound.
  exact Hslot_in.
 Qed.
 
@@ -814,8 +814,7 @@ Lemma wf_branch_slot_absent_fresh :
 Proof.
  intros depth prefix bitmap children full_hash key value Hequiv Hcongruent
    Hlength Hhash Hwf Habsent Hin.
- destruct (inA_witness (binding_equiv E) (key, value)
-   (bindings (Branch bitmap children)) Hin) as [entry [Hentry Hrelated]].
+ destruct (inA_witness Hin) as [entry [Hentry Hrelated]].
  assert (Hroute : bitmap_has bitmap
    (chunk (hash seed (fst entry)) depth) = true).
  { eapply wf_branch_binding_routes.
@@ -841,22 +840,20 @@ Lemma wf_sibling_bindings_disjoint :
    InA binding_equiv entry (bindings right) -> False.
 Proof.
  intros depth prefix left_slot right_slot left right Hequiv Hcongruent Hlength
-   Hslots entry Hinleft Hinright.
- destruct (inA_witness binding_equiv entry (bindings left) Hinleft)
+   Hslots Hleft Hright entry Hinleft Hinright.
+ destruct (inA_witness Hinleft)
    as [left_entry [Hleft_entry Hleft_related]].
- destruct (inA_witness binding_equiv entry (bindings right) Hinright)
+ destruct (inA_witness Hinright)
    as [right_entry [Hright_entry Hright_related]].
  assert (Hleft_prefix : prefix_matches (hash seed (fst left_entry))
    (S depth) (prefix ++ [left_slot])).
- { eapply (@wf_binding_prefix_matches K Seed A E hash seed left (S depth)
-     (prefix ++ [left_slot])).
+ { eapply wf_binding_prefix_matches.
    - rewrite app_length, Hlength. simpl. lia.
    - exact Hleft.
    - exact Hleft_entry. }
  assert (Hright_prefix : prefix_matches (hash seed (fst right_entry))
    (S depth) (prefix ++ [right_slot])).
- { eapply (@wf_binding_prefix_matches K Seed A E hash seed right (S depth)
-     (prefix ++ [right_slot])).
+ { eapply wf_binding_prefix_matches.
    - rewrite app_length, Hlength. simpl. lia.
    - exact Hright.
    - exact Hright_entry. }
@@ -892,12 +889,11 @@ Lemma wf_sibling_key_fresh :
 Proof.
  intros depth prefix selected_slot sibling_slot sibling full_hash key value
    Hcongruent Hlength Hslots Hhash Hroute Hwf Hin.
- destruct (inA_witness binding_equiv (key, value) (bindings sibling) Hin)
+ destruct (inA_witness Hin)
    as [entry [Hentry Hrelated]].
  assert (Hprefix : prefix_matches (hash seed (fst entry)) (S depth)
    (prefix ++ [sibling_slot])).
- { eapply (@wf_binding_prefix_matches K Seed A E hash seed sibling (S depth)
-     (prefix ++ [sibling_slot])).
+ { eapply wf_binding_prefix_matches.
    - rewrite app_length, Hlength. simpl. lia.
    - exact Hwf.
    - exact Hentry. }
@@ -2483,8 +2479,9 @@ Proof.
      destruct Hinleft as [Hhead|Hinleft].
      * apply Hfresh.
        apply (proj2 (InA_app_iff R left right head)). right.
-       exact (InA_transport_left A R head item right Hequiv
-         (Hsym _ _ Hhead) Hinright).
+       apply (@InA_transport_left A R head item right Hequiv).
+       -- apply Hsym. exact Hhead.
+       -- exact Hinright.
      * eapply Hcross; eauto.
 Qed.
 
@@ -2497,7 +2494,7 @@ Proof.
  intros A R left right item Hequiv Hnodup Hfresh.
  destruct Hequiv as [Href Hsym Htrans].
  pose proof (Build_Equivalence R Href Hsym Htrans) as Hequiv.
- destruct (NoDupA_app_inv A R left right Hequiv Hnodup)
+ destruct (@NoDupA_app_inv A R left right Hequiv Hnodup)
    as [Hleft [Hright Hcross]].
  apply NoDupA_app; [exact Hequiv|exact Hleft| |].
  apply NoDupA_cons.
@@ -2509,7 +2506,7 @@ Proof.
    destruct Htail as [Hitem|Hright_candidate].
    + apply Hfresh.
      apply (proj2 (InA_app_iff R left right item)). left.
-     exact (InA_transport_left A R item candidate left Hequiv
+     exact (@InA_transport_left A R item candidate left Hequiv
        (Hsym _ _ Hitem) Hcandidate).
    + eapply Hcross; eauto.
 Qed.
@@ -2542,7 +2539,7 @@ Lemma bindings_branch_insert_leaf_nodup :
 Proof.
  intros K Seed A E hash seed depth prefix bitmap children slot full_hash key value
    Hequiv Hwf Hfresh.
- destruct (bindings_dense_insert_split K A (rank bitmap slot)
+ destruct (@bindings_dense_insert_split K A (rank bitmap slot)
    (Leaf full_hash key value) children) as [before [after [Hbefore Hinsert]]].
  pose proof (@wf_bindings_nodup K Seed A E hash seed depth prefix
    (Branch bitmap children) Hwf) as Hnodup.
@@ -3645,6 +3642,106 @@ Proof.
   change (wf E hash seed 0 []
     (remove_tree eqb branch_levels 0 (hash seed key) key root)).
   apply remove_tree_wf. exact Hwf.
+Qed.
+
+Lemma bindings_set_tree_key_origin :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash key
+         (value : A) (t : tree K A) entry,
+    In entry (bindings (set_tree eqb fuel depth full_hash key value t)) ->
+    (exists old_value, In (fst entry, old_value) (bindings t)) \/
+    fst entry = key.
+Proof.
+  intros K A eqb fuel.
+  induction fuel as [|fuel IH]; intros depth full_hash key value t entry Hin;
+    destruct t as [|stored_hash stored old_value|stored_hash entries|bitmap children].
+  - simpl in Hin. destruct Hin as [Hin|[]]. subst entry. now right.
+  - cbn [set_tree] in Hin.
+    destruct (eqb key stored) eqn:Hkey.
+    + destruct Hin as [Hin|[]]. subst entry. left.
+      exists old_value. now left.
+    + destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+      * destruct Hin as [Hin|[Hin|[]]]; subst entry.
+        -- left. exists old_value. now left.
+        -- now right.
+      * rewrite bindings_join_worker in Hin.
+        destruct Hin as [Hin|Hin].
+        -- simpl in Hin. destruct Hin as [Hin|[]]. subst entry. now right.
+        -- simpl in Hin. destruct Hin as [Hin|[]]. subst entry.
+           left. exists old_value. now left.
+  - cbn [set_tree] in Hin.
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + rewrite bindings_normalize_collision in Hin.
+      destruct (@bucket_set_key_origin K A eqb key value entries entry Hin)
+        as [[prior Hprior]|Hnew].
+      * left. exists prior. exact Hprior.
+      * now right.
+    + rewrite bindings_join_worker in Hin.
+      destruct Hin as [Hin|Hin].
+      * simpl in Hin. destruct Hin as [Hin|[]]. subst entry. now right.
+      * destruct entry as [entry_key entry_value].
+        left. exists entry_value. exact Hin.
+  - cbn [set_tree] in Hin. destruct entry as [entry_key entry_value].
+    left. exists entry_value. exact Hin.
+  - simpl in Hin. destruct Hin as [Hin|[]]. subst entry. now right.
+  - cbn [set_tree] in Hin.
+    destruct (eqb key stored) eqn:Hkey.
+    + destruct Hin as [Hin|[]]. subst entry. left.
+      exists old_value. now left.
+    + destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+      * destruct Hin as [Hin|[Hin|[]]]; subst entry.
+        -- left. exists old_value. now left.
+        -- now right.
+      * rewrite bindings_join_worker in Hin.
+        destruct Hin as [Hin|Hin].
+        -- simpl in Hin. destruct Hin as [Hin|[]]. subst entry. now right.
+        -- simpl in Hin. destruct Hin as [Hin|[]]. subst entry.
+           left. exists old_value. now left.
+  - cbn [set_tree] in Hin.
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + rewrite bindings_normalize_collision in Hin.
+      destruct (@bucket_set_key_origin K A eqb key value entries entry Hin)
+        as [[prior Hprior]|Hnew].
+      * left. exists prior. exact Hprior.
+      * now right.
+    + rewrite bindings_join_worker in Hin.
+      destruct Hin as [Hin|Hin].
+      * simpl in Hin. destruct Hin as [Hin|[]]. subst entry. now right.
+      * destruct entry as [entry_key entry_value].
+        left. exists entry_value. exact Hin.
+  - destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
+    + destruct (dense_get (rank bitmap (chunk full_hash depth)) children)
+        as [child|] eqn:Hchild.
+      * assert (Hindex : rank bitmap (chunk full_hash depth) < length children).
+        { apply (proj1 (nth_error_Some children
+            (rank bitmap (chunk full_hash depth)))).
+          unfold dense_get in Hchild. rewrite Hchild. discriminate. }
+        assert (Hchildin : In child children).
+        { apply nth_error_In with (n := rank bitmap (chunk full_hash depth)).
+          exact Hchild. }
+        rewrite (set_tree_branch_child eqb fuel depth full_hash key value bitmap
+          children Hpresent Hchild) in Hin.
+        destruct (bindings_branch_replace_in bitmap (chunk full_hash depth)
+          (set_tree eqb fuel (S depth) full_hash key value child) children entry
+          Hindex Hin) as [Hnew|Hold].
+        -- destruct (IH (S depth) full_hash key value child entry Hnew)
+             as [[prior Hprior]|Hkey].
+           ++ left. exists prior. apply in_flat_map.
+              now exists child.
+           ++ now right.
+        -- destruct entry as [entry_key entry_value].
+           left. exists entry_value. exact Hold.
+      * rewrite (set_tree_branch_dense_missing eqb fuel depth full_hash key value
+          bitmap children Hpresent Hchild) in Hin.
+        apply bindings_branch_insert in Hin. destruct Hin as [Hin|Hin].
+        -- simpl in Hin. destruct Hin as [Hin|[]]. subst entry. now right.
+        -- destruct entry as [entry_key entry_value].
+           left. exists entry_value. exact Hin.
+    + rewrite (set_tree_branch_slot_absent eqb fuel depth full_hash key value
+        bitmap children Hpresent) in Hin.
+      apply bindings_branch_insert in Hin. destruct Hin as [Hin|Hin].
+      * simpl in Hin. destruct Hin as [Hin|[]]. subst entry. now right.
+      * destruct entry as [entry_key entry_value].
+        left. exists entry_value. exact Hin.
 Qed.
 
 Lemma elements_remove_in :
