@@ -2553,6 +2553,26 @@ Proof.
      rewrite Hbefore, Hinsert. repeat rewrite app_assoc. split; reflexivity.
 Qed.
 
+Lemma bindings_dense_replace_split :
+  forall (K A : Type) index (replacement child : tree K A) children,
+    dense_get index children = Some child ->
+    exists before after,
+      flat_map bindings children = before ++ bindings child ++ after /\
+      flat_map bindings (dense_replace index replacement children) =
+        before ++ bindings replacement ++ after.
+Proof.
+  intros K A index. induction index as [|index IH]; intros replacement child
+    children Hget; destruct children as [|head tail].
+  - unfold dense_get in Hget. discriminate.
+  - unfold dense_get in Hget. simpl in Hget. inversion Hget; subst child.
+    exists [], (flat_map bindings tail). simpl. split; reflexivity.
+  - unfold dense_get in Hget. discriminate.
+  - unfold dense_get in Hget. simpl in Hget.
+    destruct (IH replacement child tail Hget) as [before [after [Hbefore Hreplace]]].
+    exists (bindings head ++ before), after. simpl.
+    rewrite Hbefore, Hreplace. repeat rewrite app_assoc. split; reflexivity.
+Qed.
+
 Lemma bindings_branch_insert_leaf_nodup :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) depth prefix bitmap children slot full_hash key (value : A),
