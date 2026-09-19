@@ -2600,6 +2600,7 @@ Lemma Forall2_dense_get_split :
     exists slots_before slots_after children_before children_after,
       slots = slots_before ++ slot :: slots_after /\
       children = children_before ++ child :: children_after /\
+      length slots_before = index /\
       Forall2 R slots_before children_before /\
       R slot child /\
       Forall2 R slots_after children_after.
@@ -2612,7 +2613,7 @@ Proof.
   - inversion Hpaired.
   - inversion Hpaired as [|slot' child' slots' children' Hhead Htail]; subst.
     simpl in Hslot, Hchild. inversion Hslot; inversion Hchild; subst.
-    exists [], slots, [], children. simpl. auto.
+    exists [], slots, [], children. simpl. repeat split; auto.
   - discriminate.
   - inversion Hpaired.
   - inversion Hpaired.
@@ -2620,13 +2621,40 @@ Proof.
     simpl in Hslot, Hchild.
     destruct (IH slots children slot child Htail Hslot Hchild)
       as [slots_before [slots_after [children_before [children_after
-        [Hslots [Hchildren [Hbefore [Hselected Hafter]]]]]]]].
+        [Hslots [Hchildren [Hlength [Hbefore [Hselected Hafter]]]]]]]]].
     exists (head_slot :: slots_before), slots_after,
       (head_child :: children_before), children_after.
-    simpl. rewrite Hslots, Hchildren. repeat split; try reflexivity.
+    simpl. rewrite Hslots, Hchildren. repeat split; try reflexivity;
+      try (simpl; lia).
     + constructor; assumption.
     + exact Hselected.
     + exact Hafter.
+Qed.
+
+Lemma NoDup_before_selected :
+  forall A (before after : list A) selected candidate,
+    NoDup (before ++ selected :: after) ->
+    In candidate before -> selected <> candidate.
+Proof.
+  intros A before. induction before as [|head before IH];
+    intros after selected candidate Hnodup Hin.
+  - contradiction.
+  - simpl in Hin. inversion Hnodup as [|head' tail Hfresh Htail]; subst.
+    destruct Hin as [Hcandidate|Hin].
+    + subst candidate. intro Heq. subst selected.
+      apply Hfresh. apply in_app_iff. right. now left.
+    + apply IH with (after := after); assumption.
+Qed.
+
+Lemma NoDup_after_selected :
+  forall A (before after : list A) selected candidate,
+    NoDup (before ++ selected :: after) ->
+    In candidate after -> selected <> candidate.
+Proof.
+  intros A before after selected candidate Hnodup Hin Heq. subst candidate.
+  apply NoDup_app_remove_l with (l := before) in Hnodup.
+  inversion Hnodup as [|selected' after' Hfresh Htail]; subst.
+  apply Hfresh. exact Hin.
 Qed.
 
 Lemma bindings_branch_insert_leaf_nodup :
@@ -3920,6 +3948,41 @@ Proof.
       eapply Htrans; [|exact Hentrysibling].
       now apply Hsym.
     + exact Hsibling_entry.
+Qed.
+
+Lemma wf_set_tree_bindings_disjoint_segments :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix selected_slot
+         slots siblings full_hash (key : K) (value : A) child,
+    Equivalence E ->
+    (forall first second, E first second ->
+      hash seed first = hash seed second) ->
+    length prefix = depth ->
+    full_hash = hash seed key ->
+    chunk full_hash depth = selected_slot ->
+    wf E hash seed (S depth) (prefix ++ [selected_slot]) child ->
+    Forall2 (fun slot sibling => sibling <> Empty /\
+      wf E hash seed (S depth) (prefix ++ [slot]) sibling) slots siblings ->
+    (forall sibling_slot, In sibling_slot slots -> selected_slot <> sibling_slot) ->
+    forall entry,
+      InA (binding_equiv E) entry
+        (bindings (set_tree eqb fuel (S depth) full_hash key value child)) ->
+      InA (binding_equiv E) entry (flat_map bindings siblings) -> False.
+Proof.
+  intros K Seed A E hash seed eqb fuel depth prefix selected_slot slots siblings
+    full_hash key value child Hequiv Hcongruent Hlength Hhash Hroute Hchild
+    Hsiblings Hdistinct entry Hupdated Hin.
+  destruct (inA_witness Hin) as [stored [Hstored Hentrystored]].
+  apply in_flat_map in Hstored.
+  destruct Hstored as [sibling [Hsiblingin Hstored]].
+  destruct (forall2_child_wf_in (depth := depth) prefix Hsiblings sibling Hsiblingin)
+    as [sibling_slot [Hslot [Hnonempty Hsibling]]].
+  eapply (@wf_sibling_set_tree_bindings_disjoint K Seed A E hash seed eqb fuel
+    depth prefix selected_slot sibling_slot full_hash key value child sibling
+    entry Hequiv Hcongruent Hlength (Hdistinct sibling_slot Hslot) Hhash Hroute
+    Hchild Hsibling Hupdated).
+  apply (proj2 (InA_alt (binding_equiv E) entry (bindings sibling))).
+  exists stored. split; assumption.
 Qed.
 
 Lemma elements_remove_in :
