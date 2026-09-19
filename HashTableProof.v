@@ -2592,6 +2592,43 @@ Proof.
     split; reflexivity.
 Qed.
 
+Lemma Forall2_dense_get_split :
+  forall A B (R : A -> B -> Prop) index slots children slot child,
+    Forall2 R slots children ->
+    nth_error slots index = Some slot ->
+    dense_get index children = Some child ->
+    exists slots_before slots_after children_before children_after,
+      slots = slots_before ++ slot :: slots_after /\
+      children = children_before ++ child :: children_after /\
+      Forall2 R slots_before children_before /\
+      R slot child /\
+      Forall2 R slots_after children_after.
+Proof.
+  intros A B R index. induction index as [|index IH];
+    intros slots children slot child Hpaired Hslot Hchild;
+    destruct slots as [|head_slot slots]; destruct children as [|head_child children].
+  - discriminate.
+  - inversion Hpaired.
+  - inversion Hpaired.
+  - inversion Hpaired as [|slot' child' slots' children' Hhead Htail]; subst.
+    simpl in Hslot, Hchild. inversion Hslot; inversion Hchild; subst.
+    exists [], slots, [], children. simpl. auto.
+  - discriminate.
+  - inversion Hpaired.
+  - inversion Hpaired.
+  - inversion Hpaired as [|slot' child' slots' children' Hhead Htail]; subst.
+    simpl in Hslot, Hchild.
+    destruct (IH slots children slot child Htail Hslot Hchild)
+      as [slots_before [slots_after [children_before [children_after
+        [Hslots [Hchildren [Hbefore [Hselected Hafter]]]]]]]].
+    exists (head_slot :: slots_before), slots_after,
+      (head_child :: children_before), children_after.
+    simpl. rewrite Hslots, Hchildren. repeat split; try reflexivity.
+    + constructor; assumption.
+    + exact Hselected.
+    + exact Hafter.
+Qed.
+
 Lemma bindings_branch_insert_leaf_nodup :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) depth prefix bitmap children slot full_hash key (value : A),
