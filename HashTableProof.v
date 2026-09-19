@@ -2592,6 +2592,19 @@ Proof.
     split; reflexivity.
 Qed.
 
+Lemma dense_replace_at_split :
+  forall A index (before after : list A) old replacement,
+    length before = index ->
+    dense_replace index replacement (before ++ old :: after) =
+      before ++ replacement :: after.
+Proof.
+  intros A index before. revert index.
+  induction before as [|head before IH]; intros index after old replacement Hlength.
+  - destruct index; simpl; [reflexivity|discriminate].
+  - destruct index as [|index]; simpl in Hlength; [discriminate|].
+    simpl. f_equal. apply IH. lia.
+Qed.
+
 Lemma Forall2_dense_get_split :
   forall A B (R : A -> B -> Prop) index slots children slot child,
     Forall2 R slots children ->
@@ -3983,6 +3996,103 @@ Proof.
     Hchild Hsibling Hupdated).
   apply (proj2 (InA_alt (binding_equiv E) entry (bindings sibling))).
   exists stored. split; assumption.
+Qed.
+
+Lemma set_tree_branch_child_nodup :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (key : K) (value : A) bitmap children child,
+    Equivalence E ->
+    (forall first second, E first second ->
+      hash seed first = hash seed second) ->
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    length prefix = depth ->
+    full_hash = hash seed key ->
+    bitmap_has bitmap (chunk full_hash depth) = true ->
+    dense_get (rank bitmap (chunk full_hash depth)) children = Some child ->
+    NoDupA (binding_equiv E)
+      (bindings (set_tree eqb fuel (S depth) full_hash key value child)) ->
+    NoDupA (binding_equiv E)
+      (bindings (branch_replace bitmap (chunk full_hash depth)
+        (set_tree eqb fuel (S depth) full_hash key value child) children)).
+Proof.
+  intros K Seed A E hash seed eqb fuel depth prefix full_hash key value bitmap
+    children child Hequiv Hcongruent Hwf Hlength Hhash Hpresent Hchild Hupdated.
+  inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hchildren_length
+    Hchildren Horiginal].
+  assert (Hnth : nth_error (occupied_slots bitmap)
+    (rank bitmap (chunk full_hash depth)) = Some (chunk full_hash depth)).
+  { destruct (@occupied_slots_rank_split_N (chunk full_hash depth) bitmap
+      (chunk_bound full_hash depth) Hpresent) as [before [after [Hslots Hrank]]].
+    rewrite Hslots, <- Hrank.
+    rewrite nth_error_app2 by lia.
+    replace (length before - length before) with 0 by lia.
+    reflexivity. }
+  destruct (@Forall2_dense_get_split N (tree K A)
+    (fun slot sibling => sibling <> Empty /\
+      wf E hash seed (S depth) (prefix ++ [slot]) sibling)
+    (rank bitmap (chunk full_hash depth)) (occupied_slots bitmap) children
+    (chunk full_hash depth) child Hchildren Hnth Hchild)
+    as [slots_before [slots_after [children_before [children_after
+      [Hslots [Hchildren_split [Hslots_length
+        [Hbefore [Hchildwf Hafter]]]]]]]]].
+  destruct Hchildwf as [Hchild_nonempty Hchildwf].
+  assert (Hslots_nodup : NoDup (occupied_slots bitmap)).
+  { apply occupied_slots_nodup. }
+  assert (Hbefore_slots : forall sibling_slot,
+    In sibling_slot slots_before -> chunk full_hash depth <> sibling_slot).
+  { intros sibling_slot Hin.
+    apply (@NoDup_before_selected N slots_before slots_after
+      (chunk full_hash depth) sibling_slot).
+    - rewrite <- Hslots. exact Hslots_nodup.
+    - exact Hin. }
+  assert (Hafter_slots : forall sibling_slot,
+    In sibling_slot slots_after -> chunk full_hash depth <> sibling_slot).
+  { intros sibling_slot Hin.
+    apply (@NoDup_after_selected N slots_before slots_after
+      (chunk full_hash depth) sibling_slot).
+    - rewrite <- Hslots. exact Hslots_nodup.
+    - exact Hin. }
+  assert (Hbefore_cross : forall entry,
+    InA (binding_equiv E) entry (flat_map bindings children_before) ->
+    InA (binding_equiv E) entry
+      (bindings (set_tree eqb fuel (S depth) full_hash key value child)) -> False).
+  { intros entry Hinbefore Hinupdated.
+    eapply (@wf_set_tree_bindings_disjoint_segments K Seed A E hash seed eqb
+      fuel depth prefix (chunk full_hash depth) slots_before children_before
+      full_hash key value child); eauto. }
+  assert (Hafter_cross : forall entry,
+    InA (binding_equiv E) entry
+      (bindings (set_tree eqb fuel (S depth) full_hash key value child)) ->
+    InA (binding_equiv E) entry (flat_map bindings children_after) -> False).
+  { eapply (@wf_set_tree_bindings_disjoint_segments K Seed A E hash seed eqb
+      fuel depth prefix (chunk full_hash depth) slots_after children_after
+      full_hash key value child); eauto. }
+  assert (Hbefore_length : length children_before =
+    rank bitmap (chunk full_hash depth)).
+  { pose proof (Forall2_length Hbefore) as Hlength'. rewrite Hslots_length in Hlength'.
+    symmetry. exact Hlength'. }
+  assert (Hreplace : dense_replace (rank bitmap (chunk full_hash depth))
+    (set_tree eqb fuel (S depth) full_hash key value child) children =
+    children_before ++
+      set_tree eqb fuel (S depth) full_hash key value child :: children_after).
+  { rewrite Hchildren_split.
+    apply dense_replace_at_split. exact Hbefore_length. }
+  simpl in Horiginal |-.
+  rewrite Hchildren_split in Horiginal.
+  repeat rewrite flat_map_app in Horiginal.
+  simpl in Horiginal.
+  unfold branch_replace. simpl. rewrite Hreplace.
+  repeat rewrite flat_map_app. simpl.
+  apply (@NoDupA_replace_between (K * A) (binding_equiv E)
+    (flat_map bindings children_before) (bindings child)
+    (bindings (set_tree eqb fuel (S depth) full_hash key value child))
+    (flat_map bindings children_after)).
+  - now apply binding_equiv_equiv.
+  - exact Horiginal.
+  - exact Hupdated.
+  - exact Hbefore_cross.
+  - exact Hafter_cross.
 Qed.
 
 Lemma elements_remove_in :
