@@ -2511,6 +2511,32 @@ Proof.
    + eapply Hcross; eauto.
 Qed.
 
+Lemma NoDupA_replace_between :
+  forall A (R : A -> A -> Prop) before old replacement after,
+    Equivalence R ->
+    NoDupA R (before ++ old ++ after) ->
+    NoDupA R replacement ->
+    (forall entry, InA R entry before -> InA R entry replacement -> False) ->
+    (forall entry, InA R entry replacement -> InA R entry after -> False) ->
+    NoDupA R (before ++ replacement ++ after).
+Proof.
+  intros A R before old replacement after Hequiv Horiginal Hreplacement
+    Hbefore_replacement Hreplacement_after.
+  destruct (@NoDupA_app_inv A R before (old ++ after) Hequiv Horiginal)
+    as [Hbefore [Hold_after Hbefore_after]].
+  destruct (@NoDupA_app_inv A R old after Hequiv Hold_after)
+    as [_ [Hafter _]].
+  apply NoDupA_app; [exact Hequiv|exact Hbefore| |].
+  - apply NoDupA_app; [exact Hequiv|exact Hreplacement|exact Hafter|].
+    exact Hreplacement_after.
+  - intros entry Hinbefore Hinreplacement_after.
+    apply (proj1 (InA_app_iff R replacement after entry)) in Hinreplacement_after.
+    destruct Hinreplacement_after as [Hinreplacement|Hinafter].
+    + eapply Hbefore_replacement; eauto.
+    + eapply Hbefore_after; [exact Hinbefore|].
+      apply (proj2 (InA_app_iff R old after entry)). now right.
+Qed.
+
 Lemma bindings_dense_insert_split :
   forall (K A : Type) index (child : tree K A) children,
     exists before after,
