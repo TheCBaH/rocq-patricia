@@ -6610,3 +6610,323 @@ Proof.
     Hequiv Heqb Hcongruent Hrelated Hwf).
   reflexivity.
 Qed.
+
+(** Updating a collision bucket leaves each entry outside the updated
+    equivalence class untouched, including its payload. *)
+Lemma bucket_set_other_binding :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         key (value : A) entries stored (old_value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    ~ E stored key ->
+    (In (stored, old_value) (bucket_set eqb key value entries) <->
+     In (stored, old_value) entries).
+Proof.
+  intros K A E eqb key value entries.
+  induction entries as [|[head head_value] tail IH];
+    intros stored old_value [Href Hsym Htrans] Heqb Hother; simpl.
+  - split; [|contradiction].
+    intros [Hentry|[]]. inversion Hentry; subst.
+    exfalso. apply Hother. apply Href.
+  - assert (Hkey_stored : eqb key stored = false).
+    { destruct (eqb key stored) eqn:Hmatch; auto.
+      exfalso. apply Hother. apply Hsym.
+      now apply (proj1 (Heqb key stored)). }
+    destruct (eqb key head) eqn:Hhead.
+    + assert (Hstored_head : eqb stored head = false).
+      { destruct (eqb stored head) eqn:Hmatch; auto.
+        exfalso. apply Hother.
+        apply Htrans with (y := head).
+        - now apply (proj1 (Heqb stored head)).
+        - apply Hsym. now apply (proj1 (Heqb key head)). }
+      assert (Hpair_new : (stored, old_value) <> (head, value)).
+      { intro Heq. inversion Heq; subst.
+        rewrite (proj2 (Heqb head head) (Href head)) in Hstored_head.
+        discriminate. }
+      assert (Hpair_old : (stored, old_value) <> (head, head_value)).
+      { intro Heq. inversion Heq; subst.
+        rewrite (proj2 (Heqb head head) (Href head)) in Hstored_head.
+        discriminate. }
+      simpl. split; intro Hin; destruct Hin as [Hentry|Htail].
+      * exfalso. now apply Hpair_new.
+      * now right.
+      * exfalso. now apply Hpair_old.
+      * now right.
+    + simpl. destruct (eqb stored head) eqn:Hstored_head.
+      * specialize (IH stored old_value
+          (Build_Equivalence E Href Hsym Htrans) Heqb Hother).
+        split; intro Hin; destruct Hin as [Hentry|Htail].
+        -- now left.
+        -- right. now apply (proj1 IH).
+        -- now left.
+        -- right. now apply (proj2 IH).
+      * specialize (IH stored old_value
+          (Build_Equivalence E Href Hsym Htrans) Heqb Hother).
+        split; intro Hin; destruct Hin as [Hentry|Htail].
+        -- now left.
+        -- right. now apply (proj1 IH).
+        -- now left.
+        -- right. now apply (proj2 IH).
+Qed.
+
+(** Exact flattened-binding preservation for an entry whose stored key is
+    outside the class updated by [set_tree]. *)
+Lemma bindings_set_tree_other :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         fuel depth full_hash key (value : A) (t : tree K A) stored old_value,
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    ~ E stored key ->
+    (In (stored, old_value)
+       (bindings (set_tree eqb fuel depth full_hash key value t)) <->
+     In (stored, old_value) (bindings t)).
+Proof.
+  intros K A E eqb fuel.
+  induction fuel as [|fuel IH]; intros depth full_hash key value t stored old_value
+    Hequiv Heqb Hother; destruct t as
+    [|stored_hash leaf_key leaf_value|stored_hash entries|bitmap children].
+  - destruct Hequiv as [Href Hsym Htrans].
+    assert (Hpair : (stored, old_value) <> (key, value)).
+    { intro Heq. inversion Heq; subst. apply Hother. apply Href. }
+    cbn [set_tree]. simpl. split.
+    + intro Hentry.
+      destruct Hentry as [Hentry|[]].
+      apply Hpair. exact (eq_sym Hentry).
+    + intro Hempty. contradiction.
+  - cbn [set_tree].
+    assert (Hmiss : eqb key stored = false).
+    { destruct Hequiv as [Href Hsym Htrans].
+      destruct (eqb key stored) eqn:Hmatch; auto.
+      exfalso. apply Hother. apply Hsym.
+      now apply (proj1 (Heqb key stored)). }
+    destruct (eqb key leaf_key) eqn:Hleaf.
+    + destruct Hequiv as [Href Hsym Htrans].
+      assert (Hstored_leaf : ~ E stored leaf_key).
+      { intro Hrelated. apply Hother.
+        apply Htrans with (y := leaf_key); [exact Hrelated|].
+        apply Hsym. now apply (proj1 (Heqb key leaf_key)). }
+      assert (Hpair_new : (stored, old_value) <> (leaf_key, value)).
+      { intro Heq. inversion Heq; subst. apply Hstored_leaf. apply Href. }
+      assert (Hpair_old : (stored, old_value) <> (leaf_key, leaf_value)).
+      { intro Heq. inversion Heq; subst. apply Hstored_leaf. apply Href. }
+      simpl. split; intro Hin; destruct Hin as [Hentry|[]].
+      * exfalso. now apply Hpair_new.
+      * exfalso. now apply Hpair_old.
+    + destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+      * assert (Hpair : (stored, old_value) <> (key, value)).
+        { intro Heq. inversion Heq; subst. apply Hother.
+          destruct Hequiv as [Href Hsym Htrans]. apply Href. }
+        simpl. split.
+        -- intros [Hentry|Hkey].
+           ++ now left.
+           ++ destruct Hkey as [Hkey|[]]. exfalso. apply Hpair. now symmetry.
+        -- intros [Hleaf_eq|[]]. left. exact Hleaf_eq.
+      * rewrite bindings_join_worker. simpl.
+        assert (Hpair : (stored, old_value) <> (key, value)).
+        { intro Heq. inversion Heq; subst. apply Hother.
+          destruct Hequiv as [Href Hsym Htrans]. apply Href. }
+        split.
+        -- intros [Hkey|Hleaf_entry].
+           ++ destruct Hkey as [Hkey|[]]. exfalso. apply Hpair. now symmetry.
+           ++ exact Hleaf_entry.
+        -- intro Hleaf_entry. now right.
+  - cbn [set_tree].
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + rewrite bindings_normalize_collision.
+      exact (@bucket_set_other_binding K A E eqb key value entries stored old_value
+        Hequiv Heqb Hother).
+    + rewrite bindings_join_worker. simpl.
+      assert (Hpair : (stored, old_value) <> (key, value)).
+      { intro Heq. inversion Heq; subst. apply Hother.
+        destruct Hequiv as [Href Hsym Htrans]. apply Href. }
+      split.
+      * intros [Hkey|Hold].
+        -- destruct Hkey as [Hkey|[]]. exfalso. apply Hpair. now symmetry.
+        -- exact Hold.
+      * intro Hold. now right.
+  - cbn [set_tree]. tauto.
+  - destruct Hequiv as [Href Hsym Htrans].
+    assert (Hpair : (stored, old_value) <> (key, value)).
+    { intro Heq. inversion Heq; subst. apply Hother. apply Href. }
+    cbn [set_tree]. simpl. split.
+    + intro Hentry.
+      destruct Hentry as [Hentry|[]].
+      apply Hpair. exact (eq_sym Hentry).
+    + intro Hempty. contradiction.
+  - cbn [set_tree].
+    assert (Hmiss : eqb key stored = false).
+    { destruct Hequiv as [Href Hsym Htrans].
+      destruct (eqb key stored) eqn:Hmatch; auto.
+      exfalso. apply Hother. apply Hsym.
+      now apply (proj1 (Heqb key stored)). }
+    destruct (eqb key leaf_key) eqn:Hleaf.
+    + destruct Hequiv as [Href Hsym Htrans].
+      assert (Hstored_leaf : ~ E stored leaf_key).
+      { intro Hrelated. apply Hother.
+        apply Htrans with (y := leaf_key); [exact Hrelated|].
+        apply Hsym. now apply (proj1 (Heqb key leaf_key)). }
+      assert (Hpair_new : (stored, old_value) <> (leaf_key, value)).
+      { intro Heq. inversion Heq; subst. apply Hstored_leaf. apply Href. }
+      assert (Hpair_old : (stored, old_value) <> (leaf_key, leaf_value)).
+      { intro Heq. inversion Heq; subst. apply Hstored_leaf. apply Href. }
+      simpl. split; intro Hin; destruct Hin as [Hentry|[]].
+      * exfalso. now apply Hpair_new.
+      * exfalso. now apply Hpair_old.
+    + destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+      * assert (Hpair : (stored, old_value) <> (key, value)).
+        { intro Heq. inversion Heq; subst. apply Hother.
+          destruct Hequiv as [Href Hsym Htrans]. apply Href. }
+        simpl. split.
+        -- intros [Hentry|Hkey].
+           ++ now left.
+           ++ destruct Hkey as [Hkey|[]]. exfalso. apply Hpair. now symmetry.
+        -- intros [Hleaf_eq|[]]. left. exact Hleaf_eq.
+      * rewrite bindings_join_worker. simpl.
+        assert (Hpair : (stored, old_value) <> (key, value)).
+        { intro Heq. inversion Heq; subst. apply Hother.
+          destruct Hequiv as [Href Hsym Htrans]. apply Href. }
+        split.
+        -- intros [Hkey|Hleaf_entry].
+           ++ destruct Hkey as [Hkey|[]]. exfalso. apply Hpair. now symmetry.
+           ++ exact Hleaf_entry.
+        -- intro Hleaf_entry. now right.
+  - cbn [set_tree].
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + rewrite bindings_normalize_collision.
+      exact (@bucket_set_other_binding K A E eqb key value entries stored old_value
+        Hequiv Heqb Hother).
+    + rewrite bindings_join_worker. simpl.
+      assert (Hpair : (stored, old_value) <> (key, value)).
+      { intro Heq. inversion Heq; subst. apply Hother.
+        destruct Hequiv as [Href Hsym Htrans]. apply Href. }
+      split.
+      * intros [Hkey|Hold].
+        -- destruct Hkey as [Hkey|[]]. exfalso. apply Hpair. now symmetry.
+        -- exact Hold.
+      * intro Hold. now right.
+  - destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
+    + destruct (dense_get (rank bitmap (chunk full_hash depth)) children)
+        as [child|] eqn:Hchild.
+      * rewrite (set_tree_branch_child eqb fuel depth full_hash key value bitmap
+          children Hpresent Hchild).
+        destruct (@bindings_dense_replace_split K A
+          (rank bitmap (chunk full_hash depth))
+          (set_tree eqb fuel (S depth) full_hash key value child) child children Hchild)
+          as [before [after [Hbefore Hafter]]].
+        simpl. rewrite Hbefore, Hafter.
+        rewrite !in_app_iff.
+        rewrite (@IH (S depth) full_hash key value child stored old_value
+          Hequiv Heqb Hother).
+        tauto.
+      * rewrite (set_tree_branch_dense_missing eqb fuel depth full_hash key value
+          bitmap children Hpresent Hchild).
+        rewrite bindings_branch_insert. simpl.
+        assert (Hpair : (stored, old_value) <> (key, value)).
+        { intro Heq. inversion Heq; subst. apply Hother.
+          destruct Hequiv as [Href Hsym Htrans]. apply Href. }
+        split.
+        -- intros [Hkey|Hold].
+           ++ destruct Hkey as [Hkey|[]]. exfalso. apply Hpair. now symmetry.
+           ++ exact Hold.
+        -- intro Hold. now right.
+    + rewrite (set_tree_branch_slot_absent eqb fuel depth full_hash key value
+        bitmap children Hpresent).
+      rewrite bindings_branch_insert. simpl.
+      assert (Hpair : (stored, old_value) <> (key, value)).
+      { intro Heq. inversion Heq; subst. apply Hother.
+        destruct Hequiv as [Href Hsym Htrans]. apply Href. }
+      split.
+      * intros [Hkey|Hold].
+        -- destruct Hkey as [Hkey|[]]. exfalso. apply Hpair. now symmetry.
+        -- exact Hold.
+      * intro Hold. now right.
+Qed.
+
+Lemma get_after_set_other :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (query key : K) (value : A)
+         (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    ~ E query key ->
+    (hash (table_seed m) query < hash_space)%N ->
+    (hash (table_seed m) key < hash_space)%N ->
+    table_wf E hash m ->
+    get eqb hash query (set eqb hash key value m) = get eqb hash query m.
+Proof.
+  intros K Seed A E hash eqb query key value [seed root] Hequiv Heqb
+    Hcongruent Hdifferent Hquery_bound Hkey_bound Hwf.
+  assert (Hsetwf : table_wf E hash
+      (set eqb hash key value {| table_seed := seed; table_root := root |})).
+  { eapply table_wf_set; eauto. }
+  destruct (get eqb hash query {| table_seed := seed; table_root := root |})
+    as [old_value|] eqn:Hget.
+  - apply (proj1 (@get_binding_iff K Seed A E hash eqb query old_value
+      {| table_seed := seed; table_root := root |}
+      Hequiv Heqb Hcongruent Hquery_bound Hwf)) in Hget.
+    destruct Hget as [stored [Hstored Hquery_stored]].
+    assert (Hstored_other : ~ E stored key).
+    { intro Hstored_key. apply Hdifferent.
+      destruct Hequiv as [Href Hsym Htrans].
+      eapply Htrans; eauto. }
+    assert (Hstored_set : In (stored, old_value)
+      (elements (set eqb hash key value
+        {| table_seed := seed; table_root := root |}))).
+    { change (In (stored, old_value)
+        (bindings (set_tree eqb branch_levels 0 (hash seed key) key value root))).
+      apply (proj2 (@bindings_set_tree_other K A E eqb branch_levels 0
+        (hash seed key) key value root stored old_value Hequiv Heqb Hstored_other)).
+      exact Hstored. }
+    eapply get_binding_complete; eauto.
+  - destruct (get eqb hash query
+      (set eqb hash key value {| table_seed := seed; table_root := root |}))
+      as [new_value|] eqn:Hset_get; [|reflexivity].
+    exfalso.
+    apply (proj1 (@get_binding_iff K Seed A E hash eqb query new_value
+      (set eqb hash key value {| table_seed := seed; table_root := root |})
+      Hequiv Heqb Hcongruent Hquery_bound Hsetwf)) in Hset_get.
+    destruct Hset_get as [stored [Hstored_set Hquery_stored]].
+    assert (Hstored_other : ~ E stored key).
+    { intro Hstored_key. apply Hdifferent.
+      destruct Hequiv as [Href Hsym Htrans].
+      eapply Htrans; eauto. }
+    assert (Hstored : In (stored, new_value) (elements
+      {| table_seed := seed; table_root := root |})).
+    { change (In (stored, new_value)
+        (bindings (set_tree eqb branch_levels 0 (hash seed key) key value root)))
+      in Hstored_set.
+      change (In (stored, new_value) (bindings root)).
+      apply (proj1 (@bindings_set_tree_other K A E eqb branch_levels 0
+        (hash seed key) key value root stored new_value Hequiv Heqb Hstored_other)).
+      exact Hstored_set. }
+    pose proof (@get_binding_complete K Seed A E hash eqb query stored new_value
+      {| table_seed := seed; table_root := root |} Hequiv Heqb Hcongruent
+      Hquery_bound Hwf Hstored Hquery_stored) as Hold_get.
+    rewrite Hget in Hold_get. discriminate.
+Qed.
+
+Lemma get_after_set :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (query key : K) (value : A)
+         (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    (hash (table_seed m) query < hash_space)%N ->
+    (hash (table_seed m) key < hash_space)%N ->
+    table_wf E hash m ->
+    get eqb hash query (set eqb hash key value m) =
+      if eqb query key then Some value else get eqb hash query m.
+Proof.
+  intros K Seed A E hash eqb query key value m Hequiv Heqb Hcongruent
+    Hquery_bound Hkey_bound Hwf.
+  destruct (eqb query key) eqn:Hquery_key.
+  - apply get_after_set_equiv with (E := E); try assumption.
+    now apply (proj1 (Heqb query key)).
+  - apply get_after_set_other with (E := E); try assumption.
+    intro Hrelated. apply (proj2 (Heqb query key)) in Hrelated.
+    now rewrite Hquery_key in Hrelated.
+Qed.
