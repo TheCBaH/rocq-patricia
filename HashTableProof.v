@@ -769,6 +769,36 @@ Proof.
  exact Hslot_in.
 Qed.
 
+Lemma wf_branch_child_binding_slot :
+ forall depth prefix bitmap children (child : tree K A) entry,
+   length prefix = depth ->
+   wf depth prefix (Branch bitmap children) ->
+   In child children ->
+   In entry (bindings child) ->
+   exists slot,
+     In slot (occupied_slots bitmap) /\
+     chunk (hash seed (fst entry)) depth = slot /\
+     wf (S depth) (prefix ++ [slot]) child.
+Proof.
+ intros depth prefix bitmap children child entry Hlength Hwf Hchild Hin.
+ inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hchildren_len
+   Hchildren Hnodup].
+ destruct (forall2_child_wf_in (depth := depth) prefix Hchildren child Hchild)
+   as [slot [Hslot [Hnonempty Hchildwf]]].
+ exists slot. split; [exact Hslot|]. split; [|exact Hchildwf].
+ assert (Hprefix : prefix_matches (hash seed (fst entry)) (S depth)
+   (prefix ++ [slot])).
+ { eapply wf_binding_prefix_matches.
+   - rewrite app_length, Hlength. cbn. lia.
+   - exact Hchildwf.
+   - exact Hin. }
+ unfold prefix_matches in Hprefix.
+ pose proof (prefix_matches_from_app_last
+   (hash seed (fst entry)) 0 prefix slot Hprefix) as Hroute.
+ replace (0 + length prefix) with depth in Hroute by lia.
+ exact Hroute.
+Qed.
+
 Lemma collision_binding_hash :
  forall depth prefix full_hash (entries : list (K * A)) (entry : K * A),
  wf depth prefix (Collision full_hash entries) ->
