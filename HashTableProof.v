@@ -4619,6 +4619,17 @@ Proof.
   now apply bindings_remove_tree_nodup.
 Qed.
 
+Lemma elements_nodup :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (m : table K Seed A),
+    table_wf E hash m ->
+    NoDupA (binding_equiv E) (elements m).
+Proof.
+  intros K Seed A E hash [seed root] Hwf.
+  change (NoDupA (binding_equiv E) (bindings root)).
+  now apply (@wf_bindings_nodup K Seed A E hash seed 0 [] root Hwf).
+Qed.
+
 Lemma get_tree_query_equiv :
   forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
          fuel depth full_hash (left right : K) (t : tree K A),
