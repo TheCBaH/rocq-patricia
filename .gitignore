@@ -8,6 +8,7 @@
 *.cmx
 *.o
 *.lia.cache
+*.nia.cache
 /patricia-test
 /patricia-union-test
 /patricia-union-native-test
