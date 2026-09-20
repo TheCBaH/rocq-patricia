@@ -111,6 +111,153 @@ Exit: a fresh build runs all correctness gates for both libraries, CI is
 configured, benchmark smoke passes, and performance/verification claims match
 the evidence. Hosted CI results are recorded separately from local results.
 
+## Proof completion order
+
+Status reconciliation: 2026-09-20. Finish H2.G, then H3.G before resuming
+H4/H5 expansion. Preserve the existing native work and rebuild it when source
+proof changes require it. No native-array theorem is needed to close H2 or H3.
+The tracker owns completion status; the theorem names below are proposals unless
+explicitly described as existing.
+
+All semantic statements use the existing explicit contracts: equivalence `E`,
+equality reflection, seed-hash congruence, `table_wf`, and normalized hash bounds
+for the keys involved. Keep those hypotheses visible, quantify contracts rather
+than introduce axioms, and preserve arbitrary payload types without comparing
+values. For worker proofs retain the existing depth/prefix/fuel premises where
+needed; for public corollaries discharge them at the seeded root.
+
+### P1 — Preserve unrelated bindings (H2.4, H2.5)
+
+Prove exact binding preservation outside the modified equivalence class:
+
+```text
+~ E stored key ->
+  (In (stored, old) (bindings (set_tree ... key value t)) <->
+   In (stored, old) (bindings t))
+~ E stored key ->
+  (In (stored, old) (bindings (remove_tree ... key t)) <->
+   In (stored, old) (bindings t))
+```
+
+Use fuel induction and the independent flattened view. Reuse
+`bindings_join_worker`, `bindings_normalize_collision`, dense-child binding
+splits, and insertion/replacement/deletion lemmas. In recursive branch cases
+preserve both sibling segments and apply induction to the selected child.
+Removal must cover empty-child compaction and singleton-parent collapse.
+Collision helpers must preserve the exact pair, including its value; the
+existing `bucket_get_set_other` / `bucket_get_remove_other` give the corresponding
+lookup facts if useful. Derive their equality symmetry/transitivity premises
+from the existing equivalence/reflection contract.
+
+The existing `bindings_set_tree_key_origin` only preserves a key's origin, not
+its old value; `bindings_remove_tree_in` only gives one direction. Neither is
+sufficient alone. Prove the binding helpers with the weakest practical premises;
+do not generalize joins to branch subtrees, which `set_tree` does not join.
+
+Acceptance: both directions for exact unrelated bindings, including recursive
+branches, compile in `HashTableProof.v` without admitted obligations.
+
+### P2 — Complete public pointwise laws (H2.4, H2.5)
+
+Lift P1 through `get_binding_iff`, using existing `table_wf_set` /
+`table_wf_remove`, seed preservation and equivalence transitivity. For a query
+not equivalent to the modified key, characterize every `Some old` result in
+both maps; handle `None` explicitly by excluding a `Some` result on either side.
+Proposed public lemmas: `get_after_set_other` and `get_after_remove_other`.
+
+Combine these with existing `get_after_set_equiv` / `get_after_remove_equiv`:
+
+```text
+get q (set k v m) = if eqb q k then Some v else get q m
+get q (remove k m) = if eqb q k then None else get q m
+```
+
+Acceptance: the two complete equations under the ordinary valid-map contracts,
+with no extra assumption that the query is present or has a different hash.
+Distinct equivalence classes may share a hash. Update H2.4/H2.5 only when these
+theorems, their commands and results are recorded.
+
+### P3 — Close the source gate (H2.G)
+
+Map every H2 exit requirement to an actual theorem: P2 pointwise laws, existing
+validity/uniqueness/routing, seed preservation, join and operation no-fallback,
+and `wf_branch_path_bound`. Run `make hashtable-proof hashtable-assumptions proof`;
+the last target checks existing Patricia proofs. Check the audit's declaration
+coverage, including nested/indented declarations, and explicitly enumerate any
+required theorem it misses. The current script only matches declarations at
+column zero: it skips nine indented lemmas in `HashTableProof.v` (including
+`table_wf_empty` and `table_wf_singleton`) and six instance lemmas in
+`HashTableSpec.v`. Extend discovery for section declarations and use qualified
+names for module declarations; verify all 15 are audited. Record commands,
+date, count and result, then close
+H2.G. An assumption audit proves the checked declarations have no unexpected
+assumptions; it does not prove that every required declaration exists.
+
+### P4 — Representatives and arbitrary first-wins loading (H3.1)
+
+First establish the resident-representative update law: if `(stored, old)` is in
+a valid map and `E key stored`, setting `key` keeps the exact `stored` key and
+changes its value. Also establish that an absent equivalence class receives the
+supplied key as representative. Reuse leaf/bucket retention, join bindings and
+recursive branch splits; combine with P1 for unrelated entries. Lookup laws
+alone cannot distinguish equivalent representatives.
+
+Define an independent left-to-right input scan returning the first matching
+`(representative, value)` pair. Prove an accumulator theorem for `add_first`:
+an existing class and its representative/value are retained; an absent class
+receives its first input match. Induct on the input list with a general valid
+accumulator, using P2, `add_first_cons`, and `add_first_table_wf`.
+Specialize to `empty` for arbitrary `of_list` input.
+
+Acceptance: bulk lookup equals the value projection of that input scan, and
+enumeration contains exactly the selected first representatives and values,
+modulo unspecified element order. Include the no-match case. Existing
+`get_of_list_binding_iff` describes the output, not first occurrence in the
+input; existing `of_list_first_wins_equiv` covers only two equivalent entries.
+
+### P5 — Assemble the remaining API laws (H3.1)
+
+Use P2/P4 to package general singleton lookup/membership and bulk membership.
+Retain the already proved `mem_binding_iff`, `elements_keys_nodup`,
+`is_empty_iff_get_none`, validity and seed laws instead of reproving them.
+`table_extensional` and its equivalence proof already exist; add set/remove
+congruence under pointwise equality, and equality of `mem`/`is_empty` observations.
+For maps with different seeds, require appropriate hash bounds at both seeds;
+do not infer seed equality or tree equality from extensional equality.
+
+Acceptance: a compact inventory maps each design/API requirement to a theorem
+and its explicit hypotheses. Do not add map/merge/fold or equality of traversal
+order to this release's proof scope.
+
+### P6 — Close the reference release (H3.3, H3.4, H3.G)
+
+Inventory the reference extraction/compiler/runtime boundary, machine-integer
+realizers and normalization, lawful/stable equality and hashing callbacks, and
+immutable storage with shallow payload sharing. Link each obligation to the
+wrapper/extractor or relevant audit; distinguish tests from universal proofs.
+
+Map the existing reference tests to every row of the test matrix below. Record
+file/case and bytecode/native coverage, add only missing cases, and report any
+unsupported case explicitly. Include all routing depths, slot 31/full occupancy,
+collision normalization, equivalent representatives, integer/string boundaries,
+multiple callback instances, seeds, retained versions and function/ref values.
+
+Run the reference subset from freshly regenerated output in a disposable clean
+checkout of the candidate changes, using these existing targets:
+
+```sh
+make hashtable-proof hashtable-assumptions proof
+make hashtable-reference
+make hashtable-extraction-audit hashtable-reference-test \
+  hashtable-wrapper-test hashtable-wrapper-test-native \
+  hashtable-differential hashtable-test-native
+```
+
+Run regeneration before its consumers; avoid concurrent extraction targets
+writing the same directory. Record exact results and the final theorem/foreign
+inventory before closing H3.G. A full `make hashtable` is useful regression
+evidence, but neither it nor future H4 work substitutes for the H2/H3 inventories.
+
 ## Proposed build and verification targets
 
 | Target | Responsibility |
