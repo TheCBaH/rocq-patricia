@@ -250,6 +250,15 @@ Proof.
   rewrite nth_error_map, Hget. reflexivity.
 Qed.
 
+Definition native_branch_replace {K A : Type} (bitmap slot : N)
+    (child : native_tree K A) (children : pseq (native_tree K A)) : native_tree K A :=
+  NativeBranch bitmap (pseq_replace (rank bitmap slot) child children).
+
+Definition native_branch_insert {K A : Type} (bitmap slot : N)
+    (child : native_tree K A) (children : pseq (native_tree K A)) : native_tree K A :=
+  NativeBranch (N.lor bitmap (bitmap_bit slot))
+    (pseq_insert (rank bitmap slot) child children).
+
 (** Lookup is a recursive compact-child worker.  Update and removal remain
     source-refined while their compact workers are developed. *)
 Fixpoint native_get {K A : Type} (eqb : K -> K -> bool)
