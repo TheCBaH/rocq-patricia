@@ -166,27 +166,29 @@ Inductive native_tree (K A : Type) : Type :=
 | NativeEmpty
 | NativeLeaf (full_hash : N) (key : K) (value : A)
 | NativeCollision (full_hash : N) (entries : pseq (K * A))
-| NativeBranch (bitmap : N) (children : pseq (tree K A)).
+| NativeBranch (bitmap : N) (children : pseq (native_tree K A)).
 
 Arguments NativeEmpty {K A}.
 Arguments NativeLeaf {K A} _ _ _.
 Arguments NativeCollision {K A} _ _.
 Arguments NativeBranch {K A} _ _.
 
-Definition source_of_native {K A : Type} (native : native_tree K A) : tree K A :=
+Fixpoint source_of_native {K A : Type} (native : native_tree K A) : tree K A :=
   match native with
   | NativeEmpty => Empty
   | NativeLeaf full_hash key value => Leaf full_hash key value
   | NativeCollision full_hash entries => Collision full_hash (pseq_view entries)
-  | NativeBranch bitmap children => Branch bitmap (pseq_view children)
+  | NativeBranch bitmap children =>
+      Branch bitmap (map source_of_native (pseq_view children))
   end.
 
-Definition native_of_source {K A : Type} (source : tree K A) : native_tree K A :=
+Fixpoint native_of_source {K A : Type} (source : tree K A) : native_tree K A :=
   match source with
   | Empty => NativeEmpty
   | Leaf full_hash key value => NativeLeaf full_hash key value
   | Collision full_hash entries => NativeCollision full_hash (pseq_of_list entries)
-  | Branch bitmap children => NativeBranch bitmap (pseq_of_list children)
+  | Branch bitmap children =>
+      NativeBranch bitmap (pseq_of_list (map native_of_source children))
   end.
 
 Definition native_refines {K A : Type} (native : native_tree K A)
@@ -211,7 +213,20 @@ Lemma source_of_native_of_source :
   forall K A (source : tree K A),
     source_of_native (native_of_source source) = source.
 Proof.
-  intros K A source. destruct source; reflexivity.
+  intros K A source.
+  assert (Hroundtrip : forall (source' : tree K A),
+    source_of_native (native_of_source source') = source').
+  { fix source_roundtrip 1.
+    intro source'. destruct source' as [|full_hash key value|full_hash entries|bitmap children].
+    - reflexivity.
+    - reflexivity.
+    - reflexivity.
+    - cbn. f_equal.
+      induction children as [|child children IH].
+      + reflexivity.
+      + cbn. rewrite (source_roundtrip child), IH.
+        reflexivity. }
+  apply Hroundtrip.
 Qed.
 
 (** Modeled native operations are deliberately source-defined through the
