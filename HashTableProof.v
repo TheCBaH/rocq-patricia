@@ -5904,6 +5904,23 @@ Proof.
   eapply add_first_table_wf; eauto using table_wf_empty.
 Qed.
 
+Lemma of_list_elements_keys_nodup :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (entries : list (K * A)),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall actual_seed first second, E first second ->
+      hash actual_seed first = hash actual_seed second) ->
+    (forall key value, In (key, value) entries ->
+      (hash seed key < hash_space)%N) ->
+    NoDupA E (map fst (elements (of_list eqb hash seed entries))).
+Proof.
+  intros K Seed A E hash seed eqb entries Hequiv Heqb Hcongruent Hbound.
+  apply (@elements_keys_nodup K Seed A E hash
+    (of_list eqb hash seed entries)).
+  eapply table_wf_of_list; eauto.
+Qed.
+
 Lemma get_after_set_self :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
