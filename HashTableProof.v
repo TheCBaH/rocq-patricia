@@ -4975,6 +4975,17 @@ Proof.
     rewrite Hleft in Hleft_stored. discriminate.
 Qed.
 
+Lemma eqb_false_of_not_equiv :
+  forall (K : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool) left right,
+    (forall first second, eqb first second = true <-> E first second) ->
+    ~ E left right ->
+    eqb left right = false.
+Proof.
+  intros K E eqb left right Heqb Hdifferent.
+  destruct (eqb left right) eqn:Hequal; auto.
+  exfalso. apply Hdifferent. now apply (proj1 (Heqb left right)).
+Qed.
+
 Lemma bucket_remove_query_equiv :
   forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
          left right (entries : list (K * A)),
@@ -6549,6 +6560,23 @@ Proof.
   - exact Hwf.
 Qed.
 
+Lemma get_after_remove_equiv :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (query key : K) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second -> hash seed first = hash seed second) ->
+    E query key ->
+    table_wf E hash m ->
+    get eqb hash query (remove eqb hash key m) = None.
+Proof.
+  intros K Seed A E hash eqb query key m Hequiv Heqb Hcongruent Hrelated Hwf.
+  rewrite (@get_query_equiv K Seed A E eqb hash query key
+    (remove eqb hash key m) Hequiv Heqb Hcongruent Hrelated).
+  apply (@get_after_remove_self K Seed A E hash eqb key m
+    Hequiv Heqb Hcongruent Hwf).
+Qed.
+
 Lemma mem_after_remove_self :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (eqb : K -> K -> bool) (key : K) (m : table K Seed A),
@@ -6563,5 +6591,22 @@ Proof.
   unfold mem.
   rewrite (@get_after_remove_self K Seed A E hash eqb key m
     Hequiv Heqb Hcongruent Hwf).
+  reflexivity.
+Qed.
+
+Lemma mem_after_remove_equiv :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (query key : K) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second -> hash seed first = hash seed second) ->
+    E query key ->
+    table_wf E hash m ->
+    mem eqb hash query (remove eqb hash key m) = false.
+Proof.
+  intros K Seed A E hash eqb query key m Hequiv Heqb Hcongruent Hrelated Hwf.
+  unfold mem.
+  rewrite (@get_after_remove_equiv K Seed A E hash eqb query key m
+    Hequiv Heqb Hcongruent Hrelated Hwf).
   reflexivity.
 Qed.
