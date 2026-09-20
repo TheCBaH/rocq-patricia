@@ -5161,6 +5161,79 @@ Proof.
       * exact Hfallback.
 Qed.
 
+Lemma set_tree_wf_general :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (key : K) (value : A) (t : tree K A),
+    depth + fuel = branch_levels ->
+    length prefix = depth ->
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall first second, E first second -> hash seed first = hash seed second) ->
+    full_hash = hash seed key ->
+    (full_hash < hash_space)%N ->
+    prefix_matches full_hash depth prefix ->
+    wf E hash seed depth prefix t ->
+    wf E hash seed depth prefix (set_tree eqb fuel depth full_hash key value t).
+Proof.
+  intros K Seed A E hash seed eqb fuel.
+  induction fuel as [|fuel IH]; intros depth prefix full_hash key value t
+    Hfuel Hlength Hequiv Heqb Hcongruent Hhash Hbound Hprefix Hwf.
+  - destruct t as [|stored_hash stored old_value|stored_hash entries|bitmap children].
+    + eapply set_tree_empty_wf. unfold entry_matches. repeat split; assumption.
+    + eapply set_tree_leaf_wf; eauto.
+    + eapply set_tree_collision_wf_general; eauto.
+    + cbn [set_tree]. exact Hwf.
+  - destruct t as [|stored_hash stored old_value|stored_hash entries|bitmap children].
+    + eapply set_tree_empty_wf. unfold entry_matches. repeat split; assumption.
+    + eapply set_tree_leaf_wf; eauto.
+    + eapply set_tree_collision_wf_general; eauto.
+    + destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hroute.
+      * destruct (wf_branch_ranked_child Hwf (chunk_bound full_hash depth) Hroute)
+          as [child [Hchild [Hchildnonempty Hchildwf]]].
+        assert (Hnextlength : length (prefix ++ [chunk full_hash depth]) = S depth).
+        { rewrite app_length, Hlength. cbn. lia. }
+        assert (Hnextprefix : prefix_matches full_hash (S depth)
+          (prefix ++ [chunk full_hash depth])).
+        { apply prefix_matches_append_slot; assumption. }
+        assert (Hupdatedwf : wf E hash seed (S depth)
+          (prefix ++ [chunk full_hash depth])
+          (set_tree eqb fuel (S depth) full_hash key value child)).
+        { eapply IH; eauto; lia. }
+        eapply set_tree_branch_child_wf_fresh with (child := child)
+          (updated_child := set_tree eqb fuel (S depth) full_hash key value child).
+        -- exact Hequiv.
+        -- exact Hcongruent.
+        -- exact Hwf.
+        -- exact Hlength.
+        -- exact Hhash.
+        -- exact Hroute.
+        -- exact Hchild.
+        -- reflexivity.
+        -- eapply set_tree_wf_nonempty; eauto; lia.
+        -- exact Hupdatedwf.
+      * eapply set_tree_branch_slot_absent_wf_leaf_fresh; eauto.
+Qed.
+
+Lemma table_wf_set :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (key : K) (value : A) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    (hash (table_seed m) key < hash_space)%N ->
+    table_wf E hash m ->
+    table_wf E hash (set eqb hash key value m).
+Proof.
+  intros K Seed A E hash eqb key value [seed root] Hequiv Heqb Hcongruent
+    Hbound Hwf.
+  unfold table_wf, set in Hwf |-.
+  cbn in Hwf |-.
+  eapply set_tree_wf_general; eauto.
+  - reflexivity.
+Qed.
+
 Lemma get_after_set_self :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
