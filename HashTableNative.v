@@ -335,10 +335,23 @@ Fixpoint native_get {K A : Type} (eqb : K -> K -> bool)
       end
   end.
 
-Definition native_set {K A : Type} (eqb : K -> K -> bool)
+Fixpoint native_set {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (value : A)
     (native : native_tree K A) : native_tree K A :=
-  native_of_source (set_tree eqb fuel depth full_hash key value (source_of_native native)).
+  match native, fuel with
+  | NativeBranch bitmap children, S fuel' =>
+      let slot := chunk full_hash depth in
+      if bitmap_has bitmap slot then
+        match pseq_get (rank bitmap slot) children with
+        | Some child => native_branch_replace bitmap slot
+            (native_set eqb fuel' (S depth) full_hash key value child) children
+        | None => native_branch_insert bitmap slot
+            (NativeLeaf full_hash key value) children
+        end
+      else native_branch_insert bitmap slot (NativeLeaf full_hash key value) children
+  | _, _ => native_of_source
+      (set_tree eqb fuel depth full_hash key value (source_of_native native))
+  end.
 
 Definition native_remove {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (native : native_tree K A)
@@ -380,7 +393,32 @@ Lemma native_set_refines :
          (native : native_tree K A),
     source_of_native (native_set eqb fuel depth full_hash key value native) =
     set_tree eqb fuel depth full_hash key value (source_of_native native).
-Proof. intros. unfold native_set. apply source_of_native_of_source. Qed.
+Proof.
+  intros K A eqb fuel.
+  induction fuel as [|fuel IH]; intros depth full_hash key value native;
+    destruct native as [|stored_hash stored old|stored_hash entries|bitmap children].
+  all: cbn [native_set]; try apply source_of_native_of_source.
+  destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
+  - destruct (pseq_get (rank bitmap (chunk full_hash depth)) children)
+      as [child|] eqn:Hchild.
+    + rewrite source_of_native_branch_replace.
+      rewrite IH.
+      cbn [source_of_native set_tree].
+      rewrite Hpresent.
+      rewrite (@pseq_get_source_children K A
+        (rank bitmap (chunk full_hash depth)) children child Hchild).
+      reflexivity.
+    + rewrite source_of_native_branch_insert.
+      cbn [source_of_native set_tree].
+      rewrite Hpresent.
+      rewrite (@pseq_get_source_children_none K A
+        (rank bitmap (chunk full_hash depth)) children Hchild).
+      reflexivity.
+  - rewrite source_of_native_branch_insert.
+    cbn [source_of_native set_tree].
+    rewrite Hpresent.
+    reflexivity.
+Qed.
 
 Lemma native_remove_refines :
   forall K A (eqb : K -> K -> bool) fuel depth full_hash (key : K)
