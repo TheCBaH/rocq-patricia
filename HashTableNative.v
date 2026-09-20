@@ -280,6 +280,19 @@ Definition native_table_remove {K Seed A : Type} (eqb : K -> K -> bool)
      native_table_root := native_remove eqb branch_levels 0
        (hash (native_table_seed native) key) key (native_table_root native) |}.
 
+Definition native_table_get {K Seed A : Type} (eqb : K -> K -> bool)
+    (hash : Seed -> K -> N) (key : K) (native : native_table K Seed A)
+    : option A :=
+  native_get eqb branch_levels 0 (hash (native_table_seed native) key) key
+    (native_table_root native).
+
+Definition native_table_mem {K Seed A : Type} (eqb : K -> K -> bool)
+    (hash : Seed -> K -> N) (key : K) (native : native_table K Seed A) : bool :=
+  match native_table_get eqb hash key native with
+  | Some _ => true
+  | None => false
+  end.
+
 Lemma source_table_native_empty :
   forall K Seed A (seed : Seed),
     @source_table_of_native K Seed A (native_empty seed) = empty seed.
@@ -320,3 +333,17 @@ Proof.
   unfold source_table_of_native, native_table_remove, remove.
   f_equal. apply native_remove_refines.
 Qed.
+
+Lemma native_table_get_refines :
+  forall K Seed A (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         key (native : native_table K Seed A),
+    native_table_get eqb hash key native =
+    get eqb hash key (source_table_of_native native).
+Proof. reflexivity. Qed.
+
+Lemma native_table_mem_refines :
+  forall K Seed A (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         key (native : native_table K Seed A),
+    native_table_mem eqb hash key native =
+    mem eqb hash key (source_table_of_native native).
+Proof. reflexivity. Qed.
