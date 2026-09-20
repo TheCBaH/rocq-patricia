@@ -4,7 +4,7 @@
     OCaml array heap theorem; that remaining target obligation is recorded in
     the tracker. *)
 
-From Stdlib Require Import NArith RelationClasses.
+From Stdlib Require Import List NArith RelationClasses.
 
 Require Import HashTableSpec HashTable HashTableBits HashTableNative HashTableProof.
 
@@ -230,4 +230,41 @@ Proof.
   intros K Seed A E hash eqb query key native Hequiv Heqb Hcongruent Hrelated Hwf.
   rewrite native_table_mem_refines, source_table_native_remove.
   eapply mem_after_remove_equiv; eauto.
+Qed.
+
+Lemma native_table_get_binding_iff :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) query (value : A)
+         (native : native_table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    (hash (native_table_seed native) query < hash_space)%N ->
+    native_table_wf E hash native ->
+    (native_table_get eqb hash query native = Some value <->
+      exists stored,
+        In (stored, value) (native_table_elements native) /\ E query stored).
+Proof.
+  intros K Seed A E hash eqb query value native Hequiv Heqb Hcongruent Hbound Hwf.
+  rewrite native_table_get_refines, native_table_elements_refines.
+  eapply get_binding_iff; eauto.
+Qed.
+
+Lemma native_table_mem_binding_iff :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) query (native : native_table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    (hash (native_table_seed native) query < hash_space)%N ->
+    native_table_wf E hash native ->
+    (native_table_mem eqb hash query native = true <->
+      exists stored value,
+        In (stored, value) (native_table_elements native) /\ E query stored).
+Proof.
+  intros K Seed A E hash eqb query native Hequiv Heqb Hcongruent Hbound Hwf.
+  rewrite native_table_mem_refines, native_table_elements_refines.
+  eapply mem_binding_iff; eauto.
 Qed.

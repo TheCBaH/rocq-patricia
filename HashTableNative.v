@@ -293,6 +293,10 @@ Definition native_table_mem {K Seed A : Type} (eqb : K -> K -> bool)
   | None => false
   end.
 
+Definition native_table_elements {K Seed A : Type}
+    (native : native_table K Seed A) : list (K * A) :=
+  elements (source_table_of_native native).
+
 Lemma source_table_native_empty :
   forall K Seed A (seed : Seed),
     @source_table_of_native K Seed A (native_empty seed) = empty seed.
@@ -346,4 +350,9 @@ Lemma native_table_mem_refines :
          key (native : native_table K Seed A),
     native_table_mem eqb hash key native =
     mem eqb hash key (source_table_of_native native).
+Proof. reflexivity. Qed.
+
+Lemma native_table_elements_refines :
+  forall K Seed A (native : native_table K Seed A),
+    native_table_elements native = elements (source_table_of_native native).
 Proof. reflexivity. Qed.
