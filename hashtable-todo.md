@@ -374,3 +374,4 @@ supporting contract or implementation changes.
 | 2026-09-20 | H4.2 | Added `native_table_wf`, plus empty, set and remove validity theorems. Modeled native maps now inherit the source invariant through their seeded source-table refinement boundary. `rocq compile HashTableNativeProof.v` passed. |
 | 2026-09-20 | H4.2 | Added modeled `native_table_get` and `native_table_mem` with exact source-table refinement equations. `time rocq compile HashTableNative.v` remained 0.26 seconds; `HashTableNativeProof.v` also passed. |
 | 2026-09-20 | H4.2 | Added modeled native self-update and self-removal lookup/membership laws, lifting `get`/`mem` behavior through source-table refinement. `rocq compile HashTableNativeProof.v` passed. |
+| 2026-09-20 | H4.2/H4.6 (partial) | Regenerated the expanded modeled-native artifact and ran its retained-version differential history in bytecode and native code. `make hashtable-native-model-test hashtable-native-model-test-native` passed. |
