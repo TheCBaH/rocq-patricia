@@ -2573,6 +2573,27 @@ Proof.
     rewrite Hbefore, Hreplace. repeat rewrite app_assoc. split; reflexivity.
 Qed.
 
+Lemma bindings_dense_get_split :
+  forall (K A : Type) index (children : list (tree K A)) child,
+    dense_get index children = Some child ->
+    exists before after,
+      children = before ++ child :: after /\
+      flat_map bindings children =
+        flat_map bindings before ++ bindings child ++ flat_map bindings after.
+Proof.
+  intros K A index. induction index as [|index IH]; intros children child Hget;
+    destruct children as [|head tail].
+  - unfold dense_get in Hget. discriminate.
+  - unfold dense_get in Hget. simpl in Hget. inversion Hget; subst child.
+    exists [], tail. simpl. split; reflexivity.
+  - unfold dense_get in Hget. discriminate.
+  - unfold dense_get in Hget. simpl in Hget.
+    destruct (IH tail child Hget) as [before [after [Hchildren Hbindings]]].
+    exists (head :: before), after. split.
+    + simpl. now rewrite Hchildren.
+    + simpl. rewrite Hbindings. repeat rewrite app_assoc. reflexivity.
+Qed.
+
 Lemma dense_replace_split :
   forall A index (replacement child : A) children,
     dense_get index children = Some child ->
