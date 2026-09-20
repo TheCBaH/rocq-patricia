@@ -117,6 +117,41 @@ Lemma bucket_set_retains_head_representative :
     bucket_set eqb key value ((stored, old) :: tail) = (stored, value) :: tail.
 Proof. intros. simpl. now rewrite H. Qed.
 
+Lemma bucket_set_retains_representative :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         key (value : A) entries stored (old_value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    NoDupA (fun left right => E (fst left) (fst right)) entries ->
+    In (stored, old_value) entries ->
+    E key stored ->
+    In (stored, value) (bucket_set eqb key value entries).
+Proof.
+  intros K A E eqb key value entries.
+  induction entries as [|[head head_value] tail IH];
+    intros stored old_value [Href Hsym Htrans] Heqb Hnodup Hin Hrelated.
+  - contradiction.
+  - inversion Hnodup as [|entry entries Hnotin Htail]; subst.
+    destruct Hin as [Hstored|Hstored].
+    + inversion Hstored; subst stored old_value.
+      simpl. rewrite (proj2 (Heqb key head) Hrelated). now left.
+    + destruct (eqb key head) eqn:Hkey_head.
+      * exfalso. apply Hnotin.
+        apply (proj2 (@InA_alt (K * A)
+          (fun left right => E (fst left) (fst right)) (head, head_value) tail)).
+        exists (stored, old_value). split; [|exact Hstored]. simpl.
+        apply Htrans with (y := key).
+        -- apply Hsym. now apply (proj1 (Heqb key head)).
+        -- exact Hrelated.
+      * simpl. rewrite Hkey_head. right.
+        eapply IH.
+        -- exact (Build_Equivalence E Href Hsym Htrans).
+        -- exact Heqb.
+        -- exact Htail.
+        -- exact Hstored.
+        -- exact Hrelated.
+Qed.
+
 Lemma bucket_set_key_origin :
   forall K A (eqb : K -> K -> bool) key (value : A) entries entry,
     In entry (bucket_set eqb key value entries) ->
