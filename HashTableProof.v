@@ -4795,6 +4795,21 @@ Proof.
       rewrite (Hall entry_key) in Hget. discriminate.
 Qed.
 
+Definition table_extensional {K Seed A : Type} (eqb : K -> K -> bool)
+    (hash : Seed -> K -> N) (left right : table K Seed A) : Prop :=
+  forall query, get eqb hash query left = get eqb hash query right.
+
+Lemma table_extensional_equivalence :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N),
+    Equivalence (@table_extensional K Seed A eqb hash).
+Proof.
+  intros K Seed A eqb hash. split.
+  - intro table. intro query. reflexivity.
+  - intros left right Hext query. symmetry. apply Hext.
+  - intros left middle right Hleft Hright query.
+    now rewrite Hleft, Hright.
+Qed.
+
 Lemma get_tree_query_equiv :
   forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
          fuel depth full_hash (left right : K) (t : tree K A),
