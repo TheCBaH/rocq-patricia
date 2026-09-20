@@ -7319,3 +7319,141 @@ Proof.
     intro Hrelated. apply (proj2 (Heqb query key)) in Hrelated.
     now rewrite Hquery_key in Hrelated.
 Qed.
+
+Lemma get_add_first_present :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (entries : list (K * A))
+         (m : table K Seed A) (query : K) (old_value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    (forall key value, In (key, value) entries ->
+      (hash (table_seed m) key < hash_space)%N) ->
+    (hash (table_seed m) query < hash_space)%N ->
+    table_wf E hash m ->
+    get eqb hash query m = Some old_value ->
+    get eqb hash query (add_first eqb hash entries m) = Some old_value.
+Proof.
+  intros K Seed A E hash eqb entries.
+  induction entries as [|[key value] tail IH];
+    intros m query old_value Hequiv Heqb Hcongruent Hbound Hquery_bound Hwf Hget.
+  - exact Hget.
+  - rewrite add_first_cons.
+    destruct (get eqb hash key m) eqn:Hkey.
+    + eapply IH; eauto.
+      intros key' value' Hin. apply (Hbound key' value'). now right.
+    + assert (Hquery_key : eqb query key = false).
+      { destruct (eqb query key) eqn:Hquery_key; auto.
+        exfalso.
+        pose proof (@get_query_equiv K Seed A E eqb hash query key m
+          Hequiv Heqb Hcongruent
+          (proj1 (Heqb query key) Hquery_key)) as Hsame.
+        rewrite Hget in Hsame. rewrite Hkey in Hsame. discriminate. }
+      apply (IH (set eqb hash key value m) query old_value Hequiv Heqb Hcongruent).
+      * intros key' value' Hin.
+        rewrite set_seed. apply (Hbound key' value'). now right.
+      * rewrite set_seed. exact Hquery_bound.
+      * eapply table_wf_set; eauto.
+        apply (Hbound key value). now left.
+      * rewrite (@get_after_set K Seed A E hash eqb query key value m
+          Hequiv Heqb Hcongruent Hquery_bound
+          (Hbound key value (or_introl eq_refl)) Hwf).
+        now rewrite Hquery_key.
+Qed.
+
+Lemma get_add_first :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (entries : list (K * A))
+         (m : table K Seed A) (query : K),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    (forall key value, In (key, value) entries ->
+      (hash (table_seed m) key < hash_space)%N) ->
+    (hash (table_seed m) query < hash_space)%N ->
+    table_wf E hash m ->
+    get eqb hash query (add_first eqb hash entries m) =
+      match get eqb hash query m with
+      | Some value => Some value
+      | None => option_map snd (first_binding eqb query entries)
+      end.
+Proof.
+  intros K Seed A E hash eqb entries.
+  induction entries as [|[key value] tail IH];
+    intros m query Hequiv Heqb Hcongruent Hbound Hquery_bound Hwf.
+  - simpl [add_first]. destruct (get eqb hash query m); reflexivity.
+  - destruct (get eqb hash query m) as [old_value|] eqn:Hquery.
+    + change (get eqb hash query (add_first eqb hash ((key, value) :: tail) m) =
+        Some old_value).
+      eapply get_add_first_present; eauto.
+    + rewrite add_first_cons. simpl first_binding.
+      destruct (eqb query key) eqn:Hquery_key.
+      * assert (Hkey : get eqb hash key m = None).
+        { pose proof (@get_query_equiv K Seed A E eqb hash query key m
+            Hequiv Heqb Hcongruent
+            (proj1 (Heqb query key) Hquery_key)) as Hsame.
+          rewrite Hquery in Hsame. now symmetry. }
+        rewrite Hkey.
+        eapply get_add_first_present.
+        -- exact Hequiv.
+        -- exact Heqb.
+        -- exact Hcongruent.
+        -- intros key' value' Hin.
+           rewrite set_seed. apply (Hbound key' value'). now right.
+        -- rewrite set_seed. exact Hquery_bound.
+        -- eapply table_wf_set; eauto.
+           apply (Hbound key value). now left.
+        -- rewrite (@get_after_set K Seed A E hash eqb query key value m
+             Hequiv Heqb Hcongruent Hquery_bound
+             (Hbound key value (or_introl eq_refl)) Hwf).
+           now rewrite Hquery_key.
+      * destruct (get eqb hash key m) as [previous|] eqn:Hkey.
+        -- pose proof (IH m query Hequiv Heqb Hcongruent
+             (fun key' value' Hin => Hbound key' value' (or_intror Hin))
+             Hquery_bound Hwf) as Htail.
+           rewrite Hquery in Htail. exact Htail.
+        -- assert (Hquery_set : get eqb hash query
+             (set eqb hash key value m) = None).
+           { rewrite (@get_after_set K Seed A E hash eqb query key value m
+                Hequiv Heqb Hcongruent Hquery_bound
+                (Hbound key value (or_introl eq_refl)) Hwf).
+             now rewrite Hquery_key. }
+           assert (Hbound_tail_set : forall key' value', In (key', value') tail ->
+             (hash (table_seed (set eqb hash key value m)) key' < hash_space)%N).
+           { intros key' value' Hin. rewrite set_seed.
+             apply (Hbound key' value'). now right. }
+           assert (Hquery_bound_set :
+             (hash (table_seed (set eqb hash key value m)) query < hash_space)%N).
+           { rewrite set_seed. exact Hquery_bound. }
+           assert (Hwf_set : table_wf E hash (set eqb hash key value m)).
+           { eapply table_wf_set; eauto.
+             apply (Hbound key value). now left. }
+           pose proof (IH (set eqb hash key value m) query Hequiv Heqb Hcongruent
+             Hbound_tail_set Hquery_bound_set Hwf_set) as Htail.
+           rewrite Hquery_set in Htail. exact Htail.
+Qed.
+
+Lemma get_of_list_first_binding :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (entries : list (K * A))
+         (query : K),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall actual_seed first second, E first second ->
+      hash actual_seed first = hash actual_seed second) ->
+    (forall key value, In (key, value) entries ->
+      (hash seed key < hash_space)%N) ->
+    (hash seed query < hash_space)%N ->
+    get eqb hash query (of_list eqb hash seed entries) =
+      option_map snd (first_binding eqb query entries).
+Proof.
+  intros K Seed A E hash seed eqb entries query Hequiv Heqb Hcongruent
+    Hbound Hquery_bound.
+  unfold of_list.
+  pose proof (@get_add_first K Seed A E hash eqb entries (empty seed) query
+    Hequiv Heqb Hcongruent Hbound Hquery_bound
+    (table_wf_empty E hash seed)) as Hget.
+  rewrite get_empty in Hget. exact Hget.
+Qed.

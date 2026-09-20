@@ -437,6 +437,15 @@ Definition of_list {K Seed A : Type} (eqb : K -> K -> bool)
     : table K Seed A :=
   add_first eqb hash entries (empty seed).
 
+Fixpoint first_binding {K A : Type} (eqb : K -> K -> bool) (query : K)
+    (entries : list (K * A)) : option (K * A) :=
+  match entries with
+  | [] => None
+  | (key, value) :: tail =>
+      if eqb query key then Some (key, value)
+      else first_binding eqb query tail
+  end.
+
 Lemma add_first_cons :
   forall K Seed A (eqb : K -> K -> bool) (hash : Seed -> K -> N)
          key (value : A) tail (m : table K Seed A),
