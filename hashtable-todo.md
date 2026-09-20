@@ -357,3 +357,4 @@ supporting contract or implementation changes.
 | 2026-09-20 | H2.1/H3.1 | Added public `elements_nodup`, lifting the valid-tree global equivalence-key uniqueness invariant through the flattened enumeration view. `rocq compile HashTableProof.v` passed. |
 | 2026-09-20 | H2.1/H3.1 | Added `NoDupA_fst` and public `elements_keys_nodup`, giving the design's exact `NoDupA E (map fst (elements m))` uniqueness law for valid tables. `rocq compile HashTableProof.v` passed. |
 | 2026-09-20 | H3.1 (partial) | Added `is_empty_get_none`, the forward public emptiness law: an empty root gives `None` for every lookup. The valid-map converse remains open. `rocq compile HashTableProof.v` passed. |
+| 2026-09-20 | H1.2/H3.1 (partial) | Added `bitmap_nonzero_has_slot`: every nonzero bitmap bounded to the 32-bit branch width has a concrete occupied slot, supplying the finite witness for valid branch nonemptiness. `rocq compile HashTableBits.v` passed. |

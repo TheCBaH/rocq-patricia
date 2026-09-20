@@ -152,6 +152,24 @@ Proof.
     apply N.bits_above_log2. unfold branch_width in Hslot. lia.
 Qed.
 
+Lemma bitmap_nonzero_has_slot :
+  forall bitmap,
+    (bitmap < bitmap_limit)%N ->
+    bitmap <> 0%N ->
+    exists slot,
+      (slot < branch_width)%N /\ bitmap_has bitmap slot = true.
+Proof.
+  intros bitmap Hbound Hnonzero.
+  exists (N.log2 bitmap). split.
+  - assert (Hpositive : (0 < bitmap)%N) by lia.
+    assert (Hpow : (bitmap < 2 ^ 32)%N).
+    { change (bitmap < bitmap_limit)%N. exact Hbound. }
+    apply (proj1 (N.log2_lt_pow2 bitmap 32 Hpositive)) in Hpow.
+    change (N.log2 bitmap < 32)%N. exact Hpow.
+  - apply (proj2 (bitmap_has_spec bitmap (N.log2 bitmap))).
+    apply N.bit_log2. exact Hnonzero.
+Qed.
+
 Lemma bitmap_empty_iff :
   forall bitmap,
     bitmap = 0%N <-> forall slot, bitmap_has bitmap slot = false.
