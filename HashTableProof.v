@@ -618,6 +618,28 @@ Proof.
      Hnext Hchildwf).
 Qed.
 
+Definition set_tree_falls_back {K A : Type} (fuel depth : nat)
+    (full_hash : N) (t : tree K A) : bool :=
+  get_tree_falls_back fuel depth full_hash t.
+
+Lemma set_tree_wf_no_fallback :
+ forall fuel depth prefix full_hash (t : tree K A),
+   fuel + depth = branch_levels ->
+   wf depth prefix t ->
+   set_tree_falls_back fuel depth full_hash t = false.
+Proof. exact get_tree_wf_no_fallback. Qed.
+
+Definition remove_tree_falls_back {K A : Type} (fuel depth : nat)
+    (full_hash : N) (t : tree K A) : bool :=
+  get_tree_falls_back fuel depth full_hash t.
+
+Lemma remove_tree_wf_no_fallback :
+ forall fuel depth prefix full_hash (t : tree K A),
+   fuel + depth = branch_levels ->
+   wf depth prefix t ->
+   remove_tree_falls_back fuel depth full_hash t = false.
+Proof. exact get_tree_wf_no_fallback. Qed.
+
 Lemma wf_branch_replace :
  forall depth prefix bitmap children slot (child : tree K A),
  wf depth prefix (Branch bitmap children) ->
