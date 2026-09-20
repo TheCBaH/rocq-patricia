@@ -4,7 +4,7 @@
     OCaml array heap theorem; that remaining target obligation is recorded in
     the tracker. *)
 
-From Stdlib Require Import List NArith RelationClasses.
+From Stdlib Require Import List NArith RelationClasses SetoidList.
 
 Require Import HashTableSpec HashTable HashTableBits HashTableNative HashTableProof.
 
@@ -267,4 +267,16 @@ Proof.
   intros K Seed A E hash eqb query native Hequiv Heqb Hcongruent Hbound Hwf.
   rewrite native_table_mem_refines, native_table_elements_refines.
   eapply mem_binding_iff; eauto.
+Qed.
+
+Lemma native_table_elements_keys_nodup :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (native : native_table K Seed A),
+    native_table_wf E hash native ->
+    NoDupA E (map fst (native_table_elements native)).
+Proof.
+  intros K Seed A E hash native Hwf.
+  rewrite native_table_elements_refines.
+  apply (@elements_keys_nodup K Seed A E hash (source_table_of_native native)).
+  exact Hwf.
 Qed.
