@@ -410,6 +410,17 @@ Definition of_list {K Seed A : Type} (eqb : K -> K -> bool)
     : table K Seed A :=
   add_first eqb hash entries (empty seed).
 
+Lemma add_first_cons :
+  forall K Seed A (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         key (value : A) tail (m : table K Seed A),
+    add_first eqb hash ((key, value) :: tail) m =
+    let m' := match get eqb hash key m with
+              | Some _ => m
+              | None => set eqb hash key value m
+              end in
+    add_first eqb hash tail m'.
+Proof. reflexivity. Qed.
+
 Definition singleton {K Seed A : Type} (eqb : K -> K -> bool)
     (hash : Seed -> K -> N) (seed : Seed) (key : K) (value : A)
     : table K Seed A :=

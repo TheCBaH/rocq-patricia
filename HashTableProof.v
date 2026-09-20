@@ -5921,6 +5921,35 @@ Proof.
     Hequiv Heqb Hcongruent Hbound Hwf).
 Qed.
 
+Lemma of_list_first_wins_equiv :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (first_key second_key : K)
+         (first_value second_value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall actual_seed first second, E first second ->
+      hash actual_seed first = hash actual_seed second) ->
+    E second_key first_key ->
+    (hash seed first_key < hash_space)%N ->
+    of_list eqb hash seed
+      [(first_key, first_value); (second_key, second_value)] =
+    singleton eqb hash seed first_key first_value.
+Proof.
+  intros K Seed A E hash seed eqb first_key second_key first_value second_value
+    Hequiv Heqb Hcongruent Hrelated Hbound.
+  assert (Hget : get eqb hash second_key
+    (set eqb hash first_key first_value (empty seed)) = Some first_value).
+  { eapply (@get_after_set_equiv K Seed A E hash seed eqb second_key first_key
+      first_value Empty); eauto.
+    apply wf_empty. }
+  unfold of_list. rewrite add_first_cons.
+  rewrite get_empty.
+  change (add_first eqb hash [(second_key, second_value)]
+    (set eqb hash first_key first_value (empty seed)) =
+    singleton eqb hash seed first_key first_value).
+  rewrite add_first_cons, Hget. reflexivity.
+Qed.
+
 Lemma mem_after_set_equiv :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) (query key : K) (value : A)
