@@ -576,6 +576,48 @@ Proof.
   - exact Hrelated.
 Qed.
 
+Fixpoint get_tree_falls_back {K A : Type} (fuel depth : nat)
+    (full_hash : N) (t : tree K A) : bool :=
+  match fuel, t with
+  | 0, Branch _ _ => true
+  | S fuel', Branch bitmap children =>
+      if bitmap_has bitmap (chunk full_hash depth) then
+        match dense_get (rank bitmap (chunk full_hash depth)) children with
+        | Some child => get_tree_falls_back fuel' (S depth) full_hash child
+        | None => false
+        end
+      else false
+  | _, _ => false
+  end.
+
+Lemma get_tree_wf_no_fallback :
+ forall fuel depth prefix full_hash (t : tree K A),
+   fuel + depth = branch_levels ->
+   wf depth prefix t ->
+   get_tree_falls_back fuel depth full_hash t = false.
+Proof.
+ induction fuel as [|fuel IH]; intros depth prefix full_hash t Hfuel Hwf;
+   destruct t as [|stored_hash stored value|stored_hash entries|bitmap children];
+   cbn [get_tree_falls_back].
+ - reflexivity.
+ - reflexivity.
+ - reflexivity.
+ - assert (Hlimit : branch_levels <= depth) by lia.
+   exfalso. apply (wf_branch_impossible_at_or_beyond_limit Hlimit Hwf).
+ - reflexivity.
+ - reflexivity.
+ - reflexivity.
+ - destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent;
+     [destruct (@wf_branch_ranked_child depth prefix bitmap children
+        (chunk full_hash depth) Hwf (chunk_bound full_hash depth) Hpresent)
+       as [child [Hchild [_ Hchildwf]]]
+     |reflexivity].
+   rewrite Hchild.
+   assert (Hnext : fuel + S depth = branch_levels) by lia.
+   exact (IH (S depth) (prefix ++ [chunk full_hash depth]) full_hash child
+     Hnext Hchildwf).
+Qed.
+
 Lemma wf_branch_replace :
  forall depth prefix bitmap children slot (child : tree K A),
  wf depth prefix (Branch bitmap children) ->
