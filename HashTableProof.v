@@ -348,6 +348,57 @@ Proof.
   - exact H4.
 Qed.
 
+Lemma forall2_slot_child_wf_early :
+ forall depth prefix slots children,
+ Forall2 (fun slot (child : tree K A) =>
+   child <> Empty /\ wf (S depth) (prefix ++ [slot]) child) slots children ->
+ forall slot, In slot slots ->
+   exists child, In child children /\ child <> Empty /\
+     wf (S depth) (prefix ++ [slot]) child.
+Proof.
+ intros depth prefix slots children Hpaired slot Hin.
+ induction Hpaired.
+ - contradiction.
+ - simpl in Hin. destruct Hin as [Hslot|Hin].
+   + subst slot. exists y. split; [now left|exact H].
+   + destruct IHHpaired as [child [Hchild [Hnonempty Hwf]]]; auto.
+     exists child. split; [now right|split; assumption].
+Qed.
+
+Lemma wf_nonempty_has_binding :
+  forall (t : tree K A) depth prefix,
+    wf depth prefix t ->
+    t <> Empty ->
+    exists entry, In entry (bindings t).
+Proof.
+  refine (@tree_ind_nested K A
+    (fun t => forall depth prefix, wf depth prefix t -> t <> Empty ->
+      exists entry, In entry (bindings t))
+    _ _ _ _).
+  - intros depth prefix Hwf Hnonempty. contradiction.
+  - intros full_hash key value depth prefix Hwf Hnonempty.
+    exists (key, value). now left.
+  - intros full_hash entries depth prefix Hwf Hnonempty.
+    destruct entries as [|entry entries].
+    + inversion Hwf as [| |d p h es Hlength Hentries Hnodup|]; simpl in Hlength.
+      lia.
+    + exists entry. now left.
+  - intros bitmap children IH depth prefix Hwf Hnonempty.
+    inversion Hwf as [| | |d p b cs Hdepth Hbound Hbitmap_nonzero Hlength
+      Hchildren Hnodup]; subst.
+    destruct (@bitmap_nonzero_has_slot bitmap Hbound Hbitmap_nonzero)
+      as [slot [Hslot_bound Hslot_has]].
+    assert (Hslot_in : In slot (occupied_slots bitmap)).
+    { now apply occupied_slots_complete. }
+    destruct (forall2_slot_child_wf_early (depth := depth) prefix Hchildren slot Hslot_in)
+      as [child [Hchild_in [Hchild_nonempty Hchild_wf]]].
+    pose proof ((proj1 (Forall_forall _ _)) IH child Hchild_in) as Hih.
+    destruct (Hih (S depth) (prefix ++ [slot]) Hchild_wf Hchild_nonempty)
+      as [entry Hentry].
+    exists entry. simpl. apply in_flat_map.
+    now exists child.
+Qed.
+
 Lemma wf_branch_children_occupied_length :
   forall depth prefix bitmap children,
     wf depth prefix (Branch bitmap children) ->
@@ -4670,6 +4721,78 @@ Lemma is_empty_get_none :
 Proof.
   intros K Seed A eqb hash [seed root] Hempty query.
   apply is_empty_root_iff in Hempty. subst root. reflexivity.
+Qed.
+
+Lemma is_empty_iff_get_none :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         (hash : Seed -> K -> N) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second -> hash seed first = hash seed second) ->
+    table_wf E hash m ->
+    (is_empty m = true <-> forall query, get eqb hash query m = None).
+Proof.
+  intros K Seed A E eqb hash [seed root] Hequiv Heqb Hcongruent Hwf.
+  pose proof Hequiv as [Href Hsym Htrans].
+  split.
+  - apply is_empty_get_none.
+  - intro Hall.
+    destruct root as [|stored_hash stored value|stored_hash entries|bitmap children].
+    + reflexivity.
+    + exfalso.
+      destruct (@wf_nonempty_has_binding K Seed A E hash seed
+        (Leaf stored_hash stored value) 0 [] Hwf) as [entry Hin].
+      { discriminate. }
+      destruct entry as [entry_key entry_value].
+      destruct (@wf_binding_hash K Seed A E hash seed
+        (Leaf stored_hash stored value) 0 [] Hwf (entry_key, entry_value) Hin)
+        as [full_hash [Hhash Hbound]].
+      simpl in Hhash.
+      assert (Hget : get eqb hash entry_key
+        {| table_seed := seed; table_root := Leaf stored_hash stored value |} =
+        Some entry_value).
+      { assert (Hkeybound : (hash seed entry_key < hash_space)%N).
+        { rewrite <- Hhash. exact Hbound. }
+        exact (@get_binding_complete K Seed A E hash eqb entry_key entry_key
+          entry_value {| table_seed := seed; table_root := Leaf stored_hash stored value |}
+          Hequiv Heqb Hcongruent Hkeybound Hwf Hin (Href entry_key)). }
+      rewrite (Hall entry_key) in Hget. discriminate.
+    + exfalso.
+      destruct (@wf_nonempty_has_binding K Seed A E hash seed
+        (Collision stored_hash entries) 0 [] Hwf) as [entry Hin].
+      { discriminate. }
+      destruct entry as [entry_key entry_value].
+      destruct (@wf_binding_hash K Seed A E hash seed
+        (Collision stored_hash entries) 0 [] Hwf (entry_key, entry_value) Hin)
+        as [full_hash [Hhash Hbound]].
+      simpl in Hhash.
+      assert (Hget : get eqb hash entry_key
+        {| table_seed := seed; table_root := Collision stored_hash entries |} =
+        Some entry_value).
+      { assert (Hkeybound : (hash seed entry_key < hash_space)%N).
+        { rewrite <- Hhash. exact Hbound. }
+        exact (@get_binding_complete K Seed A E hash eqb entry_key entry_key
+          entry_value {| table_seed := seed; table_root := Collision stored_hash entries |}
+          Hequiv Heqb Hcongruent Hkeybound Hwf Hin (Href entry_key)). }
+      rewrite (Hall entry_key) in Hget. discriminate.
+    + exfalso.
+      destruct (@wf_nonempty_has_binding K Seed A E hash seed
+        (Branch bitmap children) 0 [] Hwf) as [entry Hin].
+      { discriminate. }
+      destruct entry as [entry_key entry_value].
+      destruct (@wf_binding_hash K Seed A E hash seed
+        (Branch bitmap children) 0 [] Hwf (entry_key, entry_value) Hin)
+        as [full_hash [Hhash Hbound]].
+      simpl in Hhash.
+      assert (Hget : get eqb hash entry_key
+        {| table_seed := seed; table_root := Branch bitmap children |} =
+        Some entry_value).
+      { assert (Hkeybound : (hash seed entry_key < hash_space)%N).
+        { rewrite <- Hhash. exact Hbound. }
+        exact (@get_binding_complete K Seed A E hash eqb entry_key entry_key
+          entry_value {| table_seed := seed; table_root := Branch bitmap children |}
+          Hequiv Heqb Hcongruent Hkeybound Hwf Hin (Href entry_key)). }
+      rewrite (Hall entry_key) in Hget. discriminate.
 Qed.
 
 Lemma get_tree_query_equiv :
