@@ -259,6 +259,54 @@ Definition native_branch_insert {K A : Type} (bitmap slot : N)
   NativeBranch (N.lor bitmap (bitmap_bit slot))
     (pseq_insert (rank bitmap slot) child children).
 
+Lemma map_dense_insert :
+  forall A B (f : A -> B) index (item : A) items,
+    map f (dense_insert index item items) =
+    dense_insert index (f item) (map f items).
+Proof.
+  intros A B f index.
+  induction index as [|index IH]; intros item items;
+    destruct items as [|head tail]; cbn; auto.
+  now rewrite IH.
+Qed.
+
+Lemma map_dense_replace :
+  forall A B (f : A -> B) index (item : A) items,
+    map f (dense_replace index item items) =
+    dense_replace index (f item) (map f items).
+Proof.
+  intros A B f index.
+  induction index as [|index IH]; intros item items;
+    destruct items as [|head tail]; cbn; auto.
+  now rewrite IH.
+Qed.
+
+Lemma source_of_native_branch_insert :
+  forall K A (bitmap slot : N) (child : native_tree K A)
+         (children : pseq (native_tree K A)),
+    source_of_native (native_branch_insert bitmap slot child children) =
+    branch_insert bitmap slot (source_of_native child)
+      (map source_of_native (pseq_view children)).
+Proof.
+  intros K A bitmap slot child children.
+  unfold native_branch_insert, source_of_native, pseq_insert, pseq_of_list,
+    branch_insert.
+  cbn. f_equal. apply map_dense_insert.
+Qed.
+
+Lemma source_of_native_branch_replace :
+  forall K A (bitmap slot : N) (child : native_tree K A)
+         (children : pseq (native_tree K A)),
+    source_of_native (native_branch_replace bitmap slot child children) =
+    branch_replace bitmap slot (source_of_native child)
+      (map source_of_native (pseq_view children)).
+Proof.
+  intros K A bitmap slot child children.
+  unfold native_branch_replace, source_of_native, pseq_replace, pseq_of_list,
+    branch_replace.
+  cbn. f_equal. apply map_dense_replace.
+Qed.
+
 (** Lookup is a recursive compact-child worker.  Update and removal remain
     source-refined while their compact workers are developed. *)
 Fixpoint native_get {K A : Type} (eqb : K -> K -> bool)

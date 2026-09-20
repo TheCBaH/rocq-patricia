@@ -294,6 +294,8 @@ Append subsequent evidence here with task IDs, theorem/source names, exact
 commands, pass/fail results and remaining assumptions. Reopen a gate if its
 supporting contract or implementation changes.
 
+| 2026-09-20 | H4.1 (partial) | Added `map_dense_insert`, `map_dense_replace`, `source_of_native_branch_insert`, and `source_of_native_branch_replace`. Compact-child insertion and replacement now have exact source-view refinement equations, so recursive native update/removal workers can lift their fresh `pseq` edits without a whole-tree conversion at branch boundaries. `opam exec -- rocq compile HashTableNative.v`, `opam exec -- rocq compile HashTableNativeProof.v`, `make hashtable-assumptions`, and `make hashtable-native-model-test` passed; recursive native update/removal workers remain open. |
+
 | 2026-09-16 | H2.5 (partial) | Added `get_tree_after_remove_leaf_miss`, branch compact-delete/replacement lookup helpers, `get_tree_after_remove_self_wf`, and public `get_after_remove_self`. A valid table no longer returns a removed key under equality reflection and hash congruence. `rocq compile HashTableProof.v` and `make hashtable-assumptions` passed with 373 declarations closed. |
 | 2026-09-16 | H3.2 | Added the documented `HashTableTestHash` API with deterministic bounded integer/string and constant-collision hashes. The direct extraction test now uses it and checks its normalization boundary and string determinism. `make hashtable-reference-test` passed. |
 | 2026-09-16 | H3.5 | Added `check-hashtable-generated-interface.sh` and made it a prerequisite of `hashtable-extraction-audit`. It verifies the regenerated source-map interface’s expected declarations, OCaml-int hashes, and lack of unsafe/foreign declarations. |
