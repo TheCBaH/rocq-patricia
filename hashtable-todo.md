@@ -356,3 +356,4 @@ supporting contract or implementation changes.
 | 2026-09-20 | H2.3/H3.1 | Added public `get_binding_iff` and `mem_binding_iff`, packaging the valid-map lookup and membership semantics as equivalence-key flattened-binding characterizations. `rocq compile HashTableProof.v` passed. |
 | 2026-09-20 | H2.1/H3.1 | Added public `elements_nodup`, lifting the valid-tree global equivalence-key uniqueness invariant through the flattened enumeration view. `rocq compile HashTableProof.v` passed. |
 | 2026-09-20 | H2.1/H3.1 | Added `NoDupA_fst` and public `elements_keys_nodup`, giving the design's exact `NoDupA E (map fst (elements m))` uniqueness law for valid tables. `rocq compile HashTableProof.v` passed. |
+| 2026-09-20 | H3.1 (partial) | Added `is_empty_get_none`, the forward public emptiness law: an empty root gives `None` for every lookup. The valid-map converse remains open. `rocq compile HashTableProof.v` passed. |

@@ -4662,6 +4662,16 @@ Proof.
   apply NoDupA_fst. now apply (@elements_nodup K Seed A E hash m Hwf).
 Qed.
 
+Lemma is_empty_get_none :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         (m : table K Seed A),
+    is_empty m = true ->
+    forall query, get eqb hash query m = None.
+Proof.
+  intros K Seed A eqb hash [seed root] Hempty query.
+  apply is_empty_root_iff in Hempty. subst root. reflexivity.
+Qed.
+
 Lemma get_tree_query_equiv :
   forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
          fuel depth full_hash (left right : K) (t : tree K A),
