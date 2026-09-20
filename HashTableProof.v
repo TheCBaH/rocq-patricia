@@ -5857,6 +5857,53 @@ Proof.
   - reflexivity.
 Qed.
 
+Lemma add_first_table_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (entries : list (K * A))
+         (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall actual_seed first second, E first second ->
+      hash actual_seed first = hash actual_seed second) ->
+    (forall key value, In (key, value) entries ->
+      (hash seed key < hash_space)%N) ->
+    table_seed m = seed ->
+    table_wf E hash m ->
+    table_wf E hash (add_first eqb hash entries m).
+Proof.
+  intros K Seed A E hash seed eqb entries.
+  induction entries as [|[key value] tail IH]; intros m Hequiv Heqb Hcongruent
+    Hbound Hseed Hwf.
+  - change (table_wf E hash m). exact Hwf.
+  - rewrite add_first_cons.
+    destruct (get eqb hash key m) eqn:Hget.
+    + eapply (IH m Hequiv Heqb Hcongruent).
+      * intros key' value' Hin. apply (Hbound key' value'). right. exact Hin.
+      * exact Hseed.
+      * exact Hwf.
+    + eapply (IH (set eqb hash key value m) Hequiv Heqb Hcongruent).
+      * intros key' value' Hin. apply (Hbound key' value'). right. exact Hin.
+      * rewrite set_seed. exact Hseed.
+      * eapply table_wf_set; eauto.
+        rewrite Hseed. apply (Hbound key value). left. reflexivity.
+Qed.
+
+Lemma table_wf_of_list :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (entries : list (K * A)),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall actual_seed first second, E first second ->
+      hash actual_seed first = hash actual_seed second) ->
+    (forall key value, In (key, value) entries ->
+      (hash seed key < hash_space)%N) ->
+    table_wf E hash (of_list eqb hash seed entries).
+Proof.
+  intros K Seed A E hash seed eqb entries Hequiv Heqb Hcongruent Hbound.
+  unfold of_list.
+  eapply add_first_table_wf; eauto using table_wf_empty.
+Qed.
+
 Lemma get_after_set_self :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
