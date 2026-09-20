@@ -3324,6 +3324,50 @@ Proof.
   - reflexivity.
 Qed.
 
+Lemma get_binding_iff :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) query (value : A) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second -> hash seed first = hash seed second) ->
+    (hash (table_seed m) query < hash_space)%N ->
+    table_wf E hash m ->
+    (get eqb hash query m = Some value <->
+      exists stored, In (stored, value) (elements m) /\ E query stored).
+Proof.
+  intros K Seed A E hash eqb query value m Hequiv Heqb Hcongruent Hbound Hwf.
+  split.
+  - intro Hget. eapply get_binding_sound; eauto.
+  - intros [stored [Hin Hrelated]].
+    eapply get_binding_complete; eauto.
+Qed.
+
+Lemma mem_binding_iff :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) query (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second -> hash seed first = hash seed second) ->
+    (hash (table_seed m) query < hash_space)%N ->
+    table_wf E hash m ->
+    (mem eqb hash query m = true <->
+      exists stored value, In (stored, value) (elements m) /\ E query stored).
+Proof.
+  intros K Seed A E hash eqb query m Hequiv Heqb Hcongruent Hbound Hwf.
+  split.
+  - intro Hmem. apply mem_spec in Hmem.
+    destruct Hmem as [value Hget].
+    apply (@get_binding_iff K Seed A E hash eqb query value m
+      Hequiv Heqb Hcongruent Hbound Hwf) in Hget.
+    destruct Hget as [stored [Hin Hrelated]].
+    now exists stored, value.
+  - intros [stored [value [Hin Hrelated]]].
+    apply mem_spec. exists value.
+    apply (@get_binding_iff K Seed A E hash eqb query value m
+      Hequiv Heqb Hcongruent Hbound Hwf).
+    now exists stored.
+Qed.
+
 Lemma get_tree_leaf_other_hash :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash stored_hash
          key stored (value : A),
