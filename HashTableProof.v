@@ -2997,6 +2997,58 @@ Proof.
   now apply (proj1 (Heqb query stored)).
 Qed.
 
+Lemma get_tree_leaf_binding_complete :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (query stored : K) (value : A) stored_hash,
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall first second, E first second -> hash seed first = hash seed second) ->
+    full_hash = hash seed query ->
+    wf E hash seed depth prefix (Leaf stored_hash stored value) ->
+    E query stored ->
+    get_tree eqb fuel depth full_hash query
+      (Leaf stored_hash stored value) = Some value.
+Proof.
+  intros K Seed A E hash seed eqb fuel depth prefix full_hash query stored
+    value stored_hash Heqb Hcongruent Hfull Hwf Hrelated.
+  assert (Hstored : stored_hash = hash seed stored).
+  { inversion Hwf; assumption. }
+  assert (Hsame : full_hash = stored_hash).
+  { rewrite Hfull, Hstored. apply Hcongruent. exact Hrelated. }
+  assert (Hmatch : eqb query stored = true).
+  { apply (proj2 (Heqb query stored)). exact Hrelated. }
+  destruct fuel; cbn [get_tree]; now rewrite Hsame, N.eqb_refl, Hmatch.
+Qed.
+
+Lemma get_tree_collision_binding_complete :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (query stored : K) (value : A) stored_hash entries,
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall first second, E first second -> hash seed first = hash seed second) ->
+    full_hash = hash seed query ->
+    wf E hash seed depth prefix (Collision stored_hash entries) ->
+    In (stored, value) entries ->
+    E query stored ->
+    get_tree eqb fuel depth full_hash query
+      (Collision stored_hash entries) = Some value.
+Proof.
+  intros K Seed A E hash seed eqb fuel depth prefix full_hash query stored
+    value stored_hash entries Hequiv Heqb Hcongruent Hfull Hwf Hin Hrelated.
+  assert (Hstored : stored_hash = hash seed stored).
+  { eapply (@collision_binding_hash K Seed A E hash seed depth prefix
+      stored_hash entries (stored, value)); eauto. }
+  assert (Hsame : full_hash = stored_hash).
+  { rewrite Hfull, Hstored. apply Hcongruent. exact Hrelated. }
+  assert (Hnodup : NoDupA (fun left right : K * A => E (fst left) (fst right))
+    entries).
+  { inversion Hwf; subst. exact H5. }
+  destruct fuel; cbn [get_tree]; rewrite Hsame, N.eqb_refl.
+  - eapply bucket_get_complete; eauto.
+  - eapply bucket_get_complete; eauto.
+Qed.
+
 Lemma get_tree_leaf_other_hash :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash stored_hash
          key stored (value : A),
