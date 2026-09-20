@@ -2936,6 +2936,67 @@ Lemma get_tree_empty :
     get_tree eqb fuel depth full_hash query (@Empty K A) = None.
 Proof. intros. destruct fuel; reflexivity. Qed.
 
+Lemma get_tree_binding_sound :
+  forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash query
+         (t : tree K A) value,
+    get_tree eqb fuel depth full_hash query t = Some value ->
+    exists stored,
+      In (stored, value) (bindings t) /\ eqb query stored = true.
+Proof.
+  intros K A eqb fuel.
+  induction fuel as [|fuel IH]; intros depth full_hash query t value Hget;
+    destruct t as [|stored_hash stored stored_value|stored_hash entries|bitmap children].
+  - discriminate.
+  - cbn [get_tree] in Hget.
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash; [|discriminate].
+    destruct (eqb query stored) eqn:Hmatch; [|discriminate].
+    inversion Hget; subst value.
+    exists stored. split; [now left|exact Hmatch].
+  - cbn [get_tree] in Hget.
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash; [|discriminate].
+    now apply bucket_get_sound in Hget.
+  - discriminate.
+  - discriminate.
+  - cbn [get_tree] in Hget.
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash; [|discriminate].
+    destruct (eqb query stored) eqn:Hmatch; [|discriminate].
+    inversion Hget; subst value.
+    exists stored. split; [now left|exact Hmatch].
+  - cbn [get_tree] in Hget.
+    destruct (N.eqb full_hash stored_hash) eqn:Hhash; [|discriminate].
+    now apply bucket_get_sound in Hget.
+  - cbn [get_tree] in Hget.
+    destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hroute;
+      [|discriminate].
+    destruct (dense_get (rank bitmap (chunk full_hash depth)) children)
+      as [child|] eqn:Hchild; [|discriminate].
+    destruct (IH (S depth) full_hash query child value Hget)
+      as [stored [Hbinding Hmatch]].
+    exists stored. split; [|exact Hmatch].
+    cbn [bindings]. apply in_flat_map.
+    exists child. split.
+    + unfold dense_get in Hchild.
+      now apply nth_error_In with (n := rank bitmap (chunk full_hash depth)).
+    + exact Hbinding.
+Qed.
+
+Lemma get_binding_sound :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         (hash : Seed -> K -> N) query (m : table K Seed A) value,
+    (forall first second, eqb first second = true <-> E first second) ->
+    get eqb hash query m = Some value ->
+    exists stored,
+      In (stored, value) (elements m) /\ E query stored.
+Proof.
+  intros K Seed A E eqb hash query [seed root] value Heqb Hget.
+  change (get_tree eqb branch_levels 0 (hash seed query) query root = Some value)
+    in Hget.
+  destruct (@get_tree_binding_sound K A eqb branch_levels 0 (hash seed query)
+    query root value Hget) as [stored [Hbinding Hmatch]].
+  exists stored. split; [exact Hbinding|].
+  now apply (proj1 (Heqb query stored)).
+Qed.
+
 Lemma get_tree_leaf_other_hash :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash stored_hash
          key stored (value : A),
