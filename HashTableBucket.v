@@ -58,6 +58,22 @@ Lemma bucket_get_empty :
     @bucket_get K A eqb query [] = None.
 Proof. reflexivity. Qed.
 
+Lemma bucket_get_sound :
+  forall K A (eqb : K -> K -> bool) key (entries : list (K * A)) value,
+    bucket_get eqb key entries = Some value ->
+    exists stored,
+      In (stored, value) entries /\ eqb key stored = true.
+Proof.
+  intros K A eqb key entries.
+  induction entries as [|[stored stored_value] tail IH]; intros value Hget.
+  - discriminate.
+  - cbn in Hget. destruct (eqb key stored) eqn:Hstored.
+    + inversion Hget; subst value.
+      exists stored. split; [now left|exact Hstored].
+    + destruct (IH value Hget) as [found [Hin Hmatch]].
+      exists found. split; [now right|exact Hmatch].
+Qed.
+
 Lemma bucket_set_empty :
   forall K A (eqb : K -> K -> bool) key (value : A),
     bucket_set eqb key value [] = [(key, value)].
