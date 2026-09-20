@@ -3251,6 +3251,79 @@ Proof.
   - eapply bucket_get_complete; eauto.
 Qed.
 
+Lemma get_tree_binding_complete :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (query stored : K) (value : A) (t : tree K A),
+    depth + fuel = branch_levels ->
+    length prefix = depth ->
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall first second, E first second -> hash seed first = hash seed second) ->
+    full_hash = hash seed query ->
+    (full_hash < hash_space)%N ->
+    prefix_matches full_hash depth prefix ->
+    wf E hash seed depth prefix t ->
+    In (stored, value) (bindings t) ->
+    E query stored ->
+    get_tree eqb fuel depth full_hash query t = Some value.
+Proof.
+  intros K Seed A E hash seed eqb fuel.
+  induction fuel as [|fuel IH]; intros depth prefix full_hash query stored value t
+    Hfuel Hlength Hequiv Heqb Hcongruent Hfull Hbound Hprefix Hwf Hin Hrelated;
+    destruct t as [|stored_hash leaf_key leaf_value|stored_hash entries|bitmap children].
+  - contradiction.
+  - simpl in Hin. destruct Hin as [Hin|[]]. inversion Hin; subst leaf_key leaf_value.
+    eapply get_tree_leaf_binding_complete; eauto.
+  - eapply get_tree_collision_binding_complete; eauto.
+  - exfalso.
+    eapply (@wf_branch_impossible_at_or_beyond_limit K Seed A E hash seed
+      depth prefix bitmap children).
+    + lia.
+    + exact Hwf.
+  - contradiction.
+  - simpl in Hin. destruct Hin as [Hin|[]]. inversion Hin; subst leaf_key leaf_value.
+    eapply get_tree_leaf_binding_complete; eauto.
+  - eapply get_tree_collision_binding_complete; eauto.
+  - assert (Hentry_hash : full_hash = hash seed (fst (stored, value))).
+    { simpl. rewrite Hfull. apply Hcongruent. exact Hrelated. }
+    assert (Hpresent : bitmap_has bitmap (chunk full_hash depth) = true).
+    { rewrite Hentry_hash.
+      eapply wf_branch_binding_routes; eauto. }
+    destruct (wf_branch_ranked_child Hwf (chunk_bound full_hash depth) Hpresent)
+      as [child [Hchild [Hchildnonempty Hchildwf]]].
+    assert (Hinchild : In (stored, value) (bindings child)).
+    { eapply wf_branch_dense_get_binding; eauto.
+      rewrite Hentry_hash. reflexivity. }
+    assert (Hnextlength : length (prefix ++ [chunk full_hash depth]) = S depth).
+    { rewrite app_length, Hlength. cbn. lia. }
+    assert (Hnextprefix : prefix_matches full_hash (S depth)
+      (prefix ++ [chunk full_hash depth])).
+    { apply prefix_matches_append_slot; assumption. }
+    cbn [get_tree]. rewrite Hpresent, Hchild.
+    eapply IH; eauto; lia.
+Qed.
+
+Lemma get_binding_complete :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) query stored (value : A) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second -> hash seed first = hash seed second) ->
+    (hash (table_seed m) query < hash_space)%N ->
+    table_wf E hash m ->
+    In (stored, value) (elements m) ->
+    E query stored ->
+    get eqb hash query m = Some value.
+Proof.
+  intros K Seed A E hash eqb query stored value [seed root] Hequiv Heqb
+    Hcongruent Hbound Hwf Hin Hrelated.
+  change (get_tree eqb branch_levels 0 (hash seed query) query root = Some value).
+  eapply get_tree_binding_complete; eauto.
+  - reflexivity.
+  - reflexivity.
+Qed.
+
 Lemma get_tree_leaf_other_hash :
   forall (K A : Type) (eqb : K -> K -> bool) fuel depth full_hash stored_hash
          key stored (value : A),
