@@ -799,6 +799,157 @@ Proof.
  exact Hroute.
 Qed.
 
+Lemma Forall2_dense_get_split_early :
+  forall X Y (R : X -> Y -> Prop) index slots children slot child,
+    Forall2 R slots children ->
+    nth_error slots index = Some slot ->
+    dense_get index children = Some child ->
+    exists slots_before slots_after children_before children_after,
+      slots = slots_before ++ slot :: slots_after /\
+      children = children_before ++ child :: children_after /\
+      length slots_before = index /\
+      Forall2 R slots_before children_before /\
+      R slot child /\
+      Forall2 R slots_after children_after.
+Proof.
+  intros X Y R index. induction index as [|index IH];
+    intros slots children slot child Hpaired Hslot Hchild;
+    destruct slots as [|head_slot slots]; destruct children as [|head_child children].
+  - discriminate.
+  - inversion Hpaired.
+  - inversion Hpaired.
+  - inversion Hpaired as [|slot' child' slots' children' Hhead Htail]; subst.
+    simpl in Hslot, Hchild. inversion Hslot; inversion Hchild; subst.
+    exists [], slots, [], children. simpl. repeat split; auto.
+  - discriminate.
+  - inversion Hpaired.
+  - inversion Hpaired.
+  - inversion Hpaired as [|slot' child' slots' children' Hhead Htail]; subst.
+    simpl in Hslot, Hchild.
+    destruct (IH slots children slot child Htail Hslot Hchild)
+      as [slots_before [slots_after [children_before [children_after
+        [Hslots [Hchildren [Hlength [Hbefore [Hselected Hafter]]]]]]]]].
+    exists (head_slot :: slots_before), slots_after,
+      (head_child :: children_before), children_after.
+    simpl. rewrite Hslots, Hchildren. repeat split; try reflexivity;
+      try (simpl; lia).
+    + constructor; assumption.
+    + exact Hselected.
+    + exact Hafter.
+Qed.
+
+Lemma NoDup_before_selected_early :
+  forall X (before after : list X) selected candidate,
+    NoDup (before ++ selected :: after) ->
+    In candidate before -> selected <> candidate.
+Proof.
+  intros X before. induction before as [|head before IH];
+    intros after selected candidate Hnodup Hin.
+  - contradiction.
+  - simpl in Hin. inversion Hnodup as [|head' tail Hfresh Htail]; subst.
+    destruct Hin as [Hcandidate|Hin].
+    + subst candidate. intro Heq. subst selected.
+      apply Hfresh. apply in_app_iff. right. now left.
+    + apply IH with (after := after); assumption.
+Qed.
+
+Lemma NoDup_after_selected_early :
+  forall X (before after : list X) selected candidate,
+    NoDup (before ++ selected :: after) ->
+    In candidate after -> selected <> candidate.
+Proof.
+  intros X before after selected candidate Hnodup Hin Heq. subst candidate.
+  apply NoDup_app_remove_l with (l := before) in Hnodup.
+  inversion Hnodup as [|selected' after' Hfresh Htail]; subst.
+  apply Hfresh. exact Hin.
+Qed.
+
+Lemma wf_branch_dense_get_binding :
+ forall depth prefix bitmap children slot (child : tree K A) entry,
+   length prefix = depth ->
+   wf depth prefix (Branch bitmap children) ->
+   bitmap_has bitmap slot = true ->
+   dense_get (rank bitmap slot) children = Some child ->
+   In entry (bindings (Branch bitmap children)) ->
+   chunk (hash seed (fst entry)) depth = slot ->
+   In entry (bindings child).
+Proof.
+ intros depth prefix bitmap children slot child entry Hlength Hwf Hpresent Hget
+   Hin Hroute.
+ pose proof Hwf as Hwf_original.
+ inversion Hwf as [| | |d p b cs Hdepth Hbound Hnonzero Hchildren_len
+   Hchildren Hnodup].
+ assert (Hslot_bound : (slot < branch_width)%N).
+ { rewrite <- Hroute. apply chunk_bound. }
+ destruct (@occupied_slots_rank_split_N slot bitmap Hslot_bound Hpresent)
+   as [slots_before [slots_after [Hslots Hrank]]].
+ assert (Hnth : nth_error (occupied_slots bitmap) (rank bitmap slot) = Some slot).
+ { rewrite Hslots, <- Hrank.
+   rewrite nth_error_app2 by lia.
+   replace (length slots_before - length slots_before) with 0 by lia.
+   reflexivity. }
+ destruct (@Forall2_dense_get_split_early N (tree K A)
+   (fun routed selected => selected <> Empty /\
+      wf (S depth) (prefix ++ [routed]) selected)
+   (rank bitmap slot) (occupied_slots bitmap) children slot child Hchildren Hnth Hget)
+   as [split_slots_before [split_slots_after
+     [children_before [children_after
+       [Hslots_split [Hchildren_split [Hbefore [Hselected Hafter]]]]]]]].
+ destruct Hafter as [Hselected_pair Hafter].
+ assert (Hslots_nodup : NoDup (occupied_slots bitmap)).
+ { apply occupied_slots_nodup. }
+ change (In entry (flat_map bindings children)) in Hin.
+ rewrite Hchildren_split in Hin.
+ repeat rewrite flat_map_app in Hin. simpl in Hin.
+ repeat rewrite in_app_iff in Hin.
+ destruct Hin as [Hinbefore|[Hinchild|Hinafter]].
+ - exfalso.
+   apply in_flat_map in Hinbefore.
+   destruct Hinbefore as [other [Hotherbefore Hentry]].
+   destruct (forall2_child_wf_in (depth := depth) prefix Hselected other Hotherbefore)
+       as [routed [Hrouted [Hothernonempty Hotherwf']]].
+   assert (Hother_route : chunk (hash seed (fst entry)) depth = routed).
+   { assert (Hotherprefix : prefix_matches (hash seed (fst entry)) (S depth)
+       (prefix ++ [routed])).
+     { eapply wf_binding_prefix_matches.
+       - rewrite app_length, Hlength. cbn. lia.
+       - exact Hotherwf'.
+       - exact Hentry. }
+     unfold prefix_matches in Hotherprefix.
+     pose proof (prefix_matches_from_app_last
+       (hash seed (fst entry)) 0 prefix routed Hotherprefix) as Hroute'.
+     replace (0 + length prefix) with depth in Hroute' by lia.
+     exact Hroute'. }
+   assert (Hdifferent : slot <> routed).
+   { rewrite Hslots_split in Hslots_nodup.
+     apply NoDup_before_selected_early with (before := split_slots_before)
+       (after := split_slots_after); assumption. }
+   apply Hdifferent. rewrite <- Hroute, <- Hother_route. reflexivity.
+ - exact Hinchild.
+ - exfalso.
+   apply in_flat_map in Hinafter.
+   destruct Hinafter as [other [Hotherafter Hentry]].
+   destruct (forall2_child_wf_in (depth := depth) prefix Hafter other Hotherafter)
+       as [routed [Hrouted [Hothernonempty Hotherwf']]].
+   assert (Hother_route : chunk (hash seed (fst entry)) depth = routed).
+   { assert (Hotherprefix : prefix_matches (hash seed (fst entry)) (S depth)
+       (prefix ++ [routed])).
+     { eapply wf_binding_prefix_matches.
+       - rewrite app_length, Hlength. cbn. lia.
+       - exact Hotherwf'.
+       - exact Hentry. }
+     unfold prefix_matches in Hotherprefix.
+     pose proof (prefix_matches_from_app_last
+       (hash seed (fst entry)) 0 prefix routed Hotherprefix) as Hroute'.
+     replace (0 + length prefix) with depth in Hroute' by lia.
+     exact Hroute'. }
+   assert (Hdifferent : slot <> routed).
+   { rewrite Hslots_split in Hslots_nodup.
+     apply NoDup_after_selected_early with (before := split_slots_before)
+       (after := split_slots_after); assumption. }
+   apply Hdifferent. rewrite <- Hroute, <- Hother_route. reflexivity.
+Qed.
+
 Lemma collision_binding_hash :
  forall depth prefix full_hash (entries : list (K * A)) (entry : K * A),
  wf depth prefix (Collision full_hash entries) ->
