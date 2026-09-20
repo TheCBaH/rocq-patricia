@@ -95,3 +95,68 @@ Proof.
   rewrite source_table_native_remove.
   eapply table_wf_remove; eauto.
 Qed.
+
+Lemma native_table_get_after_set_self :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (key : K) (value : A)
+         (native : native_table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    (hash (native_table_seed native) key < hash_space)%N ->
+    native_table_wf E hash native ->
+    native_table_get eqb hash key (native_table_set eqb hash key value native) =
+    Some value.
+Proof.
+  intros K Seed A E hash eqb key value native Hequiv Heqb Hcongruent Hbound Hwf.
+  rewrite native_table_get_refines, source_table_native_set.
+  eapply get_after_set_self; eauto.
+Qed.
+
+Lemma native_table_mem_after_set_self :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (key : K) (value : A)
+         (native : native_table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    (hash (native_table_seed native) key < hash_space)%N ->
+    native_table_wf E hash native ->
+    native_table_mem eqb hash key (native_table_set eqb hash key value native) = true.
+Proof.
+  intros K Seed A E hash eqb key value native Hequiv Heqb Hcongruent Hbound Hwf.
+  rewrite native_table_mem_refines, source_table_native_set.
+  eapply mem_after_set_self; eauto.
+Qed.
+
+Lemma native_table_get_after_remove_self :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (key : K) (native : native_table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    native_table_wf E hash native ->
+    native_table_get eqb hash key (native_table_remove eqb hash key native) = None.
+Proof.
+  intros K Seed A E hash eqb key native Hequiv Heqb Hcongruent Hwf.
+  rewrite native_table_get_refines, source_table_native_remove.
+  eapply get_after_remove_self; eauto.
+Qed.
+
+Lemma native_table_mem_after_remove_self :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (key : K) (native : native_table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    native_table_wf E hash native ->
+    native_table_mem eqb hash key (native_table_remove eqb hash key native) = false.
+Proof.
+  intros K Seed A E hash eqb key native Hequiv Heqb Hcongruent Hwf.
+  rewrite native_table_mem_refines, source_table_native_remove.
+  eapply mem_after_remove_self; eauto.
+Qed.
