@@ -74,6 +74,38 @@ Proof.
       exists found. split; [now right|exact Hmatch].
 Qed.
 
+Lemma bucket_get_complete :
+  forall K A (E : K -> K -> Prop) (eqb : K -> K -> bool) query stored
+         (value : A) (entries : list (K * A)),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    NoDupA (fun left right : K * A => E (fst left) (fst right)) entries ->
+    In (stored, value) entries ->
+    E query stored ->
+    bucket_get eqb query entries = Some value.
+Proof.
+  intros K A E eqb query stored value entries [Href Hsym Htrans] Heqb.
+  induction entries as [|[head_key head_value] tail IH];
+    intros Hnodup Hin Hrelated.
+  - inversion Hin.
+  - inversion Hnodup as [|head entries Hnotin Htail]; subst.
+    cbn. destruct (eqb query head_key) eqn:Hhead.
+    + destruct Hin as [Hin|Hin].
+      * inversion Hin. reflexivity.
+      * exfalso. apply Hnotin.
+        apply (proj2 (InA_alt _ (head_key, head_value) tail)).
+        exists (stored, value). split; [|exact Hin].
+        apply Htrans with (y := query).
+        -- apply Hsym. apply (proj1 (Heqb query head_key)). exact Hhead.
+        -- exact Hrelated.
+    + destruct Hin as [Hin|Hin].
+      * inversion Hin; subst stored value.
+        assert (Htrue : eqb query head_key = true).
+        { apply (proj2 (Heqb query head_key)). exact Hrelated. }
+        now rewrite Hhead in Htrue.
+      * apply IH; assumption.
+Qed.
+
 Lemma bucket_set_empty :
   forall K A (eqb : K -> K -> bool) key (value : A),
     bucket_set eqb key value [] = [(key, value)].
