@@ -252,3 +252,69 @@ Lemma native_remove_refines :
     source_of_native (native_remove eqb fuel depth full_hash key native) =
     remove_tree eqb fuel depth full_hash key (source_of_native native).
 Proof. intros. unfold native_remove. apply source_of_native_of_source. Qed.
+
+Record native_table (K Seed A : Type) : Type := {
+  native_table_seed : Seed;
+  native_table_root : native_tree K A
+}.
+
+Definition source_table_of_native {K Seed A : Type}
+    (native : native_table K Seed A) : table K Seed A :=
+  {| table_seed := native_table_seed native;
+     table_root := source_of_native (native_table_root native) |}.
+
+Definition native_empty {K Seed A : Type} (seed : Seed) : native_table K Seed A :=
+  {| native_table_seed := seed; native_table_root := NativeEmpty |}.
+
+Definition native_table_set {K Seed A : Type} (eqb : K -> K -> bool)
+    (hash : Seed -> K -> N) (key : K) (value : A)
+    (native : native_table K Seed A) : native_table K Seed A :=
+  {| native_table_seed := native_table_seed native;
+     native_table_root := native_set eqb branch_levels 0
+       (hash (native_table_seed native) key) key value (native_table_root native) |}.
+
+Definition native_table_remove {K Seed A : Type} (eqb : K -> K -> bool)
+    (hash : Seed -> K -> N) (key : K)
+    (native : native_table K Seed A) : native_table K Seed A :=
+  {| native_table_seed := native_table_seed native;
+     native_table_root := native_remove eqb branch_levels 0
+       (hash (native_table_seed native) key) key (native_table_root native) |}.
+
+Lemma source_table_native_empty :
+  forall K Seed A (seed : Seed),
+    @source_table_of_native K Seed A (native_empty seed) = empty seed.
+Proof. reflexivity. Qed.
+
+Lemma native_table_set_seed :
+  forall K Seed A (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         key (value : A) (native : native_table K Seed A),
+    native_table_seed (native_table_set eqb hash key value native) =
+    native_table_seed native.
+Proof. reflexivity. Qed.
+
+Lemma native_table_remove_seed :
+  forall K Seed A (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         key (native : native_table K Seed A),
+    native_table_seed (native_table_remove eqb hash key native) =
+    native_table_seed native.
+Proof. reflexivity. Qed.
+
+Lemma source_table_native_set :
+  forall K Seed A (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         key (value : A) (native : native_table K Seed A),
+    source_table_of_native (native_table_set eqb hash key value native) =
+    set eqb hash key value (source_table_of_native native).
+Proof.
+  intros. unfold source_table_of_native, native_table_set, set.
+  cbn. now rewrite native_set_refines.
+Qed.
+
+Lemma source_table_native_remove :
+  forall K Seed A (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         key (native : native_table K Seed A),
+    source_table_of_native (native_table_remove eqb hash key native) =
+    remove eqb hash key (source_table_of_native native).
+Proof.
+  intros. unfold source_table_of_native, native_table_remove, remove.
+  cbn. now rewrite native_remove_refines.
+Qed.
