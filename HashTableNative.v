@@ -229,6 +229,17 @@ Proof.
   apply Hroundtrip.
 Qed.
 
+Lemma pseq_get_source_children :
+  forall K A index (children : pseq (native_tree K A)) child,
+    pseq_get index children = Some child ->
+    dense_get index (map source_of_native (pseq_view children)) =
+    Some (source_of_native child).
+Proof.
+  intros K A index children child Hget.
+  unfold pseq_get, dense_get in *.
+  rewrite nth_error_map, Hget. reflexivity.
+Qed.
+
 (** Modeled native operations are deliberately source-defined through the
     relation above.  Later extraction binds only [pseq] updates to fresh-copy
     arrays; it must not replace these whole-map workers. *)
