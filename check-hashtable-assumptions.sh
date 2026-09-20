@@ -18,7 +18,7 @@ declaration_count=0
 for module in $modules; do
   source_file="$module.v"
   source_count=$(awk '
-    /^(Lemma|Theorem|Corollary)[[:space:]]/ { count++ }
+    /^[[:space:]]*(Lemma|Theorem|Corollary)[[:space:]]/ { count++ }
     END { print count + 0 }
   ' "$source_file")
   declaration_count=$((declaration_count + source_count))
@@ -30,7 +30,7 @@ done
   echo '.'
   for module in $modules; do
     awk -v module="$module" '
-      /^(Lemma|Theorem|Corollary)[[:space:]]/ {
+      /^[[:space:]]*(Lemma|Theorem|Corollary)[[:space:]]/ {
         name = $2
         sub(/:.*/, "", name)
         printf "Print Assumptions %s.%s.\n", module, name
