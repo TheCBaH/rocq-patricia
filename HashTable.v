@@ -311,6 +311,21 @@ Definition branch_replace {K A : Type} (bitmap : N) (slot : N)
     (child : tree K A) (children : list (tree K A)) : tree K A :=
   Branch bitmap (dense_replace (rank bitmap slot) child children).
 
+Lemma branch_insert_bitmap_bound :
+  forall K A (bitmap slot : N) (child : tree K A) (children : list (tree K A)),
+    (bitmap < bitmap_limit)%N ->
+    (slot < branch_width)%N ->
+    bitmap_has bitmap slot = false ->
+    match branch_insert bitmap slot child children with
+    | Branch bitmap' _ => (bitmap' < bitmap_limit)%N
+    | _ => False
+    end.
+Proof.
+  intros K A bitmap slot child children Hbound Hslot Habsent.
+  unfold branch_insert. cbn.
+  apply bitmap_lor_bit_bound_absent; assumption.
+Qed.
+
 Fixpoint set_tree {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (value : A) (t : tree K A)
     : tree K A :=
@@ -357,6 +372,18 @@ Definition branch_remove {K A : Type} (bitmap : N) (slot : N)
   | [] => Empty
   | _ => Branch (N.ldiff bitmap (bitmap_bit slot)) children'
   end.
+
+Lemma branch_remove_bitmap_bound :
+  forall K A (bitmap slot : N) (children : list (tree K A)) bitmap' children',
+    (bitmap < bitmap_limit)%N ->
+    branch_remove bitmap slot children = Branch bitmap' children' ->
+    (bitmap' < bitmap_limit)%N.
+Proof.
+  intros K A bitmap slot children bitmap' children' Hbound Hremove.
+  unfold branch_remove in Hremove.
+  destruct (dense_remove (rank bitmap slot) children) as [|head tail] eqn:Hdense;
+    inversion Hremove; subst; apply bitmap_ldiff_bit_bound; exact Hbound.
+Qed.
 
 Fixpoint remove_tree {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (t : tree K A) : tree K A :=
