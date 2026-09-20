@@ -5004,6 +5004,88 @@ Proof.
   discriminate.
 Qed.
 
+Lemma set_tree_leaf_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (key stored : K) (old_value value : A) stored_hash,
+    depth + fuel = branch_levels ->
+    length prefix = depth ->
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall first second, E first second ->
+      hash seed first = hash seed second) ->
+    full_hash = hash seed key ->
+    (full_hash < hash_space)%N ->
+    prefix_matches full_hash depth prefix ->
+    wf E hash seed depth prefix (Leaf stored_hash stored old_value) ->
+    wf E hash seed depth prefix
+      (set_tree eqb fuel depth full_hash key value
+        (Leaf stored_hash stored old_value)).
+Proof.
+  intros K Seed A E hash seed eqb fuel depth prefix full_hash key stored
+    old_value value stored_hash Hfuel Hlength [Href Hsym Htrans] Heqb Hcongruent
+    Hhash Hbound Hprefix Hwf.
+  destruct (eqb key stored) eqn:Hkey.
+  - assert (Hsame : full_hash = stored_hash).
+    { assert (Hstored_hash : stored_hash = hash seed stored).
+      { inversion Hwf; assumption. }
+      rewrite Hstored_hash, Hhash.
+      apply Hcongruent. apply (proj1 (Heqb key stored)). exact Hkey. }
+    subst stored_hash.
+    eapply set_tree_leaf_replacement_wf; eauto.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hsame.
+    + apply N.eqb_eq in Hsame. subst stored_hash.
+      eapply set_tree_leaf_collision_wf.
+      * exact Hwf.
+      * unfold entry_matches. repeat split; assumption.
+      * exact Hkey.
+      * intro Hrelated.
+        assert (Htrue : eqb key stored = true).
+        { apply (proj2 (Heqb key stored)). apply Hsym. exact Hrelated. }
+        now rewrite Hkey in Htrue.
+    + apply N.eqb_neq in Hsame.
+      assert (Hsameb : N.eqb full_hash stored_hash = false).
+      { apply N.eqb_neq. exact Hsame. }
+      assert (Hnew : wf E hash seed depth prefix (Leaf full_hash key value)).
+      { apply wf_leaf; assumption. }
+      assert (Hstored_hash : stored_hash = hash seed stored).
+      { inversion Hwf; assumption. }
+      assert (Hstored_bound : (stored_hash < hash_space)%N).
+      { inversion Hwf; assumption. }
+      assert (Hstored_prefix : prefix_matches stored_hash depth prefix).
+      { inversion Hwf; assumption. }
+      assert (Hfallback : join_falls_back fuel depth full_hash stored_hash = false).
+      { assert (Hfuel' : fuel = branch_levels - depth) by lia.
+        rewrite Hfuel'. eapply join_worker_suffix_no_fallback.
+        - lia.
+        - intros prior Hprior.
+          eapply prefix_matches_agree; eauto.
+        - exact Hbound.
+        - exact Hstored_bound.
+        - exact Hsame. }
+      destruct fuel as [|fuel].
+      * cbn [set_tree]. rewrite Hkey, Hsameb.
+        eapply wf_join_worker_leaf_leaf.
+        -- lia.
+        -- exact Hlength.
+        -- exact Hsame.
+        -- exact Hnew.
+        -- exact Hwf.
+        -- repeat split; assumption.
+        -- exact Hcongruent.
+        -- exact Hfallback.
+      * cbn [set_tree]. rewrite Hkey, Hsameb.
+        eapply wf_join_worker_leaf_leaf.
+        -- lia.
+        -- exact Hlength.
+        -- exact Hsame.
+        -- exact Hnew.
+        -- exact Hwf.
+        -- repeat split; assumption.
+        -- exact Hcongruent.
+        -- exact Hfallback.
+Qed.
+
 Lemma get_after_set_self :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
