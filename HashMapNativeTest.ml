@@ -69,6 +69,60 @@ let check_custom_key_and_payload () =
   check_functional "custom removal" removed_reference removed_native "gamma" None;
   check_functional "custom retained replacement" replaced_reference replaced_native "gamma" (Some 12)
 
+let check_random_custom_key_and_payload () =
+  let random = Random.State.make [| 0x43555354; 0x4f4d4b45 |] in
+  let canonical_keys =
+    [| "alpha"; "bravo"; "charl"; "delta"; "echoo"; "foxtt";
+       "golfy"; "hotel"; "india"; "julie"; "kappa"; "limaa" |]
+  in
+  let spelling key =
+    match Random.State.int random 4 with
+    | 0 -> String.uppercase_ascii key
+    | 1 -> String.capitalize_ascii key
+    | 2 -> String.lowercase_ascii key
+    | _ ->
+        String.mapi (fun index character ->
+          if index land 1 = 0 then Char.uppercase_ascii character else character) key
+  in
+  let probes =
+    Array.to_list canonical_keys
+    |> Stdlib.List.map (fun key -> [ key; String.uppercase_ascii key ])
+    |> Stdlib.List.flatten
+  in
+  let check_maps message reference native =
+    Stdlib.List.iter
+      (fun key ->
+         check (message ^ " reference " ^ key)
+           (functional_value reference key = functional_native_value native key))
+      probes;
+    check (message ^ " empty")
+      (Folded_reference.is_empty reference = Folded_native.is_empty native)
+  in
+  let rec loop step reference native retained =
+    if step = 750 then ()
+    else
+      let key = spelling canonical_keys.(Random.State.int random (Array.length canonical_keys)) in
+      let reference, native =
+        if Random.State.bool random then
+          let offset = step in
+          ( Folded_reference.set key (fun input -> input + offset) reference,
+            Folded_native.set key (fun input -> input + offset) native )
+        else
+          (Folded_reference.remove key reference, Folded_native.remove key native)
+      in
+      check_maps ("custom current " ^ string_of_int step) reference native;
+      let retained = (reference, native) :: retained in
+      let old_reference, old_native =
+        Stdlib.List.nth retained
+          (Random.State.int random (Stdlib.List.length retained))
+      in
+      check_maps ("custom retained " ^ string_of_int step) old_reference old_native;
+      loop (step + 1) reference native retained
+  in
+  let reference = Folded_reference.empty ~seed:41 in
+  let native = Folded_native.empty ~seed:41 in
+  loop 0 reference native [ (reference, native) ]
+
 let check_every_root_slot () =
   let reference = Slot_reference.empty ~seed:0 in
   let native = Slot_native.empty ~seed:0 in
@@ -146,5 +200,6 @@ let () =
   check_agreement "bulk load" reference native;
   loop 0 reference native [ (reference, native) ];
   check_custom_key_and_payload ();
+  check_random_custom_key_and_payload ();
   check_every_root_slot ();
   print_endline "HashMap native array differential test passed"
