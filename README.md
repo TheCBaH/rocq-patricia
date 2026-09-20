@@ -60,7 +60,11 @@ relation-equivalent queries (`get_after_set_self`, `get_after_set_equiv`,
 preservation (`table_wf_remove`), equivalent-query lookup/removal congruence
 (`get_query_equiv` and `remove_query_equiv`), and valid-table self-removal
 absence for both `get` and `mem` (`get_after_remove_self` and
-`mem_after_remove_self`). The modeled native operations have source-relation refinement laws
+`mem_after_remove_self`). It also proves complete valid-map `get`/`mem`
+semantics against flattened bindings (`get_binding_iff` and
+`mem_binding_iff`), bounded bulk-load validity, lookup/membership semantics
+and unique representative keys, plus exclusion of the zero-fuel branch path
+for valid lookup, update and removal routing. The modeled native operations have source-relation refinement laws
 (`native_get_refines_related`, `native_set_refines_related`, and
 `native_remove_refines_related`). The tracker identifies the remaining global
 set, join, array-realizer, and release proof gaps.
