@@ -305,8 +305,9 @@ Lemma source_table_native_set :
     source_table_of_native (native_table_set eqb hash key value native) =
     set eqb hash key value (source_table_of_native native).
 Proof.
-  intros. unfold source_table_of_native, native_table_set, set.
-  cbn. now rewrite native_set_refines.
+  intros K Seed A eqb hash key value [seed root].
+  unfold source_table_of_native, native_table_set, set.
+  f_equal. apply native_set_refines.
 Qed.
 
 Lemma source_table_native_remove :
@@ -315,6 +316,7 @@ Lemma source_table_native_remove :
     source_table_of_native (native_table_remove eqb hash key native) =
     remove eqb hash key (source_table_of_native native).
 Proof.
-  intros. unfold source_table_of_native, native_table_remove, remove.
-  cbn. now rewrite native_remove_refines.
+  intros K Seed A eqb hash key [seed root].
+  unfold source_table_of_native, native_table_remove, remove.
+  f_equal. apply native_remove_refines.
 Qed.
