@@ -4,9 +4,9 @@
     OCaml array heap theorem; that remaining target obligation is recorded in
     the tracker. *)
 
-From Stdlib Require Import NArith.
+From Stdlib Require Import NArith RelationClasses.
 
-Require Import HashTable HashTableNative.
+Require Import HashTableSpec HashTable HashTableBits HashTableNative HashTableProof.
 
 Set Implicit Arguments.
 
@@ -44,4 +44,54 @@ Proof.
   intros K A eqb fuel depth full_hash key native source Hrefines.
   unfold native_refines in *. subst source.
   apply native_remove_refines.
+Qed.
+
+Definition native_table_wf {K Seed A : Type} (E : K -> K -> Prop)
+    (hash : Seed -> K -> N) (native : native_table K Seed A) : Prop :=
+  table_wf E hash (source_table_of_native native).
+
+Lemma native_table_wf_empty :
+  forall K Seed A (E : K -> K -> Prop) (hash : Seed -> K -> N) (seed : Seed),
+    native_table_wf E hash (@native_empty K Seed A seed).
+Proof.
+  intros. unfold native_table_wf. rewrite source_table_native_empty.
+  apply table_wf_empty.
+Qed.
+
+Lemma native_table_wf_set :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (key : K) (value : A)
+         (native : native_table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    (hash (native_table_seed native) key < hash_space)%N ->
+    native_table_wf E hash native ->
+    native_table_wf E hash (native_table_set eqb hash key value native).
+Proof.
+  intros K Seed A E hash eqb key value native Hequiv Heqb Hcongruent Hbound Hwf.
+  change (table_wf E hash (source_table_of_native native)) in Hwf.
+  change (table_wf E hash
+    (source_table_of_native (native_table_set eqb hash key value native))).
+  rewrite source_table_native_set.
+  eapply table_wf_set; eauto.
+Qed.
+
+Lemma native_table_wf_remove :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (key : K) (native : native_table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    native_table_wf E hash native ->
+    native_table_wf E hash (native_table_remove eqb hash key native).
+Proof.
+  intros K Seed A E hash eqb key native Hequiv Heqb Hcongruent Hwf.
+  change (table_wf E hash (source_table_of_native native)) in Hwf.
+  change (table_wf E hash
+    (source_table_of_native (native_table_remove eqb hash key native))).
+  rewrite source_table_native_remove.
+  eapply table_wf_remove; eauto.
 Qed.
