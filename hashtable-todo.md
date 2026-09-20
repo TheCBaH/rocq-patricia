@@ -1,6 +1,6 @@
 # Persistent generic hash table: tracker
 
-Last updated: 2026-09-17.
+Last updated: 2026-09-20.
 
 Contract: [hashtable-design.md](hashtable-design.md). Delivery gates and proposed
 files/commands: [hashtable-plan.md](hashtable-plan.md). Background:
@@ -344,3 +344,4 @@ supporting contract or implementation changes.
 | 2026-09-20 | H2.4 | Added fuel-general `set_tree_leaf_wf`. It handles representative replacement, same-hash collision creation, and distinct-hash joins using `join_worker_suffix_no_fallback`, so valid leaf updates preserve `wf` at every routed subtree depth. `rocq compile HashTableProof.v` passed. |
 | 2026-09-20 | H2.4 | Added fuel-general `set_tree_collision_wf_general`. Valid collision updates now preserve `wf` for both bucket updates and distinct-hash joins at any subtree depth. `rocq compile HashTableProof.v` passed. |
 | 2026-09-20 | H2.4 | Added fuel-inductive `set_tree_wf_general` and public `table_wf_set`, proving that every valid bounded seeded update preserves the full table invariant. The present-route case combines recursive validity/nonemptiness with the completed sibling uniqueness proof. `rocq compile HashTableProof.v` passed. |
+| 2026-09-20 | H5.2/H5.5 | Re-ran `make hashtable-benchmark-smoke`: both 100-key integer and fixed-width-string checked workloads passed. Each reports build, checked lookup, update and removal for `HashMap.Make`, `HashMapNative.Make`, `Map.Make`, and imperative OCaml `Hashtbl`. |
