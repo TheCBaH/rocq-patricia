@@ -819,6 +819,15 @@ Proof.
     now rewrite N.ldiff_spec, Hhas, Hbit.
 Qed.
 
+Lemma bitmap_ldiff_bit_bound :
+  forall bitmap slot,
+    (bitmap < bitmap_limit)%N ->
+    (N.ldiff bitmap (bitmap_bit slot) < bitmap_limit)%N.
+Proof.
+  intros bitmap slot Hbound.
+  eapply N.le_lt_trans; [apply N.ldiff_le_l|exact Hbound].
+Qed.
+
 Lemma occupied_slots_from_ldiff_bit_away :
   forall fuel bitmap bit_slot start,
     (start + N.of_nat fuel <= bit_slot)%N \/ (bit_slot < start)%N ->
