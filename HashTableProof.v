@@ -5986,6 +5986,30 @@ Proof.
   - eapply table_wf_of_list; eauto.
 Qed.
 
+Lemma mem_of_list_binding_iff :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) query
+         (entries : list (K * A)),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall actual_seed first second, E first second ->
+      hash actual_seed first = hash actual_seed second) ->
+    (forall key value, In (key, value) entries ->
+      (hash seed key < hash_space)%N) ->
+    (hash seed query < hash_space)%N ->
+    (mem eqb hash query (of_list eqb hash seed entries) = true <->
+      exists stored value,
+        In (stored, value) (elements (of_list eqb hash seed entries)) /\
+        E query stored).
+Proof.
+  intros K Seed A E hash seed eqb query entries Hequiv Heqb Hcongruent
+    Hentries Hquery.
+  apply (@mem_binding_iff K Seed A E hash eqb query
+    (of_list eqb hash seed entries) Hequiv Heqb Hcongruent).
+  - rewrite of_list_seed. exact Hquery.
+  - eapply table_wf_of_list; eauto.
+Qed.
+
 Lemma get_after_set_self :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
