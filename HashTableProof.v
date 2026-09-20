@@ -6930,3 +6930,392 @@ Proof.
     intro Hrelated. apply (proj2 (Heqb query key)) in Hrelated.
     now rewrite Hquery_key in Hrelated.
 Qed.
+
+Lemma bucket_remove_other_binding :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         key entries stored (old_value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    ~ E stored key ->
+    (In (stored, old_value) (bucket_remove eqb key entries) <->
+     In (stored, old_value) entries).
+Proof.
+  intros K A E eqb key entries.
+  induction entries as [|[head head_value] tail IH];
+    intros stored old_value [Href Hsym Htrans] Heqb Hother; simpl.
+  - tauto.
+  - destruct (eqb key head) eqn:Hkey_head.
+    + assert (Hstored_head : eqb stored head = false).
+      { destruct (eqb stored head) eqn:Hmatch; auto.
+        exfalso. apply Hother.
+        apply Htrans with (y := head).
+        - now apply (proj1 (Heqb stored head)).
+        - apply Hsym. now apply (proj1 (Heqb key head)). }
+      assert (Hpair : (stored, old_value) <> (head, head_value)).
+      { intro Heq. inversion Heq; subst.
+        rewrite (proj2 (Heqb head head) (Href head)) in Hstored_head.
+        discriminate. }
+      split.
+      * intro Hin. simpl in Hin. simpl. right. exact Hin.
+      * intros [Hentry|Hin].
+        -- exfalso. apply Hpair. now symmetry.
+        -- exact Hin.
+    + specialize (IH stored old_value
+        (Build_Equivalence E Href Hsym Htrans) Heqb Hother).
+      split; intro Hin; simpl in Hin |-; destruct Hin as [Hentry|Htail].
+      * now left.
+      * right. now apply (proj1 IH).
+      * now left.
+      * right. now apply (proj2 IH).
+Qed.
+
+Lemma dense_remove_at_split :
+  forall (X : Type) before (item : X) after,
+    dense_remove (length before) (before ++ item :: after) = before ++ after.
+Proof.
+  intros X before. induction before as [|head before IH]; intros item after.
+  - reflexivity.
+  - simpl. now rewrite IH.
+Qed.
+
+Lemma dense_get_remove_split :
+  forall (X : Type) index (children : list X) child,
+    dense_get index children = Some child ->
+    exists before after,
+      children = before ++ child :: after /\
+      length before = index /\
+      dense_remove index children = before ++ after.
+Proof.
+  intros X index. induction index as [|index IH]; intros children child Hget;
+    destruct children as [|head tail].
+  - discriminate.
+  - simpl in Hget. inversion Hget; subst child.
+    exists [], tail. repeat split; reflexivity.
+  - discriminate.
+  - simpl in Hget.
+    destruct (IH tail child Hget) as [before [after [Hchildren [Hlength Hremove]]]].
+    exists (head :: before), after. split.
+    + simpl. now rewrite Hchildren.
+    + split.
+      * simpl. now rewrite Hlength.
+      * simpl. now rewrite Hremove.
+Qed.
+
+Lemma bindings_remove_leaf_other_in :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         fuel depth full_hash key stored_hash leaf_key (leaf_value : A)
+         stored old_value,
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    ~ E stored key ->
+    In (stored, old_value) (bindings (Leaf stored_hash leaf_key leaf_value)) ->
+    In (stored, old_value)
+      (bindings (remove_tree eqb fuel depth full_hash key
+        (Leaf stored_hash leaf_key leaf_value))).
+Proof.
+  intros K A E eqb fuel depth full_hash key stored_hash leaf_key leaf_value
+    stored old_value [Href Hsym Htrans] Heqb Hother Hin.
+  destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+  - destruct (eqb key leaf_key) eqn:Hkey.
+    + assert (Hkey_related : E key leaf_key).
+      { now apply (proj1 (Heqb key leaf_key)). }
+      exfalso. simpl in Hin. destruct Hin as [Hentry|[]].
+      inversion Hentry; subst. apply Hother. apply Hsym.
+      exact Hkey_related.
+    + destruct fuel; cbn [remove_tree]; now rewrite Hhash, Hkey.
+  - destruct fuel; cbn [remove_tree]; now rewrite Hhash.
+Qed.
+
+Lemma bindings_remove_collision_other_in :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         fuel depth full_hash key stored_hash entries stored (old_value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    ~ E stored key ->
+    In (stored, old_value) (bindings (Collision stored_hash entries)) ->
+    In (stored, old_value)
+      (bindings (remove_tree eqb fuel depth full_hash key
+        (Collision stored_hash entries))).
+Proof.
+  intros K A E eqb fuel depth full_hash key stored_hash entries stored old_value
+    Hequiv Heqb Hother Hin.
+  destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+  - apply N.eqb_eq in Hhash. subst stored_hash.
+    rewrite remove_tree_collision_same_hash, bindings_normalize_collision.
+    apply (proj2 (@bucket_remove_other_binding K A E eqb key entries stored old_value
+      Hequiv Heqb Hother)).
+    exact Hin.
+  - destruct fuel; cbn [remove_tree]; now rewrite Hhash.
+Qed.
+
+Lemma bindings_remove_tree_other_in :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         fuel depth full_hash key (t : tree K A) stored (old_value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    ~ E stored key ->
+    In (stored, old_value) (bindings t) ->
+    In (stored, old_value)
+      (bindings (remove_tree eqb fuel depth full_hash key t)).
+Proof.
+  intros K A E eqb fuel.
+  induction fuel as [|fuel IH]; intros depth full_hash key t stored old_value
+    Hequiv Heqb Hother Hin; destruct t as
+    [|stored_hash leaf_key leaf_value|stored_hash entries|bitmap children].
+  - contradiction.
+  - eapply bindings_remove_leaf_other_in; eauto.
+  - eapply bindings_remove_collision_other_in; eauto.
+  - cbn [remove_tree]. exact Hin.
+  - contradiction.
+  - eapply bindings_remove_leaf_other_in; eauto.
+  - eapply bindings_remove_collision_other_in; eauto.
+  - destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
+    + destruct (dense_get (rank bitmap (chunk full_hash depth)) children)
+        as [child|] eqn:Hchild.
+      * destruct (@dense_get_remove_split (tree K A)
+          (rank bitmap (chunk full_hash depth)) children child Hchild)
+          as [before [after [Hchildren [Hlength Hremove_dense]]]].
+        change (In (stored, old_value) (flat_map bindings children)) in Hin.
+        rewrite Hchildren in Hin.
+        repeat rewrite flat_map_app in Hin.
+        simpl in Hin.
+        rewrite (remove_tree_branch_child eqb fuel depth full_hash key bitmap
+          children Hpresent Hchild).
+        remember (remove_tree eqb fuel (S depth) full_hash key child) as child'.
+        assert (Hchild_preserved :
+          In (stored, old_value) (bindings child) ->
+          In (stored, old_value) (bindings child')).
+        { intro Hchild_binding. subst child'.
+          eapply IH; eauto. }
+        destruct child' as
+          [|child_hash child_key child_value|child_hash child_entries
+           |child_bitmap child_children] eqn:Hchild'.
+        -- unfold branch_remove. rewrite Hchildren, <- Hlength.
+           rewrite dense_remove_at_split.
+           repeat rewrite flat_map_app.
+           apply in_app_iff in Hin.
+           destruct Hin as [Hbefore|Hchild_after].
+           ++ assert (Hremaining : In (stored, old_value)
+                (flat_map bindings before ++ flat_map bindings after)).
+              { apply (proj2 (in_app_iff _ _ _)). now left. }
+              destruct (before ++ after) as [|head tail] eqn:Hremaining_nodes;
+                [apply app_eq_nil in Hremaining_nodes;
+                 destruct Hremaining_nodes as [Hbefore_empty Hafter_empty];
+                 subst before; subst after; simpl in Hremaining; contradiction|].
+              change (In (stored, old_value) (flat_map bindings (head :: tail))).
+              rewrite <- Hremaining_nodes, flat_map_app. exact Hremaining.
+           ++ apply in_app_iff in Hchild_after.
+              destruct Hchild_after as [Hchild_binding|Hafter].
+              ** specialize (Hchild_preserved Hchild_binding).
+                 simpl in Hchild_preserved. contradiction.
+              ** assert (Hremaining : In (stored, old_value)
+                   (flat_map bindings before ++ flat_map bindings after)).
+                 { apply (proj2 (in_app_iff _ _ _)). now right. }
+                 destruct (before ++ after) as [|head tail] eqn:Hremaining_nodes;
+                   [apply app_eq_nil in Hremaining_nodes;
+                    destruct Hremaining_nodes as [Hbefore_empty Hafter_empty];
+                    subst before; subst after; simpl in Hremaining; contradiction|].
+                 change (In (stored, old_value) (flat_map bindings (head :: tail))).
+                 rewrite <- Hremaining_nodes, flat_map_app. exact Hremaining.
+        -- unfold branch_replace. simpl.
+           rewrite Hchildren, <- Hlength.
+           rewrite dense_replace_at_split by reflexivity.
+           repeat rewrite flat_map_app.
+           change (In (stored, old_value)
+             (flat_map bindings before ++
+              (bindings (Leaf child_hash child_key child_value) ++ flat_map bindings after))).
+           change (In (stored, old_value)
+             (flat_map bindings before ++ (bindings child ++ flat_map bindings after))) in Hin.
+           assert (Hsplit : In (stored, old_value) (flat_map bindings before) \/
+             In (stored, old_value) (bindings child ++ flat_map bindings after)).
+           { exact (proj1 (in_app_iff _ _ _) Hin). }
+           destruct Hsplit as [Hbefore|Hchild_after].
+           ++ apply (proj2 (in_app_iff (flat_map bindings before)
+                (bindings (Leaf child_hash child_key child_value) ++ flat_map bindings after)
+                (stored, old_value))). now left.
+           ++ assert (Hsplit_child : In (stored, old_value) (bindings child) \/
+                In (stored, old_value) (flat_map bindings after)).
+              { exact (proj1 (in_app_iff _ _ _) Hchild_after). }
+              destruct Hsplit_child as [Hchild_binding|Hafter].
+              ** apply (proj2 (in_app_iff (flat_map bindings before)
+                   (bindings (Leaf child_hash child_key child_value) ++ flat_map bindings after)
+                   (stored, old_value))). right.
+                 apply (proj2 (in_app_iff (bindings (Leaf child_hash child_key child_value))
+                   (flat_map bindings after) (stored, old_value))). left.
+                 now apply Hchild_preserved.
+              ** apply (proj2 (in_app_iff (flat_map bindings before)
+                   (bindings (Leaf child_hash child_key child_value) ++ flat_map bindings after)
+                   (stored, old_value))). right.
+                 apply (proj2 (in_app_iff (bindings (Leaf child_hash child_key child_value))
+                   (flat_map bindings after) (stored, old_value))). now right.
+        -- unfold branch_replace. simpl.
+           rewrite Hchildren, <- Hlength.
+           rewrite dense_replace_at_split by reflexivity.
+           repeat rewrite flat_map_app.
+           change (In (stored, old_value)
+             (flat_map bindings before ++
+              (bindings (Collision child_hash child_entries) ++ flat_map bindings after))).
+           change (In (stored, old_value)
+             (flat_map bindings before ++ (bindings child ++ flat_map bindings after))) in Hin.
+           assert (Hsplit : In (stored, old_value) (flat_map bindings before) \/
+             In (stored, old_value) (bindings child ++ flat_map bindings after)).
+           { exact (proj1 (in_app_iff _ _ _) Hin). }
+           destruct Hsplit as [Hbefore|Hchild_after].
+           ++ apply (proj2 (in_app_iff (flat_map bindings before)
+                (bindings (Collision child_hash child_entries) ++ flat_map bindings after)
+                (stored, old_value))). now left.
+           ++ assert (Hsplit_child : In (stored, old_value) (bindings child) \/
+                In (stored, old_value) (flat_map bindings after)).
+              { exact (proj1 (in_app_iff _ _ _) Hchild_after). }
+              destruct Hsplit_child as [Hchild_binding|Hafter].
+              ** apply (proj2 (in_app_iff (flat_map bindings before)
+                   (bindings (Collision child_hash child_entries) ++ flat_map bindings after)
+                   (stored, old_value))). right.
+                 apply (proj2 (in_app_iff (bindings (Collision child_hash child_entries))
+                   (flat_map bindings after) (stored, old_value))). left.
+                 now apply Hchild_preserved.
+              ** apply (proj2 (in_app_iff (flat_map bindings before)
+                   (bindings (Collision child_hash child_entries) ++ flat_map bindings after)
+                   (stored, old_value))). right.
+                 apply (proj2 (in_app_iff (bindings (Collision child_hash child_entries))
+                   (flat_map bindings after) (stored, old_value))). now right.
+        -- unfold branch_replace. simpl.
+           rewrite Hchildren, <- Hlength.
+           rewrite dense_replace_at_split by reflexivity.
+           repeat rewrite flat_map_app.
+           change (In (stored, old_value)
+             (flat_map bindings before ++
+              (bindings (Branch child_bitmap child_children) ++ flat_map bindings after))).
+           change (In (stored, old_value)
+             (flat_map bindings before ++ (bindings child ++ flat_map bindings after))) in Hin.
+           assert (Hsplit : In (stored, old_value) (flat_map bindings before) \/
+             In (stored, old_value) (bindings child ++ flat_map bindings after)).
+           { exact (proj1 (in_app_iff _ _ _) Hin). }
+           destruct Hsplit as [Hbefore|Hchild_after].
+           ++ apply (proj2 (in_app_iff (flat_map bindings before)
+                (bindings (Branch child_bitmap child_children) ++ flat_map bindings after)
+                (stored, old_value))). now left.
+           ++ assert (Hsplit_child : In (stored, old_value) (bindings child) \/
+                In (stored, old_value) (flat_map bindings after)).
+              { exact (proj1 (in_app_iff _ _ _) Hchild_after). }
+              destruct Hsplit_child as [Hchild_binding|Hafter].
+              ** apply (proj2 (in_app_iff (flat_map bindings before)
+                   (bindings (Branch child_bitmap child_children) ++ flat_map bindings after)
+                   (stored, old_value))). right.
+                 apply (proj2 (in_app_iff (bindings (Branch child_bitmap child_children))
+                   (flat_map bindings after) (stored, old_value))). left.
+                 now apply Hchild_preserved.
+              ** apply (proj2 (in_app_iff (flat_map bindings before)
+                   (bindings (Branch child_bitmap child_children) ++ flat_map bindings after)
+                   (stored, old_value))). right.
+                 apply (proj2 (in_app_iff (bindings (Branch child_bitmap child_children))
+                   (flat_map bindings after) (stored, old_value))). now right.
+      * rewrite (remove_tree_branch_dense_missing eqb fuel depth full_hash key
+          bitmap children Hpresent Hchild).
+        exact Hin.
+    + rewrite (remove_tree_branch_slot_absent eqb fuel depth full_hash key
+        bitmap children Hpresent).
+      exact Hin.
+Qed.
+
+Lemma bindings_remove_tree_other :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         fuel depth full_hash key (t : tree K A) stored (old_value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    ~ E stored key ->
+    (In (stored, old_value)
+       (bindings (remove_tree eqb fuel depth full_hash key t)) <->
+     In (stored, old_value) (bindings t)).
+Proof.
+  intros K A E eqb fuel depth full_hash key t stored old_value
+    Hequiv Heqb Hother.
+  split.
+  - apply bindings_remove_tree_in.
+  - eapply bindings_remove_tree_other_in; eauto.
+Qed.
+
+Lemma get_after_remove_other :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (query key : K) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    ~ E query key ->
+    (hash (table_seed m) query < hash_space)%N ->
+    table_wf E hash m ->
+    get eqb hash query (remove eqb hash key m) = get eqb hash query m.
+Proof.
+  intros K Seed A E hash eqb query key [seed root] Hequiv Heqb Hcongruent
+    Hdifferent Hquery_bound Hwf.
+  assert (Hremwf : table_wf E hash
+      (remove eqb hash key {| table_seed := seed; table_root := root |})).
+  { eapply table_wf_remove; eauto. }
+  destruct (get eqb hash query {| table_seed := seed; table_root := root |})
+    as [old_value|] eqn:Hget.
+  - apply (proj1 (@get_binding_iff K Seed A E hash eqb query old_value
+      {| table_seed := seed; table_root := root |}
+      Hequiv Heqb Hcongruent Hquery_bound Hwf)) in Hget.
+    destruct Hget as [stored [Hstored Hquery_stored]].
+    assert (Hstored_other : ~ E stored key).
+    { intro Hstored_key. apply Hdifferent.
+      destruct Hequiv as [Href Hsym Htrans].
+      eapply Htrans; eauto. }
+    assert (Hstored_removed : In (stored, old_value)
+      (elements (remove eqb hash key
+        {| table_seed := seed; table_root := root |}))).
+    { change (In (stored, old_value)
+        (bindings (remove_tree eqb branch_levels 0 (hash seed key) key root))).
+      apply (proj2 (@bindings_remove_tree_other K A E eqb branch_levels 0
+        (hash seed key) key root stored old_value Hequiv Heqb Hstored_other)).
+      exact Hstored. }
+    eapply get_binding_complete; eauto.
+  - destruct (get eqb hash query
+      (remove eqb hash key {| table_seed := seed; table_root := root |}))
+      as [new_value|] eqn:Hrem_get; [|reflexivity].
+    exfalso.
+    apply (proj1 (@get_binding_iff K Seed A E hash eqb query new_value
+      (remove eqb hash key {| table_seed := seed; table_root := root |})
+      Hequiv Heqb Hcongruent Hquery_bound Hremwf)) in Hrem_get.
+    destruct Hrem_get as [stored [Hstored_removed Hquery_stored]].
+    assert (Hstored_other : ~ E stored key).
+    { intro Hstored_key. apply Hdifferent.
+      destruct Hequiv as [Href Hsym Htrans].
+      eapply Htrans; eauto. }
+    assert (Hstored : In (stored, new_value) (elements
+      {| table_seed := seed; table_root := root |})).
+    { change (In (stored, new_value)
+        (bindings (remove_tree eqb branch_levels 0 (hash seed key) key root)))
+      in Hstored_removed.
+      change (In (stored, new_value) (bindings root)).
+      apply (proj1 (@bindings_remove_tree_other K A E eqb branch_levels 0
+        (hash seed key) key root stored new_value Hequiv Heqb Hstored_other)).
+      exact Hstored_removed. }
+    pose proof (@get_binding_complete K Seed A E hash eqb query stored new_value
+      {| table_seed := seed; table_root := root |} Hequiv Heqb Hcongruent
+      Hquery_bound Hwf Hstored Hquery_stored) as Hold_get.
+    rewrite Hget in Hold_get. discriminate.
+Qed.
+
+Lemma get_after_remove :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (query key : K) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    (hash (table_seed m) query < hash_space)%N ->
+    table_wf E hash m ->
+    get eqb hash query (remove eqb hash key m) =
+      if eqb query key then None else get eqb hash query m.
+Proof.
+  intros K Seed A E hash eqb query key m Hequiv Heqb Hcongruent
+    Hquery_bound Hwf.
+  destruct (eqb query key) eqn:Hquery_key.
+  - apply get_after_remove_equiv with (E := E); try assumption.
+    now apply (proj1 (Heqb query key)).
+  - apply get_after_remove_other with (E := E); try assumption.
+    intro Hrelated. apply (proj2 (Heqb query key)) in Hrelated.
+    now rewrite Hquery_key in Hrelated.
+Qed.
