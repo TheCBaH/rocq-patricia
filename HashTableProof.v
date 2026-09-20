@@ -4095,6 +4095,50 @@ Proof.
   - exact Hafter_cross.
 Qed.
 
+Lemma set_tree_branch_child_wf_fresh :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (key : K) (value : A) bitmap children child updated_child,
+    Equivalence E ->
+    (forall first second, E first second ->
+      hash seed first = hash seed second) ->
+    wf E hash seed depth prefix (Branch bitmap children) ->
+    length prefix = depth ->
+    full_hash = hash seed key ->
+    bitmap_has bitmap (chunk full_hash depth) = true ->
+    dense_get (rank bitmap (chunk full_hash depth)) children = Some child ->
+    set_tree eqb fuel (S depth) full_hash key value child = updated_child ->
+    updated_child <> Empty ->
+    wf E hash seed (S depth) (prefix ++ [chunk full_hash depth]) updated_child ->
+    wf E hash seed depth prefix
+      (set_tree eqb (S fuel) depth full_hash key value (Branch bitmap children)).
+Proof.
+  intros K Seed A E hash seed eqb fuel depth prefix full_hash key value bitmap
+    children child updated_child Hequiv Hcongruent Hwf Hlength Hhash Hpresent
+    Hchild Hset Hnonempty Hupdatedwf.
+  eapply (@set_tree_branch_child_wf_nonempty K Seed A E hash seed fuel depth
+    prefix full_hash key value bitmap children eqb child updated_child).
+  - exact Hwf.
+  - exact Hpresent.
+  - exact Hchild.
+  - exact Hset.
+  - exact Hnonempty.
+  - exact Hupdatedwf.
+  - rewrite <- Hset.
+    eapply (@set_tree_branch_child_nodup K Seed A E hash seed eqb fuel depth
+      prefix full_hash key value bitmap children child).
+    + exact Hequiv.
+    + exact Hcongruent.
+    + exact Hwf.
+    + exact Hlength.
+    + exact Hhash.
+    + exact Hpresent.
+    + exact Hchild.
+    + rewrite Hset.
+      apply (@wf_bindings_nodup K Seed A E hash seed (S depth)
+        (prefix ++ [chunk full_hash depth]) updated_child Hupdatedwf).
+Qed.
+
 Lemma elements_remove_in :
   forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
          key (m : table K Seed A) entry,
