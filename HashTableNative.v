@@ -7,7 +7,7 @@
 From Stdlib Require Import List NArith.
 Import ListNotations.
 
-Require Import HashTable HashTableBits.
+Require Import HashTable HashTableBits HashTableBucket.
 
 Set Implicit Arguments.
 
@@ -240,13 +240,43 @@ Proof.
   rewrite nth_error_map, Hget. reflexivity.
 Qed.
 
-(** Modeled native operations are deliberately source-defined through the
-    relation above.  Later extraction binds only [pseq] updates to fresh-copy
-    arrays; it must not replace these whole-map workers. *)
-Definition native_get {K A : Type} (eqb : K -> K -> bool)
+Lemma pseq_get_source_children_none :
+  forall K A index (children : pseq (native_tree K A)),
+    pseq_get index children = None ->
+    dense_get index (map source_of_native (pseq_view children)) = None.
+Proof.
+  intros K A index children Hget.
+  unfold pseq_get, dense_get in *.
+  rewrite nth_error_map, Hget. reflexivity.
+Qed.
+
+(** Lookup is a recursive compact-child worker.  Update and removal remain
+    source-refined while their compact workers are developed. *)
+Fixpoint native_get {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (native : native_tree K A)
     : option A :=
-  get_tree eqb fuel depth full_hash key (source_of_native native).
+  match native with
+  | NativeEmpty => None
+  | NativeLeaf stored_hash stored value =>
+      if N.eqb full_hash stored_hash then
+        if eqb key stored then Some value else None
+      else None
+  | NativeCollision stored_hash entries =>
+      if N.eqb full_hash stored_hash then bucket_get eqb key (pseq_view entries)
+      else None
+  | NativeBranch bitmap children =>
+      match fuel with
+      | O => None
+      | S fuel' =>
+          let slot := chunk full_hash depth in
+          if bitmap_has bitmap slot then
+            match pseq_get (rank bitmap slot) children with
+            | Some child => native_get eqb fuel' (S depth) full_hash key child
+            | None => None
+            end
+          else None
+      end
+  end.
 
 Definition native_set {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (value : A)
@@ -263,7 +293,30 @@ Lemma native_get_refines :
          (native : native_tree K A),
     native_get eqb fuel depth full_hash key native =
     get_tree eqb fuel depth full_hash key (source_of_native native).
-Proof. reflexivity. Qed.
+Proof.
+  intros K A eqb fuel.
+  induction fuel as [|fuel IH]; intros depth full_hash key native;
+    destruct native as [|stored_hash stored value|stored_hash entries|bitmap children];
+    cbn [native_get source_of_native get_tree].
+  - reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent; auto.
+    destruct (pseq_get (rank bitmap (chunk full_hash depth)) children)
+      as [child|] eqn:Hchild.
+    + cbn [source_of_native get_tree].
+      rewrite (@pseq_get_source_children K A
+        (rank bitmap (chunk full_hash depth)) children child Hchild).
+      now apply IH.
+    + cbn [source_of_native get_tree].
+      rewrite (@pseq_get_source_children_none K A
+        (rank bitmap (chunk full_hash depth)) children Hchild).
+      reflexivity.
+Qed.
 
 Lemma native_set_refines :
   forall K A (eqb : K -> K -> bool) fuel depth full_hash (key : K) (value : A)
@@ -376,14 +429,21 @@ Lemma native_table_get_refines :
          key (native : native_table K Seed A),
     native_table_get eqb hash key native =
     get eqb hash key (source_table_of_native native).
-Proof. reflexivity. Qed.
+Proof.
+  intros K Seed A eqb hash key [seed root].
+  exact (@native_get_refines K A eqb branch_levels 0 (hash seed key) key root).
+Qed.
 
 Lemma native_table_mem_refines :
   forall K Seed A (eqb : K -> K -> bool) (hash : Seed -> K -> N)
          key (native : native_table K Seed A),
     native_table_mem eqb hash key native =
     mem eqb hash key (source_table_of_native native).
-Proof. reflexivity. Qed.
+Proof.
+  intros K Seed A eqb hash key native.
+  unfold native_table_mem, mem.
+  now rewrite native_table_get_refines.
+Qed.
 
 Lemma native_table_elements_refines :
   forall K Seed A (native : native_table K Seed A),
