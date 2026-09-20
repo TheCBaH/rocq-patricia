@@ -4979,6 +4979,31 @@ Proof.
       * exact Hroute.
 Qed.
 
+Lemma set_tree_wf_nonempty :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (key : K) (value : A) (t : tree K A),
+    depth + fuel = branch_levels ->
+    length prefix = depth ->
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall first second, E first second ->
+      hash seed first = hash seed second) ->
+    full_hash = hash seed key ->
+    (full_hash < hash_space)%N ->
+    prefix_matches full_hash depth prefix ->
+    wf E hash seed depth prefix t ->
+    set_tree eqb fuel depth full_hash key value t <> Empty.
+Proof.
+  intros K Seed A E hash seed eqb fuel depth prefix full_hash key value t
+    Hfuel Hlength Hequiv Heqb Hcongruent Hhash Hbound Hprefixmatch Hwf Hempty.
+  pose proof (@get_tree_after_set_self_wf K Seed A E hash seed eqb fuel depth
+    prefix full_hash key value t Hfuel Hlength Hequiv Heqb Hcongruent Hhash
+    Hbound Hprefixmatch Hwf) as Hget.
+  rewrite Hempty, get_tree_empty in Hget.
+  discriminate.
+Qed.
+
 Lemma get_after_set_self :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (seed : Seed) (eqb : K -> K -> bool) (key : K) (value : A)
