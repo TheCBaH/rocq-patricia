@@ -35,7 +35,15 @@ grep -Fq 'native_branch_insert bitmap slot' "$model_file" ||
   fail "native_set does not visibly insert a compact child"
 grep -Fq 'set_tree eqb0 fuel depth full_hash key value' "$model_file" ||
   fail "native_set has no source fallback for non-branch nodes"
-grep -Fq 'remove_tree eqb0 fuel depth full_hash key (source_of_native native)' "$model_file" ||
-  fail "native_remove does not visibly delegate through the source worker"
+grep -Eq '^let( rec)? native_remove' "$model_file" ||
+  fail "native_remove is missing"
+grep -Fq 'native_remove eqb0 fuel' "$model_file" ||
+  fail "native_remove does not visibly recurse through compact children"
+grep -Fq 'native_branch_remove bitmap slot' "$model_file" ||
+  fail "native_remove does not visibly compact an empty child"
+grep -Fq 'native_branch_replace bitmap slot' "$model_file" ||
+  fail "native_remove does not visibly replace a compact child"
+grep -Fq 'remove_tree eqb0 fuel depth full_hash key' "$model_file" ||
+  fail "native_remove has no source fallback for non-branch nodes"
 
-echo "Hash-table native-model extraction audit: list-modeled sequence, recursive get/set, and source-refined removal confirmed; no array binding claimed"
+echo "Hash-table native-model extraction audit: list-modeled sequence and recursive get/set/remove confirmed; no array binding claimed"

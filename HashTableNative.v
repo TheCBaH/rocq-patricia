@@ -281,6 +281,17 @@ Proof.
   now rewrite IH.
 Qed.
 
+Lemma map_dense_remove :
+  forall A B (f : A -> B) index items,
+    map f (dense_remove index items) =
+    dense_remove index (map f items).
+Proof.
+  intros A B f index.
+  induction index as [|index IH]; intros items;
+    destruct items as [|head tail]; cbn; auto.
+  now rewrite IH.
+Qed.
+
 Lemma source_of_native_branch_insert :
   forall K A (bitmap slot : N) (child : native_tree K A)
          (children : pseq (native_tree K A)),
@@ -307,8 +318,44 @@ Proof.
   cbn. f_equal. apply map_dense_replace.
 Qed.
 
-(** Lookup is a recursive compact-child worker.  Update and removal remain
-    source-refined while their compact workers are developed. *)
+Definition native_children_remove {K A : Type} (bitmap slot : N) (index : nat)
+    (children : pseq (native_tree K A)) : native_tree K A :=
+  let children' := pseq_remove index children in
+  match pseq_view children' with
+  | [] => NativeEmpty
+  | _ => NativeBranch (N.ldiff bitmap (bitmap_bit slot)) children'
+  end.
+
+Definition native_branch_remove {K A : Type} (bitmap slot : N)
+    (children : pseq (native_tree K A)) : native_tree K A :=
+  native_children_remove bitmap slot (rank bitmap slot) children.
+
+Lemma source_of_native_children_remove :
+  forall K A (bitmap slot : N) index (children : pseq (native_tree K A)),
+    source_of_native (native_children_remove bitmap slot index children) =
+    match dense_remove index (map source_of_native (pseq_view children)) with
+    | [] => Empty
+    | _ => Branch (N.ldiff bitmap (bitmap_bit slot))
+        (dense_remove index (map source_of_native (pseq_view children)))
+    end.
+Proof.
+  intros K A bitmap slot index children.
+  unfold native_children_remove, pseq_remove, pseq_of_list, source_of_native.
+  rewrite <- map_dense_remove.
+  destruct (dense_remove index (pseq_view children)) as [|head tail]; reflexivity.
+Qed.
+
+Lemma source_of_native_branch_remove :
+  forall K A (bitmap slot : N) (children : pseq (native_tree K A)),
+    source_of_native (native_branch_remove bitmap slot children) =
+    branch_remove bitmap slot (map source_of_native (pseq_view children)).
+Proof.
+  intros K A bitmap slot children.
+  unfold native_branch_remove, branch_remove.
+  apply source_of_native_children_remove.
+Qed.
+
+(** Lookup, update and removal are recursive compact-child workers. *)
 Fixpoint native_get {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (native : native_tree K A)
     : option A :=
@@ -353,10 +400,25 @@ Fixpoint native_set {K A : Type} (eqb : K -> K -> bool)
       (set_tree eqb fuel depth full_hash key value (source_of_native native))
   end.
 
-Definition native_remove {K A : Type} (eqb : K -> K -> bool)
+Fixpoint native_remove {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (native : native_tree K A)
     : native_tree K A :=
-  native_of_source (remove_tree eqb fuel depth full_hash key (source_of_native native)).
+  match native, fuel with
+  | NativeBranch bitmap children, S fuel' =>
+      let slot := chunk full_hash depth in
+      if bitmap_has bitmap slot then
+        match pseq_get (rank bitmap slot) children with
+        | Some child =>
+            match native_remove eqb fuel' (S depth) full_hash key child with
+            | NativeEmpty => native_branch_remove bitmap slot children
+            | child' => native_branch_replace bitmap slot child' children
+            end
+        | None => NativeBranch bitmap children
+        end
+      else NativeBranch bitmap children
+  | _, _ => native_of_source
+      (remove_tree eqb fuel depth full_hash key (source_of_native native))
+  end.
 
 Lemma native_get_refines :
   forall K A (eqb : K -> K -> bool) fuel depth full_hash (key : K)
@@ -425,7 +487,58 @@ Lemma native_remove_refines :
          (native : native_tree K A),
     source_of_native (native_remove eqb fuel depth full_hash key native) =
     remove_tree eqb fuel depth full_hash key (source_of_native native).
-Proof. intros. unfold native_remove. apply source_of_native_of_source. Qed.
+Proof.
+  intros K A eqb fuel.
+  induction fuel as [|fuel IH]; intros depth full_hash key native;
+    destruct native as [|stored_hash stored value|stored_hash entries|bitmap children].
+  all: cbn [native_remove]; try apply source_of_native_of_source.
+  destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
+  - destruct (pseq_get (rank bitmap (chunk full_hash depth)) children)
+      as [child|] eqn:Hchild.
+    + destruct (native_remove eqb fuel (S depth) full_hash key child)
+        as [|child_hash child_key child_value|child_hash child_entries|child_bitmap child_children]
+        eqn:Hremove.
+      * rewrite source_of_native_branch_remove.
+        cbn [source_of_native remove_tree].
+        rewrite Hpresent.
+        rewrite (@pseq_get_source_children K A
+          (rank bitmap (chunk full_hash depth)) children child Hchild).
+        rewrite <- (IH (S depth) full_hash key child).
+        rewrite Hremove.
+        reflexivity.
+      * rewrite source_of_native_branch_replace.
+        cbn [source_of_native remove_tree].
+        rewrite Hpresent.
+        rewrite (@pseq_get_source_children K A
+          (rank bitmap (chunk full_hash depth)) children child Hchild).
+        rewrite <- (IH (S depth) full_hash key child).
+        rewrite Hremove.
+        reflexivity.
+      * rewrite source_of_native_branch_replace.
+        cbn [source_of_native remove_tree].
+        rewrite Hpresent.
+        rewrite (@pseq_get_source_children K A
+          (rank bitmap (chunk full_hash depth)) children child Hchild).
+        rewrite <- (IH (S depth) full_hash key child).
+        rewrite Hremove.
+        reflexivity.
+      * rewrite source_of_native_branch_replace.
+        cbn [source_of_native remove_tree].
+        rewrite Hpresent.
+        rewrite (@pseq_get_source_children K A
+          (rank bitmap (chunk full_hash depth)) children child Hchild).
+        rewrite <- (IH (S depth) full_hash key child).
+        rewrite Hremove.
+        reflexivity.
+    + cbn [source_of_native remove_tree].
+      rewrite Hpresent.
+      rewrite (@pseq_get_source_children_none K A
+        (rank bitmap (chunk full_hash depth)) children Hchild).
+      reflexivity.
+  - cbn [source_of_native remove_tree].
+    rewrite Hpresent.
+    reflexivity.
+Qed.
 
 Record native_table (K Seed A : Type) : Type := {
   native_table_seed : Seed;
