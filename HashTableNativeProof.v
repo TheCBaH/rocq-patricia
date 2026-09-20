@@ -280,3 +280,23 @@ Proof.
   apply (@elements_keys_nodup K Seed A E hash (source_table_of_native native)).
   exact Hwf.
 Qed.
+
+Lemma native_table_is_empty_iff_get_none :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (native : native_table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    native_table_wf E hash native ->
+    (native_table_is_empty native = true <->
+      forall query, native_table_get eqb hash query native = None).
+Proof.
+  intros K Seed A E hash eqb native Hequiv Heqb Hcongruent Hwf.
+  rewrite native_table_is_empty_refines.
+  rewrite (@is_empty_iff_get_none K Seed A E eqb hash
+    (source_table_of_native native) Hequiv Heqb Hcongruent Hwf).
+  split; intros Hall query.
+  - rewrite native_table_get_refines. apply Hall.
+  - rewrite <- native_table_get_refines. apply Hall.
+Qed.

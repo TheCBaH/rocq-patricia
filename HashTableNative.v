@@ -297,6 +297,13 @@ Definition native_table_elements {K Seed A : Type}
     (native : native_table K Seed A) : list (K * A) :=
   elements (source_table_of_native native).
 
+Definition native_table_is_empty {K Seed A : Type}
+    (native : native_table K Seed A) : bool :=
+  match native_table_root native with
+  | NativeEmpty => true
+  | _ => false
+  end.
+
 Lemma source_table_native_empty :
   forall K Seed A (seed : Seed),
     @source_table_of_native K Seed A (native_empty seed) = empty seed.
@@ -356,3 +363,8 @@ Lemma native_table_elements_refines :
   forall K Seed A (native : native_table K Seed A),
     native_table_elements native = elements (source_table_of_native native).
 Proof. reflexivity. Qed.
+
+Lemma native_table_is_empty_refines :
+  forall K Seed A (native : native_table K Seed A),
+    native_table_is_empty native = is_empty (source_table_of_native native).
+Proof. intros K Seed A [seed root]; destruct root; reflexivity. Qed.
