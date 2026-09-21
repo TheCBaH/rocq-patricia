@@ -7651,3 +7651,39 @@ Proof.
         apply (Hbound key value). now left.
       * eapply elements_set_other; eauto.
 Qed.
+
+Lemma elements_set_absent :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (key : K) (value : A) (m : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second -> hash seed first = hash seed second) ->
+    (hash (table_seed m) key < hash_space)%N ->
+    table_wf E hash m ->
+    get eqb hash key m = None ->
+    In (key, value) (elements (set eqb hash key value m)).
+Proof.
+  intros K Seed A E hash eqb key value [seed root] Hequiv Heqb Hcongruent
+    Hbound Hwf Hnone.
+  assert (Hsetwf : table_wf E hash
+    (set eqb hash key value {| table_seed := seed; table_root := root |})).
+  { eapply table_wf_set; eauto. }
+  assert (Hsetget : get eqb hash key
+    (set eqb hash key value {| table_seed := seed; table_root := root |}) =
+    Some value).
+  { eapply get_after_set_self; eauto. }
+  destruct (@get_binding_sound K Seed A E eqb hash key
+    (set eqb hash key value {| table_seed := seed; table_root := root |}) value
+    Heqb Hsetget) as [stored [Hstored Hrelated]].
+  change (In (stored, value)
+    (bindings (set_tree eqb branch_levels 0 (hash seed key) key value root)))
+    in Hstored.
+  destruct (@bindings_set_tree_key_origin K A eqb branch_levels 0 (hash seed key)
+    key value root (stored, value) Hstored) as [[prior Hprior]|Hnew].
+  - exfalso.
+    pose proof (@get_binding_complete K Seed A E hash eqb key stored prior
+      {| table_seed := seed; table_root := root |} Hequiv Heqb Hcongruent
+      Hbound Hwf Hprior Hrelated) as Hfound.
+    rewrite Hnone in Hfound. discriminate.
+  - simpl in Hnew. subst stored. exact Hstored.
+Qed.
