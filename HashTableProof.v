@@ -7774,3 +7774,53 @@ Proof.
   - apply get_empty.
   - exact Hscan.
 Qed.
+
+Lemma table_extensional_set :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) key (value : A) (left right : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second -> hash seed first = hash seed second) ->
+    table_extensional eqb hash left right ->
+    table_wf E hash left -> table_wf E hash right ->
+    (hash (table_seed left) key < hash_space)%N ->
+    (hash (table_seed right) key < hash_space)%N ->
+    (forall query,
+      (hash (table_seed left) query < hash_space)%N /\
+      (hash (table_seed right) query < hash_space)%N) ->
+    table_extensional eqb hash (set eqb hash key value left)
+      (set eqb hash key value right).
+Proof.
+  intros K Seed A E hash eqb key value left right Hequiv Heqb Hcongruent Hext
+    Hleft Hright Hkey_left Hkey_right Hbound query.
+  destruct (Hbound query) as [Hquery_left Hquery_right].
+  rewrite (@get_after_set K Seed A E hash eqb query key value left
+    Hequiv Heqb Hcongruent Hquery_left Hkey_left Hleft).
+  rewrite (@get_after_set K Seed A E hash eqb query key value right
+    Hequiv Heqb Hcongruent Hquery_right Hkey_right Hright).
+  now rewrite Hext.
+Qed.
+
+Lemma table_extensional_remove :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) key (left right : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second -> hash seed first = hash seed second) ->
+    table_extensional eqb hash left right ->
+    table_wf E hash left -> table_wf E hash right ->
+    (forall query,
+      (hash (table_seed left) query < hash_space)%N /\
+      (hash (table_seed right) query < hash_space)%N) ->
+    table_extensional eqb hash (remove eqb hash key left)
+      (remove eqb hash key right).
+Proof.
+  intros K Seed A E hash eqb key left right Hequiv Heqb Hcongruent Hext
+    Hleft Hright Hbound query.
+  destruct (Hbound query) as [Hquery_left Hquery_right].
+  rewrite (@get_after_remove K Seed A E hash eqb query key left
+    Hequiv Heqb Hcongruent Hquery_left Hleft).
+  rewrite (@get_after_remove K Seed A E hash eqb query key right
+    Hequiv Heqb Hcongruent Hquery_right Hright).
+  now rewrite Hext.
+Qed.
