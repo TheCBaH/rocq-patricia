@@ -37,3 +37,7 @@
 /hashtable_skeleton_extracted/
 /hashtable_extracted/
 /hashtable_native_array_extracted/
+/hashtable-native-extract-wrapper-test
+/hashtable-native-extract-wrapper-native-test
+/hashtable-native-extract-differential-test
+/hashtable-native-extract-differential-native-test
