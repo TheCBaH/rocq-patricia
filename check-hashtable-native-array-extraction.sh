@@ -10,4 +10,7 @@ done
 for worker in native_get native_set native_remove; do
   grep -Eq "^let( rec)? $worker" "$model_file" || { echo "missing $worker" >&2; exit 1; }
 done
+for operation in native_empty native_table_is_empty native_table_get native_table_mem native_table_set native_table_remove native_table_elements native_table_of_list; do
+  grep -Eq "^let( rec)? $operation" "$model_file" || { echo "missing native table API $operation" >&2; exit 1; }
+done
 echo "Hash-table native-array extraction audit: pseq alone binds to private arrays; recursive native workers remain extracted"

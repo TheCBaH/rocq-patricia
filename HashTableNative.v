@@ -573,6 +573,24 @@ Definition native_table_get {K Seed A : Type} (eqb : K -> K -> bool)
   native_get eqb branch_levels 0 (hash (native_table_seed native) key) key
     (native_table_root native).
 
+Fixpoint native_table_add_first {K Seed A : Type} (eqb : K -> K -> bool)
+    (hash : Seed -> K -> N) (entries : list (K * A))
+    (native : native_table K Seed A) : native_table K Seed A :=
+  match entries with
+  | [] => native
+  | (key, value) :: tail =>
+      let next := match native_table_get eqb hash key native with
+                  | Some _ => native
+                  | None => native_table_set eqb hash key value native
+                  end in
+      native_table_add_first eqb hash tail next
+  end.
+
+Definition native_table_of_list {K Seed A : Type} (eqb : K -> K -> bool)
+    (hash : Seed -> K -> N) (seed : Seed) (entries : list (K * A))
+    : native_table K Seed A :=
+  native_table_add_first eqb hash entries (native_empty seed).
+
 Definition native_table_mem {K Seed A : Type} (eqb : K -> K -> bool)
     (hash : Seed -> K -> N) (key : K) (native : native_table K Seed A) : bool :=
   match native_table_get eqb hash key native with
@@ -651,6 +669,37 @@ Proof.
   intros K Seed A eqb hash key native.
   unfold native_table_mem, mem.
   now rewrite native_table_get_refines.
+Qed.
+
+Lemma source_table_native_add_first :
+  forall K Seed A (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         entries (native : native_table K Seed A),
+    source_table_of_native (native_table_add_first eqb hash entries native) =
+    add_first eqb hash entries (source_table_of_native native).
+Proof.
+  intros K Seed A eqb hash entries.
+  induction entries as [|[key value] tail IH]; intro native.
+  - reflexivity.
+  - simpl.
+    destruct (native_table_get eqb hash key native) as [previous|] eqn:Hget.
+    + rewrite native_table_get_refines in Hget.
+      rewrite Hget. apply IH.
+    + rewrite native_table_get_refines in Hget.
+      rewrite Hget.
+      pose proof (IH (native_table_set eqb hash key value native)) as Htail.
+      rewrite source_table_native_set in Htail. exact Htail.
+Qed.
+
+Lemma source_table_native_of_list :
+  forall K Seed A (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         (seed : Seed) (entries : list (K * A)),
+    source_table_of_native (native_table_of_list eqb hash seed entries) =
+    of_list eqb hash seed entries.
+Proof.
+  intros K Seed A eqb hash seed entries.
+  unfold native_table_of_list, of_list.
+  rewrite source_table_native_add_first.
+  rewrite source_table_native_empty. reflexivity.
 Qed.
 
 Lemma native_table_elements_refines :

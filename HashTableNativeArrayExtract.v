@@ -23,4 +23,8 @@ Separate Extraction
   HashTableNative.pseq_replace HashTableNative.pseq_remove
   HashTable.get_tree
   HashTableNative.source_of_native HashTableNative.native_of_source
-  HashTableNative.native_get HashTableNative.native_set HashTableNative.native_remove.
+  HashTableNative.native_get HashTableNative.native_set HashTableNative.native_remove
+  HashTableNative.native_empty HashTableNative.native_table_is_empty
+  HashTableNative.native_table_get HashTableNative.native_table_mem
+  HashTableNative.native_table_set HashTableNative.native_table_remove
+  HashTableNative.native_table_elements HashTableNative.native_table_of_list.
