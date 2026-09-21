@@ -259,6 +259,35 @@ Definition native_branch_insert {K A : Type} (bitmap slot : N)
   NativeBranch (N.lor bitmap (bitmap_bit slot))
     (pseq_insert (rank bitmap slot) child children).
 
+Lemma native_branch_replace_bitmap_bound :
+  forall K A (bitmap slot : N) (child : native_tree K A)
+         (children : pseq (native_tree K A)),
+    (bitmap < bitmap_limit)%N ->
+    match native_branch_replace bitmap slot child children with
+    | NativeBranch bitmap' _ => (bitmap' < bitmap_limit)%N
+    | _ => False
+    end.
+Proof.
+  intros K A bitmap slot child children Hbound.
+  unfold native_branch_replace. exact Hbound.
+Qed.
+
+Lemma native_branch_insert_bitmap_bound :
+  forall K A (bitmap slot : N) (child : native_tree K A)
+         (children : pseq (native_tree K A)),
+    (bitmap < bitmap_limit)%N ->
+    (slot < branch_width)%N ->
+    bitmap_has bitmap slot = false ->
+    match native_branch_insert bitmap slot child children with
+    | NativeBranch bitmap' _ => (bitmap' < bitmap_limit)%N
+    | _ => False
+    end.
+Proof.
+  intros K A bitmap slot child children Hbound Hslot Habsent.
+  unfold native_branch_insert. cbn.
+  apply bitmap_lor_bit_bound_absent; assumption.
+Qed.
+
 Lemma map_dense_insert :
   forall A B (f : A -> B) index (item : A) items,
     map f (dense_insert index item items) =
@@ -329,6 +358,36 @@ Definition native_children_remove {K A : Type} (bitmap slot : N) (index : nat)
 Definition native_branch_remove {K A : Type} (bitmap slot : N)
     (children : pseq (native_tree K A)) : native_tree K A :=
   native_children_remove bitmap slot (rank bitmap slot) children.
+
+Lemma native_children_remove_bitmap_bound :
+  forall K A (bitmap slot : N) index (children : pseq (native_tree K A)),
+    (bitmap < bitmap_limit)%N ->
+    match native_children_remove bitmap slot index children with
+    | NativeEmpty => True
+    | NativeBranch bitmap' _ => (bitmap' < bitmap_limit)%N
+    | _ => False
+    end.
+Proof.
+  intros K A bitmap slot index children Hbound.
+  unfold native_children_remove, pseq_remove, pseq_of_list.
+  destruct (dense_remove index (pseq_view children)) as [|child tail]; cbn.
+  - exact I.
+  - apply bitmap_ldiff_bit_bound. exact Hbound.
+Qed.
+
+Lemma native_branch_remove_bitmap_bound :
+  forall K A (bitmap slot : N) (children : pseq (native_tree K A)),
+    (bitmap < bitmap_limit)%N ->
+    match native_branch_remove bitmap slot children with
+    | NativeEmpty => True
+    | NativeBranch bitmap' _ => (bitmap' < bitmap_limit)%N
+    | _ => False
+    end.
+Proof.
+  intros K A bitmap slot children Hbound.
+  unfold native_branch_remove.
+  eapply native_children_remove_bitmap_bound; eauto.
+Qed.
 
 Lemma source_of_native_children_remove :
   forall K A (bitmap slot : N) index (children : pseq (native_tree K A)),
