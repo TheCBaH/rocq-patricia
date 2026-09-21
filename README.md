@@ -42,8 +42,8 @@ therefore return the same normalized hash for a given seed. Each map retains
 the seed supplied to `empty`, `singleton`, or `of_list`.
 
 The [source-reference release inventory](hashtable-reference-release.md)
-records the extraction/runtime contracts and maps each required reference test
-case to its bytecode or native evidence.
+records the source-reference and native-wrapper extraction/runtime contracts,
+and maps each required reference test case to its bytecode or native evidence.
 
 The [source API inventory](hashtable-api-inventory.md) maps the checked
 lookup, update, representative, enumeration, and extensional-observer laws to
@@ -52,7 +52,7 @@ their explicit contracts.
 `HashTableTestHash` provides deterministic 30-bit integer, string, and
 constant-collision hashes for direct reference-backend tests. It is intended
 for reproducible test workloads; applications supply their own callback via
-`HashMap.Make`.
+`HashMap.Make` now uses the generated native table backend.
 
 For equivalent keys, `set` keeps the resident key representative while
 replacing its value. `of_list` is first-wins for both the value and the key
@@ -75,15 +75,14 @@ and unique representative keys, plus exclusion of the zero-fuel branch path
 for valid lookup, update and removal routing. The modeled native operations have source-relation refinement laws
 (`native_get_refines_related`, `native_set_refines_related`, and
 `native_remove_refines_related`). The tracker identifies the remaining global
-set, join, array-realizer, and release proof gaps.
+foreign array-realizer and release-evidence boundaries.
 
-The list-backed `HashTableReference` package is generated from Rocq source.
-`HashMap.Make` is a handwritten abstract wrapper around that package. The
-private-array `HashMapNative` backend has deterministic bytecode/native
-differential tests and implementation audits, but it is not the public
-backend and its OCaml array realization is outside the kernel proof. The
-generated-interface, wrapper-boundary, primitive, and native-array audits
-make those boundaries executable build checks.
+The list-backed `HashTableReference` package remains generated from Rocq source
+and directly tested. `HashMap.Make` is an abstract wrapper around generated
+native table workers whose compact sequence interface maps to private fresh-copy
+arrays. The OCaml array/view contract remains outside the kernel proof;
+`HashTableArrayRefinement.v`, primitive tests, and extraction/runtime audits
+state and exercise that boundary.
 
 Run:
 

@@ -36,7 +36,10 @@ grep -A5 'let rec bindings' "$backend_file" | grep -Fq 'HashTablePrimitives.to_l
   fail "the sole compact-child materialization is not in bindings"
 
 if grep -Fq 'HashMapNative' "$public_wrapper"; then
-  fail "public wrapper switched to the native backend before the gate closed"
+  fail "public wrapper delegates to the standalone backend instead of generated native workers"
 fi
 
-echo "Hash-table native-array audit: private sequence workers only; compact children materialized only for enumeration; no reference delegation or unsafe escape; public wrapper remains reference-backed"
+grep -Fq 'HashTableNative.' "$public_wrapper" ||
+  fail "public wrapper does not use the generated native table package"
+
+echo "Hash-table native-array audit: private sequence workers only; compact children materialized only for enumeration; no reference delegation or unsafe escape; public wrapper uses generated native workers"

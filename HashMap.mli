@@ -1,5 +1,5 @@
-(** Public source-reference hash-map interface.  Node constructors, depth,
-    routing hashes, and extraction details remain private to this wrapper. *)
+(** Public persistent hash-map interface.  Node constructors, depth, routing
+    hashes, and extraction details remain private to this wrapper. *)
 
 module type KEY = sig
   type t

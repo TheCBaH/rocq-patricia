@@ -167,22 +167,23 @@ hashtable-native-extract-differential-native: hashtable-native-extract-wrapper-t
 	./hashtable-native-extract-differential-native-test
 
 hashtable-native-array-test: hashtable-reference-ocaml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashMapNativeTest.ml
-	$(OCAMLC) -I hashtable_reference_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashMapNativeTest.ml
-	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
-	  $(OCAMLC) -I . -I .. -o ../hashtable-native-array-test $$objects ../HashTableReference.cmo ../HashMap.cmo ../HashTablePrimitives.cmo ../HashMapNative.cmo ../HashMapNativeTest.cmo
+	cd hashtable_native_array_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLC) -I .. -c
+	$(OCAMLC) -I hashtable_reference_extracted -I hashtable_native_array_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashMapNativeTest.ml
+	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
+	  $(OCAMLC) -I . -I .. -o ../hashtable-native-array-test ../HashTablePrimitives.cmo $$objects ../HashMap.cmo ../HashMapNative.cmo ../HashMapNativeTest.cmo
 	./hashtable-native-array-test
 
 hashtable-native-array-test-native: hashtable-wrapper-test-native HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashMapNativeTest.ml
-	$(OCAMLOPT) -I hashtable_reference_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashMapNativeTest.ml
-	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
-	  $(OCAMLOPT) -I . -I .. -o ../hashtable-native-array-native-test $$objects ../HashTableReference.cmx ../HashMap.cmx ../HashTablePrimitives.cmx ../HashMapNative.cmx ../HashMapNativeTest.cmx
+	$(OCAMLOPT) -I hashtable_reference_extracted -I hashtable_native_array_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashMapNativeTest.ml
+	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. -o ../hashtable-native-array-native-test ../HashTablePrimitives.cmx $$objects ../HashMap.cmx ../HashMapNative.cmx ../HashMapNativeTest.cmx
 	./hashtable-native-array-native-test
 
 hashtable-native-array-audit: HashMapNative.ml HashMap.ml check-hashtable-native-array-backend.sh
 	sh ./check-hashtable-native-array-backend.sh HashMapNative.ml HashMap.ml
 
-hashtable-reference-ocaml: hashtable-reference HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml
-	$(OCAMLC) -I hashtable_reference_extracted -c HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml
+hashtable-reference-ocaml: hashtable-reference hashtable-native-array-extracted HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml
+	$(OCAMLC) -I hashtable_reference_extracted -I hashtable_native_array_extracted -c HashTableReference.mli HashTableReference.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMap.mli HashMap.ml
 
 hashtable-reference-test: hashtable-reference HashTableTestHash.mli HashTableTestHash.ml HashTableReferenceTest.ml
 	$(OCAMLC) -c HashTableTestHash.mli HashTableTestHash.ml
@@ -191,27 +192,28 @@ hashtable-reference-test: hashtable-reference HashTableTestHash.mli HashTableTes
 	./hashtable-reference-test
 
 hashtable-wrapper-test: hashtable-reference-ocaml HashMapTest.ml
-	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
-	  $(OCAMLC) -I . -I .. -o ../hashtable-wrapper-test $$objects ../HashTableReference.cmo ../HashMap.cmo ../HashMapTest.ml
+	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
+	  $(OCAMLC) -I . -I .. -o ../hashtable-wrapper-test ../HashTablePrimitives.cmo $$objects ../HashMap.cmo ../HashMapTest.ml
 	./hashtable-wrapper-test
 
 hashtable-wrapper-test-native: hashtable-reference HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashMapTest.ml
-	cd hashtable_reference_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
-	$(OCAMLOPT) -I hashtable_reference_extracted -c HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml
-	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
-	  $(OCAMLOPT) -I . -I .. -o ../hashtable-wrapper-native-test $$objects ../HashTableReference.cmx ../HashMap.cmx ../HashMapTest.ml
+	$(MAKE) hashtable-native-array-extracted
+	cd hashtable_native_array_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -I .. -c
+	$(OCAMLOPT) -I hashtable_native_array_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMap.mli HashMap.ml
+	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. -o ../hashtable-wrapper-native-test ../HashTablePrimitives.cmx $$objects ../HashMap.cmx ../HashMapTest.ml
 	./hashtable-wrapper-native-test
 
 hashtable-test: hashtable-reference-test hashtable-wrapper-test
 
 hashtable-differential: hashtable-reference-ocaml HashTableDifferentialTest.ml
-	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
-	  $(OCAMLC) -I . -I .. -o ../hashtable-differential-test $$objects ../HashTableReference.cmo ../HashMap.cmo ../HashTableDifferentialTest.ml
+	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
+	  $(OCAMLC) -I . -I .. -o ../hashtable-differential-test ../HashTablePrimitives.cmo $$objects ../HashMap.cmo ../HashTableDifferentialTest.ml
 	./hashtable-differential-test
 
 hashtable-test-native: hashtable-wrapper-test-native HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashTableDifferentialTest.ml
-	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
-	  $(OCAMLOPT) -I . -I .. -o ../hashtable-differential-native-test $$objects ../HashTableReference.cmx ../HashMap.cmx ../HashTableDifferentialTest.ml
+	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. -o ../hashtable-differential-native-test ../HashTablePrimitives.cmx $$objects ../HashMap.cmx ../HashTableDifferentialTest.ml
 	./hashtable-differential-native-test
 
 hashtable-generated-interface-audit: hashtable-reference check-hashtable-generated-interface.sh
