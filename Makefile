@@ -27,7 +27,7 @@ HASHTABLE_VOFILES := $(HASHTABLE_VFILES:.v=.vo)
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
-.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-test hashtable-differential hashtable-test-native hashtable-native hashtable-native-model-extraction-audit hashtable-native-model-test hashtable-native-model-test-native hashtable-native-array-extracted hashtable-native-array-extraction-audit hashtable-native-array-test hashtable-native-array-test-native hashtable-native-primitives-test hashtable-native-primitives-audit hashtable-native-array-audit hashtable-benchmark hashtable-benchmark-smoke hashtable-string-benchmark hashtable-string-benchmark-smoke hashtable-extraction-audit hashtable-generated-interface-audit hashtable-assumptions
+.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-test hashtable-differential hashtable-test-native hashtable-native hashtable-native-model-extraction-audit hashtable-native-model-test hashtable-native-model-test-native hashtable-native-array-extracted hashtable-native-array-extraction-audit hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-array-test hashtable-native-array-test-native hashtable-native-primitives-test hashtable-native-primitives-audit hashtable-native-array-audit hashtable-benchmark hashtable-benchmark-smoke hashtable-string-benchmark hashtable-string-benchmark-smoke hashtable-extraction-audit hashtable-generated-interface-audit hashtable-assumptions
 
 .PHONY: string-primitive-profile
 .PHONY: string-worker-performance
@@ -116,6 +116,22 @@ hashtable-native-array-extracted: hashtable-proof HashTableNativeArrayExtract.v 
 
 hashtable-native-array-extraction-audit: hashtable-native-array-extracted check-hashtable-native-array-extraction.sh
 	sh ./check-hashtable-native-array-extraction.sh hashtable_native_array_extracted/HashTableNative.ml
+
+hashtable-native-array-extracted-test: hashtable-native-array-extracted HashTableNativeModelTest.ml
+	$(OCAMLC) -c HashTablePrimitives.mli HashTablePrimitives.ml
+	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
+	  $(OCAMLC) -I . -I .. -o ../hashtable-native-array-extracted-test ../HashTablePrimitives.cmo $$objects ../HashTableNativeModelTest.ml
+	./hashtable-native-array-extracted-test
+
+hashtable-native-array-extracted-test-native: hashtable-proof HashTableNativeArrayExtract.v HashTableNativeModelTest.ml
+	@mkdir -p hashtable_native_array_extracted
+	$(RM) hashtable_native_array_extracted/*.ml hashtable_native_array_extracted/*.mli hashtable_native_array_extracted/*.cmi hashtable_native_array_extracted/*.cmo hashtable_native_array_extracted/*.cmx hashtable_native_array_extracted/*.o
+	$(ROCQ) compile $(ROCQFLAGS) HashTableNativeArrayExtract.v
+	cd hashtable_native_array_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -I .. -c
+	$(OCAMLOPT) -c HashTablePrimitives.mli HashTablePrimitives.ml
+	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. -o ../hashtable-native-array-extracted-native-test ../HashTablePrimitives.cmx $$objects ../HashTableNativeModelTest.ml
+	./hashtable-native-array-extracted-native-test
 
 hashtable-native-array-test: hashtable-reference-ocaml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashMapNativeTest.ml
 	$(OCAMLC) -I hashtable_reference_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashMapNativeTest.ml
