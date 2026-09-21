@@ -146,6 +146,23 @@ hashtable-native-extract-differential: hashtable-native-extract-wrapper-test Has
 	  $(OCAMLC) -I . -I .. -o ../hashtable-native-extract-differential-test ../HashTablePrimitives.cmo $$objects ../HashMapNativeExtract.cmo /tmp/HashTableNativeExtractDifferentialTest.ml
 	./hashtable-native-extract-differential-test
 
+hashtable-native-extract-wrapper-test-native: hashtable-wrapper-test-native HashTableNativeArrayExtract.v HashMapNativeExtract.mli HashMapNativeExtract.ml HashMapTest.ml
+	@mkdir -p hashtable_native_array_extracted
+	$(RM) hashtable_native_array_extracted/*.ml hashtable_native_array_extracted/*.mli hashtable_native_array_extracted/*.cmi hashtable_native_array_extracted/*.cmo hashtable_native_array_extracted/*.cmx hashtable_native_array_extracted/*.o
+	$(ROCQ) compile $(ROCQFLAGS) HashTableNativeArrayExtract.v
+	cd hashtable_native_array_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -I .. -c
+	$(OCAMLOPT) -I hashtable_native_array_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMapNativeExtract.mli HashMapNativeExtract.ml
+	sed 's/HashMap\.Make/HashMapNativeExtract.Make/g' HashMapTest.ml > /tmp/HashMapNativeExtractTest.ml
+	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. -o ../hashtable-native-extract-wrapper-native-test ../HashTablePrimitives.cmx $$objects ../HashMapNativeExtract.cmx /tmp/HashMapNativeExtractTest.ml
+	./hashtable-native-extract-wrapper-native-test
+
+hashtable-native-extract-differential-native: hashtable-native-extract-wrapper-test-native HashTableDifferentialTest.ml
+	sed 's/HashMap\.Make/HashMapNativeExtract.Make/g' HashTableDifferentialTest.ml > /tmp/HashTableNativeExtractDifferentialTest.ml
+	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. -o ../hashtable-native-extract-differential-native-test ../HashTablePrimitives.cmx $$objects ../HashMapNativeExtract.cmx /tmp/HashTableNativeExtractDifferentialTest.ml
+	./hashtable-native-extract-differential-native-test
+
 hashtable-native-array-test: hashtable-reference-ocaml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashMapNativeTest.ml
 	$(OCAMLC) -I hashtable_reference_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashMapNativeTest.ml
 	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
