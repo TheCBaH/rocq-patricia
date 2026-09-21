@@ -7457,3 +7457,21 @@ Proof.
     (table_wf_empty E hash seed)) as Hget.
   rewrite get_empty in Hget. exact Hget.
 Qed.
+
+Lemma bindings_set_tree_collision_retains_representative :
+  forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         fuel depth full_hash key (value : A) entries stored (old_value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    NoDupA (fun left right => E (fst left) (fst right)) entries ->
+    In (stored, old_value) entries ->
+    E key stored ->
+    In (stored, value)
+      (bindings (set_tree eqb fuel depth full_hash key value
+        (Collision full_hash entries))).
+Proof.
+  intros K A E eqb fuel depth full_hash key value entries stored old_value
+    Hequiv Heqb Hnodup Hin Hrelated.
+  rewrite set_tree_collision_same_hash, bindings_normalize_collision.
+  eapply bucket_set_retains_representative; eauto.
+Qed.
