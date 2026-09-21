@@ -59,6 +59,16 @@ let () =
   expect_get hash 32768 None routed';
   expect_get hash 32768 (Some "32768") routed;
 
+  (* [0] and [32] share the root slot but diverge at the next level.  Removing
+     one then inserting it again exercises a retained unary branch path. *)
+  let unary = empty |> M.set equal hash 0 "zero" |> M.set equal hash 32 "thirty-two" in
+  let unary_after_remove = M.remove equal hash 32 unary in
+  expect_get hash 0 (Some "zero") unary_after_remove;
+  expect_get hash 32 None unary_after_remove;
+  let unary_reinserted = M.set equal hash 32 "again" unary_after_remove in
+  expect_get hash 0 (Some "zero") unary_reinserted;
+  expect_get hash 32 (Some "again") unary_reinserted;
+
   let every_slot =
     Stdlib.List.fold_left (fun map slot -> M.set equal hash slot slot map)
       empty (Stdlib.List.init 32 Fun.id)

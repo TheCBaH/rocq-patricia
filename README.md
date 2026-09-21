@@ -41,6 +41,10 @@ wrapper retains the low 30 bits of every returned hash; equivalent keys must
 therefore return the same normalized hash for a given seed. Each map retains
 the seed supplied to `empty`, `singleton`, or `of_list`.
 
+The [source-reference release inventory](hashtable-reference-release.md)
+records the extraction/runtime contracts and maps each required reference test
+case to its bytecode or native evidence.
+
 `HashTableTestHash` provides deterministic 30-bit integer, string, and
 constant-collision hashes for direct reference-backend tests. It is intended
 for reproducible test workloads; applications supply their own callback via
