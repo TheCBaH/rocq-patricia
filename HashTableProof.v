@@ -2097,6 +2097,19 @@ Proof.
   unfold singleton. now apply get_set_empty.
 Qed.
 
+Lemma mem_singleton_query :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         seed query stored (value : A),
+    hash seed query = hash seed stored ->
+    mem eqb hash query (singleton eqb hash seed stored value) =
+    if eqb query stored then true else false.
+Proof.
+  intros K Seed A eqb hash seed query stored value Hhash.
+  unfold mem. rewrite (@get_singleton_query K Seed A eqb hash seed query
+    stored value Hhash).
+  destruct (eqb query stored); reflexivity.
+Qed.
+
 Lemma get_set_singleton_replace :
   forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
          seed key stored (old_value value : A),
@@ -7458,6 +7471,31 @@ Proof.
   rewrite get_empty in Hget. exact Hget.
 Qed.
 
+Lemma mem_of_list_first_binding :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (entries : list (K * A))
+         (query : K),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall actual_seed first second, E first second ->
+      hash actual_seed first = hash actual_seed second) ->
+    (forall key value, In (key, value) entries ->
+      (hash seed key < hash_space)%N) ->
+    (hash seed query < hash_space)%N ->
+    mem eqb hash query (of_list eqb hash seed entries) =
+      match first_binding eqb query entries with
+      | Some _ => true
+      | None => false
+      end.
+Proof.
+  intros K Seed A E hash seed eqb entries query Hequiv Heqb Hcongruent
+    Hbound Hquery_bound.
+  unfold mem.
+  rewrite (@get_of_list_first_binding K Seed A E hash seed eqb entries query
+    Hequiv Heqb Hcongruent Hbound Hquery_bound).
+  destruct (first_binding eqb query entries) as [[stored value]|]; reflexivity.
+Qed.
+
 Lemma bindings_set_tree_collision_retains_representative :
   forall (K A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
          fuel depth full_hash key (value : A) entries stored (old_value : A),
@@ -7823,4 +7861,53 @@ Proof.
   rewrite (@get_after_remove K Seed A E hash eqb query key right
     Hequiv Heqb Hcongruent Hquery_right Hright).
   now rewrite Hext.
+Qed.
+
+Lemma table_extensional_mem :
+  forall (K Seed A : Type) (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+         (left right : table K Seed A),
+    table_extensional eqb hash left right ->
+    forall query,
+      mem eqb hash query left = mem eqb hash query right.
+Proof.
+  intros K Seed A eqb hash left right Hext query.
+  unfold mem. now rewrite Hext.
+Qed.
+
+Lemma table_extensional_is_empty :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (eqb : K -> K -> bool)
+         (hash : Seed -> K -> N) (left right : table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second -> hash seed first = hash seed second) ->
+    table_extensional eqb hash left right ->
+    table_wf E hash left ->
+    table_wf E hash right ->
+    is_empty left = is_empty right.
+Proof.
+  intros K Seed A E eqb hash left right Hequiv Heqb Hcongruent Hext Hleft
+    Hright.
+  assert (Hempty : is_empty left = true <-> is_empty right = true).
+  { split; intro Hempty.
+    - apply (proj2 (@is_empty_iff_get_none K Seed A E eqb hash right Hequiv
+        Heqb Hcongruent Hright)).
+      intro query. rewrite <- Hext.
+      apply (proj1 (@is_empty_iff_get_none K Seed A E eqb hash left Hequiv
+        Heqb Hcongruent Hleft)).
+      exact Hempty.
+    - apply (proj2 (@is_empty_iff_get_none K Seed A E eqb hash left Hequiv
+        Heqb Hcongruent Hleft)).
+      intro query. rewrite Hext.
+      apply (proj1 (@is_empty_iff_get_none K Seed A E eqb hash right Hequiv
+        Heqb Hcongruent Hright)).
+      exact Hempty. }
+  destruct (is_empty left) eqn:Hleft_empty.
+  - destruct (is_empty right) eqn:Hright_empty; [reflexivity|].
+    exfalso.
+    pose proof (proj1 Hempty eq_refl) as Hright_true.
+    discriminate Hright_true.
+  - destruct (is_empty right) eqn:Hright_empty; [|reflexivity].
+    exfalso.
+    pose proof (proj2 Hempty eq_refl) as Hleft_true.
+    discriminate Hleft_true.
 Qed.

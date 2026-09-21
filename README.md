@@ -45,6 +45,10 @@ The [source-reference release inventory](hashtable-reference-release.md)
 records the extraction/runtime contracts and maps each required reference test
 case to its bytecode or native evidence.
 
+The [source API inventory](hashtable-api-inventory.md) maps the checked
+lookup, update, representative, enumeration, and extensional-observer laws to
+their explicit contracts.
+
 `HashTableTestHash` provides deterministic 30-bit integer, string, and
 constant-collision hashes for direct reference-backend tests. It is intended
 for reproducible test workloads; applications supply their own callback via
