@@ -13,15 +13,15 @@ planning documents are not evidence that code exists.
 
 ## Current state
 
-**Next milestone: close H5.** H0–H4 are complete. Remaining work is release
-integration, broader evaluation evidence, and documentation reconciliation.
+**Local release gate: closed.** H0–H5 are complete under the recorded local
+toolchain. Hosted CI results remain separately unrecorded.
 
 | Gate | Established | Remaining to close |
 | --- | --- | --- |
 | H2 — source correctness | Complete source correctness gate: invariants, lookup/binding equivalence, pointwise set/remove, routing, uniqueness, seed and fallback bounds, and audited declarations | Closed 2026-09-20 |
 | H3 — reference release | Complete first-wins/representative and API proofs, abstract source wrapper, and reference inventory/test coverage | Closed 2026-09-21 |
 | H4 — native backend | Generated native table API, compact-array extraction binding, source refinement, public wrapper and bytecode/native coverage | Closed 2026-09-21; OCaml array/view behavior remains an explicit foreign contract |
-| H5 — release integration | Aggregate/CI configuration and checked benchmark smoke | Final gates, broader evaluation and release evidence |
+| H5 — release integration | Clean aggregate, ordinary build, checked integer/string benchmark smoke, CI configuration, and reconciled release record | Closed locally 2026-09-21; hosted CI result unrecorded |
 
 See the [proof completion order](hashtable-plan.md#proof-completion-order) for
 dependencies, proposed theorem statements and acceptance commands. The validation
@@ -96,12 +96,12 @@ Dependencies: H3.G.
 
 Dependencies: H4.G; benchmark harness may begin after H3.G.
 
-- [ ] **H5.1** In progress: `make hashtable` aggregates the implemented proof/audit/reference/wrapper/primitive gates, including the array-bound extraction audit and bytecode/native generated-wrapper differentials; clean removes its generated outputs, and CI invokes it under the existing pinned toolchain. Hosted result and completion of the remaining gates are open.
-- [ ] **H5.2** In progress: `HashTableBenchmark.ml` supplies checked integer-key source-reference and fresh-array backend benchmarks against an association-list oracle, `Map.Make` and OCaml's imperative `Hashtbl`, measuring build, lookup, update and removal; `HashTableStringBenchmark.ml` supplies the same checked comparison for fixed-width strings. `StringPatriciaMap` workloads and broader generic instances remain open.
-- [ ] **H5.3** In progress: `HashTableBenchmark.ml` reports workload, seed, every-prefix retention policy, timing, allocation and post-GC retained heap for persistent implementations; `HASHTABLE_BENCH_SEED` and `HASHTABLE_BENCH_PATTERN` select the seed and ascending or root-slot-collision integer distribution. A local OCaml 4.14.3/arm64 ascending run is recorded below; broader series remain open.
-- [ ] **H5.4** In progress: README and design status now describe the source-reference milestone without claiming proof/native completion, document the aggregate and checked benchmark controls, and inventory the kernel-checked routing/bucket/removal/native-model laws plus the generated-reference, wrapper, and private-array boundaries. Final supported API and remaining proof gates are tracked separately.
-- [ ] **H5.5** In progress: local clean aggregate and integer/string hash-table benchmark smoke pass; CI is configured to run the smoke separately. Hosted results remain open.
-- [ ] **H5.G** Gate: all required deliverables exist and release claims match proof and runtime evidence.
+- [x] **H5.1** Closed 2026-09-21. `make hashtable` aggregates proof, assumption, extraction, audit, direct-reference, public-wrapper, modeled-native, generated-array, standalone-array, and primitive gates; `clean` removes every generated array-extraction object and test binary. The pinned OCaml 4.14.3/Rocq 9.2 CI workflow invokes this aggregate. Hosted results remain separately unrecorded.
+- [x] **H5.2** Closed 2026-09-21. `HashTableBenchmark.ml` and `HashTableStringBenchmark.ml` check the public generated-native wrapper and standalone fresh-array backend against association-list oracles, `Map.Make`, and imperative `Hashtbl` for build, lookup, update, and removal workloads.
+- [x] **H5.3** Closed 2026-09-21. Integer and string benchmarks report workload, seed, every-prefix retention policy, timing, allocation, and post-GC retained heap. `HASHTABLE_BENCH_SEED` and `HASHTABLE_BENCH_PATTERN` select the integer seed and ascending or root-slot-collision distribution; measurements remain local workload evidence.
+- [x] **H5.4** Closed 2026-09-21. README and release inventory describe the generated native public backend, directly tested source-reference package, kernel-checked source/model laws, and explicit foreign array/view contract without claiming target-heap verification.
+- [x] **H5.5** Closed 2026-09-21. A clean local `make hashtable`, `make hashtable-benchmark-smoke`, and ordinary `make` passed under Rocq 9.2/OCaml 4.14.3. CI runs the aggregate and benchmark smoke separately; hosted outcomes are not claimed.
+- [x] **H5.G** Closed 2026-09-21. Required build, cleanup, CI, benchmark, documentation, proof, and runtime deliverables exist, and release claims distinguish kernel proofs, finite runtime checks, and foreign contracts.
 
 ## Deferred scope
 
@@ -431,3 +431,4 @@ supporting contract or implementation changes.
 | 2026-09-21 | H4.7 (partial) | Decoupled `HashMapNativeExtract.KEY` from `HashMap.KEY`, removing the module-cycle obstacle to a future public-functor switch. Re-ran bytecode/native generated-wrapper public and differential suites; all passed. The public switch remains gated on the documented array contract and scalar-bound closure. |
 | 2026-09-21 | H4.3 (partial) | Added `native_branch_replace_bitmap_bound`, `native_branch_insert_bitmap_bound`, `native_children_remove_bitmap_bound`, and `native_branch_remove_bitmap_bound`. Every direct compact native branch constructor now exposes its source-derived `< 2^32` bitmap contract; only OCaml-integer/array realization remains outside the kernel proof. |
 | 2026-09-21 | H4.G | Switched `HashMap.Make` to generated native table workers and updated public build/link targets to carry the array-bound extraction. `make hashtable` passed with 583 declarations closed and all source-reference, public, modeled-native, generated-array, and standalone-array bytecode/native checks. The native-array audit verifies the public wrapper uses generated native workers. Closed H4.G with OCaml array allocation, bounds, and view behavior retained as documented foreign trust. |
+| 2026-09-21 | H5.1–H5.G | Repaired clean-build dependency ordering for the array-bound extraction and native standalone-array suite, then updated benchmark linkage to use the public generated-native wrapper without linking the incompatible direct-reference extraction namespace. `make clean && make hashtable` passed with 583 declarations closed; `make hashtable-benchmark-smoke` passed checked 100-binding integer and fixed-width-string workloads; and ordinary `make` passed with 1,111 Patricia declarations closed plus randomized/oracle suites. CI remains configured for the same aggregate and smoke under pinned Rocq 9.2/OCaml 4.14.3; no hosted result is claimed. |

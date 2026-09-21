@@ -18,23 +18,25 @@ strategies and separate native-verification tracker are in
 Publication citations and local PDF provenance are indexed in
 [`papers/README.md`](papers/README.md).
 
-The in-progress persistent generic hash table accepts a key module supplying
+The persistent generic hash table accepts a key module supplying
 equality and hashing through `HashMap.Make(Key)`. It has a separate
 [design](hashtable-design.md), [implementation plan](hashtable-plan.md) and
 [tracker](hashtable-todo.md), based on [hashtable.md](hashtable.md). The design
 compares HAMT and CHAMP for OCaml runtime behavior and Rocq proof effort.
-Its list-backed source HAMT, reference extraction, public wrapper and finite
-runtime tests exist; the primitive/core proof gates, full reference release,
-compact-array backend and release integration remain open. Run
-`make hashtable` for the implemented proof, extraction, audit and differential
-test aggregate. `make hashtable-benchmark` compares the reference wrapper,
-the experimental private-array backend, `Map.Make`, and OCaml's imperative
-`Hashtbl` on checked integer build, lookup, update and removal workloads;
+Its list-backed source HAMT, source-reference extraction, generated native
+public wrapper, and finite runtime tests exist. The remaining release work is
+optional workload-specific evaluation. Run `make hashtable` for the implemented
+proof, extraction, audit and differential-test aggregate. `make hashtable-benchmark`
+compares the public generated-native wrapper, the experimental private-array
+backend, `Map.Make`, and OCaml's imperative `Hashtbl` on checked integer build,
+lookup, update and removal workloads;
 `make hashtable-string-benchmark` performs the same comparison for fixed-width
 string keys. Set `HASHTABLE_BENCH_SIZE`,
 `HASHTABLE_BENCH_SEED`, and `HASHTABLE_BENCH_PATTERN` (`ascending` or
 `root-slot-collision`) to record a local series; its timing and heap output is
 workload-specific evidence.
+CI runs `make hashtable` and the 100-binding `make hashtable-benchmark-smoke`
+under the pinned OCaml/Rocq toolchain.
 
 `HashMap.Make` accepts an equality callback and a seeded hash callback. The
 wrapper retains the low 30 bits of every returned hash; equivalent keys must
@@ -50,9 +52,9 @@ lookup, update, representative, enumeration, and extensional-observer laws to
 their explicit contracts.
 
 `HashTableTestHash` provides deterministic 30-bit integer, string, and
-constant-collision hashes for direct reference-backend tests. It is intended
-for reproducible test workloads; applications supply their own callback via
-`HashMap.Make` now uses the generated native table backend.
+constant-collision hashes for direct source-reference tests. It is intended
+for reproducible test workloads; applications supply their own callback to
+`HashMap.Make`, which uses the generated native table backend.
 
 For equivalent keys, `set` keeps the resident key representative while
 replacing its value. `of_list` is first-wins for both the value and the key

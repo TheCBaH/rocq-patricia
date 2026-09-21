@@ -26,6 +26,8 @@
 /hashtable-differential-native-test
 /hashtable-native-model-test
 /hashtable-native-model-native-test
+/hashtable-native-array-extracted-test
+/hashtable-native-array-extracted-native-test
 /hashtable-native-array-test
 /hashtable-native-array-native-test
 /hashtable-native-primitives-test

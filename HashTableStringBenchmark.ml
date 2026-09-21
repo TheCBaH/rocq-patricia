@@ -1,4 +1,4 @@
-(* Checked string-key comparison for the public source-reference and private
+(* Checked string-key comparison for the public generated-native and private
    fresh-array backends, [Map.Make(String)], and OCaml's imperative [Hashtbl].
    It is a local measurement harness, not a portable performance claim. *)
 

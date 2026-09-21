@@ -1,4 +1,4 @@
-(* Checked, workload-specific benchmark for the source-reference and
+(* Checked, workload-specific benchmark for the public generated-native and
    experimental fresh-array backends, plus OCaml's imperative [Hashtbl].
    Every timed result is checked against the association-list oracle; timings
    are not proof or portable performance claims. *)

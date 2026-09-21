@@ -114,6 +114,7 @@ hashtable-native-array-extracted: hashtable-proof HashTableNativeArrayExtract.v 
 	@mkdir -p hashtable_native_array_extracted
 	$(RM) hashtable_native_array_extracted/*.ml hashtable_native_array_extracted/*.mli hashtable_native_array_extracted/*.cmi hashtable_native_array_extracted/*.cmo hashtable_native_array_extracted/*.cmx hashtable_native_array_extracted/*.o
 	$(ROCQ) compile $(ROCQFLAGS) HashTableNativeArrayExtract.v
+	$(OCAMLC) -c HashTablePrimitives.mli HashTablePrimitives.ml
 	cd hashtable_native_array_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLC) -I .. -c
 
 hashtable-native-array-extraction-audit: hashtable-native-array-extracted check-hashtable-native-array-extraction.sh
@@ -173,8 +174,9 @@ hashtable-native-array-test: hashtable-reference-ocaml HashTablePrimitives.mli H
 	  $(OCAMLC) -I . -I .. -o ../hashtable-native-array-test ../HashTablePrimitives.cmo $$objects ../HashMap.cmo ../HashMapNative.cmo ../HashMapNativeTest.cmo
 	./hashtable-native-array-test
 
-hashtable-native-array-test-native: hashtable-wrapper-test-native HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashMapNativeTest.ml
-	$(OCAMLOPT) -I hashtable_reference_extracted -I hashtable_native_array_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashMapNativeTest.ml
+hashtable-native-array-test-native: hashtable-native-array-extracted HashTablePrimitives.mli HashTablePrimitives.ml HashMap.mli HashMap.ml HashMapNative.mli HashMapNative.ml HashMapNativeTest.ml
+	cd hashtable_native_array_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -I .. -c
+	$(OCAMLOPT) -I hashtable_native_array_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMap.mli HashMap.ml HashMapNative.mli HashMapNative.ml HashMapNativeTest.ml
 	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
 	  $(OCAMLOPT) -I . -I .. -o ../hashtable-native-array-native-test ../HashTablePrimitives.cmx $$objects ../HashMap.cmx ../HashMapNative.cmx ../HashMapNativeTest.cmx
 	./hashtable-native-array-native-test
@@ -230,18 +232,18 @@ hashtable-native-primitives-test: HashTablePrimitives.mli HashTablePrimitives.ml
 hashtable-native-primitives-audit: HashTablePrimitives.ml check-hashtable-primitives.sh
 	sh ./check-hashtable-primitives.sh HashTablePrimitives.ml
 
-hashtable-benchmark: hashtable-reference HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableBenchmark.ml
-	cd hashtable_reference_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
-	$(OCAMLOPT) -I hashtable_reference_extracted -c HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableBenchmark.ml
-	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
-	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-benchmark $$objects ../HashTableReference.cmx ../HashMap.cmx ../HashTablePrimitives.cmx ../HashMapNative.cmx ../HashTableBenchmark.cmx
+hashtable-benchmark: hashtable-native-array-extracted HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableBenchmark.ml
+	cd hashtable_native_array_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -I .. -c
+	$(OCAMLOPT) -I hashtable_native_array_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMap.mli HashMap.ml HashMapNative.mli HashMapNative.ml HashTableBenchmark.ml
+	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-benchmark ../HashTablePrimitives.cmx $$objects ../HashMap.cmx ../HashMapNative.cmx ../HashTableBenchmark.cmx
 	./hashtable-benchmark
 
-hashtable-string-benchmark: hashtable-reference HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableStringBenchmark.ml
-	cd hashtable_reference_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -c
-	$(OCAMLOPT) -I hashtable_reference_extracted -c HashTableReference.mli HashTableReference.ml HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableStringBenchmark.ml
-	cd hashtable_reference_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
-	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-string-benchmark $$objects ../HashTableReference.cmx ../HashMap.cmx ../HashTablePrimitives.cmx ../HashMapNative.cmx ../HashTableStringBenchmark.cmx
+hashtable-string-benchmark: hashtable-native-array-extracted HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableStringBenchmark.ml
+	cd hashtable_native_array_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -I .. -c
+	$(OCAMLOPT) -I hashtable_native_array_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMap.mli HashMap.ml HashMapNative.mli HashMapNative.ml HashTableStringBenchmark.ml
+	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-string-benchmark ../HashTablePrimitives.cmx $$objects ../HashMap.cmx ../HashMapNative.cmx ../HashTableStringBenchmark.cmx
 	./hashtable-string-benchmark
 
 hashtable-benchmark-smoke: hashtable-benchmark hashtable-string-benchmark
@@ -500,16 +502,21 @@ clean:
 	rm -f hashtable_skeleton_extracted/*.ml hashtable_skeleton_extracted/*.mli \
 	  hashtable_skeleton_extracted/*.cmi hashtable_skeleton_extracted/*.cmo \
 	  hashtable_skeleton_extracted/*.cmx hashtable_skeleton_extracted/*.o
+	rm -f hashtable_native_array_extracted/*.ml hashtable_native_array_extracted/*.mli \
+	  hashtable_native_array_extracted/*.cmi hashtable_native_array_extracted/*.cmo \
+	  hashtable_native_array_extracted/*.cmx hashtable_native_array_extracted/*.o
 	rm -f PatriciaMap.cmi PatriciaMap.cmo PatriciaMap.cmx PatriciaMap.o
 	rm -f StringPatriciaMap.cmi StringPatriciaMap.cmo StringPatriciaMap.cmx StringPatriciaMap.o
 	rm -f HashTableReference.cmi HashTableReference.cmo HashTableReference.cmx HashTableReference.o
 	rm -f HashMap.cmi HashMap.cmo HashMap.cmx HashMap.o
 	rm -f HashTableBenchmark.cmi HashTableBenchmark.cmo HashTableBenchmark.cmx HashTableBenchmark.o
+	rm -f HashTableStringBenchmark.cmi HashTableStringBenchmark.cmo HashTableStringBenchmark.cmx HashTableStringBenchmark.o
 	rm -f HashTablePrimitives.cmi HashTablePrimitives.cmo HashTablePrimitives.cmx HashTablePrimitives.o
 	rm -f HashTablePrimitivesTest.cmi HashTablePrimitivesTest.cmo HashTablePrimitivesTest.cmx HashTablePrimitivesTest.o
 	rm -f HashMapNative.cmi HashMapNative.cmo HashMapNative.cmx HashMapNative.o
 	rm -f HashMapNativeTest.cmi HashMapNativeTest.cmo HashMapNativeTest.cmx HashMapNativeTest.o
-	rm -f hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-native-test hashtable-differential-test hashtable-differential-native-test hashtable-native-model-test hashtable-native-model-native-test hashtable-native-array-test hashtable-native-array-native-test hashtable-native-primitives-test hashtable-benchmark hashtable-string-benchmark
+	rm -f HashMapNativeExtract.cmi HashMapNativeExtract.cmo HashMapNativeExtract.cmx HashMapNativeExtract.o
+	rm -f hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-native-test hashtable-differential-test hashtable-differential-native-test hashtable-native-model-test hashtable-native-model-native-test hashtable-native-array-extracted-test hashtable-native-array-extracted-native-test hashtable-native-extract-wrapper-test hashtable-native-extract-wrapper-native-test hashtable-native-extract-differential-test hashtable-native-extract-differential-native-test hashtable-native-array-test hashtable-native-array-native-test hashtable-native-primitives-test hashtable-benchmark hashtable-string-benchmark
 	rm -f PatriciaReference.cmi PatriciaReference.cmo PatriciaReference.cmx PatriciaReference.o
 	rm -f PatriciaTest.cmi PatriciaTest.cmo PatriciaDifferentialTest.cmi \
 	  PatriciaDifferentialTest.cmo PatriciaUnionTest.cmi PatriciaUnionTest.cmo \
