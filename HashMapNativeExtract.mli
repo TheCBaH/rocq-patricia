@@ -1,7 +1,11 @@
 (** Abstract wrapper over the array-bound extracted native HAMT.  This is kept
     separate from [HashMap] while its foreign array contract remains explicit. *)
 
-module type KEY = HashMap.KEY
+module type KEY = sig
+  type t
+  val equal : t -> t -> bool
+  val hash : seed:int -> t -> int
+end
 
 module Make (Key : KEY) : sig
   type key = Key.t
