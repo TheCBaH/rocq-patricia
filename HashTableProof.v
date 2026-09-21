@@ -7475,3 +7475,179 @@ Proof.
   rewrite set_tree_collision_same_hash, bindings_normalize_collision.
   eapply bucket_set_retains_representative; eauto.
 Qed.
+
+Lemma bindings_set_tree_retains_representative :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) fuel depth prefix full_hash
+         (key : K) (value : A) (t : tree K A) stored (old_value : A),
+    depth + fuel = branch_levels ->
+    length prefix = depth ->
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall first second, E first second -> hash seed first = hash seed second) ->
+    full_hash = hash seed key ->
+    wf E hash seed depth prefix t ->
+    In (stored, old_value) (bindings t) ->
+    E key stored ->
+    In (stored, value)
+      (bindings (set_tree eqb fuel depth full_hash key value t)).
+Proof.
+  intros K Seed A E hash seed eqb fuel.
+  induction fuel as [|fuel IH]; intros depth prefix full_hash key value t stored
+    old_value Hfuel Hlength Hequiv Heqb Hcongruent Hhash Hwf Hin Hrelated;
+    destruct t as [|stored_hash leaf_key leaf_value|stored_hash entries|bitmap children].
+  - contradiction.
+  - simpl in Hin. destruct Hin as [Hin|[]].
+    inversion Hin; subst stored old_value.
+    cbn [set_tree]. rewrite (proj2 (Heqb key leaf_key) Hrelated). now left.
+  - cbn [set_tree]. destruct (N.eqb full_hash stored_hash) eqn:Hsame.
+    + rewrite bindings_normalize_collision.
+      inversion Hwf as [| |d p hash' entries' Hentries Hmatches Hnodup|].
+      eapply bucket_set_retains_representative; eauto.
+    + exfalso.
+      apply N.eqb_neq in Hsame. apply Hsame.
+      inversion Hwf as [| |d p hash' entries' Hentries Hmatches Hnodup|].
+      assert (Hentry : entry_matches hash seed stored_hash depth prefix
+        (stored, old_value)).
+      { apply (proj1 (Forall_forall
+          (entry_matches hash seed stored_hash depth prefix) entries));
+          assumption. }
+      destruct Hentry as [Hstored_hash [_ _]].
+      rewrite Hhash, Hstored_hash. now apply Hcongruent.
+  - exfalso. eapply (@wf_branch_impossible_at_or_beyond_limit K Seed A E hash
+      seed depth prefix bitmap children); [lia|exact Hwf].
+  - contradiction.
+  - simpl in Hin. destruct Hin as [Hin|[]].
+    inversion Hin; subst stored old_value.
+    cbn [set_tree]. rewrite (proj2 (Heqb key leaf_key) Hrelated). now left.
+  - cbn [set_tree]. destruct (N.eqb full_hash stored_hash) eqn:Hsame.
+    + rewrite bindings_normalize_collision.
+      inversion Hwf as [| |d p hash' entries' Hentries Hmatches Hnodup|].
+      eapply bucket_set_retains_representative; eauto.
+    + exfalso.
+      apply N.eqb_neq in Hsame. apply Hsame.
+      inversion Hwf as [| |d p hash' entries' Hentries Hmatches Hnodup|].
+      assert (Hentry : entry_matches hash seed stored_hash depth prefix
+        (stored, old_value)).
+      { apply (proj1 (Forall_forall
+          (entry_matches hash seed stored_hash depth prefix) entries));
+          assumption. }
+      destruct Hentry as [Hstored_hash [_ _]].
+      rewrite Hhash, Hstored_hash. now apply Hcongruent.
+  - assert (Hstored_hash : hash seed stored = full_hash).
+    { rewrite Hhash. now apply Hcongruent. }
+    assert (Hpresent : bitmap_has bitmap (chunk full_hash depth) = true).
+    { rewrite <- Hstored_hash.
+      eapply (@wf_branch_binding_routes K Seed A E hash seed depth prefix
+        bitmap children Hlength Hwf (stored, old_value) Hin). }
+    destruct (wf_branch_ranked_child Hwf (chunk_bound full_hash depth) Hpresent)
+      as [child [Hchild [_ Hchild_wf]]].
+    assert (Hchild_in : In (stored, old_value) (bindings child)).
+    { eapply (@wf_branch_dense_get_binding K Seed A E hash seed depth prefix
+        bitmap children (chunk full_hash depth) child (stored, old_value)
+        Hlength Hwf Hpresent Hchild Hin).
+      simpl. now rewrite Hstored_hash. }
+    assert (Hchild_updated : In (stored, value)
+      (bindings (set_tree eqb fuel (S depth) full_hash key value child))).
+    { eapply (IH (S depth) (prefix ++ [chunk full_hash depth]) full_hash key
+        value child stored old_value).
+      - lia.
+      - rewrite app_length, Hlength. simpl. lia.
+      - exact Hequiv.
+      - exact Heqb.
+      - exact Hcongruent.
+      - exact Hhash.
+      - exact Hchild_wf.
+      - exact Hchild_in.
+      - exact Hrelated. }
+    rewrite (set_tree_branch_child eqb fuel depth full_hash key value bitmap
+      children Hpresent Hchild).
+    destruct (@bindings_dense_replace_split K A
+      (rank bitmap (chunk full_hash depth))
+      (set_tree eqb fuel (S depth) full_hash key value child) child children Hchild)
+      as [before [after [Hbefore Hafter]]].
+    simpl. rewrite Hafter. apply in_or_app. right. apply in_or_app. now left.
+Qed.
+
+Lemma elements_set_retains_representative :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (key : K) (value : A) (m : table K Seed A)
+         stored (old_value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second -> hash seed first = hash seed second) ->
+    table_wf E hash m ->
+    In (stored, old_value) (elements m) ->
+    E key stored ->
+    In (stored, value) (elements (set eqb hash key value m)).
+Proof.
+  intros K Seed A E hash eqb key value [seed root] stored old_value Hequiv Heqb
+    Hcongruent Hwf Hin Hrelated.
+  change (wf E hash seed 0 [] root) in Hwf.
+  change (In (stored, old_value) (bindings root)) in Hin.
+  change (In (stored, value)
+    (bindings (set_tree eqb branch_levels 0 (hash seed key) key value root))).
+  eapply (@bindings_set_tree_retains_representative K Seed A E hash seed eqb
+    branch_levels 0 [] (hash seed key) key value root stored old_value); eauto.
+Qed.
+
+Lemma elements_set_other :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (key : K) (value : A) (m : table K Seed A)
+         stored (old_value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    ~ E stored key ->
+    In (stored, old_value) (elements m) ->
+    In (stored, old_value) (elements (set eqb hash key value m)).
+Proof.
+  intros K Seed A E hash eqb key value [seed root] stored old_value Hequiv Heqb
+    Hother Hin.
+  change (In (stored, old_value) (bindings root)) in Hin.
+  change (In (stored, old_value)
+    (bindings (set_tree eqb branch_levels 0 (hash seed key) key value root))).
+  apply (proj2 (@bindings_set_tree_other K A E eqb branch_levels 0
+    (hash seed key) key value root stored old_value Hequiv Heqb Hother)).
+  exact Hin.
+Qed.
+
+Lemma elements_add_first_present :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (entries : list (K * A))
+         (m : table K Seed A) stored (old_value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second -> hash seed first = hash seed second) ->
+    (forall key value, In (key, value) entries ->
+      (hash (table_seed m) key < hash_space)%N) ->
+    table_wf E hash m ->
+    In (stored, old_value) (elements m) ->
+    In (stored, old_value) (elements (add_first eqb hash entries m)).
+Proof.
+  intros K Seed A E hash eqb entries.
+  induction entries as [|[key value] tail IH];
+    intros m stored old_value Hequiv Heqb Hcongruent Hbound Hwf Hin.
+  - exact Hin.
+  - rewrite add_first_cons.
+    destruct (get eqb hash key m) as [previous|] eqn:Hget.
+    + eapply IH; eauto.
+      intros key' value' Hin'. apply (Hbound key' value'). now right.
+    + assert (Hother : ~ E stored key).
+      { intro Hrelated.
+        assert (Hkey_stored : E key stored).
+        { destruct Hequiv as [_ Hsym _]. now apply Hsym. }
+        pose proof (@get_binding_complete K Seed A E hash eqb key stored old_value m
+          Hequiv Heqb Hcongruent
+          (Hbound key value (or_introl eq_refl)) Hwf
+          Hin Hkey_stored) as Hfound.
+        rewrite Hget in Hfound. discriminate. }
+      eapply IH with (m := set eqb hash key value m).
+      * exact Hequiv.
+      * exact Heqb.
+      * exact Hcongruent.
+      * intros key' value' Hin'. rewrite set_seed.
+        apply (Hbound key' value'). now right.
+      * eapply table_wf_set; eauto.
+        apply (Hbound key value). now left.
+      * eapply elements_set_other; eauto.
+Qed.
