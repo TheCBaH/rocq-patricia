@@ -7813,6 +7813,186 @@ Proof.
   - exact Hscan.
 Qed.
 
+Lemma first_binding_some_eqb :
+  forall (K A : Type) (eqb : K -> K -> bool) query
+         (entries : list (K * A)) stored (value : A),
+    first_binding eqb query entries = Some (stored, value) ->
+    eqb query stored = true.
+Proof.
+  intros K A eqb query entries.
+  induction entries as [|[key entry_value] tail IH]; intros stored value Hscan.
+  - discriminate Hscan.
+  - simpl in Hscan. destruct (eqb query key) eqn:Hkey.
+    + inversion Hscan. subst stored value. exact Hkey.
+    + eapply IH. exact Hscan.
+Qed.
+
+Lemma first_binding_some_in :
+  forall (K A : Type) (eqb : K -> K -> bool) query
+         (entries : list (K * A)) stored (value : A),
+    first_binding eqb query entries = Some (stored, value) ->
+    In (stored, value) entries.
+Proof.
+  intros K A eqb query entries.
+  induction entries as [|[key entry_value] tail IH]; intros stored value Hscan.
+  - discriminate Hscan.
+  - simpl in Hscan. destruct (eqb query key) eqn:Hkey.
+    + inversion Hscan. now left.
+    + right. eapply IH. exact Hscan.
+Qed.
+
+Lemma NoDupA_related_in_eq :
+  forall (K : Type) (E : K -> K -> Prop) (entries : list K) left right,
+    Equivalence E ->
+    NoDupA E entries ->
+    In left entries ->
+    In right entries ->
+    E left right ->
+    left = right.
+Proof.
+  intros K E entries.
+  induction entries as [|head tail IH]; intros left right Hequiv Hnodup
+    Hleft Hright Hrelated.
+  - contradiction.
+  - inversion Hnodup as [|head' tail' Hnotin Htail]; subst.
+    simpl in Hleft, Hright.
+    destruct Hleft as [Hleft|Hleft]; destruct Hright as [Hright|Hright].
+    + now subst.
+    + subst left. exfalso. apply Hnotin.
+      apply (proj2 (InA_alt E head tail)).
+      now exists right.
+    + subst right. exfalso. apply Hnotin.
+      apply (proj2 (InA_alt E head tail)).
+      destruct Hequiv as [_ Hsym _]. now exists left.
+    + eapply IH; eauto.
+Qed.
+
+Lemma elements_of_list_first_binding_converse :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (entries : list (K * A))
+         stored (value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall actual_seed first second, E first second ->
+      hash actual_seed first = hash actual_seed second) ->
+    (forall key value, In (key, value) entries ->
+      (hash seed key < hash_space)%N) ->
+    In (stored, value) (elements (of_list eqb hash seed entries)) ->
+    first_binding eqb stored entries = Some (stored, value).
+Proof.
+  intros K Seed A E hash seed eqb entries stored value Hequiv Heqb Hcongruent
+    Hentries Hin.
+  assert (Hwf : table_wf E hash (of_list eqb hash seed entries)).
+  { eapply table_wf_of_list; eauto. }
+  assert (Hwf_root : wf E hash seed 0 []
+    (table_root (of_list eqb hash seed entries))).
+  { unfold table_wf in Hwf. rewrite of_list_seed in Hwf. exact Hwf. }
+  change (In (stored, value)
+    (bindings (table_root (of_list eqb hash seed entries)))) in Hin.
+  destruct (@wf_binding_hash K Seed A E hash seed
+    (table_root (of_list eqb hash seed entries)) 0 [] Hwf_root
+    (stored, value) Hin) as [full_hash [Hhash Hbound]].
+  assert (Hstored_bound : (hash seed stored < hash_space)%N).
+  { simpl in Hhash. rewrite <- Hhash. exact Hbound. }
+  assert (Hget : get eqb hash stored (of_list eqb hash seed entries) = Some value).
+  { eapply (@get_binding_complete K Seed A E hash eqb stored stored value
+      (of_list eqb hash seed entries)).
+    - exact Hequiv.
+    - exact Heqb.
+    - exact Hcongruent.
+    - rewrite of_list_seed. exact Hstored_bound.
+    - exact Hwf.
+    - exact Hin.
+    - destruct Hequiv as [Href _ _]. apply Href. }
+  pose proof (@get_of_list_first_binding K Seed A E hash seed eqb entries
+    stored Hequiv Heqb Hcongruent Hentries Hstored_bound) as Hscan.
+  rewrite Hget in Hscan.
+  destruct (first_binding eqb stored entries) as [[selected selected_value]|]
+    eqn:Hfirst; simpl in Hscan.
+  - inversion Hscan. subst selected_value.
+    assert (Hrelated : E stored selected).
+    { apply (proj1 (Heqb stored selected)).
+      eapply first_binding_some_eqb; eauto. }
+    assert (Hselected : In (selected, value)
+      (elements (of_list eqb hash seed entries))).
+    { eapply (@elements_of_list_first_binding K Seed A E hash seed eqb entries
+        stored selected value Hequiv Heqb Hcongruent Hentries).
+      - exact Hstored_bound.
+      - exact Hfirst. }
+    assert (Hkeys : NoDupA E
+      (map fst (elements (of_list eqb hash seed entries)))).
+    { eapply of_list_elements_keys_nodup; eauto. }
+    assert (Hstored_key : In stored
+      (map fst (elements (of_list eqb hash seed entries)))).
+    { apply in_map_iff. now exists (stored, value). }
+    assert (Hselected_key : In selected
+      (map fst (elements (of_list eqb hash seed entries)))).
+    { apply in_map_iff. now exists (selected, value). }
+    pose proof (@NoDupA_related_in_eq K E
+      (map fst (elements (of_list eqb hash seed entries))) stored selected
+      Hequiv Hkeys Hstored_key Hselected_key Hrelated) as Hkeys_equal.
+    subst selected. reflexivity.
+  - discriminate Hscan.
+Qed.
+
+Lemma elements_of_list_first_binding_iff :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (entries : list (K * A))
+         stored (value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall actual_seed first second, E first second ->
+      hash actual_seed first = hash actual_seed second) ->
+    (forall key value, In (key, value) entries ->
+      (hash seed key < hash_space)%N) ->
+    (In (stored, value) (elements (of_list eqb hash seed entries)) <->
+      first_binding eqb stored entries = Some (stored, value)).
+Proof.
+  intros K Seed A E hash seed eqb entries stored value Hequiv Heqb Hcongruent
+    Hentries.
+  split.
+  - eapply elements_of_list_first_binding_converse; eauto.
+  - intro Hscan.
+    eapply (@elements_of_list_first_binding K Seed A E hash seed eqb entries
+      stored stored value Hequiv Heqb Hcongruent Hentries).
+    + apply (Hentries stored value).
+      eapply (@first_binding_some_in K A eqb stored entries stored value).
+      exact Hscan.
+    + exact Hscan.
+Qed.
+
+Lemma first_binding_none_no_element :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) (eqb : K -> K -> bool) (entries : list (K * A))
+         query stored (value : A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall actual_seed first second, E first second ->
+      hash actual_seed first = hash actual_seed second) ->
+    (forall key value, In (key, value) entries ->
+      (hash seed key < hash_space)%N) ->
+    (hash seed query < hash_space)%N ->
+    first_binding eqb query entries = None ->
+    In (stored, value) (elements (of_list eqb hash seed entries)) ->
+    ~ E query stored.
+Proof.
+  intros K Seed A E hash seed eqb entries query stored value Hequiv Heqb
+    Hcongruent Hentries Hquery_bound Hscan Hin Hrelated.
+  assert (Hwf : table_wf E hash (of_list eqb hash seed entries)).
+  { eapply table_wf_of_list; eauto. }
+  assert (Hget : get eqb hash query (of_list eqb hash seed entries) = None).
+  { rewrite (@get_of_list_first_binding K Seed A E hash seed eqb entries
+      query Hequiv Heqb Hcongruent Hentries Hquery_bound).
+    now rewrite Hscan. }
+  assert (Hquery_bound_map :
+    (hash (table_seed (of_list eqb hash seed entries)) query < hash_space)%N).
+  { rewrite of_list_seed. exact Hquery_bound. }
+  pose proof (@get_binding_complete K Seed A E hash eqb query stored value
+    (of_list eqb hash seed entries) Hequiv Heqb Hcongruent
+    Hquery_bound_map Hwf Hin Hrelated) as Hfound.
+  rewrite Hget in Hfound. discriminate.
+Qed.
+
 Lemma table_extensional_set :
   forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
          (eqb : K -> K -> bool) key (value : A) (left right : table K Seed A),

@@ -13,14 +13,14 @@ planning documents are not evidence that code exists.
 
 ## Current state
 
-**Active milestone: close H3.** H0–H2 are complete. H4/H5 work
-already exists, but does not satisfy the earlier gates; further native/backend
-and benchmark expansion is outside the completion sequence below.
+**Next milestone: close H4.** H0–H3 are complete. H4/H5 work already exists,
+but the actual array extraction/refinement boundary and remaining native
+contracts are still open.
 
 | Gate | Established | Remaining to close |
 | --- | --- | --- |
 | H2 — source correctness | Complete source correctness gate: invariants, lookup/binding equivalence, pointwise set/remove, routing, uniqueness, seed and fallback bounds, and audited declarations | Closed 2026-09-20 |
-| H3 — reference release | Working extracted library, abstract wrapper, substantial tests, most derived semantics | General first-wins and representative proofs, API corollaries, foreign inventory and test coverage reconciliation |
+| H3 — reference release | Complete first-wins/representative and API proofs, abstract source wrapper, and reference inventory/test coverage | Closed 2026-09-21 |
 | H4 — native backend | Recursive list-modeled refinement and tested standalone private arrays | Actual array extraction/refinement boundary, remaining scalar/foreign contracts, coverage and public switch |
 | H5 — release integration | Aggregate/CI configuration and checked benchmark smoke | Final gates, broader evaluation and release evidence |
 
@@ -73,12 +73,12 @@ Dependencies: H1.G. Completion sequence: [P1–P3](hashtable-plan.md#proof-compl
 
 Dependencies: H2.G. Completion sequence: [P4–P6](hashtable-plan.md#proof-completion-order).
 
-- [ ] **H3.1** Membership, valid-map emptiness, lookup/enumeration correspondence, enumeration uniqueness, bulk-load validity and seed preservation are proved. `table_extensional` and its equivalence laws exist. Arbitrary-list first-wins lookup and membership follow an independent left-to-right `(key, value)` scan, and every selected first pair is present in the resulting enumeration. Exact representative retention holds for valid `set`: resident classes retain their stored key, while absent classes receive the supplied key; arbitrary later `add_first` input preserves a resident representative. Singleton and extensional update/removal, membership, and emptiness corollaries are indexed in [hashtable-api-inventory.md](hashtable-api-inventory.md). **Remaining:** the converse enumeration/scan characterization required by P4.
+- [x] **H3.1** Closed 2026-09-21. Membership, valid-map emptiness, lookup/enumeration correspondence, enumeration uniqueness, bulk-load validity and seed preservation are proved. `elements_of_list_first_binding_iff` gives exact first-scan representative/value enumeration and `first_binding_none_no_element` gives the no-match case. Exact resident retention and absent supplied-key insertion hold for valid `set`; arbitrary later `add_first` input preserves a resident representative. Singleton and extensional update/removal, membership, and emptiness corollaries are indexed in [hashtable-api-inventory.md](hashtable-api-inventory.md).
 - [x] **H3.2** Isolated reference extraction, stable `HashTableReference` package and normalized deterministic integer/string/collision test hashes exist.
 - [x] **H3.3** Abstract `HashMap.Make`, normalized callbacks and documented seed/representative contracts exist. The source-reference extraction/compiler/runtime, OCaml-integer normalization, callback-law, persistence/shallow-payload, and H4-native boundary inventory is recorded in [hashtable-reference-release.md](hashtable-reference-release.md).
 - [x] **H3.4** Direct/wrapper bytecode and native tests, association-list/standard-map histories, custom equivalence and retained-version cases exist. [hashtable-reference-release.md](hashtable-reference-release.md) maps every P6 matrix row to a concrete case; `HashTableReferenceTest.ml` now exercises unary-branch deletion followed by re-insertion.
 - [x] **H3.5** Abstract wrapper and extraction/interface audits cover callback isolation, hidden routing internals and the generated reference surface.
-- [ ] **H3.G** Close after H2.G, P4–P5 proofs and P6 reference inventory/coverage/regeneration evidence. Native-array realization is not a prerequisite.
+- [x] **H3.G** Closed 2026-09-21 after H2.G, P4–P5 and the P6 source-reference inventory/coverage/regeneration evidence. Native-array realization is not a prerequisite.
 
 ## H4 — Compact-array backend
 
@@ -420,3 +420,5 @@ supporting contract or implementation changes.
 | 2026-09-21 | H3.1 / P4 (partial) | Added `elements_add_first_first_binding` and `elements_of_list_first_binding`. Under the ordinary bounded valid-map contracts, a `first_binding` selected representative/value occurs in the accumulator or empty-seeded bulk enumeration; the induction handles both skipped entries and unrelated insertion before the selected match. Rebuilt dependent native modules; `make hashtable-assumptions` passed with 560 declarations closed. The converse enumeration-to-first-scan packaging remains open. |
 | 2026-09-21 | H3.1 / P5 (partial) | Added `table_extensional_set` and `table_extensional_remove`. Pointwise-equal valid maps remain pointwise equal after the corresponding operation, with bounded query/key hypotheses retained independently for each map seed. `opam exec -- rocq compile HashTableProof.v` passed. |
 | 2026-09-21 | H3.1 / P5 | Added `mem_singleton_query`, `mem_of_list_first_binding`, `table_extensional_mem`, and `table_extensional_is_empty`; the last lifts valid-map universal lookup absence through extensional equality. Added [hashtable-api-inventory.md](hashtable-api-inventory.md), which maps the checked API laws to their callback, validity, and per-seed bound hypotheses. `opam exec -- rocq compile HashTableProof.v` passed. P5 is complete; only P4's converse enumeration-to-first-scan characterization remains. |
+| 2026-09-21 | H3.1 / P4 | Added `first_binding_some_eqb`/`first_binding_some_in`, `NoDupA_related_in_eq`, `elements_of_list_first_binding_converse`, `elements_of_list_first_binding_iff`, and `first_binding_none_no_element`. A binding found in the bulk enumeration yields its scan value by lookup, while selected-pair inclusion and equivalence-key uniqueness force the exact stored representative; no selected pair excludes every equivalent enumeration binding. `opam exec -- rocq compile HashTableProof.v` passed. P4 is complete. |
+| 2026-09-21 | H3.G | Rebuilt `HashTableNative.v` and `HashTableNativeProof.v` after the source proof update. `make hashtable-assumptions` passed with 572 declarations closed. `make hashtable-extraction-audit hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-differential hashtable-test-native` passed: generated interface and wrapper-boundary audits, direct reference test, public wrapper bytecode/native tests, and public differential bytecode/native tests all succeeded. Closed H3.G. |
