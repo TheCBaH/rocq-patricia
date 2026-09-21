@@ -61,6 +61,8 @@ union-proof: $(UNION_VOFILES)
 hashtable: hashtable-proof hashtable-assumptions hashtable-extraction-audit \
 	hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native \
 	hashtable-differential hashtable-test-native hashtable-native-model-extraction-audit hashtable-native-model-test hashtable-native-model-test-native \
+	hashtable-native-array-extraction-audit hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native \
+	hashtable-native-extract-differential hashtable-native-extract-differential-native \
 	hashtable-native-array-test hashtable-native-array-test-native hashtable-native-primitives-test \
 	hashtable-native-primitives-audit hashtable-native-array-audit
 
@@ -134,6 +136,7 @@ hashtable-native-array-extracted-test-native: hashtable-proof HashTableNativeArr
 	./hashtable-native-array-extracted-native-test
 
 hashtable-native-extract-wrapper-test: hashtable-reference-ocaml hashtable-native-array-extracted HashMapNativeExtract.mli HashMapNativeExtract.ml HashMapTest.ml
+	cd hashtable_native_array_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLC) -I .. -c
 	$(OCAMLC) -I hashtable_native_array_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMapNativeExtract.mli HashMapNativeExtract.ml
 	sed 's/HashMap\.Make/HashMapNativeExtract.Make/g' HashMapTest.ml > /tmp/HashMapNativeExtractTest.ml
 	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmo/g'` && \
