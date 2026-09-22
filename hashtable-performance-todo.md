@@ -97,8 +97,12 @@ implemented or validated, and no new performance target is achieved.
   Decision: retain checked `pseq_get` and fresh edits. The residual smoke
   profile is insufficiently attributed to justify an option-free primitive,
   and collision sequences are not bounded by branch width.
-- [ ] **HP2.G** Generated deletion has no child-list emptiness conversion;
+- [x] **HP2.G** Generated deletion has no child-list emptiness conversion;
   persistence and operation tests pass; stage measurements recorded.
+  `native_children_remove` uses the refined emptiness primitive, and generated
+  hot-worker audits reject a sequence view in public deletion. The aggregate
+  bytecode/native persistence suites and the recorded rank-reuse smoke provide
+  the required operation evidence; later HP3 workers do not revert the path.
 
 - [x] **HP3.1** Implement/prove direct native empty/leaf/join workers; preserve
   total model fallback behavior or prove a separate valid-public-worker bridge.
