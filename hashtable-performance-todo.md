@@ -98,13 +98,13 @@ implemented or validated, and no new performance target is achieved.
   model proof, target contract, audit, persistence tests and isolated results;
   otherwise record why the stage is deferred.
 
-- [ ] **HP5.1** Strengthen generated public-call-path and extraction-binding
+- [x] **HP5.1** Strengthen generated public-call-path and extraction-binding
   audits, add negative fixtures, replace obsolete required-fallback checks.
-  Partial: the native-array audit now rejects source-tree/sequence-view use in
-  generated get/set/remove/first-wins loading and requires recursive public
-  workers; its negative-fixture target proves rejection of an injected hot
-  `to_list` and a non-recursive `native_set` override. The native-model audit
-  still needs its obsolete fallback expectations replaced.
+  The native-array audit rejects source-tree/sequence-view use in generated
+  get/set/remove/first-wins loading and requires recursive public workers; its
+  negative-fixture target proves rejection of an injected hot `to_list` and a
+  non-recursive `native_set` override. The list-model audit now requires the
+  direct join/collision workers rather than obsolete source fallbacks.
 - [ ] **HP5.2** Run `make hashtable-proof hashtable-assumptions`, `make hashtable`,
   `make all`, `make hashtable-benchmark-smoke`; integrate proposed new checks.
 - [ ] **HP5.3** Run clean-checkout aggregate and matched repeated performance
@@ -142,3 +142,4 @@ implemented or validated, and no new performance target is achieved.
 | 2026-09-22 | HP3.2 indexed collision removal slice | `make hashtable-assumptions hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-array-extraction-audit` | Passed. `native_bucket_remove` walks the same checked, bounded index and uses a fresh `pseq_remove` only on a hit; its view theorem refines `bucket_remove_index`. Same-hash public `native_remove` now avoids source conversion and normalizes to leaf/empty through `native_normalize_collision`; a hash mismatch retains the collision directly. The generated audit requires the removal worker. Bytecode/native tests cover removal and retained history in a 41-entry collision plus two-entry normalization to leaf and then empty. Collision-specific measurement and the remaining HP3 join/public-reachability work are open. |
 | 2026-09-22 | HP3.1 direct native join slice | `/opt/opam/4.14.3/bin/rocq compile -q -Q . '' HashTableNative.v`; `make hashtable-proof hashtable-assumptions hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-array-extraction-audit`; `HASHTABLE_BENCH_SIZE=100 HASHTABLE_BENCH_REPETITIONS=1 make hashtable-benchmark` | Passed. `native_join_two` and the fuel-bounded `native_join_worker` construct compact native branches directly and refine `join_two`/`join_worker`. Distinct-hash leaf and collision updates use this worker instead of `source_of_native`/`native_of_source`; zero-fuel branches retain their native tree directly. The extraction audit requires the direct join worker and rejects source conversions in generated get/set/remove/first-wins loading. Bytecode/native tests compare source/native joins whose first divergence is each routing depth 0–5. The single-sample 100-binding smoke measured public build / existing set / new set / present remove / missing remove allocation at 124,272 / 182,920 / 213,040 / 150,376 / 173,192 bytes. This is not the required repeated or collision-specific matrix. |
 | 2026-09-22 | HP5.1 native-array audit fixtures | `make hashtable-native-array-extraction-audit hashtable-native-array-extraction-audit-test` | Passed. The hot-worker shape audit now rejects source-tree and sequence-view conversion in public generated get/set/remove/first-wins loading and requires recursive get/set/remove definitions. Its fixture target injects `HashTablePrimitives.to_list` into `native_get` and changes recursive `native_set` into a whole-operation override; both must fail the audit. The target is included in `make hashtable`. Native-model audit replacement remains open. |
+| 2026-09-22 | HP5.1 native-model audit update | `make hashtable-native-model-extraction-audit` | Passed. The list-model audit now requires length/emptiness operations, direct join and collision workers, indexed branch helpers, and no source-tree/sequence-view conversion in generated get/set/remove/first-wins loading. It no longer requires the HP3 source fallbacks. |
