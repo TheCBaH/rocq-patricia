@@ -35,6 +35,10 @@ string keys. Set `HASHTABLE_BENCH_SIZE`,
 `HASHTABLE_BENCH_SEED`, and `HASHTABLE_BENCH_PATTERN` (`ascending`, `shuffled`,
 `root-slot-collision`, or `constant-hash`) to record a local series; its timing
 and heap output is workload-specific evidence.
+`make hashtable-primitive-benchmark` separately measures checked scalar calls,
+the benchmark hash callback, and fixed-size private-sequence operations when
+profiling is unavailable; set `HASHTABLE_PRIMITIVE_BENCH_ITERATIONS` to adjust
+its default 100,000 iterations.
 The [performance review](hashtable-performance.md),
 [optimization plan](hashtable-performance-plan.md) and
 [performance tracker](hashtable-performance-todo.md) cover bounded native

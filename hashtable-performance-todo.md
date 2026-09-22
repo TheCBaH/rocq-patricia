@@ -49,8 +49,12 @@ implemented or validated, and no new performance target is achieved.
   planned 100/2,000 cap and labels larger-size omissions. The public and
   standalone HAMTs use the supplied constant callback; `Map` and `Hashtbl`
   retain their own comparison/hashing policies.
-- [ ] **HP0.4** Profile scalar operations, conversions, primitive copies and
+- [x] **HP0.4** Profile scalar operations, conversions, primitive copies and
   hashing, or record controlled microbenchmark attribution and its limitations.
+  No compatible profiler is installed locally. `hashtable-primitive-benchmark`
+  is the recorded fallback; it isolates checked scalar calls, the hash callback,
+  sequence get, fresh edits and `to_list`. It does not attribute call counts
+  inside whole-map operations, so it is not a substitute for a sampling trace.
 - [ ] **HP0.G** Publish corrected baseline and remaining attribution uncertainty.
 
 - [ ] **HP1.1** Define bounded scalar wrappers and source popcount; prove
@@ -159,3 +163,4 @@ implemented or validated, and no new performance target is achieved.
 | 2026-09-22 | HP5.1 native-array audit fixtures | `make hashtable-native-array-extraction-audit hashtable-native-array-extraction-audit-test` | Passed. The hot-worker shape audit now rejects source-tree and sequence-view conversion in public generated get/set/remove/first-wins loading and requires recursive get/set/remove definitions. Its fixture target injects `HashTablePrimitives.to_list` into `native_get` and changes recursive `native_set` into a whole-operation override; both must fail the audit. The target is included in `make hashtable`. Native-model audit replacement remains open. |
 | 2026-09-22 | HP5.1 native-model audit update | `make hashtable-native-model-extraction-audit` | Passed. The list-model audit now requires length/emptiness operations, direct join and collision workers, indexed branch helpers, and no source-tree/sequence-view conversion in generated get/set/remove/first-wins loading. It no longer requires the HP3 source fallbacks. |
 | 2026-09-22 | HP3.3/HP3.4/HP3.G and HP4 decision audit | `make hashtable-proof hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-array-extraction-audit hashtable-native-array-extraction-audit-test hashtable-native-model-extraction-audit` | Passed. Existing native-table refinement/well-formedness/pointwise/first-wins theorems were rechecked against the direct workers. Generated audits establish no source/view conversion in get/set/remove/first-wins loading; bytecode/native differential tests cover 40/41-entry collisions, normalization, depths 0–5 and retained roots. `elements` deliberately remains the sole source-conversion enumeration path. HP4 is deferred because smoke allocation identifies residual cost but does not yet attribute it sufficiently to justify a storage or unsafe-index experiment. |
+| 2026-09-22 | HP0.4 isolated attribution | `HASHTABLE_PRIMITIVE_BENCH_ITERATIONS=100000 HASHTABLE_BENCH_REPETITIONS=3 HASHTABLE_BENCH_WARMUPS=1 make hashtable-primitive-benchmark` | Passed. No compatible profiler was found on the local toolchain, so this is the prescribed isolated fallback. Scalar chunk/bitmap-has/hash-callback loops each allocated 96 bytes per 100,000 calls; rank allocated 96 bytes and took 2.227 ms. A 32-entry private sequence allocated 1,600,096 bytes for checked gets, 25,600,096/27,200,096/26,400,096 bytes for remove/insert/replace fresh copies, and 80,800,096 bytes for `to_list`. The measurement isolates primitives rather than attributing their call counts in a whole-map operation. |
