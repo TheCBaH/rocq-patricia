@@ -641,6 +641,64 @@ Proof.
     apply source_of_native_of_source.
 Qed.
 
+Fixpoint native_bucket_remove {K A : Type} (eqb : K -> K -> bool)
+    (key : K) (entries : pseq (K * A))
+    (index remaining : nat) : pseq (K * A) :=
+  match remaining with
+  | O => entries
+  | S remaining' =>
+      match pseq_get index entries with
+      | None => entries
+      | Some (stored, value) =>
+          if eqb key stored then pseq_remove index entries
+          else native_bucket_remove eqb key entries (S index) remaining'
+      end
+  end.
+
+Lemma native_bucket_remove_refines :
+  forall K A (eqb : K -> K -> bool) (key : K)
+         (entries : pseq (K * A)) index remaining,
+    pseq_view (native_bucket_remove eqb key entries index remaining) =
+    bucket_remove_index eqb key (pseq_view entries) index remaining.
+Proof.
+  intros K A eqb key entries index remaining.
+  revert index.
+  induction remaining as [|remaining IH]; intro index.
+  - reflexivity.
+  - cbn [native_bucket_remove bucket_remove_index].
+    rewrite pseq_get_view.
+    destruct (nth_error (pseq_view entries) index) as [[stored value]|].
+    + destruct (eqb key stored); [apply pseq_remove_view|apply IH].
+    + reflexivity.
+Qed.
+
+Definition native_collision_remove {K A : Type} (eqb : K -> K -> bool)
+    (full_hash : N) (key : K) (stored_hash : N) (entries : pseq (K * A))
+    : native_tree K A :=
+  if N.eqb full_hash stored_hash then
+    native_normalize_collision stored_hash
+      (native_bucket_remove eqb key entries O (pseq_length entries))
+  else NativeCollision stored_hash entries.
+
+Lemma native_collision_remove_refines :
+  forall K A (eqb : K -> K -> bool) fuel depth full_hash (key : K)
+         stored_hash (entries : pseq (K * A)),
+    source_of_native
+      (native_collision_remove eqb full_hash key stored_hash entries) =
+    remove_tree eqb fuel depth full_hash key
+      (Collision stored_hash (pseq_view entries)).
+Proof.
+  intros K A eqb fuel depth full_hash key stored_hash entries.
+  unfold native_collision_remove.
+  destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+  - rewrite remove_tree_collision, Hhash.
+    rewrite native_normalize_collision_refines.
+    rewrite native_bucket_remove_refines, pseq_length_view, bucket_remove_index_spec.
+    reflexivity.
+  - rewrite remove_tree_collision, Hhash.
+    reflexivity.
+Qed.
+
 Fixpoint native_get {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (native : native_tree K A)
     : option A :=
@@ -712,6 +770,8 @@ Fixpoint native_remove {K A : Type} (eqb : K -> K -> bool)
   | NativeEmpty, _ => NativeEmpty
   | NativeLeaf stored_hash stored value, _ =>
       native_leaf_remove eqb full_hash key stored_hash stored value
+  | NativeCollision stored_hash entries, _ =>
+      native_collision_remove eqb full_hash key stored_hash entries
   | _, _ => native_of_source
       (remove_tree eqb fuel depth full_hash key (source_of_native native))
   end.
@@ -813,6 +873,7 @@ Proof.
   all: cbn [native_remove]; try apply source_of_native_of_source.
   all: try reflexivity.
   all: try apply native_leaf_remove_refines.
+  all: try apply native_collision_remove_refines.
   destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
   - destruct (pseq_get (rank bitmap (chunk full_hash depth)) children)
       as [child|] eqn:Hchild.

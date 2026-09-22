@@ -443,6 +443,15 @@ Lemma remove_tree_leaf :
     else Leaf stored_hash stored value.
 Proof. destruct fuel; reflexivity. Qed.
 
+Lemma remove_tree_collision :
+  forall K A (eqb : K -> K -> bool) fuel depth full_hash (key : K)
+         stored_hash (entries : list (K * A)),
+    remove_tree eqb fuel depth full_hash key (Collision stored_hash entries) =
+    if N.eqb full_hash stored_hash
+    then normalize_collision stored_hash (bucket_remove eqb key entries)
+    else Collision stored_hash entries.
+Proof. destruct fuel; reflexivity. Qed.
+
 Definition remove {K Seed A : Type} (eqb : K -> K -> bool)
     (hash : Seed -> K -> N) (key : K) (m : table K Seed A) : table K Seed A :=
   {| table_seed := table_seed m;

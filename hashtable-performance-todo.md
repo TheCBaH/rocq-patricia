@@ -74,13 +74,13 @@ implemented or validated, and no new performance target is achieved.
   Partial: `native_set` and `native_remove` now handle empty and leaf cases
   directly; distinct-hash leaf joins and collision cases still use the
   source-model conversion.
-- [ ] **HP3.2** Implement/prove indexed sequence collision workers, termination,
+- [x] **HP3.2** Implement/prove indexed sequence collision workers, termination,
   representative retention and empty/singleton normalization; test buckets >32.
-  Prerequisite complete: the private sequence contract now exposes a refined
-  length operation, extracted as `Array.length`, for bounded indexed workers.
-  Partial: collision lookup and update now use bounded indexed workers;
-  update normalizes arbitrary empty/singleton collision sequences without a
-  view conversion. Collision removal remains open.
+  The private sequence contract exposes a refined length operation, extracted
+  as `Array.length`, for bounded indexed workers. Lookup/update/removal use
+  one length-bounded checked traversal; update/removal normalize arbitrary
+  empty/singleton collision sequences without a view conversion. The remaining
+  HP3 work is direct distinct-hash joining, public reachability and measurement.
 - [ ] **HP3.3** Lift worker proofs to native public validity/lookup/set/remove/
   first-wins loading; preserve seed, callback and arbitrary-payload contracts.
 - [ ] **HP3.4** Separate proof/test conversions from public operation paths and
@@ -128,3 +128,4 @@ implemented or validated, and no new performance target is achieved.
 | 2026-09-22 | HP3.2 indexed-worker length prerequisite | `/opt/opam/4.14.3/bin/rocq compile -q -Q . '' HashTableNative.v`; `/opt/opam/4.14.3/bin/rocq compile -q -Q . '' HashTableArrayRefinement.v`; `make hashtable-native-primitives-test hashtable-native-array-extracted-test-native hashtable-native-array-extraction-audit` | Passed. `pseq_length` has a view theorem and is mapped only at the native array extraction boundary to `HashTablePrimitives.length` (`Array.length`). The sequence refinement contract and primitive corpus now cover this operation. Collision workers have not yet been routed through it, so HP3.2 remains open. |
 | 2026-09-22 | HP3.2 indexed collision lookup slice | `/opt/opam/4.14.3/bin/rocq compile -q -Q . '' HashTableBucket.v`; `/opt/opam/4.14.3/bin/rocq compile -q -Q . '' HashTableNative.v`; `make hashtable-proof hashtable-assumptions hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-array-extraction-audit` | Passed. `native_bucket_get` walks checked `pseq_get` indexes bounded by `pseq_length`; its source-index theorem proves equivalence to `bucket_get`. Generated collision lookup calls it with `HashTablePrimitives.length`, and the audit requires that route. Bytecode/native model tests explicitly check every hit and a miss in a 40-entry collision bucket. Collision update/removal, singleton/empty normalization and a collision-specific measurement remain open. |
 | 2026-09-22 | HP3.2 indexed collision update slice | `make hashtable-proof hashtable-assumptions hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-array-extraction-audit` | Passed. `native_bucket_set` walks a checked index bounded by one `pseq_length`, using fresh `pseq_replace` on a hit (retaining the resident key) and `pseq_insert` on a miss. Its list-view theorem refines `bucket_set_index`; `native_normalize_collision` uses only length/get to preserve total empty/singleton behavior. Public `native_set` dispatches same-hash collisions directly through this worker; the distinct-hash join fallback remains. The generated audit requires the indexed update worker, and bytecode/native tests cover an existing-key update, append, and retained old version in a 40-entry collision bucket. Collision removal and a collision-specific measurement remain open. |
+| 2026-09-22 | HP3.2 indexed collision removal slice | `make hashtable-assumptions hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-array-extraction-audit` | Passed. `native_bucket_remove` walks the same checked, bounded index and uses a fresh `pseq_remove` only on a hit; its view theorem refines `bucket_remove_index`. Same-hash public `native_remove` now avoids source conversion and normalizes to leaf/empty through `native_normalize_collision`; a hash mismatch retains the collision directly. The generated audit requires the removal worker. Bytecode/native tests cover removal and retained history in a 41-entry collision plus two-entry normalization to leaf and then empty. Collision-specific measurement and the remaining HP3 join/public-reachability work are open. |

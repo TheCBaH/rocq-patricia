@@ -55,6 +55,40 @@ let () =
          (HashTableNative.native_get equal 6 0 0 key collision_native_appended =
           HashTable.get_tree equal 6 0 0 key collision_source_appended))
     (Stdlib.List.init 41 Fun.id);
+  let collision_source_removed =
+    HashTable.remove_tree equal 6 0 0 17 collision_source_appended
+  in
+  let collision_native_removed =
+    HashTableNative.native_remove equal 6 0 0 17 collision_native_appended
+  in
+  check "collision removal preserves old version"
+    (HashTableNative.native_get equal 6 0 0 17 collision_native_appended =
+     Some "collision-updated");
+  Stdlib.List.iter
+    (fun key ->
+       check ("collision remove key " ^ string_of_int key)
+         (HashTableNative.native_get equal 6 0 0 key collision_native_removed =
+          HashTable.get_tree equal 6 0 0 key collision_source_removed))
+    (Stdlib.List.init 41 Fun.id);
+  let two_entries = [ 1, "one"; 2, "two" ] in
+  let two_source = HashTable.Collision (0, two_entries) in
+  let two_native =
+    HashTableNative.NativeCollision (0, HashTableNative.pseq_of_list two_entries)
+  in
+  let one_source = HashTable.remove_tree equal 6 0 0 1 two_source in
+  let one_native = HashTableNative.native_remove equal 6 0 0 1 two_native in
+  check "collision removal normalizes to leaf"
+    (match one_native with HashTableNative.NativeLeaf (0, 2, "two") -> true | _ -> false);
+  check "collision leaf normalization agrees"
+    (HashTableNative.native_get equal 6 0 0 2 one_native =
+     HashTable.get_tree equal 6 0 0 2 one_source);
+  let empty_source = HashTable.remove_tree equal 6 0 0 2 one_source in
+  let empty_native = HashTableNative.native_remove equal 6 0 0 2 one_native in
+  check "collision removal normalizes to empty"
+    (match empty_native with HashTableNative.NativeEmpty -> true | _ -> false);
+  check "collision empty normalization agrees"
+    (HashTableNative.native_get equal 6 0 0 2 empty_native =
+     HashTable.get_tree equal 6 0 0 2 empty_source);
   let random = Random.State.make [| 0x4e415449; 0x56454d4f |] in
   let rec loop step source native retained =
     if step = 750 then ()

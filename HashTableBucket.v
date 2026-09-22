@@ -170,6 +170,69 @@ Fixpoint bucket_remove {K A : Type} (eqb : K -> K -> bool)
       else (stored, value) :: bucket_remove eqb key tail
   end.
 
+Fixpoint bucket_remove_index {K A : Type} (eqb : K -> K -> bool)
+    (key : K) (entries : list (K * A)) (index remaining : nat) : list (K * A) :=
+  match remaining with
+  | O => entries
+  | S remaining' =>
+      match nth_error entries index with
+      | None => entries
+      | Some (stored, value) =>
+          if eqb key stored then dense_remove index entries
+          else bucket_remove_index eqb key entries (S index) remaining'
+      end
+  end.
+
+Lemma dense_remove_at_length :
+  forall A (prefix : list A) head tail,
+    dense_remove (length prefix) (prefix ++ head :: tail) = prefix ++ tail.
+Proof.
+  intros A prefix. induction prefix as [|item prefix IH]; intros head tail.
+  - reflexivity.
+  - simpl. f_equal. apply IH.
+Qed.
+
+Lemma bucket_remove_index_from :
+  forall K A (eqb : K -> K -> bool) (key : K)
+         (entries prefix : list (K * A)),
+    bucket_remove_index eqb key (prefix ++ entries) (length prefix)
+      (length entries) = prefix ++ bucket_remove eqb key entries.
+Proof.
+  intros K A eqb key entries.
+  induction entries as [|[stored value] tail IH]; intro prefix.
+  - reflexivity.
+  - change ((match nth_error (prefix ++ (stored, value) :: tail) (length prefix) with
+             | None => prefix ++ (stored, value) :: tail
+             | Some (stored', value') =>
+                 if eqb key stored'
+                 then dense_remove (length prefix) (prefix ++ (stored, value) :: tail)
+                 else bucket_remove_index eqb key
+                        (prefix ++ (stored, value) :: tail)
+                        (S (length prefix)) (length tail)
+             end) =
+            prefix ++ (if eqb key stored then tail
+                       else (stored, value) :: bucket_remove eqb key tail)).
+    rewrite nth_error_app2 by lia.
+    replace (length prefix - length prefix) with 0 by lia.
+    cbn. destruct (eqb key stored) eqn:Hstored.
+    + rewrite dense_remove_at_length. reflexivity.
+    + replace (S (length prefix)) with (length (prefix ++ [(stored, value)]))
+        by (rewrite length_app; cbn; lia).
+      replace (prefix ++ (stored, value) :: tail) with
+        ((prefix ++ [(stored, value)]) ++ tail)
+        by exact (eq_sym (app_assoc prefix [(stored, value)] tail)).
+      rewrite IH. now rewrite <- app_assoc.
+Qed.
+
+Lemma bucket_remove_index_spec :
+  forall K A (eqb : K -> K -> bool) (key : K) (entries : list (K * A)),
+    bucket_remove_index eqb key entries 0 (length entries) =
+    bucket_remove eqb key entries.
+Proof.
+  intros. replace entries with ([] ++ entries) by reflexivity.
+  apply bucket_remove_index_from.
+Qed.
+
 Inductive normalized_bucket (K A : Type) : Type :=
 | BucketEmpty
 | BucketLeaf (entry : K * A)
