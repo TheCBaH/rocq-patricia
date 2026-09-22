@@ -500,6 +500,28 @@ Proof.
     + apply source_of_native_of_source.
 Qed.
 
+Definition native_leaf_remove {K A : Type} (eqb : K -> K -> bool)
+    (full_hash : N) (key : K) (stored_hash : N) (stored : K) (value : A)
+    : native_tree K A :=
+  if N.eqb full_hash stored_hash then
+    if eqb key stored then NativeEmpty else NativeLeaf stored_hash stored value
+  else NativeLeaf stored_hash stored value.
+
+Lemma native_leaf_remove_refines :
+  forall K A (eqb : K -> K -> bool) fuel depth full_hash (key : K)
+         stored_hash stored (value : A),
+    source_of_native
+      (native_leaf_remove eqb full_hash key stored_hash stored value) =
+    remove_tree eqb fuel depth full_hash key (Leaf stored_hash stored value).
+Proof.
+  intros K A eqb fuel depth full_hash key stored_hash stored value.
+  unfold native_leaf_remove.
+  rewrite remove_tree_leaf.
+  destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+  - destruct (eqb key stored) eqn:Hkey; reflexivity.
+  - reflexivity.
+Qed.
+
 Fixpoint native_get {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (native : native_tree K A)
     : option A :=
@@ -565,6 +587,9 @@ Fixpoint native_remove {K A : Type} (eqb : K -> K -> bool)
         | None => NativeBranch bitmap children
         end
       else NativeBranch bitmap children
+  | NativeEmpty, _ => NativeEmpty
+  | NativeLeaf stored_hash stored value, _ =>
+      native_leaf_remove eqb full_hash key stored_hash stored value
   | _, _ => native_of_source
       (remove_tree eqb fuel depth full_hash key (source_of_native native))
   end.
@@ -663,6 +688,8 @@ Proof.
   induction fuel as [|fuel IH]; intros depth full_hash key native;
     destruct native as [|stored_hash stored value|stored_hash entries|bitmap children].
   all: cbn [native_remove]; try apply source_of_native_of_source.
+  all: try reflexivity.
+  all: try apply native_leaf_remove_refines.
   destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
   - destruct (pseq_get (rank bitmap (chunk full_hash depth)) children)
       as [child|] eqn:Hchild.

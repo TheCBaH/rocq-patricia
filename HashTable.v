@@ -424,6 +424,15 @@ Fixpoint remove_tree {K A : Type} (eqb : K -> K -> bool)
       else t
   end.
 
+Lemma remove_tree_leaf :
+  forall K A (eqb : K -> K -> bool) fuel depth full_hash (key : K)
+         stored_hash stored (value : A),
+    remove_tree eqb fuel depth full_hash key (Leaf stored_hash stored value) =
+    if N.eqb full_hash stored_hash then
+      if eqb key stored then Empty else Leaf stored_hash stored value
+    else Leaf stored_hash stored value.
+Proof. destruct fuel; reflexivity. Qed.
+
 Definition remove {K Seed A : Type} (eqb : K -> K -> bool)
     (hash : Seed -> K -> N) (key : K) (m : table K Seed A) : table K Seed A :=
   {| table_seed := table_seed m;
