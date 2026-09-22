@@ -4,6 +4,13 @@ This note records local, workload-specific measurements and optimization
 ideas. It is not a complexity proof, a portable benchmark result, or a claim
 about an unmeasured OCaml runtime.
 
+Feasibility review: 2026-09-22. The proposed optimization is feasible, with a
+smaller first step than a new node representation: realize bounded scalar
+operations natively, then remove source/list conversions from hot workers.
+The [detailed implementation plan](hashtable-performance-plan.md) records the
+evidence, proof/foreign boundary, dependencies and acceptance gates;
+[the performance tracker](hashtable-performance-todo.md) owns progress.
+
 ## Implementations
 
 | Name | Implementation | Persistence |
@@ -27,9 +34,12 @@ make hashtable-benchmark hashtable-string-benchmark
 make benchmark
 ```
 
-The HAMT commands use `ocamlopt`, 2,000 ascending bindings, seed 31, and keep
-every prefix version of each persistent map. Each timed operation checks its
-result against an association-list oracle. The Patricia command uses a separate
+The HAMT commands use `ocamlopt`, 2,000 ascending bindings and seed 31. Separate
+retained-heap passes keep every prefix version of each persistent map; the timed
+build/update/remove passes do not retain every intermediate root. Integer lookup
+includes an association-list oracle search inside the timer; string lookup
+compares directly with expected values. Update/remove validation is outside the
+timer. The Patricia command uses a separate
 `ocamlopt` harness with 10,000 bindings per input tree and includes more
 operations, randomized insertion, and several string distributions. Therefore
 the two tables below must not be used to compare a HAMT number directly with a
@@ -98,61 +108,70 @@ dominates that distribution.
 
 - Use `Hashtbl` for the fastest mutable single-version table. It does not offer
   retained versions or persistent structural sharing.
-- Patricia is currently the stronger persistent implementation for ordinary
-  integer and string lookup/removal workloads, and for many structural unions.
+- Patricia performs well against AVL in its measured integer/string
+  lookup/removal and structural-union workloads. Its ranking against HAMT
+  still needs a matched harness.
 - AVL uses less retained memory than Patricia and is a steadier choice when
   comparator-based semantics or long common-prefix string behavior matter.
 - The public HAMT has the desired generated/refined implementation boundary,
   but its current target realization needs performance work before it should be
   selected for throughput.
 
-## Likely public-HAMT cost centers
+## Cost centers identified by source inspection
 
-These are hypotheses from the allocation profile and implementation shape, not
-yet profiler-confirmed causes.
+These call paths exist in the source and regenerated OCaml. Their share of
+runtime/allocation still requires profiling or controlled experiments.
 
-1. `HashTablePrimitives.insert`, `replace`, and `remove` allocate a fresh array
-   for every compact-child edit. Fresh storage is required by the persistent
-   sequence contract, but the number and placement of those edits should be
-   measured.
-2. The generated representation crosses the `pseq` extraction boundary for
-   every compact-child operation. Construction, option values, and callback
-   wrappers may add temporary allocation beyond the final map structure.
-3. `pseq_view` is extracted as `Array.to_list`; enumeration necessarily
-   materializes a list. It should remain confined to enumeration, but profiling
-   must verify that an unexpected call path does not reach it during updates or
-   lookup.
-4. The benchmarks deliberately retain every prefix. This is valuable
-   persistence coverage but magnifies allocation behavior and does not model a
-   workload that discards intermediate roots.
+1. `HashTableNativeArrayExtract.v` realizes arrays but supplies no HAMT scalar
+   bindings. Generated `HashTableBits.chunk`, `rank` and bitmap edits reach
+   recursive `BinNat.N`/`BinPos.Pos` operations. `N.of_nat` recursively converts
+   depth arithmetic, `N.shiftr` iterates division, and `popcount32` always makes
+   32 steps. Mapping the number types to OCaml `int` does not make all these
+   operations native instructions. This is the first optimization candidate,
+   following `PatriciaExtract.v`'s scalar-realizer precedent.
+2. `native_children_remove` materializes `pseq_view children'` just to test
+   emptiness. `native_get` materializes collision entries for `bucket_get`.
+   `native_set`/`native_remove` delegate non-branch cases through
+   `source_of_native`, source workers and `native_of_source`, constructing
+   temporary nodes/lists. Thus enumeration-only materialization is a goal,
+   not the current generated backend's behavior.
+3. The standalone HAMT uses the same `HashTablePrimitives` array edits and is
+   much cheaper on these workloads. Fresh compact-array copies are real costs,
+   but do not by themselves explain the generated backend's allocation gap.
+   Both implementations already copy only occupied child storage.
+4. Option/callback allocation, repeated rank computation and copied unchanged
+   paths remain secondary candidates. Measure them after scalar realization.
+   Branch children have width at most 32; collision sequences do not.
+
+The current enumeration-only audit in
+`check-hashtable-native-array-backend.sh` examines the standalone
+`HashMapNative.ml`, not the generated workers. The generated extraction audit
+checks primitive/worker presence, not the absence of these hot call paths.
+
+On 2026-09-22, rerunning both HAMT benchmark targets with Rocq 9.2 and OCaml
+4.14.3 reproduced the recorded build allocations exactly: integer public/
+standalone 215,905,264 / 1,394,040 bytes; string 243,088,456 / 1,279,488 bytes.
+Integer build was 8.056 / 0.302 ms and string build 9.190 / 0.360 ms in this
+single rerun. This confirms the baseline issue, not its allocation attribution
+or a stable speed ratio. No optimized implementation was measured.
 
 ## Optimization plan
 
-1. **Profile before changing the representation.** Run `memtrace` or a sampled
-   allocation profiler for build, lookup, update, and removal. Attribute
-   allocation to generated workers, primitive edits, option/list construction,
-   and hashing. Repeat with retained-prefix and latest-version-only histories.
-2. **Add fairer benchmark distributions.** Record several sizes, random input,
-   `root-slot-collision`, collision-heavy custom keys, and long-prefix strings.
-   Run multiple repetitions and report median/range instead of interpreting one
-   timing as a stable ranking.
-3. **Specialize the compact sequence representation.** A persistent,
-   fixed-width (at most 32 children) node representation can copy only its
-   occupied child storage and avoid generic list/option scaffolding. It must
-   preserve the `HashTableArrayRefinement.v` view and fresh-update contract.
-4. **Reduce temporary values in generated hot paths.** Inspect the extracted
-   `native_get`, `native_set`, and `native_remove` workers after profiling.
-   Candidate changes include direct bounded-index helpers and extraction
-   directives for hot sequence combinators. Keep `pseq_view` materialization
-   limited to `elements`.
-5. **Consider a reviewed specialized target realizer.** If extraction-level
-   specialization is insufficient, implement a small OCaml compact-node
-   realizer behind the existing abstract `HashMap` interface, prove it meets
-   the quantified sequence contract, and extend the extraction/backend audits
-   and bytecode/native differential suites. Do not trade persistence or the
-   documented foreign-boundary checks for a benchmark result.
-6. **Re-evaluate the public backend only with evidence.** Compare the revised
-   generated HAMT against the standalone HAMT, Patricia, AVL, and `Hashtbl` on
-   matched integer/string workloads. Publish allocation, retained heap, and
-   timing together.
+1. Correct timing boundaries and add matched, repeated workloads; profile the
+   existing backend with history policies measured separately.
+2. Add bounded scalar realizers with range contracts and source-defined
+   popcount/control flow, following the Patricia extraction approach.
+3. Add a sequence emptiness primitive, direct native leaf/join workers, and
+   indexed collision workers, proving refinement before selecting each worker.
+4. Audit the generated public call graph and primitive contracts; run existing
+   bytecode/native, persistence, representative and callback suites.
+5. Consider additional sequence specialization only if the residual profile
+   warrants it. A Rocq theorem quantified over a sequence contract does not
+   itself prove that handwritten OCaml satisfies that contract; target execution
+   remains an explicit foreign obligation unless separately verified.
+6. Re-evaluate against the standalone HAMT, Patricia, AVL and `Hashtbl` on the
+   same workloads. Keep the public API and persistence contract unchanged.
 
+Execution details and closure criteria are in
+[the performance plan](hashtable-performance-plan.md). There is no promised
+speedup or change to the completed H0–H5 correctness gates in this proposal.
