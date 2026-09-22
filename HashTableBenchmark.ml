@@ -2,10 +2,17 @@
    used by updates are made before timing; each task retains its result and
    returns an observable checksum. *)
 
+let pattern = match Sys.getenv_opt "HASHTABLE_BENCH_PATTERN" with
+  | None | Some "ascending" -> "ascending"
+  | Some "shuffled" -> "shuffled"
+  | Some "root-slot-collision" -> "root-slot-collision"
+  | Some "constant-hash" -> "constant-hash"
+  | Some value -> failwith ("unknown HASHTABLE_BENCH_PATTERN " ^ value)
+
 module Key = struct
   type t = int
   let equal = Int.equal
-  let hash ~seed key = key lxor seed
+  let hash ~seed key = if pattern = "constant-hash" then 0 else key lxor seed
 end
 
 module Hash_map = HashMap.Make (Key)
@@ -17,12 +24,6 @@ let fail message = failwith ("HashTable benchmark: " ^ message)
 let int_env name default = match Sys.getenv_opt name with None -> default | Some v -> int_of_string v
 let size = int_env "HASHTABLE_BENCH_SIZE" 2_000
 let seed = int_env "HASHTABLE_BENCH_SEED" 31
-
-let pattern = match Sys.getenv_opt "HASHTABLE_BENCH_PATTERN" with
-  | None | Some "ascending" -> "ascending"
-  | Some "shuffled" -> "shuffled"
-  | Some "root-slot-collision" -> "root-slot-collision"
-  | Some value -> fail ("unknown HASHTABLE_BENCH_PATTERN " ^ value)
 
 let keys =
   let keys = Array.init size (fun index ->

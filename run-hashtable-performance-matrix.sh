@@ -40,6 +40,10 @@ for size in $sizes; do
     for pattern in ascending shuffled root-slot-collision; do
       run_integer "$size" "$seed" "$pattern"
     done
+    case "$size" in
+      100|2000) run_integer "$size" "$seed" constant-hash ;;
+      *) printf 'Skipping constant-hash size %s (planned cap: 100/2000)\n' "$size" ;;
+    esac
     for pattern in fixed-width mixed-length common-prefix; do
       run_string "$size" "$seed" "$pattern"
     done

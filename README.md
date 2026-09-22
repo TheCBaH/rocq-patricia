@@ -32,9 +32,9 @@ backend, `Map.Make`, and OCaml's imperative `Hashtbl` on checked integer build,
 lookup, update and removal workloads;
 `make hashtable-string-benchmark` performs the same comparison for fixed-width
 string keys. Set `HASHTABLE_BENCH_SIZE`,
-`HASHTABLE_BENCH_SEED`, and `HASHTABLE_BENCH_PATTERN` (`ascending` or
-`root-slot-collision`) to record a local series; its timing and heap output is
-workload-specific evidence.
+`HASHTABLE_BENCH_SEED`, and `HASHTABLE_BENCH_PATTERN` (`ascending`, `shuffled`,
+`root-slot-collision`, or `constant-hash`) to record a local series; its timing
+and heap output is workload-specific evidence.
 The [performance review](hashtable-performance.md),
 [optimization plan](hashtable-performance-plan.md) and
 [performance tracker](hashtable-performance-todo.md) cover bounded native
