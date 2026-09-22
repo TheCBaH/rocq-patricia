@@ -22,6 +22,8 @@ Definition pseq_of_list {A : Type} (items : list A) : pseq A :=
   {| pseq_view := items |}.
 Definition pseq_get {A : Type} (index : nat) (items : pseq A) : option A :=
   nth_error (pseq_view items) index.
+Definition pseq_length {A : Type} (items : pseq A) : nat :=
+  length (pseq_view items).
 Definition pseq_is_empty {A : Type} (items : pseq A) : bool :=
   match pseq_view items with [] => true | _ => false end.
 Definition pseq_insert {A : Type} (index : nat) (item : A) (items : pseq A)
@@ -40,6 +42,10 @@ Proof. reflexivity. Qed.
 Lemma pseq_get_view :
   forall A index (items : pseq A),
     pseq_get index items = nth_error (pseq_view items) index.
+Proof. reflexivity. Qed.
+
+Lemma pseq_length_view :
+  forall A (items : pseq A), pseq_length items = length (pseq_view items).
 Proof. reflexivity. Qed.
 
 Lemma pseq_is_empty_spec :

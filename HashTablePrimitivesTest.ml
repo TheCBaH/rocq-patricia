@@ -3,6 +3,7 @@ let check message condition = if not condition then fail message
 
 let () =
   let items = HashTablePrimitives.of_list [ 10; 20; 30 ] in
+  check "length" (HashTablePrimitives.length items = 3);
   check "nonempty" (not (HashTablePrimitives.is_empty items));
   check "get" (HashTablePrimitives.get 1 items = Some 20);
   check "missing get" (HashTablePrimitives.get 3 items = None);
@@ -27,6 +28,7 @@ let () =
   check "negative remove view"
     (HashTablePrimitives.to_list negative_remove = [ 10; 20; 30 ]);
   let empty = HashTablePrimitives.empty () in
+  check "empty length" (HashTablePrimitives.length empty = 0);
   check "empty" (HashTablePrimitives.is_empty empty);
   let empty_remove = HashTablePrimitives.remove 0 empty in
   check "removed is empty" (HashTablePrimitives.is_empty empty_remove);

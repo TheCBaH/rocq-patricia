@@ -18,6 +18,7 @@ Record array_sequence_contract : Type := {
   array_of_list : forall {A}, list A -> array_seq A;
   array_is_empty : forall {A}, array_seq A -> bool;
   array_get : forall {A}, nat -> array_seq A -> option A;
+  array_length : forall {A}, array_seq A -> nat;
   array_insert : forall {A}, nat -> A -> array_seq A -> array_seq A;
   array_replace : forall {A}, nat -> A -> array_seq A -> array_seq A;
   array_remove : forall {A}, nat -> array_seq A -> array_seq A;
@@ -28,6 +29,8 @@ Record array_sequence_contract : Type := {
       array_is_empty items = true <-> array_view items = [];
   array_get_view : forall A index (items : array_seq A),
       array_get index items = nth_error (array_view items) index;
+  array_length_view : forall A (items : array_seq A),
+      array_length items = length (array_view items);
   array_insert_view : forall A index (item : A) (items : array_seq A),
       array_view (array_insert index item items) =
         dense_insert index item (array_view items);
@@ -86,6 +89,17 @@ Proof.
   intros C A index target model Hrefines.
   unfold array_pseq_refines in Hrefines.
   rewrite array_get_view, pseq_get_view, Hrefines. reflexivity.
+Qed.
+
+Lemma array_pseq_length_refines :
+  forall (C : array_sequence_contract) A
+         (target : array_seq C A) (model : pseq A),
+    array_pseq_refines C target model ->
+    array_length C target = pseq_length model.
+Proof.
+  intros C A target model Hrefines.
+  unfold array_pseq_refines in Hrefines.
+  rewrite array_length_view, pseq_length_view, Hrefines. reflexivity.
 Qed.
 
 Lemma array_pseq_insert_refines :
