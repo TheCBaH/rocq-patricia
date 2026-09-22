@@ -121,6 +121,144 @@ Proof.
   cbv [branch_levels]. lia.
 Qed.
 
+(** Direct joins use scalar chunks at each remaining routing depth. *)
+Fixpoint native_join_scalar_safe (fuel depth : nat) (left_hash right_hash : N) : Prop :=
+  (left_hash < hash_space)%N /\
+  (right_hash < hash_space)%N /\
+  depth + fuel <= branch_levels /\
+  match fuel with
+  | O => True
+  | S fuel' => native_join_scalar_safe fuel' (S depth) left_hash right_hash
+  end.
+
+Lemma native_join_scalar_safe_of_bounds :
+  forall fuel depth left_hash right_hash,
+    (left_hash < hash_space)%N ->
+    (right_hash < hash_space)%N ->
+    depth + fuel <= branch_levels ->
+    native_join_scalar_safe fuel depth left_hash right_hash.
+Proof.
+  induction fuel as [|fuel IH]; intros depth left_hash right_hash Hleft Hright Hdepth;
+    cbn [native_join_scalar_safe]; repeat split; try assumption; try lia; try exact I.
+  apply IH; try assumption; lia.
+Qed.
+
+(** Update traversals share branch routing with lookup, and may additionally
+    invoke a direct join at a leaf or collision.  This stronger invariant
+    records both classes of scalar call without assuming that the target
+    realization is a Rocq function. *)
+Fixpoint native_update_scalar_safe {K A : Type} (fuel depth : nat)
+    (full_hash : N) (native : native_tree K A) : Prop :=
+  (full_hash < hash_space)%N /\
+  depth + fuel <= branch_levels /\
+  match fuel, native with
+  | S fuel', NativeBranch bitmap children =>
+      (bitmap < bitmap_limit)%N /\
+      match native_bitmap_has bitmap (native_chunk full_hash depth) with
+      | true => forall child,
+          pseq_get (native_rank bitmap (native_chunk full_hash depth)) children = Some child ->
+          native_update_scalar_safe fuel' (S depth) full_hash child
+      | false => True
+      end
+  | _, NativeLeaf stored_hash _ _ =>
+      native_join_scalar_safe fuel depth full_hash stored_hash
+  | _, NativeCollision stored_hash _ =>
+      native_join_scalar_safe fuel depth full_hash stored_hash
+  | _, _ => True
+  end.
+
+Lemma native_update_scalar_safe_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (seed : Seed) fuel depth prefix full_hash (native : native_tree K A),
+    (full_hash < hash_space)%N ->
+    depth + fuel <= branch_levels ->
+    wf E hash seed depth prefix (source_of_native native) ->
+    native_update_scalar_safe fuel depth full_hash native.
+Proof.
+  intros K Seed A E hash seed fuel.
+  induction fuel as [|fuel IH]; intros depth prefix full_hash native
+    Hhash Hdepth Hwf.
+  - destruct native as [|stored_hash stored value|stored_hash entries|bitmap children].
+    + cbn [native_update_scalar_safe]. repeat split; try assumption; try lia; exact I.
+    + cbn [native_update_scalar_safe source_of_native] in *.
+      split; [exact Hhash|]. split; [exact Hdepth|].
+      inversion Hwf; subst. now apply native_join_scalar_safe_of_bounds.
+    + cbn [native_update_scalar_safe source_of_native] in *.
+      split; [exact Hhash|]. split; [exact Hdepth|].
+      apply native_join_scalar_safe_of_bounds; try assumption.
+      eapply (@wf_collision_hash_bound K Seed A E hash seed depth prefix stored_hash
+        (pseq_view entries)); exact Hwf.
+    + cbn [native_update_scalar_safe]. repeat split; try assumption; try lia; exact I.
+  - destruct native as [|stored_hash stored value|stored_hash entries|bitmap children].
+    + cbn [native_update_scalar_safe]. repeat split; try assumption; try lia; exact I.
+    + cbn [native_update_scalar_safe source_of_native] in *.
+      split; [exact Hhash|]. split; [exact Hdepth|].
+      inversion Hwf; subst. now apply native_join_scalar_safe_of_bounds.
+    + cbn [native_update_scalar_safe source_of_native] in *.
+      split; [exact Hhash|]. split; [exact Hdepth|].
+      apply native_join_scalar_safe_of_bounds; try assumption.
+      eapply (@wf_collision_hash_bound K Seed A E hash seed depth prefix stored_hash
+        (pseq_view entries)); exact Hwf.
+    + cbn [native_update_scalar_safe source_of_native].
+      split; [exact Hhash|]. split; [exact Hdepth|].
+      inversion Hwf as [| | |actual_depth actual_prefix actual_bitmap actual_children
+        Hbranch_depth Hbitmap _ _ Hchildren _];
+        subst actual_depth actual_prefix actual_bitmap actual_children.
+      split; [exact Hbitmap|].
+      destruct (native_bitmap_has bitmap (native_chunk full_hash depth)) eqn:Hpresent; [|exact I].
+      intros child Hchild.
+      change (bitmap_has bitmap (chunk full_hash depth) = true) in Hpresent.
+      pose proof (@pseq_get_source_children K A
+        (rank bitmap (chunk full_hash depth)) children child Hchild) as Hsource.
+      destruct (@wf_branch_ranked_child K Seed A E hash seed depth prefix bitmap
+        (map source_of_native (pseq_view children)) (chunk full_hash depth)
+        Hwf (chunk_bound full_hash depth) Hpresent)
+        as [source_child [Hindexed [_ Hchildwf]]].
+      rewrite Hsource in Hindexed. inversion Hindexed. subst source_child.
+      apply (IH (S depth) (prefix ++ chunk full_hash depth :: nil) full_hash child);
+        try assumption; lia.
+Qed.
+
+Lemma native_table_update_scalar_safe :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (query : K) (native : native_table K Seed A),
+    (hash (native_table_seed native) query < hash_space)%N ->
+    native_table_wf E hash native ->
+    native_update_scalar_safe branch_levels 0
+      (hash (native_table_seed native) query) (native_table_root native).
+Proof.
+  intros K Seed A E hash query native Hhash Hwf.
+  destruct native as [seed root].
+  unfold native_table_wf, table_wf, source_table_of_native in Hwf.
+  apply (@native_update_scalar_safe_wf K Seed A E hash seed branch_levels 0 nil
+    (hash seed query) root); try assumption.
+  cbv [branch_levels]. lia.
+Qed.
+
+Lemma native_table_set_scalar_safe :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (key : K) (value : A) (native : native_table K Seed A),
+    (hash (native_table_seed native) key < hash_space)%N ->
+    native_table_wf E hash native ->
+    native_update_scalar_safe branch_levels 0
+      (hash (native_table_seed native) key) (native_table_root native).
+Proof.
+  intros K Seed A E hash key value native Hhash Hwf.
+  eapply (@native_table_update_scalar_safe K Seed A E hash key native); eauto.
+Qed.
+
+Lemma native_table_remove_scalar_safe :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (key : K) (native : native_table K Seed A),
+    (hash (native_table_seed native) key < hash_space)%N ->
+    native_table_wf E hash native ->
+    native_update_scalar_safe branch_levels 0
+      (hash (native_table_seed native) key) (native_table_root native).
+Proof.
+  intros K Seed A E hash key native Hhash Hwf.
+  eapply (@native_table_update_scalar_safe K Seed A E hash key native); eauto.
+Qed.
+
 Lemma native_table_wf_empty :
   forall K Seed A (E : K -> K -> Prop) (hash : Seed -> K -> N) (seed : Seed),
     native_table_wf E hash (@native_empty K Seed A seed).

@@ -68,10 +68,11 @@ implemented or validated, and no new performance target is achieved.
 - [ ] **HP1.1** Define bounded scalar wrappers and source popcount; prove
   equivalence to `HashTableBits` and range closure for reachable calls.
   Partial: transparent wrappers now also expose kernel-checked local bounds for
-  chunk, bitmap bit, rank, insertion at an absent slot, and deletion. The
-  public `native_table_get_scalar_safe` theorem now supplies normalized hash,
-  depth, and every recursively reached branch bitmap bound from
-  `native_table_wf`; set/remove/join call closure remains open.
+  chunk, bitmap bit, rank, insertion at an absent slot, and deletion. Public
+  lookup/set/remove safety theorems now supply normalized hash, depth, every
+  recursively reached branch bitmap bound, and direct-join stored-hash bounds
+  from `native_table_wf`. The recursive first-wins loader's composition of
+  those per-operation domains remains open.
 - [x] **HP1.2** Add small OCaml scalar realizers/extraction bindings, platform
   guard and complete primitive/foreign-obligation inventory.
   `HashTableScalarPrimitives` supplies guarded 64-bit bounded operations;
@@ -211,3 +212,4 @@ implemented or validated, and no new performance target is achieved.
 | 2026-09-22 | HP1.4 bytecode/native scalar corpus | `make hashtable-scalar-test-bytecode hashtable-scalar-test`; `git diff --check` | Passed. The full target-domain corpus now runs in both bytecode and native code; the bytecode target is included in `make hashtable` and clean rules. It validates scalar behavior, not the separate public-call range-closure theorem. |
 | 2026-09-22 | HP1.2/HP1.3 scalar inventory and aggregate integration | `make hashtable-scalar-primitives-audit hashtable-scalar-test-bytecode hashtable-scalar-test`; then `make hashtable` (detached status capture) | Passed, aggregate exit status 0. The scalar audit confirms each approved guarded binding, domain checks, 32-step popcount, and no unsafe escape; the extraction audit confirms bindings reach generated workers. `make hashtable` runs the source proof/assumption audit, both scalar execution modes, bytecode/native model suites, and all declared runtime link paths. Public scalar range closure and the stage matrix remain HP1.G work. |
 | 2026-09-22 | HP1.1 public lookup scalar closure | `make hashtable-proof hashtable-assumptions hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-array-extraction-audit` (detached status capture) | Passed, exit status 0. `native_get_scalar_safe_wf` follows the exact `pseq_get` child selected by a generated lookup from source `wf`, preserving the normalized hash and six-level depth bound and extracting each branch bitmap bound. `native_table_get_scalar_safe` lifts that invariant from `native_table_wf` at the public root. Set/remove branch and direct-join scalar reachability are deliberately not claimed by this lookup theorem. |
+| 2026-09-22 | HP1.1 public update/join scalar closure | `/opt/opam/4.14.3/bin/rocq compile -q -Q . '' HashTableNativeProof.v`; `make hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-array-extraction-audit hashtable-scalar-primitives-audit hashtable-scalar-test-bytecode hashtable-scalar-test` | Passed. `native_update_scalar_safe_wf` follows update/removal branch routing through the source well-formed child relation and proves stored leaf/collision hashes for direct joins. Its public set/remove corollaries, plus the bounded recursive join invariant, cover every scalar call in those operations. The theorem is intentionally per operation; it does not yet induct over `native_table_add_first`/`of_list`. |
