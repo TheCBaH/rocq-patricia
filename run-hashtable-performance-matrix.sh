@@ -35,6 +35,14 @@ run_patricia_integer() {
   HASHTABLE_BENCH_RESULTS=$record make patricia-matrix-benchmark
 }
 
+require_record() {
+  record=$1
+  if [ ! -s "$record" ]; then
+    printf 'Expected nonempty matrix record: %s\n' "$record" >&2
+    exit 1
+  fi
+}
+
 run_string() {
   size=$1
   seed=$2
@@ -50,16 +58,21 @@ for size in $sizes; do
     for pattern in ascending shuffled root-slot-collision; do
       run_integer "$size" "$seed" "$pattern"
       run_patricia_integer "$size" "$seed" "$pattern"
+      require_record "$output/integer-size${size}-seed${seed}-${pattern}.jsonl"
+      require_record "$output/patricia-integer-size${size}-seed${seed}-${pattern}.jsonl"
     done
     case "$size" in
       100|2000)
         run_integer "$size" "$seed" constant-hash
         run_patricia_integer "$size" "$seed" constant-hash
+        require_record "$output/integer-size${size}-seed${seed}-constant-hash.jsonl"
+        require_record "$output/patricia-integer-size${size}-seed${seed}-constant-hash.jsonl"
         ;;
       *) printf 'Skipping constant-hash size %s (planned cap: 100/2000)\n' "$size" ;;
     esac
     for pattern in fixed-width mixed-length common-prefix; do
       run_string "$size" "$seed" "$pattern"
+      require_record "$output/string-size${size}-seed${seed}-${pattern}.jsonl"
     done
   done
 done
