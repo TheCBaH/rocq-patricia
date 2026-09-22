@@ -71,10 +71,15 @@ implemented or validated, and no new performance target is achieved.
   chunk, bitmap bit, rank, insertion at an absent slot, and deletion. The
   public native-table reachability proof that supplies bitmap bounds and all
   call-site preconditions remains open.
-- [ ] **HP1.2** Add small OCaml scalar realizers/extraction bindings, platform
+- [x] **HP1.2** Add small OCaml scalar realizers/extraction bindings, platform
   guard and complete primitive/foreign-obligation inventory.
-- [ ] **HP1.3** Register new modules in proof, assumption audit, extraction,
+  `HashTableScalarPrimitives` supplies guarded 64-bit bounded operations;
+  extraction and primitive-inventory audits name every approved binding and
+  document target execution as a foreign contract.
+- [x] **HP1.3** Register new modules in proof, assumption audit, extraction,
   bytecode/native link recipes and clean rules.
+  The scalar source is in `HASHTABLE_VFILES`/assumption checks, both runtime
+  link lists, every native extraction consumer, the aggregate, and clean rules.
 - [x] **HP1.4** Add model-vs-target scalar tests across slot/hash/bitmap/depth
   boundaries, full 16-bit popcount corpus and random 32-bit patterns.
   The same corpus now runs through explicit bytecode and native targets: all
@@ -199,3 +204,4 @@ implemented or validated, and no new performance target is achieved.
 | 2026-09-22 | HP0.1/HP0.2 corrected operation and history policies | `make hashtable-benchmark-smoke`; `HASHTABLE_BENCH_SIZE=100 HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_BENCH_STRING_PATTERN=common-prefix make hashtable-string-benchmark`; `git diff --check` | Passed. Both persistent harnesses now separately time existing/new set with latest-root and all-prefix-root policies, retaining all roots through the timed allocation boundary and checking every policy's latest/oldest result afterward. The integer `Hashtbl` branch now also prepares independent mutable update/add/remove inputs outside timing and validates all operation/enumeration outputs, matching the string boundary. The fixed-width smoke and common-prefix run cover all configured operations; cross-family matched distributions remain HP0.3 work. |
 | 2026-09-22 | HP0.3 history-policy JSONL metadata | `HASHTABLE_BENCH_SIZE=10 HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_BENCH_RESULTS=<mktemp> make hashtable-benchmark`; `jq` assertions on samples/summaries | Passed. Each timing sample and summary now carries `history_policy`; the smoke validates `latest-root` for ordinary persistent updates, `all-prefix-roots` for retained histories, and `single-version` for `Hashtbl`. The field complements operation labels and live-heap records so external matrix processing need not infer a policy from names. |
 | 2026-09-22 | HP1.4 bytecode/native scalar corpus | `make hashtable-scalar-test-bytecode hashtable-scalar-test`; `git diff --check` | Passed. The full target-domain corpus now runs in both bytecode and native code; the bytecode target is included in `make hashtable` and clean rules. It validates scalar behavior, not the separate public-call range-closure theorem. |
+| 2026-09-22 | HP1.2/HP1.3 scalar inventory and aggregate integration | `make hashtable-scalar-primitives-audit hashtable-scalar-test-bytecode hashtable-scalar-test`; then `make hashtable` (detached status capture) | Passed, aggregate exit status 0. The scalar audit confirms each approved guarded binding, domain checks, 32-step popcount, and no unsafe escape; the extraction audit confirms bindings reach generated workers. `make hashtable` runs the source proof/assumption audit, both scalar execution modes, bytecode/native model suites, and all declared runtime link paths. Public scalar range closure and the stage matrix remain HP1.G work. |
