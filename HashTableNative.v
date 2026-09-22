@@ -478,6 +478,67 @@ Proof.
 Qed.
 
 (** Lookup, update and removal are recursive compact-child workers. *)
+Definition native_join_two {K A : Type} (left_hash : N) (left : native_tree K A)
+    (right_hash : N) (right : native_tree K A) (depth : nat) : native_tree K A :=
+  let left_slot := native_chunk left_hash depth in
+  let right_slot := native_chunk right_hash depth in
+  let bitmap := native_bitmap_insert (native_bitmap_bit left_slot) right_slot in
+  if N.ltb left_slot right_slot
+  then NativeBranch bitmap (pseq_of_list [left; right])
+  else NativeBranch bitmap (pseq_of_list [right; left]).
+
+Lemma native_join_two_refines :
+  forall K A depth left_hash right_hash (left right : native_tree K A),
+    source_of_native (native_join_two left_hash left right_hash right depth) =
+    join_two left_hash (source_of_native left)
+      right_hash (source_of_native right) depth.
+Proof.
+  intros K A depth left_hash right_hash left right.
+  unfold native_join_two, join_two, native_chunk, native_bitmap_bit,
+    native_bitmap_insert.
+  cbn [source_of_native pseq_of_list].
+  destruct (N.ltb (chunk left_hash depth) (chunk right_hash depth)); reflexivity.
+Qed.
+
+Fixpoint native_join_worker {K A : Type} (fuel depth : nat)
+    (left_hash : N) (left : native_tree K A)
+    (right_hash : N) (right : native_tree K A) : native_tree K A :=
+  match fuel with
+  | O => native_join_two left_hash left right_hash right depth
+  | S fuel' =>
+      if N.eqb (native_chunk left_hash depth) (native_chunk right_hash depth)
+      then NativeBranch (native_bitmap_bit (native_chunk left_hash depth))
+             (pseq_of_list [native_join_worker fuel' (S depth)
+               left_hash left right_hash right])
+      else native_join_two left_hash left right_hash right depth
+  end.
+
+Lemma native_join_worker_refines :
+  forall K A fuel depth left_hash right_hash (left right : native_tree K A),
+    source_of_native (native_join_worker fuel depth left_hash left right_hash right) =
+    join_worker fuel depth left_hash (source_of_native left)
+      right_hash (source_of_native right).
+Proof.
+  intros K A fuel.
+  induction fuel as [|fuel IH]; intros depth left_hash right_hash left right.
+  - cbn [native_join_worker join_worker]. apply native_join_two_refines.
+  - cbn [native_join_worker join_worker].
+    destruct (N.eqb (chunk left_hash depth) (chunk right_hash depth)) eqn:Hslots.
+    + change (N.eqb (native_chunk left_hash depth)
+        (native_chunk right_hash depth) = true) in Hslots.
+      rewrite Hslots.
+      change (Branch (bitmap_bit (chunk left_hash depth))
+        [source_of_native (native_join_worker fuel (S depth)
+          left_hash left right_hash right)] =
+        Branch (bitmap_bit (chunk left_hash depth))
+          [join_worker fuel (S depth) left_hash (source_of_native left)
+            right_hash (source_of_native right)]).
+      f_equal. f_equal. apply IH.
+    + change (N.eqb (native_chunk left_hash depth)
+        (native_chunk right_hash depth) = false) in Hslots.
+      rewrite Hslots. apply native_join_two_refines.
+Qed.
+
 Definition native_leaf_set {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (value : A)
     (stored_hash : N) (stored : K) (old : A) : native_tree K A :=
@@ -485,9 +546,8 @@ Definition native_leaf_set {K A : Type} (eqb : K -> K -> bool)
   else if N.eqb full_hash stored_hash
        then NativeCollision stored_hash
          (pseq_of_list [(stored, old); (key, value)])
-       else native_of_source
-         (set_tree eqb fuel depth full_hash key value
-           (Leaf stored_hash stored old)).
+       else native_join_worker fuel depth full_hash
+         (NativeLeaf full_hash key value) stored_hash (NativeLeaf stored_hash stored old).
 
 Lemma native_leaf_set_refines :
   forall K A (eqb : K -> K -> bool) fuel depth full_hash (key : K) (value : A)
@@ -503,7 +563,7 @@ Proof.
   - reflexivity.
   - destruct (N.eqb full_hash stored_hash) eqn:Hhash.
     + reflexivity.
-    + apply source_of_native_of_source.
+    + apply native_join_worker_refines.
 Qed.
 
 Definition native_leaf_remove {K A : Type} (eqb : K -> K -> bool)
@@ -618,9 +678,8 @@ Definition native_collision_set {K A : Type} (eqb : K -> K -> bool)
   if N.eqb full_hash stored_hash then
     native_normalize_collision stored_hash
       (native_bucket_set eqb key value entries O (pseq_length entries))
-  else native_of_source
-    (set_tree eqb fuel depth full_hash key value
-      (Collision stored_hash (pseq_view entries))).
+  else native_join_worker fuel depth full_hash
+    (NativeLeaf full_hash key value) stored_hash (NativeCollision stored_hash entries).
 
 Lemma native_collision_set_refines :
   forall K A (eqb : K -> K -> bool) fuel depth full_hash (key : K) (value : A)
@@ -638,7 +697,7 @@ Proof.
     rewrite native_bucket_set_refines, pseq_length_view, bucket_set_index_spec.
     reflexivity.
   - rewrite set_tree_collision, Hhash.
-    apply source_of_native_of_source.
+    apply native_join_worker_refines.
 Qed.
 
 Fixpoint native_bucket_remove {K A : Type} (eqb : K -> K -> bool)
@@ -746,8 +805,7 @@ Fixpoint native_set {K A : Type} (eqb : K -> K -> bool)
       native_leaf_set eqb fuel depth full_hash key value stored_hash stored old
   | NativeCollision stored_hash entries, _ =>
       native_collision_set eqb fuel depth full_hash key value stored_hash entries
-  | _, _ => native_of_source
-      (set_tree eqb fuel depth full_hash key value (source_of_native native))
+  | NativeBranch bitmap children, O => NativeBranch bitmap children
   end.
 
 Fixpoint native_remove {K A : Type} (eqb : K -> K -> bool)
@@ -772,8 +830,7 @@ Fixpoint native_remove {K A : Type} (eqb : K -> K -> bool)
       native_leaf_remove eqb full_hash key stored_hash stored value
   | NativeCollision stored_hash entries, _ =>
       native_collision_remove eqb full_hash key stored_hash entries
-  | _, _ => native_of_source
-      (remove_tree eqb fuel depth full_hash key (source_of_native native))
+  | NativeBranch bitmap children, O => NativeBranch bitmap children
   end.
 
 Lemma native_get_refines :

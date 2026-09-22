@@ -31,7 +31,7 @@ Separate Extraction
   HashTableNative.pseq_is_empty
   HashTableNative.pseq_get HashTableNative.pseq_length HashTableNative.pseq_insert
   HashTableNative.pseq_replace HashTableNative.pseq_remove
-  HashTable.get_tree
+  HashTable.get_tree HashTable.set_tree HashTable.remove_tree
   HashTableNative.source_of_native HashTableNative.native_of_source
   HashTableNative.native_get HashTableNative.native_set HashTableNative.native_remove
   HashTableNative.native_empty HashTableNative.native_table_is_empty

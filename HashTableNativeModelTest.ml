@@ -89,6 +89,24 @@ let () =
   check "collision empty normalization agrees"
     (HashTableNative.native_get equal 6 0 0 2 empty_native =
      HashTable.get_tree equal 6 0 0 2 empty_source);
+  Stdlib.List.iter
+    (fun depth ->
+       let right_hash = 1 lsl (5 * depth) in
+       let left_source = HashTable.Leaf (0, 0, "left") in
+       let left_native = HashTableNative.NativeLeaf (0, 0, "left") in
+       let source =
+         HashTable.set_tree equal 6 0 right_hash (depth + 1) "right" left_source
+       in
+       let native =
+         HashTableNative.native_set equal 6 0 right_hash (depth + 1) "right" left_native
+       in
+       check ("distinct-hash join depth " ^ string_of_int depth ^ " left")
+         (HashTableNative.native_get equal 6 0 0 0 native =
+          HashTable.get_tree equal 6 0 0 0 source);
+       check ("distinct-hash join depth " ^ string_of_int depth ^ " right")
+         (HashTableNative.native_get equal 6 0 right_hash (depth + 1) native =
+          HashTable.get_tree equal 6 0 right_hash (depth + 1) source))
+    (Stdlib.List.init 6 Fun.id);
   let random = Random.State.make [| 0x4e415449; 0x56454d4f |] in
   let rec loop step source native retained =
     if step = 750 then ()
