@@ -39,16 +39,17 @@ implemented or validated, and no new performance target is achieved.
 
 ## Implementation checklist
 
-- [ ] **HP0.1** Move oracle work/input-value creation outside timing; consume and
+- [x] **HP0.1** Move oracle work/input-value creation outside timing; consume and
   validate measured results; separate repeated-set build and first-wins `of_list`.
-  Partial: both HAMT harnesses now prepare per-sample inputs before timing,
-  retain an observable checksum, validate results afterward, and distinguish
-  first-wins loading from repeated replacement. The string harness also covers
-  hit/miss lookup and membership, existing/new set, present/missing remove and
-  enumeration for its four implementations. A matched Patricia comparison is
-  still absent.
-- [ ] **HP0.2** Add latest-root/all-prefix timed policies and controlled live-heap
+  Both integer/string harnesses prepare per-sample inputs before timing, retain
+  observable checksums, validate maps/enumeration afterward, and distinguish
+  first-wins loading from repeated replacement across their four implementations.
+- [x] **HP0.2** Add latest-root/all-prefix timed policies and controlled live-heap
   measurement with all roots alive; separate mutable single-version results.
+  Persistent existing/new-set tasks explicitly time both policies; the all-prefix
+  task retains each root in its sample slot through allocation measurement and
+  validates newest/oldest versions. Post-GC live heap is reported separately;
+  `Hashtbl` remains a prepared single-version comparison.
 - [ ] **HP0.3** Add matched Patricia/AVL/Hashtbl/HAMT integer/string distributions,
   sizes, seeds, repetitions and machine-readable environment/revision metadata.
   Partial: the integer runner now includes the constant-hash workload at the
@@ -191,3 +192,4 @@ implemented or validated, and no new performance target is achieved.
 | 2026-09-22 | HP5.4 release/performance documentation | Reviewed `README.md`, `hashtable-performance.md`, and `hashtable-reference-release.md`; `git diff --check` | Updated the public benchmark description, implementation/performance status, generated-audit scope, source-model extraction purpose, and direct collision-worker evidence. The documents distinguish kernel source/refinement theorems from foreign OCaml contracts and finite bytecode/native tests; they retain the open range-closure, profiling, matched-matrix, and CI limits. |
 | 2026-09-22 | HP0.3/HP5.3 repeated 2,000-entry matrix (partial) | `HASHTABLE_MATRIX_SIZES=2000 HASHTABLE_MATRIX_SEEDS='0 31 104729' HASHTABLE_BENCH_REPETITIONS=3 HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_MATRIX_OUTPUT=/tmp/patricia-hamt-matrix.CIroDu/records sh ./run-hashtable-performance-matrix.sh`; JSONL metadata/summary validation with `jq` | Passed, exit status 0. All 21 expected records exist: ascending, shuffled, root-slot-collision, capped constant-hash, fixed-width, mixed-length, and common-prefix workloads for each seed. Every record declares size 2,000, three repetitions, and one warmup. It is reproducible repeated local evidence, but not the required four-size matrix, clean-checkout result, or a matched Patricia comparison. |
 | 2026-09-22 | HP1.1 scalar local range contracts | `/opt/opam/4.14.3/bin/rocq compile -q -Q . '' HashTableNativeBits.v`; `/opt/opam/4.14.3/bin/rocq compile -q -Q . '' HashTableNative.v`; `make hashtable-scalar-test hashtable-native-array-extracted-test-native hashtable-native-array-extraction-audit` | Passed. `HashTableNativeBits.v` now proves wrapper-local bounds for chunk, bitmap bit, rank, insertion, and deletion by the existing source scalar lemmas. Insertion explicitly requires an absent slot, matching branch insertion rather than claiming an unconstrained bitwise-or contract. This is local model evidence only: deriving valid bitmap and call-site hypotheses from a public native table remains HP1.1's open range-closure portion. |
+| 2026-09-22 | HP0.1/HP0.2 corrected operation and history policies | `make hashtable-benchmark-smoke`; `HASHTABLE_BENCH_SIZE=100 HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_BENCH_STRING_PATTERN=common-prefix make hashtable-string-benchmark`; `git diff --check` | Passed. Both persistent harnesses now separately time existing/new set with latest-root and all-prefix-root policies, retaining all roots through the timed allocation boundary and checking every policy's latest/oldest result afterward. The integer `Hashtbl` branch now also prepares independent mutable update/add/remove inputs outside timing and validates all operation/enumeration outputs, matching the string boundary. The fixed-width smoke and common-prefix run cover all configured operations; cross-family matched distributions remain HP0.3 work. |

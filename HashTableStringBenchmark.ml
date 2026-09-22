@@ -97,6 +97,8 @@ let run_persistent name empty of_list set get mem remove elements =
   let built_set = Array.make count (empty ()) in
   let changed = Array.make count (empty ()) in
   let added = Array.make count (empty ()) in
+  let changed_histories = Array.make count [ empty () ] in
+  let added_histories = Array.make count [ empty () ] in
   let removed = Array.make count (empty ()) in
   let missing_removed = Array.make count (empty ()) in
   let task operation run = { Bench.implementation = name; operation; run } in
@@ -114,16 +116,28 @@ let run_persistent name empty of_list set get mem remove elements =
     task "lookup/miss" (fun repetition -> lookup_checksum get bases.(slot repetition) missing_keys);
     task "mem/hit" (fun repetition -> mem_checksum mem bases.(slot repetition) keys);
     task "mem/miss" (fun repetition -> mem_checksum mem bases.(slot repetition) missing_keys);
-    task "set/existing" (fun repetition ->
+    task "set/existing/latest-root" (fun repetition ->
         let result = Stdlib.List.fold_left (fun map (key, value) -> set key value map)
             bases.(slot repetition) updated_bindings in
         changed.(slot repetition) <- result;
         lookup_checksum get result keys);
-    task "set/new" (fun repetition ->
+    task "set/new/latest-root" (fun repetition ->
         let result = Stdlib.List.fold_left (fun map (key, value) -> set key value map)
             bases.(slot repetition) new_bindings in
         added.(slot repetition) <- result;
         lookup_checksum get result new_keys);
+    task "set/existing/all-prefix-roots" (fun repetition ->
+        let roots = Stdlib.List.fold_left
+            (fun roots (key, value) -> set key value (Stdlib.List.hd roots) :: roots)
+            [ bases.(slot repetition) ] updated_bindings in
+        changed_histories.(slot repetition) <- roots;
+        lookup_checksum get (Stdlib.List.hd roots) keys);
+    task "set/new/all-prefix-roots" (fun repetition ->
+        let roots = Stdlib.List.fold_left
+            (fun roots (key, value) -> set key value (Stdlib.List.hd roots) :: roots)
+            [ bases.(slot repetition) ] new_bindings in
+        added_histories.(slot repetition) <- roots;
+        lookup_checksum get (Stdlib.List.hd roots) new_keys);
     task "remove/present" (fun repetition ->
         let result = Stdlib.List.fold_left (fun map (key, _) -> remove key map)
             bases.(slot repetition) bindings in
@@ -141,12 +155,25 @@ let run_persistent name empty of_list set get mem remove elements =
     if get keys.(0) built_set.(index) <> Some ("duplicate-ignored-" ^ string_of_int 0) then
       fail (name ^ " repeated-set duplicate mismatch");
     check_map (name ^ " update") get changed.(index) updated_bindings;
+    let updated_roots = changed_histories.(index) in
+    if Stdlib.List.length updated_roots <> size + 1 then
+      fail (name ^ " update history count mismatch");
+    check_map (name ^ " update history latest") get (Stdlib.List.hd updated_roots) updated_bindings;
+    check_map (name ^ " update history oldest") get (Stdlib.List.hd (Stdlib.List.rev updated_roots)) bindings;
     check_map (name ^ " missing remove") get missing_removed.(index) bindings;
     if Array.exists (fun key -> get key removed.(index) <> None) keys then
       fail (name ^ " present remove mismatch");
     check_map (name ^ " added old keys") get added.(index) bindings;
     Stdlib.List.iter (fun (key, value) ->
         if get key added.(index) <> Some value then fail (name ^ " new set mismatch")) new_bindings;
+    let added_roots = added_histories.(index) in
+    if Stdlib.List.length added_roots <> size + 1 then
+      fail (name ^ " new history count mismatch");
+    check_map (name ^ " new history old keys") get (Stdlib.List.hd added_roots) bindings;
+    Stdlib.List.iter (fun (key, value) ->
+        if get key (Stdlib.List.hd added_roots) <> Some value then
+          fail (name ^ " new history latest mismatch")) new_bindings;
+    check_map (name ^ " new history oldest") get (Stdlib.List.hd (Stdlib.List.rev added_roots)) bindings;
     check_elements (name ^ " elements") get elements bases.(index) bindings
   done;
   let latest = Bench.live_heap ~implementation:name ~policy:"latest-root" (fun () ->
