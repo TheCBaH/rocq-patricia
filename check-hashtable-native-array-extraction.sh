@@ -11,8 +11,14 @@ done
 grep -Eq '^let rec native_bucket_get' "$model_file" || {
   echo "missing indexed native collision lookup worker" >&2; exit 1;
 }
+grep -Eq '^let rec native_bucket_set' "$model_file" || {
+  echo "missing indexed native collision update worker" >&2; exit 1;
+}
 grep -Fq 'native_bucket_get eqb0 key entries 0 (pseq_length entries)' "$model_file" || {
   echo "native collision lookup does not use the bounded indexed worker" >&2; exit 1;
+}
+grep -Fq 'native_collision_set eqb0 fuel depth full_hash key value stored_hash entries' "$model_file" || {
+  echo "native collision update does not use the bounded indexed worker" >&2; exit 1;
 }
 for worker in native_get native_set native_remove; do
   grep -Eq "^let( rec)? $worker" "$model_file" || { echo "missing $worker" >&2; exit 1; }

@@ -369,6 +369,16 @@ Lemma set_tree_leaf :
                 stored_hash (Leaf stored_hash stored old).
 Proof. destruct fuel; reflexivity. Qed.
 
+Lemma set_tree_collision :
+  forall K A (eqb : K -> K -> bool) fuel depth full_hash (key : K) (value : A)
+         stored_hash (entries : list (K * A)),
+    set_tree eqb fuel depth full_hash key value (Collision stored_hash entries) =
+    if N.eqb full_hash stored_hash
+    then normalize_collision stored_hash (bucket_set eqb key value entries)
+    else join_worker fuel depth full_hash (Leaf full_hash key value)
+           stored_hash (Collision stored_hash entries).
+Proof. destruct fuel; reflexivity. Qed.
+
 Definition set {K Seed A : Type} (eqb : K -> K -> bool)
     (hash : Seed -> K -> N) (key : K) (value : A) (m : table K Seed A)
     : table K Seed A :=

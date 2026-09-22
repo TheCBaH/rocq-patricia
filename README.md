@@ -35,6 +35,10 @@ string keys. Set `HASHTABLE_BENCH_SIZE`,
 `HASHTABLE_BENCH_SEED`, and `HASHTABLE_BENCH_PATTERN` (`ascending` or
 `root-slot-collision`) to record a local series; its timing and heap output is
 workload-specific evidence.
+The [performance review](hashtable-performance.md),
+[optimization plan](hashtable-performance-plan.md) and
+[performance tracker](hashtable-performance-todo.md) cover bounded native
+scalar extraction, direct native workers and corrected comparative measurement.
 CI runs `make hashtable` and the 100-binding `make hashtable-benchmark-smoke`
 under the pinned OCaml/Rocq toolchain.
 

@@ -29,6 +29,32 @@ let () =
     (Stdlib.List.init 40 Fun.id);
   check "collision miss"
     (HashTableNative.native_get equal 6 0 0 41 collision_native = None);
+  let collision_source_updated =
+    HashTable.set_tree equal 6 0 0 17 "collision-updated" collision_source
+  in
+  let collision_native_updated =
+    HashTableNative.native_set equal 6 0 0 17 "collision-updated" collision_native
+  in
+  check "collision update preserves old version"
+    (HashTableNative.native_get equal 6 0 0 17 collision_native = Some "collision-17");
+  Stdlib.List.iter
+    (fun key ->
+       check ("collision update key " ^ string_of_int key)
+         (HashTableNative.native_get equal 6 0 0 key collision_native_updated =
+          HashTable.get_tree equal 6 0 0 key collision_source_updated))
+    (Stdlib.List.init 40 Fun.id);
+  let collision_source_appended =
+    HashTable.set_tree equal 6 0 0 40 "collision-40" collision_source_updated
+  in
+  let collision_native_appended =
+    HashTableNative.native_set equal 6 0 0 40 "collision-40" collision_native_updated
+  in
+  Stdlib.List.iter
+    (fun key ->
+       check ("collision append key " ^ string_of_int key)
+         (HashTableNative.native_get equal 6 0 0 key collision_native_appended =
+          HashTable.get_tree equal 6 0 0 key collision_source_appended))
+    (Stdlib.List.init 41 Fun.id);
   let random = Random.State.make [| 0x4e415449; 0x56454d4f |] in
   let rec loop step source native retained =
     if step = 750 then ()

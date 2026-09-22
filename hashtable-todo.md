@@ -11,6 +11,10 @@ separately. Close implementation tasks only with source/theorem references,
 validation command, result and date. Proposed theorem names or targets in the
 planning documents are not evidence that code exists.
 
+Post-release optimization has a separate
+[performance plan](hashtable-performance-plan.md) and
+[tracker](hashtable-performance-todo.md). Its open gates do not reopen H0–H5.
+
 ## Current state
 
 **Local release gate: closed.** H0–H5 are complete under the recorded local

@@ -558,6 +558,89 @@ Proof.
     + reflexivity.
 Qed.
 
+Fixpoint native_bucket_set {K A : Type} (eqb : K -> K -> bool)
+    (key : K) (value : A) (entries : pseq (K * A))
+    (index remaining : nat) : pseq (K * A) :=
+  match remaining with
+  | O => pseq_insert index (key, value) entries
+  | S remaining' =>
+      match pseq_get index entries with
+      | None => pseq_insert index (key, value) entries
+      | Some (stored, old_value) =>
+          if eqb key stored then pseq_replace index (stored, value) entries
+          else native_bucket_set eqb key value entries (S index) remaining'
+      end
+  end.
+
+Lemma native_bucket_set_refines :
+  forall K A (eqb : K -> K -> bool) (key : K) (value : A)
+         (entries : pseq (K * A)) index remaining,
+    pseq_view (native_bucket_set eqb key value entries index remaining) =
+    bucket_set_index eqb key value (pseq_view entries) index remaining.
+Proof.
+  intros K A eqb key value entries index remaining.
+  revert index.
+  induction remaining as [|remaining IH]; intro index.
+  - reflexivity.
+  - cbn [native_bucket_set bucket_set_index].
+    rewrite pseq_get_view.
+    destruct (nth_error (pseq_view entries) index) as [[stored old_value]|].
+    + destruct (eqb key stored); [apply pseq_replace_view|apply IH].
+    + apply pseq_insert_view.
+Qed.
+
+(** Normalize an updated collision without converting its sequence to a list.
+    The length/get operations remain checked and total for raw modeled trees. *)
+Definition native_normalize_collision {K A : Type} (full_hash : N)
+    (entries : pseq (K * A)) : native_tree K A :=
+  match pseq_length entries with
+  | O => NativeEmpty
+  | S O =>
+      match pseq_get O entries with
+      | Some (key, value) => NativeLeaf full_hash key value
+      | None => NativeEmpty
+      end
+  | S (S _) => NativeCollision full_hash entries
+  end.
+
+Lemma native_normalize_collision_refines :
+  forall K A (full_hash : N) (entries : pseq (K * A)),
+    source_of_native (native_normalize_collision full_hash entries) =
+    normalize_collision full_hash (pseq_view entries).
+Proof.
+  intros K A full_hash [entries].
+  destruct entries as [|[key value] [|[key' value'] entries]]; reflexivity.
+Qed.
+
+Definition native_collision_set {K A : Type} (eqb : K -> K -> bool)
+    (fuel depth : nat) (full_hash : N) (key : K) (value : A)
+    (stored_hash : N) (entries : pseq (K * A)) : native_tree K A :=
+  if N.eqb full_hash stored_hash then
+    native_normalize_collision stored_hash
+      (native_bucket_set eqb key value entries O (pseq_length entries))
+  else native_of_source
+    (set_tree eqb fuel depth full_hash key value
+      (Collision stored_hash (pseq_view entries))).
+
+Lemma native_collision_set_refines :
+  forall K A (eqb : K -> K -> bool) fuel depth full_hash (key : K) (value : A)
+         stored_hash (entries : pseq (K * A)),
+    source_of_native
+      (native_collision_set eqb fuel depth full_hash key value stored_hash entries) =
+    set_tree eqb fuel depth full_hash key value
+      (Collision stored_hash (pseq_view entries)).
+Proof.
+  intros K A eqb fuel depth full_hash key value stored_hash entries.
+  unfold native_collision_set.
+  destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+  - rewrite set_tree_collision, Hhash.
+    rewrite native_normalize_collision_refines.
+    rewrite native_bucket_set_refines, pseq_length_view, bucket_set_index_spec.
+    reflexivity.
+  - rewrite set_tree_collision, Hhash.
+    apply source_of_native_of_source.
+Qed.
+
 Fixpoint native_get {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (native : native_tree K A)
     : option A :=
@@ -603,6 +686,8 @@ Fixpoint native_set {K A : Type} (eqb : K -> K -> bool)
   | NativeEmpty, _ => NativeLeaf full_hash key value
   | NativeLeaf stored_hash stored old, _ =>
       native_leaf_set eqb fuel depth full_hash key value stored_hash stored old
+  | NativeCollision stored_hash entries, _ =>
+      native_collision_set eqb fuel depth full_hash key value stored_hash entries
   | _, _ => native_of_source
       (set_tree eqb fuel depth full_hash key value (source_of_native native))
   end.
@@ -680,6 +765,7 @@ Proof.
   all: cbn [native_set native_chunk native_bitmap_has native_rank]; try apply source_of_native_of_source.
   all: try reflexivity.
   all: try apply native_leaf_set_refines.
+  all: try apply native_collision_set_refines.
   destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
   - destruct (pseq_get (rank bitmap (chunk full_hash depth)) children)
       as [child|] eqn:Hchild.

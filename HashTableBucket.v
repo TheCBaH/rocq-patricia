@@ -7,6 +7,8 @@
 From Stdlib Require Import Bool Lia List NArith SetoidList.
 Import ListNotations.
 
+Require Import HashTableBits.
+
 Set Implicit Arguments.
 
 Fixpoint bucket_get {K A : Type} (eqb : K -> K -> bool)
@@ -80,6 +82,84 @@ Fixpoint bucket_set {K A : Type} (eqb : K -> K -> bool)
       then (stored, value) :: tail
       else (stored, old_value) :: bucket_set eqb key value tail
   end.
+
+Fixpoint bucket_set_index {K A : Type} (eqb : K -> K -> bool)
+    (key : K) (value : A) (entries : list (K * A)) (index remaining : nat)
+    : list (K * A) :=
+  match remaining with
+  | O => dense_insert index (key, value) entries
+  | S remaining' =>
+      match nth_error entries index with
+      | None => dense_insert index (key, value) entries
+      | Some (stored, old_value) =>
+          if eqb key stored then dense_replace index (stored, value) entries
+          else bucket_set_index eqb key value entries (S index) remaining'
+      end
+  end.
+
+Lemma dense_replace_at_length :
+  forall A (prefix : list A) head tail replacement,
+    dense_replace (length prefix) replacement (prefix ++ head :: tail) =
+    prefix ++ replacement :: tail.
+Proof.
+  intros A prefix. induction prefix as [|item prefix IH]; intros head tail replacement.
+  - reflexivity.
+  - simpl. f_equal. apply IH.
+Qed.
+
+Lemma dense_insert_at_length :
+  forall A (items : list A) item,
+    dense_insert (length items) item items = items ++ [item].
+Proof.
+  intros A items. induction items as [|head tail IH]; intro item.
+  - reflexivity.
+  - simpl. f_equal. apply IH.
+Qed.
+
+Lemma bucket_set_index_from :
+  forall K A (eqb : K -> K -> bool) (key : K) (value : A)
+         (entries prefix : list (K * A)),
+    bucket_set_index eqb key value (prefix ++ entries) (length prefix)
+      (length entries) = prefix ++ bucket_set eqb key value entries.
+Proof.
+  intros K A eqb key value entries.
+  induction entries as [|[stored old_value] tail IH]; intro prefix.
+  - cbn [bucket_set_index bucket_set].
+    rewrite app_nil_r. apply dense_insert_at_length.
+  - change ((match nth_error (prefix ++ (stored, old_value) :: tail) (length prefix) with
+             | None => dense_insert (length prefix) (key, value)
+                         (prefix ++ (stored, old_value) :: tail)
+             | Some (stored', old_value') =>
+                 if eqb key stored'
+                 then dense_replace (length prefix) (stored', value)
+                        (prefix ++ (stored, old_value) :: tail)
+                 else bucket_set_index eqb key value
+                        (prefix ++ (stored, old_value) :: tail)
+                        (S (length prefix)) (length tail)
+             end) =
+            prefix ++ (if eqb key stored then (stored, value) :: tail
+                       else (stored, old_value) :: bucket_set eqb key value tail)).
+    rewrite nth_error_app2 by lia.
+    replace (length prefix - length prefix) with 0 by lia.
+    cbn. destruct (eqb key stored) eqn:Hstored.
+    + rewrite dense_replace_at_length. reflexivity.
+    + replace (S (length prefix)) with (length (prefix ++ [(stored, old_value)]))
+        by (rewrite length_app; cbn; lia).
+      replace (prefix ++ (stored, old_value) :: tail) with
+        ((prefix ++ [(stored, old_value)]) ++ tail)
+        by exact (eq_sym (app_assoc prefix [(stored, old_value)] tail)).
+      rewrite IH. now rewrite <- app_assoc.
+Qed.
+
+Lemma bucket_set_index_spec :
+  forall K A (eqb : K -> K -> bool) (key : K) (value : A)
+         (entries : list (K * A)),
+    bucket_set_index eqb key value entries 0 (length entries) =
+    bucket_set eqb key value entries.
+Proof.
+  intros. replace entries with ([] ++ entries) by reflexivity.
+  apply bucket_set_index_from.
+Qed.
 
 Fixpoint bucket_remove {K A : Type} (eqb : K -> K -> bool)
     (key : K) (entries : list (K * A)) : list (K * A) :=
