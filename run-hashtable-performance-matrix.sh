@@ -25,6 +25,16 @@ run_integer() {
   HASHTABLE_BENCH_RESULTS=$record make hashtable-benchmark
 }
 
+run_patricia_integer() {
+  size=$1
+  seed=$2
+  pattern=$3
+  record="$output/patricia-integer-size${size}-seed${seed}-${pattern}.jsonl"
+  HASHTABLE_BENCH_SIZE=$size HASHTABLE_BENCH_SEED=$seed \
+  HASHTABLE_BENCH_PATTERN=$pattern HASHTABLE_BENCH_REPETITIONS=$repetitions \
+  HASHTABLE_BENCH_RESULTS=$record make patricia-matrix-benchmark
+}
+
 run_string() {
   size=$1
   seed=$2
@@ -39,9 +49,13 @@ for size in $sizes; do
   for seed in $seeds; do
     for pattern in ascending shuffled root-slot-collision; do
       run_integer "$size" "$seed" "$pattern"
+      run_patricia_integer "$size" "$seed" "$pattern"
     done
     case "$size" in
-      100|2000) run_integer "$size" "$seed" constant-hash ;;
+      100|2000)
+        run_integer "$size" "$seed" constant-hash
+        run_patricia_integer "$size" "$seed" constant-hash
+        ;;
       *) printf 'Skipping constant-hash size %s (planned cap: 100/2000)\n' "$size" ;;
     esac
     for pattern in fixed-width mixed-length common-prefix; do

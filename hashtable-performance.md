@@ -66,13 +66,19 @@ make benchmark
 The HAMT commands use `ocamlopt`, 2,000 ascending bindings and seed 31. Separate
 retained-heap passes keep every prefix version of each persistent map; the timed
 build/update/remove passes do not retain every intermediate root. Integer lookup
-includes an association-list oracle search inside the timer; string lookup
-compares directly with expected values. Update/remove validation is outside the
-timer. The Patricia command uses a separate
+and string lookup both compute only an observable checksum during timing; their
+independent expected-result checks run afterward. Update/remove validation is
+also outside the timer. The Patricia command uses a separate
 `ocamlopt` harness with 10,000 bindings per input tree and includes more
 operations, randomized insertion, and several string distributions. Therefore
 the two tables below must not be used to compare a HAMT number directly with a
-Patricia number.
+Patricia number. `make patricia-matrix-benchmark` now provides a separate
+process-level integer companion with the HAMT harness's exact input,
+operation, retention, warmup/repetition, and JSONL metadata boundary. The
+matrix runner pairs those files by workload, size, and seed because the two
+un-namespaced generated extraction trees cannot link in one executable. The
+new companion has not yet supplied matched Patricia string inputs or the full
+repeated size matrix, so it does not make the historical tables comparable.
 
 ### Generated HAMT, standalone HAMT, AVL, and imperative table
 
