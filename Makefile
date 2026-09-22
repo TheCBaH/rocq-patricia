@@ -232,11 +232,12 @@ hashtable-native-primitives-test: HashTablePrimitives.mli HashTablePrimitives.ml
 hashtable-native-primitives-audit: HashTablePrimitives.ml check-hashtable-primitives.sh
 	sh ./check-hashtable-primitives.sh HashTablePrimitives.ml
 
-hashtable-benchmark: hashtable-native-array-extracted HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableBenchmark.ml
+hashtable-benchmark: hashtable-native-array-extracted HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableBenchmarkSupport.mli HashTableBenchmarkSupport.ml HashTableBenchmark.ml
+	$(OCAMLOPT) -c HashTablePrimitives.mli HashTablePrimitives.ml HashTableBenchmarkSupport.mli HashTableBenchmarkSupport.ml
 	cd hashtable_native_array_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -I .. -c
-	$(OCAMLOPT) -I hashtable_native_array_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMap.mli HashMap.ml HashMapNative.mli HashMapNative.ml HashTableBenchmark.ml
+	$(OCAMLOPT) -I hashtable_native_array_extracted -c HashMap.mli HashMap.ml HashMapNative.mli HashMapNative.ml HashTableBenchmark.ml
 	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
-	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-benchmark ../HashTablePrimitives.cmx $$objects ../HashMap.cmx ../HashMapNative.cmx ../HashTableBenchmark.cmx
+	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-benchmark ../HashTablePrimitives.cmx $$objects ../HashMap.cmx ../HashMapNative.cmx ../HashTableBenchmarkSupport.cmx ../HashTableBenchmark.cmx
 	./hashtable-benchmark
 
 hashtable-string-benchmark: hashtable-native-array-extracted HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableStringBenchmark.ml
@@ -510,6 +511,7 @@ clean:
 	rm -f HashTableReference.cmi HashTableReference.cmo HashTableReference.cmx HashTableReference.o
 	rm -f HashMap.cmi HashMap.cmo HashMap.cmx HashMap.o
 	rm -f HashTableBenchmark.cmi HashTableBenchmark.cmo HashTableBenchmark.cmx HashTableBenchmark.o
+	rm -f HashTableBenchmarkSupport.cmi HashTableBenchmarkSupport.cmo HashTableBenchmarkSupport.cmx HashTableBenchmarkSupport.o
 	rm -f HashTableStringBenchmark.cmi HashTableStringBenchmark.cmo HashTableStringBenchmark.cmx HashTableStringBenchmark.o
 	rm -f HashTablePrimitives.cmi HashTablePrimitives.cmo HashTablePrimitives.cmx HashTablePrimitives.o
 	rm -f HashTablePrimitivesTest.cmi HashTablePrimitivesTest.cmo HashTablePrimitivesTest.cmx HashTablePrimitivesTest.o

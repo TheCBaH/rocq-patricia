@@ -1,6 +1,6 @@
 # Generated HAMT performance: feasibility and implementation plan
 
-Date: 2026-09-22. Status: feasible; implementation not started.
+Date: 2026-09-22. Status: HP0 benchmark correction in progress.
 Evidence and historical measurements: [performance note](hashtable-performance.md).
 Progress: [performance tracker](hashtable-performance-todo.md).
 The [design](hashtable-design.md) remains the API/representation contract;
