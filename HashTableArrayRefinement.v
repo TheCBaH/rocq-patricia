@@ -16,6 +16,7 @@ Record array_sequence_contract : Type := {
   array_seq : Type -> Type;
   array_view : forall {A}, array_seq A -> list A;
   array_of_list : forall {A}, list A -> array_seq A;
+  array_is_empty : forall {A}, array_seq A -> bool;
   array_get : forall {A}, nat -> array_seq A -> option A;
   array_insert : forall {A}, nat -> A -> array_seq A -> array_seq A;
   array_replace : forall {A}, nat -> A -> array_seq A -> array_seq A;
@@ -23,6 +24,8 @@ Record array_sequence_contract : Type := {
   array_fresh : forall {A}, array_seq A -> array_seq A -> Prop;
   array_of_list_view : forall A (items : list A),
       array_view (array_of_list items) = items;
+  array_is_empty_view : forall A (items : array_seq A),
+      array_is_empty items = true <-> array_view items = [];
   array_get_view : forall A index (items : array_seq A),
       array_get index items = nth_error (array_view items) index;
   array_insert_view : forall A index (item : A) (items : array_seq A),
@@ -52,6 +55,26 @@ Lemma array_pseq_of_list_refines :
 Proof.
   intros. unfold array_pseq_refines, pseq_of_list.
   apply array_of_list_view.
+Qed.
+
+Lemma array_pseq_is_empty_refines :
+  forall (C : array_sequence_contract) A
+         (target : array_seq C A) (model : pseq A),
+    array_pseq_refines C target model ->
+    array_is_empty C target = pseq_is_empty model.
+Proof.
+  intros C A target model Hrefines.
+  unfold array_pseq_refines in Hrefines.
+  destruct (array_is_empty C target) eqn:Hempty;
+    destruct (pseq_is_empty model) eqn:Hmodel; try reflexivity.
+  - apply array_is_empty_view in Hempty.
+    rewrite Hrefines in Hempty.
+    apply (proj2 (pseq_is_empty_spec model)) in Hempty.
+    rewrite Hempty in Hmodel. discriminate.
+  - apply pseq_is_empty_spec in Hmodel.
+    rewrite <- Hrefines in Hmodel.
+    apply array_is_empty_view in Hmodel.
+    rewrite Hmodel in Hempty. discriminate.
 Qed.
 
 Lemma array_pseq_get_refines :

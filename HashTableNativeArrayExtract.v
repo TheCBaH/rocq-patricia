@@ -12,6 +12,7 @@ Extract Inductive HashTableNative.pseq => "HashTablePrimitives.t"
   [ "(fun items -> HashTablePrimitives.of_list items)" ].
 Extract Constant HashTableNative.pseq_view => "HashTablePrimitives.to_list".
 Extract Constant HashTableNative.pseq_of_list => "HashTablePrimitives.of_list".
+Extract Constant HashTableNative.pseq_is_empty => "HashTablePrimitives.is_empty".
 Extract Constant HashTableNative.pseq_get => "HashTablePrimitives.get".
 Extract Constant HashTableNative.pseq_insert => "HashTablePrimitives.insert".
 Extract Constant HashTableNative.pseq_replace => "HashTablePrimitives.replace".
@@ -26,6 +27,7 @@ Extract Constant HashTableNativeBits.native_bitmap_remove => "HashTableScalarPri
 
 Separate Extraction
   HashTableNative.pseq_of_list
+  HashTableNative.pseq_is_empty
   HashTableNative.pseq_get HashTableNative.pseq_insert
   HashTableNative.pseq_replace HashTableNative.pseq_remove
   HashTable.get_tree

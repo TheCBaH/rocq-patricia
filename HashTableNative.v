@@ -22,6 +22,8 @@ Definition pseq_of_list {A : Type} (items : list A) : pseq A :=
   {| pseq_view := items |}.
 Definition pseq_get {A : Type} (index : nat) (items : pseq A) : option A :=
   nth_error (pseq_view items) index.
+Definition pseq_is_empty {A : Type} (items : pseq A) : bool :=
+  match pseq_view items with [] => true | _ => false end.
 Definition pseq_insert {A : Type} (index : nat) (item : A) (items : pseq A)
     : pseq A :=
   pseq_of_list (dense_insert index item (pseq_view items)).
@@ -39,6 +41,13 @@ Lemma pseq_get_view :
   forall A index (items : pseq A),
     pseq_get index items = nth_error (pseq_view items) index.
 Proof. reflexivity. Qed.
+
+Lemma pseq_is_empty_spec :
+  forall A (items : pseq A),
+    pseq_is_empty items = true <-> pseq_view items = [].
+Proof.
+  intros A [items]. destruct items; simpl; split; intro H; try reflexivity; discriminate.
+Qed.
 
 Lemma pseq_insert_view :
   forall A index (item : A) items,
@@ -350,10 +359,8 @@ Qed.
 Definition native_children_remove {K A : Type} (bitmap slot : N) (index : nat)
     (children : pseq (native_tree K A)) : native_tree K A :=
   let children' := pseq_remove index children in
-  match pseq_view children' with
-  | [] => NativeEmpty
-  | _ => NativeBranch (native_bitmap_remove bitmap slot) children'
-  end.
+  if pseq_is_empty children' then NativeEmpty
+  else NativeBranch (native_bitmap_remove bitmap slot) children'.
 
 Definition native_branch_remove {K A : Type} (bitmap slot : N)
     (children : pseq (native_tree K A)) : native_tree K A :=
@@ -369,7 +376,7 @@ Lemma native_children_remove_bitmap_bound :
     end.
 Proof.
   intros K A bitmap slot index children Hbound.
-  unfold native_children_remove, pseq_remove, pseq_of_list.
+  unfold native_children_remove, pseq_remove, pseq_of_list, pseq_is_empty.
   destruct (dense_remove index (pseq_view children)) as [|child tail]; cbn.
   - exact I.
   - apply bitmap_ldiff_bit_bound. exact Hbound.
@@ -399,7 +406,7 @@ Lemma source_of_native_children_remove :
     end.
 Proof.
   intros K A bitmap slot index children.
-  unfold native_children_remove, pseq_remove, pseq_of_list, source_of_native.
+  unfold native_children_remove, pseq_remove, pseq_of_list, pseq_is_empty, source_of_native.
   rewrite <- map_dense_remove.
   destruct (dense_remove index (pseq_view children)) as [|head tail]; reflexivity.
 Qed.

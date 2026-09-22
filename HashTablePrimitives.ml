@@ -4,6 +4,7 @@ let empty () = [||]
 let of_list = Array.of_list
 let to_list = Array.to_list
 let length = Array.length
+let is_empty items = Array.length items = 0
 
 let get index items =
   if index < 0 || index >= Array.length items then None else Some items.(index)
