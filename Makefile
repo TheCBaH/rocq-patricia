@@ -250,6 +250,9 @@ hashtable-scalar-test-bytecode: HashTableScalarPrimitives.mli HashTableScalarPri
 	$(OCAMLC) -o hashtable-scalar-bytecode-test HashTableScalarPrimitives.cmo HashTableScalarPrimitivesTest.cmo
 	./hashtable-scalar-bytecode-test
 
+HashTableScalarPrimitives.cmx: HashTableScalarPrimitives.mli HashTableScalarPrimitives.ml
+	$(OCAMLOPT) -c HashTableScalarPrimitives.mli HashTableScalarPrimitives.ml
+
 hashtable-benchmark: hashtable-native-array-extracted HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableBenchmarkSupport.mli HashTableBenchmarkSupport.ml HashTableBenchmark.ml
 	$(OCAMLOPT) -c HashTablePrimitives.mli HashTablePrimitives.ml HashTableBenchmarkSupport.mli HashTableBenchmarkSupport.ml
 	cd hashtable_native_array_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -I .. -c
