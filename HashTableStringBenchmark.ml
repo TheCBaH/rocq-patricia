@@ -23,49 +23,69 @@ let seed =
   | None -> 31
   | Some value -> int_of_string value
 
+type workload = Fixed_width | Mixed_length | Common_prefix
+
+let workload =
+  match Sys.getenv_opt "HASHTABLE_BENCH_STRING_PATTERN" with
+  | None | Some "fixed-width" -> Fixed_width
+  | Some "mixed-length" -> Mixed_length
+  | Some "common-prefix" -> Common_prefix
+  | Some value ->
+      failwith ("HashTable string benchmark: unknown HASHTABLE_BENCH_STRING_PATTERN " ^ value)
+
+let workload_name, key_of_index =
+  match workload with
+  | Fixed_width ->
+      "fixed-width decimal string keys", (fun index -> Printf.sprintf "key-%08d" index)
+  | Mixed_length ->
+      "mixed-length byte string keys", (fun index ->
+          let width = 1 + (index mod 31) in
+          Printf.sprintf "%02d:%0*d" width width index)
+  | Common_prefix ->
+      let prefix = String.make 192 'p' in
+      "192-byte common-prefix string keys", (fun index ->
+          prefix ^ Printf.sprintf ":%08d" index)
+
 let fail message = failwith ("HashTable string benchmark: " ^ message)
 
 let time name run =
   let result = ref None in
   Bench.measure [ {
-    Bench.implementation = "fixed-width string workload";
+    Bench.implementation = workload_name;
     operation = name;
     run = (fun _ -> let value = run () in result := Some value; 0);
   } ];
   match !result with Some value -> value | None -> assert false
 
 let retained_versions name empty set get bindings first_key first_value =
-  Gc.compact ();
-  let before = (Gc.stat ()).live_words in
-  let roots =
+  let latest = Bench.live_heap ~implementation:name ~policy:"latest-root" (fun () ->
+      Stdlib.List.fold_left (fun map (key, value) -> set key value map) empty bindings)
+  in
+  if get first_key latest <> Some first_value then
+    fail (name ^ " latest-root lookup mismatch");
+  let roots = Bench.live_heap ~implementation:name ~policy:"all-prefix-roots" (fun () ->
     Stdlib.List.fold_left
       (fun roots (key, value) -> set key value (Stdlib.List.hd roots) :: roots)
-      [ empty ] bindings
+      [ empty ] bindings)
   in
-  Gc.compact ();
-  let roots = Sys.opaque_identity roots in
-  let after = (Gc.stat ()).live_words in
   let newest = Stdlib.List.hd roots in
   let oldest = Stdlib.List.hd (Stdlib.List.rev roots) in
   if Stdlib.List.length roots <> Stdlib.List.length bindings + 1 then
     fail (name ^ " retained-root count mismatch");
   if get first_key newest <> Some first_value || get first_key oldest <> None then
     fail (name ^ " retained-root lookup mismatch");
-  let bytes = (after - before) * (Sys.word_size / 8) in
-  Printf.printf "%s retained heap: %d bytes (%d prefix roots)\n%!"
-    name bytes (Stdlib.List.length roots);
   Sys.opaque_identity roots
 
 let () =
   if size < 1 then fail "HASHTABLE_BENCH_SIZE must be positive";
-  Bench.start ~workload:"fixed-width decimal string keys" ~size ~seed;
+  Bench.start ~workload:workload_name ~size ~seed;
   Printf.printf
-    "HashTable string benchmark workload: fixed-width decimal keys [0,%d), seed %d; \
+    "HashTable string benchmark workload: %s [0,%d), seed %d; \
      retained policy: every prefix root for persistent maps\n%!"
-    size seed;
+    workload_name size seed;
   let bindings =
     Stdlib.List.init size (fun index ->
-        let key = Printf.sprintf "key-%08d" index in
+        let key = key_of_index index in
         (key, string_of_int index))
   in
   let first_key, first_value = Stdlib.List.hd bindings in

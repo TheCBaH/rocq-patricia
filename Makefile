@@ -264,6 +264,7 @@ hashtable-benchmark hashtable-string-benchmark: export HASHTABLE_BENCH_DIRTY := 
 
 hashtable-string-benchmark-smoke: export HASHTABLE_BENCH_SIZE := 100
 hashtable-string-benchmark-smoke: export HASHTABLE_BENCH_SEED := 31
+hashtable-string-benchmark-smoke: export HASHTABLE_BENCH_STRING_PATTERN := fixed-width
 
 hashtable-assumptions: hashtable-proof check-hashtable-assumptions.sh
 	sh ./check-hashtable-assumptions.sh $(ROCQ) $(ROCQFLAGS)
