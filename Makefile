@@ -255,6 +255,12 @@ hashtable-benchmark-smoke: export HASHTABLE_BENCH_SIZE := 100
 hashtable-benchmark-smoke: export HASHTABLE_BENCH_SEED := 31
 hashtable-benchmark-smoke: export HASHTABLE_BENCH_PATTERN := ascending
 
+# A benchmark may be launched directly as well as through these targets.  The
+# harness records these values in JSONL, while callers can override either for
+# an already-built executable or a separate worktree.
+hashtable-benchmark hashtable-string-benchmark: export HASHTABLE_BENCH_REVISION := $(shell git rev-parse HEAD)
+hashtable-benchmark hashtable-string-benchmark: export HASHTABLE_BENCH_DIRTY := $(shell if git diff --quiet --ignore-submodules --; then echo false; else echo true; fi)
+
 hashtable-string-benchmark-smoke: export HASHTABLE_BENCH_SIZE := 100
 hashtable-string-benchmark-smoke: export HASHTABLE_BENCH_SEED := 31
 
