@@ -27,7 +27,9 @@ grep -Fq 'native_collision_remove eqb0 full_hash key stored_hash entries' "$mode
   echo "native collision removal does not use the bounded indexed worker" >&2; exit 1;
 }
 for worker in native_get native_set native_remove; do
-  grep -Eq "^let( rec)? $worker" "$model_file" || { echo "missing $worker" >&2; exit 1; }
+  grep -Eq "^let rec $worker" "$model_file" || {
+    echo "missing extracted recursive $worker worker" >&2; exit 1;
+  }
 done
 for worker in native_join_two native_join_worker; do
   grep -Eq "^let( rec)? $worker" "$model_file" || {
@@ -41,10 +43,10 @@ for worker in native_get native_set native_remove native_table_add_first native_
   if ! awk -v worker="$worker" '
     $0 ~ "^let( rec)? " worker " " { in_worker = 1; next }
     in_worker && /^\(\*\*/ { exit bad }
-    in_worker && /source_of_native|native_of_source/ { bad = 1 }
+    in_worker && /source_of_native|native_of_source|pseq_view|HashTablePrimitives\.to_list/ { bad = 1 }
     END { exit bad }
   ' "$model_file"; then
-    echo "$worker still contains a source-tree conversion" >&2; exit 1;
+    echo "$worker still contains a source-tree or sequence-view conversion" >&2; exit 1;
   fi
 done
 for operation in native_empty native_table_is_empty native_table_get native_table_mem native_table_set native_table_remove native_table_elements native_table_of_list; do

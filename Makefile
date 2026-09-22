@@ -29,7 +29,7 @@ HASHTABLE_ARRAY_RUNTIME_CMX := ../HashTablePrimitives.cmx ../HashTableScalarPrim
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
-.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-test hashtable-differential hashtable-test-native hashtable-native hashtable-native-model-extraction-audit hashtable-native-model-test hashtable-native-model-test-native hashtable-native-array-extracted hashtable-native-array-extraction-audit hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-extract-wrapper-test hashtable-native-extract-wrapper-test-native hashtable-native-extract-differential hashtable-native-extract-differential-native hashtable-native-array-test hashtable-native-array-test-native hashtable-native-primitives-test hashtable-native-primitives-audit hashtable-scalar-test hashtable-native-array-audit hashtable-benchmark hashtable-benchmark-smoke hashtable-string-benchmark hashtable-string-benchmark-smoke hashtable-performance-matrix hashtable-extraction-audit hashtable-generated-interface-audit hashtable-assumptions
+.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-test hashtable-differential hashtable-test-native hashtable-native hashtable-native-model-extraction-audit hashtable-native-model-test hashtable-native-model-test-native hashtable-native-array-extracted hashtable-native-array-extraction-audit hashtable-native-array-extraction-audit-test hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-extract-wrapper-test hashtable-native-extract-wrapper-test-native hashtable-native-extract-differential hashtable-native-extract-differential-native hashtable-native-array-test hashtable-native-array-test-native hashtable-native-primitives-test hashtable-native-primitives-audit hashtable-scalar-test hashtable-native-array-audit hashtable-benchmark hashtable-benchmark-smoke hashtable-string-benchmark hashtable-string-benchmark-smoke hashtable-performance-matrix hashtable-extraction-audit hashtable-generated-interface-audit hashtable-assumptions
 
 .PHONY: string-primitive-profile
 .PHONY: string-worker-performance
@@ -63,7 +63,7 @@ union-proof: $(UNION_VOFILES)
 hashtable: hashtable-proof hashtable-assumptions hashtable-extraction-audit \
 	hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native \
 	hashtable-differential hashtable-test-native hashtable-native-model-extraction-audit hashtable-native-model-test hashtable-native-model-test-native \
-	hashtable-native-array-extraction-audit hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native \
+	hashtable-native-array-extraction-audit hashtable-native-array-extraction-audit-test hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native \
 	hashtable-native-extract-differential hashtable-native-extract-differential-native \
 	hashtable-native-array-test hashtable-native-array-test-native hashtable-native-primitives-test \
 	hashtable-native-primitives-audit hashtable-scalar-test hashtable-native-array-audit
@@ -121,6 +121,9 @@ hashtable-native-array-extracted: hashtable-proof HashTableNativeArrayExtract.v 
 
 hashtable-native-array-extraction-audit: hashtable-native-array-extracted check-hashtable-native-array-extraction.sh
 	sh ./check-hashtable-native-array-extraction.sh hashtable_native_array_extracted/HashTableNative.ml
+
+hashtable-native-array-extraction-audit-test: hashtable-native-array-extracted check-hashtable-native-array-extraction.sh check-hashtable-native-array-extraction-test.sh
+	sh ./check-hashtable-native-array-extraction-test.sh hashtable_native_array_extracted/HashTableNative.ml ./check-hashtable-native-array-extraction.sh
 
 hashtable-native-array-extracted-test: hashtable-native-array-extracted HashTableNativeModelTest.ml
 	$(OCAMLC) -c HashTablePrimitives.mli HashTablePrimitives.ml HashTableScalarPrimitives.mli HashTableScalarPrimitives.ml
