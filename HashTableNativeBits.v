@@ -49,3 +49,38 @@ Proof. reflexivity. Qed.
 Lemma native_bitmap_remove_eq : forall bitmap slot,
   native_bitmap_remove bitmap slot = N.ldiff bitmap (bitmap_bit slot).
 Proof. reflexivity. Qed.
+
+(** Range facts for each scalar boundary.  Public-worker reachability is
+    discharged separately from these local result contracts. *)
+Lemma native_chunk_bound : forall full_hash depth,
+  (native_chunk full_hash depth < branch_width)%N.
+Proof. intros. unfold native_chunk. apply chunk_bound. Qed.
+
+Lemma native_bitmap_bit_bound : forall slot,
+  (slot < branch_width)%N ->
+  (native_bitmap_bit slot < bitmap_limit)%N.
+Proof. intros. unfold native_bitmap_bit. apply bitmap_bit_bound. assumption. Qed.
+
+Lemma native_rank_bound : forall bitmap slot,
+  native_rank bitmap slot <= 32.
+Proof. intros. unfold native_rank. apply rank_bound. Qed.
+
+Lemma native_bitmap_insert_bound : forall bitmap slot,
+  (bitmap < bitmap_limit)%N ->
+  (slot < branch_width)%N ->
+  native_bitmap_has bitmap slot = false ->
+  (native_bitmap_insert bitmap slot < bitmap_limit)%N.
+Proof.
+  intros bitmap slot Hbitmap Hslot Habsent.
+  unfold native_bitmap_insert.
+  apply bitmap_lor_bit_bound_absent; assumption.
+Qed.
+
+Lemma native_bitmap_remove_bound : forall bitmap slot,
+  (bitmap < bitmap_limit)%N ->
+  (native_bitmap_remove bitmap slot < bitmap_limit)%N.
+Proof.
+  intros bitmap slot Hbitmap.
+  unfold native_bitmap_remove.
+  apply bitmap_ldiff_bit_bound. assumption.
+Qed.
