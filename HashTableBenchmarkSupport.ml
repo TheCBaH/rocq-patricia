@@ -27,6 +27,17 @@ let output = ref None
 
 let json_string value = Printf.sprintf "%S" value
 
+let has_suffix suffix value =
+  let suffix_length = String.length suffix in
+  let value_length = String.length value in
+  suffix_length <= value_length &&
+  String.sub value (value_length - suffix_length) suffix_length = suffix
+
+let history_policy operation =
+  if has_suffix "/all-prefix-roots" operation then "all-prefix-roots"
+  else if has_suffix "/latest-root" operation then "latest-root"
+  else "single-version"
+
 let write_json line =
   match !output with
   | None -> ()
@@ -119,9 +130,9 @@ let timed task repetition =
   add_sample (task.implementation, task.operation) sample;
   write_json
     (Printf.sprintf
-       "{\"record\":\"sample\",\"implementation\":%s,\"operation\":%s,\"repetition\":%d,\"seconds\":%.9f,\"allocated_bytes\":%.0f,\"checksum\":%d}"
-       (json_string task.implementation) (json_string task.operation) repetition
-       seconds bytes checksum)
+       "{\"record\":\"sample\",\"implementation\":%s,\"operation\":%s,\"history_policy\":%s,\"repetition\":%d,\"seconds\":%.9f,\"allocated_bytes\":%.0f,\"checksum\":%d}"
+       (json_string task.implementation) (json_string task.operation)
+       (json_string (history_policy task.operation)) repetition seconds bytes checksum)
 
 let measure tasks =
   let settings = match !active_config with Some value -> value | None -> invalid_arg "HashTableBenchmarkSupport.start" in
@@ -147,8 +158,9 @@ let measure tasks =
          median_bytes min_bytes max_bytes;
        write_json
          (Printf.sprintf
-            "{\"record\":\"summary\",\"implementation\":%s,\"operation\":%s,\"median_seconds\":%.9f,\"min_seconds\":%.9f,\"max_seconds\":%.9f,\"median_allocated_bytes\":%.0f,\"min_allocated_bytes\":%.0f,\"max_allocated_bytes\":%.0f}"
+            "{\"record\":\"summary\",\"implementation\":%s,\"operation\":%s,\"history_policy\":%s,\"median_seconds\":%.9f,\"min_seconds\":%.9f,\"max_seconds\":%.9f,\"median_allocated_bytes\":%.0f,\"min_allocated_bytes\":%.0f,\"max_allocated_bytes\":%.0f}"
             (json_string implementation) (json_string operation)
+            (json_string (history_policy operation))
             median_seconds min_seconds max_seconds median_bytes min_bytes max_bytes))
     task_samples;
   Hashtbl.reset task_samples
