@@ -42,7 +42,11 @@ let duplicate_bindings =
   | (key, value) :: _ -> bindings @ [ key, "duplicate-ignored-" ^ value ]
   | [] -> assert false
 let updated_bindings = Array.to_list (Array.map (fun key -> key, "updated-" ^ string_of_int key) keys)
-let new_bindings = Array.to_list (Array.mapi (fun index _ -> size + index + 1, "new-" ^ string_of_int index) keys)
+let fresh_key index =
+  if pattern = "root-slot-collision" then (size + index + 1) lsl 5
+  else size + index + 1
+
+let new_bindings = Array.to_list (Array.mapi (fun index _ -> fresh_key index, "new-" ^ string_of_int index) keys)
 let new_keys = Array.map fst (Array.of_list new_bindings)
 let missing_keys = Array.map (fun key -> key + (2 * size) + 1) keys
 let samples () = (Bench.config ()).repetitions + 1
