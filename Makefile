@@ -40,7 +40,7 @@ HASHTABLE_ARRAY_RUNTIME_CMX := ../HashTablePrimitives.cmx ../HashTableScalarPrim
 
 .PHONY: remove-profile
 
-all: proof assumptions extraction extraction-boundary native-string-worker-audit native-union-realizer-audit \
+all: proof hashtable-proof assumptions extraction extraction-boundary native-string-worker-audit native-union-realizer-audit \
 	cached-representative-audit \
 	reference-extraction ocaml reference-ocaml \
 	test union-oracle differential
