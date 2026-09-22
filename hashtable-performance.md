@@ -18,9 +18,11 @@ backend. `HashTableNativeBits.v` supplies source-defined bounded chunk,
 bitmap-membership/edit, and rank operations, and
 `HashTableNativeArrayExtract.v` realizes them through checked OCaml scalar
 bindings. `native_get`, `native_set`, and `native_remove` use those bindings;
-the primitive corpus covers their target domains. The public range-closure
-proof for every reachable call is still open, so this is not a claim that the
-foreign OCaml realization has become kernel-checked.
+the primitive corpus covers their target domains. Source theorems establish
+scalar-domain closure for public lookup, set/remove, direct joins, and
+first-wins loading under wrapper-normalized hashes and the standard valid-table
+premises. This is not a claim that the foreign OCaml realization has become
+kernel-checked.
 
 The public native get/set/remove/first-wins-load workers now operate directly
 on native constructors. They use bounded indexed collision sequences and a

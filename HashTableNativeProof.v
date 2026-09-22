@@ -259,6 +259,84 @@ Proof.
   eapply (@native_table_update_scalar_safe K Seed A E hash key native); eauto.
 Qed.
 
+(** A first-wins load invokes lookup first and only invokes set on absence.
+    This trace property retains the domain fact for every such call. *)
+Fixpoint native_table_add_first_scalar_safe {K Seed A : Type}
+    (eqb : K -> K -> bool) (hash : Seed -> K -> N)
+    (entries : list (K * A)) (native : native_table K Seed A) : Prop :=
+  match entries with
+  | nil => True
+  | (key, value) :: tail =>
+      native_get_scalar_safe branch_levels 0
+        (hash (native_table_seed native) key) (native_table_root native) /\
+      match native_table_get eqb hash key native with
+      | Some _ => native_table_add_first_scalar_safe eqb hash tail native
+      | None =>
+          native_update_scalar_safe branch_levels 0
+            (hash (native_table_seed native) key) (native_table_root native) /\
+          native_table_add_first_scalar_safe eqb hash tail
+            (native_table_set eqb hash key value native)
+      end
+  end.
+
+Lemma native_table_add_first_scalar_safe_wf :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (entries : list (K * A))
+         (native : native_table K Seed A),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall seed first second, E first second ->
+      hash seed first = hash seed second) ->
+    (forall key value, In (key, value) entries ->
+      (hash (native_table_seed native) key < hash_space)%N) ->
+    native_table_wf E hash native ->
+    native_table_add_first_scalar_safe eqb hash entries native.
+Proof.
+  intros K Seed A E hash eqb entries.
+  induction entries as [|[key value] tail IH]; intros native Hequiv Heqb Hcongruent
+    Hbound Hwf; cbn [native_table_add_first_scalar_safe].
+  - exact I.
+  - assert (Hkey : (hash (native_table_seed native) key < hash_space)%N).
+    { apply (Hbound key value). now left. }
+    split.
+    + eapply native_table_get_scalar_safe; eauto.
+    + destruct (native_table_get eqb hash key native) eqn:Hget.
+      * apply IH; try assumption.
+        intros key' value' Hin. apply (Hbound key' value'). now right.
+      * split.
+        -- eapply native_table_set_scalar_safe; eauto.
+        -- apply IH.
+           ++ exact Hequiv.
+           ++ exact Heqb.
+           ++ exact Hcongruent.
+           ++ intros key' value' Hin.
+              rewrite native_table_set_seed.
+              apply (Hbound key' value'). now right.
+           ++ unfold native_table_wf.
+              change (table_wf E hash (source_table_of_native native)) in Hwf.
+              change (table_wf E hash
+                (source_table_of_native (native_table_set eqb hash key value native))).
+              rewrite source_table_native_set.
+              eapply table_wf_set; eauto.
+Qed.
+
+Lemma native_table_of_list_scalar_safe :
+  forall (K Seed A : Type) (E : K -> K -> Prop) (hash : Seed -> K -> N)
+         (eqb : K -> K -> bool) (seed : Seed) (entries : list (K * A)),
+    Equivalence E ->
+    (forall first second, eqb first second = true <-> E first second) ->
+    (forall actual_seed first second, E first second ->
+      hash actual_seed first = hash actual_seed second) ->
+    (forall key value, In (key, value) entries ->
+      (hash seed key < hash_space)%N) ->
+    native_table_add_first_scalar_safe eqb hash entries (native_empty seed).
+Proof.
+  intros K Seed A E hash eqb seed entries Hequiv Heqb Hcongruent Hbound.
+  eapply native_table_add_first_scalar_safe_wf; eauto.
+  unfold native_table_wf. rewrite source_table_native_empty.
+  apply table_wf_empty.
+Qed.
+
 Lemma native_table_wf_empty :
   forall K Seed A (E : K -> K -> Prop) (hash : Seed -> K -> N) (seed : Seed),
     native_table_wf E hash (@native_empty K Seed A seed).
