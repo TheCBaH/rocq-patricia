@@ -252,12 +252,12 @@ Qed.
 
 Definition native_branch_replace {K A : Type} (bitmap slot : N)
     (child : native_tree K A) (children : pseq (native_tree K A)) : native_tree K A :=
-  NativeBranch bitmap (pseq_replace (rank bitmap slot) child children).
+  NativeBranch bitmap (pseq_replace (native_rank bitmap slot) child children).
 
 Definition native_branch_insert {K A : Type} (bitmap slot : N)
     (child : native_tree K A) (children : pseq (native_tree K A)) : native_tree K A :=
-  NativeBranch (N.lor bitmap (bitmap_bit slot))
-    (pseq_insert (rank bitmap slot) child children).
+  NativeBranch (native_bitmap_insert bitmap slot)
+    (pseq_insert (native_rank bitmap slot) child children).
 
 Lemma native_branch_replace_bitmap_bound :
   forall K A (bitmap slot : N) (child : native_tree K A)
@@ -352,12 +352,12 @@ Definition native_children_remove {K A : Type} (bitmap slot : N) (index : nat)
   let children' := pseq_remove index children in
   match pseq_view children' with
   | [] => NativeEmpty
-  | _ => NativeBranch (N.ldiff bitmap (bitmap_bit slot)) children'
+  | _ => NativeBranch (native_bitmap_remove bitmap slot) children'
   end.
 
 Definition native_branch_remove {K A : Type} (bitmap slot : N)
     (children : pseq (native_tree K A)) : native_tree K A :=
-  native_children_remove bitmap slot (rank bitmap slot) children.
+  native_children_remove bitmap slot (native_rank bitmap slot) children.
 
 Lemma native_children_remove_bitmap_bound :
   forall K A (bitmap slot : N) index (children : pseq (native_tree K A)),

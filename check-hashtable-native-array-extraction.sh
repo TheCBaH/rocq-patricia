@@ -15,7 +15,7 @@ for operation in native_empty native_table_is_empty native_table_get native_tabl
   grep -Eq "^let( rec)? $operation" "$model_file" || { echo "missing native table API $operation" >&2; exit 1; }
 done
 if [ -f "$scalar_file" ]; then
-  for binding in chunk bitmap_has rank; do
+  for binding in chunk bitmap_has rank bitmap_insert bitmap_remove; do
     grep -Fq "HashTableScalarPrimitives.$binding" "$scalar_file" || {
       echo "missing scalar binding $binding" >&2; exit 1;
     }
