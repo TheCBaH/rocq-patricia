@@ -11,6 +11,7 @@ end
 module Hash_map = HashMap.Make (Key)
 module Native_hash_map = HashMapNative.Make (Key)
 module Ordered_map = Map.Make (String)
+module Bench = HashTableBenchmarkSupport
 
 let size =
   match Sys.getenv_opt "HASHTABLE_BENCH_SIZE" with
@@ -25,14 +26,13 @@ let seed =
 let fail message = failwith ("HashTable string benchmark: " ^ message)
 
 let time name run =
-  Gc.compact ();
-  let before = Gc.allocated_bytes () in
-  let started = Unix.gettimeofday () in
-  let result = run () in
-  let elapsed = Unix.gettimeofday () -. started in
-  let allocated = Gc.allocated_bytes () -. before in
-  Printf.printf "%s: %.6fs, %.0f allocated bytes\n%!" name elapsed allocated;
-  result
+  let result = ref None in
+  Bench.measure [ {
+    Bench.implementation = "fixed-width string workload";
+    operation = name;
+    run = (fun _ -> let value = run () in result := Some value; 0);
+  } ];
+  match !result with Some value -> value | None -> assert false
 
 let retained_versions name empty set get bindings first_key first_value =
   Gc.compact ();
@@ -58,6 +58,7 @@ let retained_versions name empty set get bindings first_key first_value =
 
 let () =
   if size < 1 then fail "HASHTABLE_BENCH_SIZE must be positive";
+  Bench.start ~workload:"fixed-width decimal string keys" ~size ~seed;
   Printf.printf
     "HashTable string benchmark workload: fixed-width decimal keys [0,%d), seed %d; \
      retained policy: every prefix root for persistent maps\n%!"
@@ -97,14 +98,26 @@ let () =
       bindings;
     if get "not-present" <> None then fail (name ^ " missing lookup mismatch")
   in
-  time "HashMap.Make checked string lookup"
-    (fun () -> check "HashMap.Make" (fun key -> Hash_map.get key hashed));
-  time "HashMapNative.Make checked string lookup"
-    (fun () -> check "HashMapNative.Make" (fun key -> Native_hash_map.get key native_hashed));
-  time "Map.Make(String) checked lookup"
-    (fun () -> check "Map.Make(String)" (fun key -> Ordered_map.find_opt key ordered));
-  time "OCaml Hashtbl (imperative) checked string lookup"
-    (fun () -> check "Hashtbl" (fun key -> Hashtbl.find_opt standard key));
+  let lookup_checksum get =
+    Stdlib.List.fold_left
+      (fun checksum (key, value) ->
+         match get key with
+         | Some found -> checksum lxor String.length found lxor String.length value
+         | None -> checksum lxor 0x9e3779)
+      0 bindings
+  in
+  ignore (time "HashMap.Make string lookup/hit"
+    (fun () -> lookup_checksum (fun key -> Hash_map.get key hashed)));
+  ignore (time "HashMapNative.Make string lookup/hit"
+    (fun () -> lookup_checksum (fun key -> Native_hash_map.get key native_hashed)));
+  ignore (time "Map.Make(String) lookup/hit"
+    (fun () -> lookup_checksum (fun key -> Ordered_map.find_opt key ordered)));
+  ignore (time "OCaml Hashtbl (imperative) lookup/hit"
+    (fun () -> lookup_checksum (fun key -> Hashtbl.find_opt standard key)));
+  check "HashMap.Make" (fun key -> Hash_map.get key hashed);
+  check "HashMapNative.Make" (fun key -> Native_hash_map.get key native_hashed);
+  check "Map.Make(String)" (fun key -> Ordered_map.find_opt key ordered);
+  check "Hashtbl" (fun key -> Hashtbl.find_opt standard key);
   let updated_value key = "updated-" ^ key in
   let updated = time "HashMap.Make string update" (fun () ->
       Stdlib.List.fold_left
@@ -122,9 +135,10 @@ let () =
         ordered bindings)
   in
   let standard_updated = time "OCaml Hashtbl (imperative) string update" (fun () ->
+      let table = Hashtbl.copy standard in
       Stdlib.List.iter
-        (fun (key, _) -> Hashtbl.replace standard key (updated_value key)) bindings;
-      standard)
+        (fun (key, _) -> Hashtbl.replace table key (updated_value key)) bindings;
+      table)
   in
   Stdlib.List.iter (fun (key, _) ->
       let expected = Some (updated_value key) in
@@ -145,8 +159,9 @@ let () =
         ordered_updated bindings)
   in
   let standard_removed = time "OCaml Hashtbl (imperative) string remove" (fun () ->
-      Stdlib.List.iter (fun (key, _) -> Hashtbl.remove standard_updated key) bindings;
-      standard_updated)
+      let table = Hashtbl.copy standard_updated in
+      Stdlib.List.iter (fun (key, _) -> Hashtbl.remove table key) bindings;
+      table)
   in
   Stdlib.List.iter (fun (key, _) ->
       if Hash_map.get key removed <> None
@@ -154,4 +169,5 @@ let () =
          || Ordered_map.find_opt key ordered_removed <> None
          || Hashtbl.find_opt standard_removed key <> None then
         fail "remove lookup mismatch") bindings;
+  Bench.finish ();
   Printf.printf "HashTable checked string benchmark passed (%d bindings)\n%!" size

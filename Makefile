@@ -240,11 +240,12 @@ hashtable-benchmark: hashtable-native-array-extracted HashMap.mli HashMap.ml Has
 	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-benchmark ../HashTablePrimitives.cmx $$objects ../HashMap.cmx ../HashMapNative.cmx ../HashTableBenchmarkSupport.cmx ../HashTableBenchmark.cmx
 	./hashtable-benchmark
 
-hashtable-string-benchmark: hashtable-native-array-extracted HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableStringBenchmark.ml
+hashtable-string-benchmark: hashtable-native-array-extracted HashMap.mli HashMap.ml HashTablePrimitives.mli HashTablePrimitives.ml HashMapNative.mli HashMapNative.ml HashTableBenchmarkSupport.mli HashTableBenchmarkSupport.ml HashTableStringBenchmark.ml
+	$(OCAMLOPT) -c HashTablePrimitives.mli HashTablePrimitives.ml HashTableBenchmarkSupport.mli HashTableBenchmarkSupport.ml
 	cd hashtable_native_array_extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -I .. -c
-	$(OCAMLOPT) -I hashtable_native_array_extracted -c HashTablePrimitives.mli HashTablePrimitives.ml HashMap.mli HashMap.ml HashMapNative.mli HashMapNative.ml HashTableStringBenchmark.ml
+	$(OCAMLOPT) -I hashtable_native_array_extracted -c HashMap.mli HashMap.ml HashMapNative.mli HashMapNative.ml HashTableStringBenchmark.ml
 	cd hashtable_native_array_extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
-	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-string-benchmark ../HashTablePrimitives.cmx $$objects ../HashMap.cmx ../HashMapNative.cmx ../HashTableStringBenchmark.cmx
+	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../hashtable-string-benchmark ../HashTablePrimitives.cmx $$objects ../HashMap.cmx ../HashMapNative.cmx ../HashTableBenchmarkSupport.cmx ../HashTableStringBenchmark.cmx
 	./hashtable-string-benchmark
 
 hashtable-benchmark-smoke: hashtable-benchmark hashtable-string-benchmark
