@@ -30,11 +30,14 @@ proof, extraction, audit and differential-test aggregate. `make hashtable-benchm
 compares the public generated-native wrapper, the experimental private-array
 backend, `Map.Make`, and OCaml's imperative `Hashtbl` on checked integer build,
 lookup, update and removal workloads;
-`make hashtable-string-benchmark` performs the same comparison for fixed-width
-string keys. Set `HASHTABLE_BENCH_SIZE`,
-`HASHTABLE_BENCH_SEED`, and `HASHTABLE_BENCH_PATTERN` (`ascending`, `shuffled`,
-`root-slot-collision`, or `constant-hash`) to record a local series; its timing
-and heap output is workload-specific evidence.
+`make hashtable-string-benchmark` performs the same comparison for deterministic
+fixed-width, mixed-length, or common-prefix string keys. Set
+`HASHTABLE_BENCH_SIZE`, `HASHTABLE_BENCH_SEED`, and `HASHTABLE_BENCH_PATTERN`
+(`ascending`, `shuffled`, `root-slot-collision`, or `constant-hash`) for integer
+workloads, or `HASHTABLE_BENCH_STRING_PATTERN` (`fixed-width`, `mixed-length`,
+or `common-prefix`) for string workloads. The string harness reports separately
+timed builds, lookup/membership hits and misses, updates, removals, enumeration
+and retained heap; its output is workload-specific local evidence.
 `make hashtable-primitive-benchmark` separately measures checked scalar calls,
 the benchmark hash callback, and fixed-size private-sequence operations when
 profiling is unavailable; set `HASHTABLE_PRIMITIVE_BENCH_ITERATIONS` to adjust
