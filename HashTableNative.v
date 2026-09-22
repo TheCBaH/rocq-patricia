@@ -446,9 +446,9 @@ Fixpoint native_set {K A : Type} (eqb : K -> K -> bool)
     (native : native_tree K A) : native_tree K A :=
   match native, fuel with
   | NativeBranch bitmap children, S fuel' =>
-      let slot := chunk full_hash depth in
-      if bitmap_has bitmap slot then
-        match pseq_get (rank bitmap slot) children with
+      let slot := native_chunk full_hash depth in
+      if native_bitmap_has bitmap slot then
+        match pseq_get (native_rank bitmap slot) children with
         | Some child => native_branch_replace bitmap slot
             (native_set eqb fuel' (S depth) full_hash key value child) children
         | None => native_branch_insert bitmap slot
@@ -525,24 +525,37 @@ Proof.
   intros K A eqb fuel.
   induction fuel as [|fuel IH]; intros depth full_hash key value native;
     destruct native as [|stored_hash stored old|stored_hash entries|bitmap children].
-  all: cbn [native_set]; try apply source_of_native_of_source.
+  all: cbn [native_set native_chunk native_bitmap_has native_rank]; try apply source_of_native_of_source.
   destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
   - destruct (pseq_get (rank bitmap (chunk full_hash depth)) children)
       as [child|] eqn:Hchild.
-    + rewrite source_of_native_branch_replace.
+    + assert (Hnativepresent :
+        native_bitmap_has bitmap (native_chunk full_hash depth) = true) by exact Hpresent.
+      assert (Hnativechild :
+        pseq_get (native_rank bitmap (native_chunk full_hash depth)) children = Some child) by exact Hchild.
+      rewrite Hnativepresent, Hnativechild.
+      rewrite source_of_native_branch_replace.
       rewrite IH.
       cbn [source_of_native set_tree].
       rewrite Hpresent.
       rewrite (@pseq_get_source_children K A
         (rank bitmap (chunk full_hash depth)) children child Hchild).
       reflexivity.
-    + rewrite source_of_native_branch_insert.
+    + assert (Hnativepresent :
+        native_bitmap_has bitmap (native_chunk full_hash depth) = true) by exact Hpresent.
+      assert (Hnativechild :
+        pseq_get (native_rank bitmap (native_chunk full_hash depth)) children = None) by exact Hchild.
+      rewrite Hnativepresent, Hnativechild.
+      rewrite source_of_native_branch_insert.
       cbn [source_of_native set_tree].
       rewrite Hpresent.
       rewrite (@pseq_get_source_children_none K A
         (rank bitmap (chunk full_hash depth)) children Hchild).
       reflexivity.
-  - rewrite source_of_native_branch_insert.
+  - assert (Hnativepresent :
+      native_bitmap_has bitmap (native_chunk full_hash depth) = false) by exact Hpresent.
+    rewrite Hnativepresent.
+    rewrite source_of_native_branch_insert.
     cbn [source_of_native set_tree].
     rewrite Hpresent.
     reflexivity.
