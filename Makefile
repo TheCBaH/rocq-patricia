@@ -284,6 +284,9 @@ patricia-matrix-benchmark: extraction PatriciaMap.mli PatriciaMap.ml HashTableBe
 
 hashtable-benchmark-smoke: hashtable-benchmark hashtable-string-benchmark patricia-matrix-benchmark
 
+.PHONY: hashtable-performance-baseline
+hashtable-performance-baseline: hashtable-benchmark-smoke
+
 hashtable-string-benchmark-smoke: hashtable-string-benchmark
 
 hashtable-performance-matrix: run-hashtable-performance-matrix.sh
