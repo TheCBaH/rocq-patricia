@@ -136,8 +136,12 @@ implemented or validated, and no new performance target is achieved.
   repository aggregate, and two-harness 100-entry benchmark smoke all pass.
 - [ ] **HP5.3** Run clean-checkout aggregate and matched repeated performance
   matrix; record achieved/unmet targets and any repeatable regressions.
-- [ ] **HP5.4** Update README, performance note and release/foreign-contract
+- [x] **HP5.4** Update README, performance note and release/foreign-contract
   inventories; retain source proof versus target testing distinction.
+  `README.md`, `hashtable-performance.md`, and
+  `hashtable-reference-release.md` now describe scalar/direct-worker status,
+  enumeration's explicit exception, model-only source oracles, and the
+  remaining foreign/runtime and measurement limits.
 - [ ] **HP5.G** Publish final local decision with proof/test/measurement evidence.
 - [ ] **CI** Record hosted CI result separately; local success is not hosted CI.
 
@@ -176,3 +180,4 @@ implemented or validated, and no new performance target is achieved.
 | 2026-09-22 | HP0.1 string operation coverage (partial) | `make hashtable-string-benchmark-smoke`; then `HASHTABLE_BENCH_SIZE=100 HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_BENCH_STRING_PATTERN=common-prefix make hashtable-string-benchmark` and the same command with `mixed-length` | Passed. The string harness now matches the corrected operation boundary: first-wins `of_list` and repeated `set` builds; hit/miss lookup and membership; existing/new set; present/missing remove; and `elements`. It makes deterministic fresh/missing keys and all expected bindings before timing; persistent and mutable per-sample mutation inputs are distinct; post-timing checks validate maps and enumeration contents. Persistent maps report both retention policies and `Hashtbl` reports single-version heap. This 100-entry smoke across fixed-width, common-prefix and mixed-length inputs is not a matched Patricia comparison or a repeated full matrix. |
 | 2026-09-22 | HP5.2 hash-table aggregate | `make hashtable` (detached status capture) | Passed, exit status 0. The first aggregate exposed that `HashTableNativeModelTest.ml` calls `HashTable.set_tree`/`remove_tree` but `HashTableExtract.v` did not separately extract them after direct workers removed their incidental reachability. Adding those source functions to the model-only extraction restored bytecode/native model differential tests; the re-run passed proof/assumption audits, extraction audits and all hash-table tests. `make all`, the release matrix and hosted CI remain open. |
 | 2026-09-22 | HP5.2 repository aggregate and benchmark smoke | `make all` (detached status capture); `make hashtable-benchmark-smoke` | Both passed, each exit status 0. The repository aggregate completed its global assumption audit and Patricia oracle/differential suite. The benchmark smoke ran the corrected 100-binding integer and fixed-width string harnesses with all configured operations, generated JSONL records, and passed their semantic checks. This closes the local aggregate command requirement only; clean-checkout repetition, release documentation and hosted CI remain separate gates. |
+| 2026-09-22 | HP5.4 release/performance documentation | Reviewed `README.md`, `hashtable-performance.md`, and `hashtable-reference-release.md`; `git diff --check` | Updated the public benchmark description, implementation/performance status, generated-audit scope, source-model extraction purpose, and direct collision-worker evidence. The documents distinguish kernel source/refinement theorems from foreign OCaml contracts and finite bytecode/native tests; they retain the open range-closure, profiling, matched-matrix, and CI limits. |

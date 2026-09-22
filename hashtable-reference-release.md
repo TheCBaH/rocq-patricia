@@ -2,16 +2,17 @@
 
 This records the H3 source-reference boundary. The Rocq-extracted, list-backed
 HAMT remains available as the separately tested `HashTableReference` package.
-`HashMap.Make` now uses the H4 generated native table backend under the same
-abstract map type; its array/view contract is recorded separately in the H4
-tracker.
+`HashMap.Make` uses the generated native table backend under the same abstract
+map type; its array/scalar target contracts and performance evidence are
+recorded separately in the performance tracker.
 
 ## Boundary and external contracts
 
 | Boundary | Contract / evidence | Status |
 | --- | --- | --- |
 | Source map semantics | `HashTableProof.v` proves validity, flattened-binding lookup, set/remove equations, enumeration uniqueness, seed preservation, and first-wins lookup under explicit equivalence, reflection, hash-congruence, and bounded-hash hypotheses. | Kernel-checked; `hashtable-assumptions` rejects open assumptions. |
-| Extraction and public surface | `HashTableReferenceExtract.v` extracts source workers for the direct reference package. `HashTableNativeArrayExtract.v` binds only native `pseq` to private fresh-copy arrays for the public wrapper. `HashTableReference.mli` and `HashMap.mli` hide constructors, depth, routing hashes, and raw callbacks. Generated-interface, reference-boundary, and native-array extraction audits cover these surfaces. | Generated code and interface audit; array implementation contract is foreign. |
+| Extraction and public surface | `HashTableReferenceExtract.v` extracts source workers for the direct reference package. `HashTableNativeArrayExtract.v` binds native `pseq` to private fresh-copy arrays and realizes bounded scalar routing through `HashTablePrimitives`/`HashTableScalarPrimitives` for the public wrapper. `HashTableReference.mli` and `HashMap.mli` hide constructors, depth, routing hashes, and raw callbacks. Generated-interface, reference-boundary, scalar, and native-array extraction audits cover these surfaces. | Generated code and interface audit; array/scalar implementation contracts are foreign. |
+| Direct public workers | Generated native get/set/remove/first-wins loading recurse on native constructors, use direct joins and indexed collision operations, and are audited to reject source-tree or sequence-view conversion. `elements` is the explicit enumeration-only source conversion. `HashTableExtract.v` separately extracts source get/set/remove only for model differential tests. | Worker refinement is kernel-checked; generated code shape and bytecode/native execution are finite evidence, not a proof of target realization. |
 | Machine integers and normalization | The wrapper computes `raw land 0x3fffffff`, so callbacks may return any OCaml `int` and routing receives a nonnegative 30-bit value. This relies on OCaml `int` bitwise semantics and the compiler/runtime executing the generated code as specified. Extreme negative and large raw hashes are tested in `HashMapTest.ml`; deterministic source test hashes are in `HashTableTestHash.ml`. | Foreign runtime contract; finite bytecode/native evidence. |
 | Key callbacks | `Key.equal` must implement an equivalence relation. Equivalent keys must have the same normalized hash for each seed, and callbacks must be stable for a map's lifetime. The functor binds callbacks to its map instance. | Client contract stated in `HashMap.mli`; equivalent-key and multi-instance tests provide finite evidence. |
 | Persistence and payloads | Source maps use immutable Rocq trees/lists; update and removal return new roots. Values are never compared and are shallowly shared, so mutation through a retrieved reference remains observable. | Source algorithms are kernel-checked; OCaml allocation/immutability and payload identity are runtime contracts, with retained-version and mutable-payload tests. |
@@ -27,6 +28,7 @@ wrapper in both bytecode and native code via the targets named below.
 | --- | --- |
 | Empty, singleton, replacement, missing removal | `HashTableReferenceTest.ml`: `empty`, `one`, collision replacement/removal; `HashMapTest.ml`: public update/removal cases. |
 | Constant hash, many keys, collision normalization | `HashTableReferenceTest.ml`: three constant-hash keys, update, deletion; `HashMapTest.ml`: normalized raw collision. |
+| Direct native collision workers | `HashTableNativeModelTest.ml`: every hit and a miss in 40 entries; update, append, 41-entry removal, singleton/empty normalization, and retained versions; bytecode and native targets. |
 | First difference at depths 0–5 | `HashTableReferenceTest.ml`: `routed` keys `0; 1; 32; 1024; 32768; 1048576; 33554432`. |
 | Slot 31 and all 32 children | `HashTableReferenceTest.ml`: `every_slot`, including deletion of slot 31. |
 | Delete to unary, then insert again | `HashTableReferenceTest.ml`: `unary_after_remove` / `unary_reinserted` for `0` and `32`. |
@@ -42,5 +44,6 @@ Validation commands for this matrix are:
 
 ```sh
 make hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native \
-  hashtable-differential hashtable-test-native
+  hashtable-differential hashtable-test-native \
+  hashtable-native-model-test hashtable-native-model-test-native
 ```

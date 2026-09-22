@@ -11,6 +11,33 @@ The [detailed implementation plan](hashtable-performance-plan.md) records the
 evidence, proof/foreign boundary, dependencies and acceptance gates;
 [the performance tracker](hashtable-performance-todo.md) owns progress.
 
+## Implementation status
+
+The first three implementation stages are now present in the generated public
+backend. `HashTableNativeBits.v` supplies source-defined bounded chunk,
+bitmap-membership/edit, and rank operations, and
+`HashTableNativeArrayExtract.v` realizes them through checked OCaml scalar
+bindings. `native_get`, `native_set`, and `native_remove` use those bindings;
+the primitive corpus covers their target domains. The public range-closure
+proof for every reachable call is still open, so this is not a claim that the
+foreign OCaml realization has become kernel-checked.
+
+The public native get/set/remove/first-wins-load workers now operate directly
+on native constructors. They use bounded indexed collision sequences and a
+direct native join worker; generated hot-path audits reject source-tree and
+sequence-view conversion there. `elements` intentionally remains the sole
+source-tree conversion: enumeration materializes a list by design and its
+allocation is measured separately. Bytecode/native model tests cover 40/41
+entry constant-hash buckets, singleton/empty normalization, divergence at
+routing depths 0–5, and retained versions.
+
+Storage specialization is deliberately deferred. The remaining smoke gap to
+the standalone backend has not been attributed sufficiently among callbacks,
+checked options, and fresh compact-array copies to justify a fixed-width or
+unsafe-index representation. The full rationale and open proof/measurement
+work are tracked in HP1, HP2, HP4, and HP5 rather than implied by these local
+measurements.
+
 ## Implementations
 
 | Name | Implementation | Persistence |
@@ -117,60 +144,58 @@ dominates that distribution.
   but its current target realization needs performance work before it should be
   selected for throughput.
 
-## Cost centers identified by source inspection
+## Cost centers and residual uncertainty
 
-These call paths exist in the source and regenerated OCaml. Their share of
-runtime/allocation still requires profiling or controlled experiments.
+The following separates implemented removals from costs that still need
+attribution. A passing extraction audit establishes code shape, not an OCaml
+cost model.
 
-1. `HashTableNativeArrayExtract.v` realizes arrays but supplies no HAMT scalar
-   bindings. Generated `HashTableBits.chunk`, `rank` and bitmap edits reach
-   recursive `BinNat.N`/`BinPos.Pos` operations. `N.of_nat` recursively converts
-   depth arithmetic, `N.shiftr` iterates division, and `popcount32` always makes
-   32 steps. Mapping the number types to OCaml `int` does not make all these
-   operations native instructions. This is the first optimization candidate,
-   following `PatriciaExtract.v`'s scalar-realizer precedent.
-2. `native_children_remove` materializes `pseq_view children'` just to test
-   emptiness. `native_get` materializes collision entries for `bucket_get`.
-   `native_set`/`native_remove` delegate non-branch cases through
-   `source_of_native`, source workers and `native_of_source`, constructing
-   temporary nodes/lists. Thus enumeration-only materialization is a goal,
-   not the current generated backend's behavior.
-3. The standalone HAMT uses the same `HashTablePrimitives` array edits and is
+1. Scalar routing, child emptiness, collision lookup/update/removal, and
+   distinct-hash joins no longer use their former recursive arithmetic or
+   source/view fallbacks in public workers. The isolated primitive benchmark is
+   useful attribution evidence, but does not count calls within a map update.
+2. The standalone HAMT uses the same `HashTablePrimitives` array edits and is
    much cheaper on these workloads. Fresh compact-array copies are real costs,
    but do not by themselves explain the generated backend's allocation gap.
    Both implementations already copy only occupied child storage.
-4. Option/callback allocation, repeated rank computation and copied unchanged
-   paths remain secondary candidates. Measure them after scalar realization.
-   Branch children have width at most 32; collision sequences do not.
+3. Callback costs, checked-option allocation, and copied unchanged paths remain
+   possible contributors. Branch children have width at most 32; collision
+   sequences do not, so a branch-only storage experiment cannot safely change
+   the general sequence contract.
 
-The current enumeration-only audit in
-`check-hashtable-native-array-backend.sh` examines the standalone
-`HashMapNative.ml`, not the generated workers. The generated extraction audit
-checks primitive/worker presence, not the absence of these hot call paths.
+`check-hashtable-native-array-backend.sh` continues to audit the standalone
+implementation. The companion generated extraction audit now rejects
+source-tree and sequence-view conversion in the public native workers, and its
+negative fixtures prove that injected conversion or a nonrecursive whole-map
+override is rejected.
 
-On 2026-09-22, rerunning both HAMT benchmark targets with Rocq 9.2 and OCaml
-4.14.3 reproduced the recorded build allocations exactly: integer public/
-standalone 215,905,264 / 1,394,040 bytes; string 243,088,456 / 1,279,488 bytes.
-Integer build was 8.056 / 0.302 ms and string build 9.190 / 0.360 ms in this
-single rerun. This confirms the baseline issue, not its allocation attribution
-or a stable speed ratio. No optimized implementation was measured.
+The historical 2,000-binding figures above predate the corrected operation
+boundary and direct workers; they are retained only as a baseline record. After
+the direct-worker change, the corrected 100-binding integer smoke measured
+public/standalone first-wins build allocation of 124,272 / 40,376 bytes and
+public existing/new set allocation of 182,920 / 213,040 bytes. The string
+smoke reports the same operation separation for fixed-width, mixed-length, and
+common-prefix keys. These are single local smoke points, not a portable
+speedup claim or the required repeated, matched Patricia matrix. The capped
+2,000-entry constant-hash point and primitive measurements are recorded in the
+tracker.
 
 ## Optimization plan
 
-1. Correct timing boundaries and add matched, repeated workloads; profile the
-   existing backend with history policies measured separately.
-2. Add bounded scalar realizers with range contracts and source-defined
-   popcount/control flow, following the Patricia extraction approach.
-3. Add a sequence emptiness primitive, direct native leaf/join workers, and
-   indexed collision workers, proving refinement before selecting each worker.
-4. Audit the generated public call graph and primitive contracts; run existing
-   bytecode/native, persistence, representative and callback suites.
+1. Complete the matched, repeated integer/string/Patricia matrix and obtain
+   whole-map attribution; current histories and smoke points are not enough.
+2. Close public range proofs for scalar calls and complete the scalar-stage
+   measurement matrix.
+3. Retain the proved indexed sequence and direct workers; no source/view
+   conversion remains in the public hot set.
+4. Keep generated public-call audits, their negative fixtures, and bytecode/
+   native model suites in the release evidence.
 5. Consider additional sequence specialization only if the residual profile
    warrants it. A Rocq theorem quantified over a sequence contract does not
    itself prove that handwritten OCaml satisfies that contract; target execution
    remains an explicit foreign obligation unless separately verified.
-6. Re-evaluate against the standalone HAMT, Patricia, AVL and `Hashtbl` on the
-   same workloads. Keep the public API and persistence contract unchanged.
+6. Re-evaluate against the standalone HAMT, Patricia, AVL and `Hashtbl` on
+   identical workloads. Keep the public API and persistence contract unchanged.
 
 Execution details and closure criteria are in
 [the performance plan](hashtable-performance-plan.md). There is no promised
