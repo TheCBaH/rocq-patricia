@@ -20,14 +20,14 @@ if [ -f "$scalar_file" ]; then
       echo "missing scalar binding $binding" >&2; exit 1;
     }
   done
-  for worker in native_get native_set; do
+  for worker in native_get native_set native_remove; do
     grep -Eq "^let( rec)? $worker" "$model_file" || {
       echo "missing extracted $worker worker" >&2; exit 1;
     }
   done
   scalar_routes=$(grep -Fc 'native_chunk full_hash depth' "$model_file" || true)
-  if [ "$scalar_routes" -lt 2 ]; then
-    echo "native get/set do not both route through scalar chunk" >&2; exit 1
+  if [ "$scalar_routes" -lt 3 ]; then
+    echo "native get/set/remove do not all route through scalar chunk" >&2; exit 1
   fi
 fi
 echo "Hash-table native-array extraction audit: pseq alone binds to private arrays; recursive native workers remain extracted"
