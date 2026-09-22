@@ -40,4 +40,13 @@ let () =
     check_bitmap word
   done;
   check_bitmap 4_294_967_295;
+  let rejects thunk =
+    try ignore (thunk ()); false with Invalid_argument _ -> true
+  in
+  if not (rejects (fun () -> Scalar.bitmap_has (-1) 0)) then
+    fail "negative bitmap was accepted";
+  if not (rejects (fun () -> Scalar.rank (1 lsl 32) 0)) then
+    fail "wide bitmap was accepted";
+  if not (rejects (fun () -> Scalar.chunk (1 lsl 30) 0)) then
+    fail "wide hash was accepted";
   print_endline "HashTable scalar primitive test passed"
