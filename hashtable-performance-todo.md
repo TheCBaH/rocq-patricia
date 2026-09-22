@@ -64,12 +64,15 @@ implemented or validated, and no new performance target is achieved.
 - [ ] **HP1.G** Proof/audit/test pass; generated arithmetic inspection and isolated
   scalar-stage measurements recorded against HP0.
 
-- [ ] **HP2.1** Add proved sequence emptiness and its array contract/binding;
+- [x] **HP2.1** Add proved sequence emptiness and its array contract/binding;
   replace deletion's child-view check and reprove refinement.
-- [ ] **HP2.2** Reuse computed dense ranks through private helpers, preserving
+- [x] **HP2.2** Reuse computed dense ranks through private helpers, preserving
   insertion versus existing-child bounds.
-- [ ] **HP2.3** Record bounded/option-free indexing decision from profile; keep
+- [x] **HP2.3** Record bounded/option-free indexing decision from profile; keep
   checked indexing unless new call-site proof and measurable benefit justify it.
+  Decision: retain checked `pseq_get` and fresh edits. The residual smoke
+  profile is insufficiently attributed to justify an option-free primitive,
+  and collision sequences are not bounded by branch width.
 - [ ] **HP2.G** Generated deletion has no child-list emptiness conversion;
   persistence and operation tests pass; stage measurements recorded.
 
