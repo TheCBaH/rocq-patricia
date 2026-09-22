@@ -56,7 +56,10 @@ implemented or validated, and no new performance target is achieved.
   planned 100/2,000 cap and labels larger-size omissions. The public and
   standalone HAMTs use the supplied constant callback; `Map` and `Hashtbl`
   retain their own comparison/hashing policies. JSONL sample and summary
-  records now carry explicit `history_policy` values.
+  records now carry explicit `history_policy` values. A matched Patricia
+  JSONL runner still needs a namespace or process-level record boundary:
+  directly linking the two current extraction trees collides on their shared
+  un-namespaced generated support modules.
 - [x] **HP0.4** Profile scalar operations, conversions, primitive copies and
   hashing, or record controlled microbenchmark attribution and its limitations.
   No compatible profiler is installed locally. `hashtable-primitive-benchmark`
