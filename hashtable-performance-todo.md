@@ -75,8 +75,11 @@ implemented or validated, and no new performance target is achieved.
   guard and complete primitive/foreign-obligation inventory.
 - [ ] **HP1.3** Register new modules in proof, assumption audit, extraction,
   bytecode/native link recipes and clean rules.
-- [ ] **HP1.4** Add model-vs-target scalar tests across slot/hash/bitmap/depth
+- [x] **HP1.4** Add model-vs-target scalar tests across slot/hash/bitmap/depth
   boundaries, full 16-bit popcount corpus and random 32-bit patterns.
+  The same corpus now runs through explicit bytecode and native targets: all
+  slots, hashes 0/`2^30-1`, depths 0–6, all 16-bit words, 10,000 deterministic
+  32-bit masks, full bitmap, and invalid target-domain inputs.
 - [ ] **HP1.G** Proof/audit/test pass; generated arithmetic inspection and isolated
   scalar-stage measurements recorded against HP0.
 
@@ -195,3 +198,4 @@ implemented or validated, and no new performance target is achieved.
 | 2026-09-22 | HP1.1 scalar local range contracts | `/opt/opam/4.14.3/bin/rocq compile -q -Q . '' HashTableNativeBits.v`; `/opt/opam/4.14.3/bin/rocq compile -q -Q . '' HashTableNative.v`; `make hashtable-scalar-test hashtable-native-array-extracted-test-native hashtable-native-array-extraction-audit` | Passed. `HashTableNativeBits.v` now proves wrapper-local bounds for chunk, bitmap bit, rank, insertion, and deletion by the existing source scalar lemmas. Insertion explicitly requires an absent slot, matching branch insertion rather than claiming an unconstrained bitwise-or contract. This is local model evidence only: deriving valid bitmap and call-site hypotheses from a public native table remains HP1.1's open range-closure portion. |
 | 2026-09-22 | HP0.1/HP0.2 corrected operation and history policies | `make hashtable-benchmark-smoke`; `HASHTABLE_BENCH_SIZE=100 HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_BENCH_STRING_PATTERN=common-prefix make hashtable-string-benchmark`; `git diff --check` | Passed. Both persistent harnesses now separately time existing/new set with latest-root and all-prefix-root policies, retaining all roots through the timed allocation boundary and checking every policy's latest/oldest result afterward. The integer `Hashtbl` branch now also prepares independent mutable update/add/remove inputs outside timing and validates all operation/enumeration outputs, matching the string boundary. The fixed-width smoke and common-prefix run cover all configured operations; cross-family matched distributions remain HP0.3 work. |
 | 2026-09-22 | HP0.3 history-policy JSONL metadata | `HASHTABLE_BENCH_SIZE=10 HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_BENCH_RESULTS=<mktemp> make hashtable-benchmark`; `jq` assertions on samples/summaries | Passed. Each timing sample and summary now carries `history_policy`; the smoke validates `latest-root` for ordinary persistent updates, `all-prefix-roots` for retained histories, and `single-version` for `Hashtbl`. The field complements operation labels and live-heap records so external matrix processing need not infer a policy from names. |
+| 2026-09-22 | HP1.4 bytecode/native scalar corpus | `make hashtable-scalar-test-bytecode hashtable-scalar-test`; `git diff --check` | Passed. The full target-domain corpus now runs in both bytecode and native code; the bytecode target is included in `make hashtable` and clean rules. It validates scalar behavior, not the separate public-call range-closure theorem. |
