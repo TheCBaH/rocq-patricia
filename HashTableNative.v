@@ -528,6 +528,36 @@ Proof.
   - reflexivity.
 Qed.
 
+Fixpoint native_bucket_get {K A : Type} (eqb : K -> K -> bool) (query : K)
+    (entries : pseq (K * A)) (index remaining : nat) : option A :=
+  match remaining with
+  | O => None
+  | S remaining' =>
+      match pseq_get index entries with
+      | None => None
+      | Some (stored, value) =>
+          if eqb query stored then Some value
+          else native_bucket_get eqb query entries (S index) remaining'
+      end
+  end.
+
+Lemma native_bucket_get_refines :
+  forall K A (eqb : K -> K -> bool) (query : K)
+         (entries : pseq (K * A)) index remaining,
+    native_bucket_get eqb query entries index remaining =
+    bucket_get_index eqb query (pseq_view entries) index remaining.
+Proof.
+  intros K A eqb query entries index remaining.
+  revert index.
+  induction remaining as [|remaining IH]; intro index.
+  - reflexivity.
+  - cbn [native_bucket_get bucket_get_index].
+    rewrite pseq_get_view.
+    destruct (nth_error (pseq_view entries) index) as [[stored value]|].
+    + destruct (eqb query stored); [reflexivity|apply IH].
+    + reflexivity.
+Qed.
+
 Fixpoint native_get {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (native : native_tree K A)
     : option A :=
@@ -538,7 +568,8 @@ Fixpoint native_get {K A : Type} (eqb : K -> K -> bool)
         if eqb key stored then Some value else None
       else None
   | NativeCollision stored_hash entries =>
-      if N.eqb full_hash stored_hash then bucket_get eqb key (pseq_view entries)
+      if N.eqb full_hash stored_hash then
+        native_bucket_get eqb key entries 0 (pseq_length entries)
       else None
   | NativeBranch bitmap children =>
       match fuel with
@@ -610,8 +641,8 @@ Proof.
   induction fuel as [|fuel IH]; intros depth full_hash key native;
     destruct native as [|stored_hash stored value|stored_hash entries|bitmap children];
     cbn [native_get native_chunk native_bitmap_has native_rank source_of_native get_tree].
-  - reflexivity.
-  - reflexivity.
+  all: try (rewrite native_bucket_get_refines, pseq_length_view,
+    bucket_get_index_spec; reflexivity).
   - reflexivity.
   - reflexivity.
   - reflexivity.

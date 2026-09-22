@@ -14,6 +14,21 @@ let check_agreement message source native =
     probes
 
 let () =
+  let collision_entries =
+    Stdlib.List.init 40 (fun key -> (key, "collision-" ^ string_of_int key))
+  in
+  let collision_source = HashTable.Collision (0, collision_entries) in
+  let collision_native =
+    HashTableNative.NativeCollision (0, HashTableNative.pseq_of_list collision_entries)
+  in
+  Stdlib.List.iter
+    (fun key ->
+       check ("collision key " ^ string_of_int key)
+         (HashTableNative.native_get equal 6 0 0 key collision_native =
+          HashTable.get_tree equal 6 0 0 key collision_source))
+    (Stdlib.List.init 40 Fun.id);
+  check "collision miss"
+    (HashTableNative.native_get equal 6 0 0 41 collision_native = None);
   let random = Random.State.make [| 0x4e415449; 0x56454d4f |] in
   let rec loop step source native retained =
     if step = 750 then ()

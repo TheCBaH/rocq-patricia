@@ -17,6 +17,60 @@ Fixpoint bucket_get {K A : Type} (eqb : K -> K -> bool)
       if eqb query stored then Some value else bucket_get eqb query tail
   end.
 
+Fixpoint bucket_get_index {K A : Type} (eqb : K -> K -> bool) (query : K)
+    (entries : list (K * A)) (index remaining : nat) : option A :=
+  match remaining with
+  | O => None
+  | S remaining' =>
+      match nth_error entries index with
+      | None => None
+      | Some (stored, value) =>
+          if eqb query stored then Some value
+          else bucket_get_index eqb query entries (S index) remaining'
+      end
+  end.
+
+Lemma bucket_get_index_from :
+  forall K A (eqb : K -> K -> bool) (query : K) (entries : list (K * A))
+         prefix,
+    bucket_get_index eqb query (prefix ++ entries) (length prefix)
+      (length entries) = bucket_get eqb query entries.
+Proof.
+  intros K A eqb query entries.
+  induction entries as [|[stored value] tail IH]; intro prefix.
+  - reflexivity.
+  - cbn [bucket_get_index bucket_get].
+    change ((match nth_error (prefix ++ (stored, value) :: tail) (length prefix) with
+             | None => None
+             | Some (stored', value') =>
+                 if eqb query stored' then Some value'
+                 else bucket_get_index eqb query
+                        (prefix ++ (stored, value) :: tail)
+                        (S (length prefix)) (length tail)
+             end) =
+            if eqb query stored then Some value else bucket_get eqb query tail).
+    rewrite nth_error_app2 by lia.
+    replace (length prefix - length prefix) with 0 by lia.
+    cbn.
+    cbn.
+    destruct (eqb query stored) eqn:Hstored; [reflexivity|].
+    replace (S (length prefix)) with (length (prefix ++ [(stored, value)]))
+      by (rewrite length_app; cbn; lia).
+    replace (prefix ++ (stored, value) :: tail) with
+      ((prefix ++ [(stored, value)]) ++ tail)
+      by exact (eq_sym (app_assoc prefix [(stored, value)] tail)).
+    apply IH.
+Qed.
+
+Lemma bucket_get_index_spec :
+  forall K A (eqb : K -> K -> bool) (query : K) (entries : list (K * A)),
+    bucket_get_index eqb query entries 0 (length entries) =
+    bucket_get eqb query entries.
+Proof.
+  intros. replace entries with ([] ++ entries) by reflexivity.
+  apply bucket_get_index_from.
+Qed.
+
 Fixpoint bucket_set {K A : Type} (eqb : K -> K -> bool)
     (key : K) (value : A) (entries : list (K * A)) : list (K * A) :=
   match entries with
