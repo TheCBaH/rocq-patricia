@@ -3,7 +3,7 @@
     ordinary extracted lists; this mapping is deliberately local to [pseq]. *)
 
 From Stdlib Require Import Extraction ExtrOcamlBasic ExtrOcamlNatInt ExtrOcamlZInt.
-Require Import HashTableSpec HashTableBits HashTableBucket HashTable HashTableNative.
+Require Import HashTableSpec HashTableBits HashTableNativeBits HashTableBucket HashTable HashTableNative.
 
 Extraction Language OCaml.
 Set Extraction Output Directory "hashtable_native_array_extracted".
@@ -16,6 +16,13 @@ Extract Constant HashTableNative.pseq_get => "HashTablePrimitives.get".
 Extract Constant HashTableNative.pseq_insert => "HashTablePrimitives.insert".
 Extract Constant HashTableNative.pseq_replace => "HashTablePrimitives.replace".
 Extract Constant HashTableNative.pseq_remove => "HashTablePrimitives.remove".
+
+Extract Constant HashTableNativeBits.native_chunk => "HashTableScalarPrimitives.chunk".
+Extract Constant HashTableNativeBits.native_bitmap_bit => "HashTableScalarPrimitives.bitmap_bit".
+Extract Constant HashTableNativeBits.native_bitmap_has => "HashTableScalarPrimitives.bitmap_has".
+Extract Constant HashTableNativeBits.native_rank => "HashTableScalarPrimitives.rank".
+Extract Constant HashTableNativeBits.native_bitmap_insert => "HashTableScalarPrimitives.bitmap_insert".
+Extract Constant HashTableNativeBits.native_bitmap_remove => "HashTableScalarPrimitives.bitmap_remove".
 
 Separate Extraction
   HashTableNative.pseq_of_list

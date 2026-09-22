@@ -10,7 +10,7 @@ fi
 rocq_command=$1
 shift
 
-modules='HashTableSpec HashTableBits HashTableBucket HashTable HashTableProof HashTableNative HashTableNativeProof HashTableArrayRefinement HashTableSkeleton'
+modules='HashTableSpec HashTableBits HashTableNativeBits HashTableBucket HashTable HashTableProof HashTableNative HashTableNativeProof HashTableArrayRefinement HashTableSkeleton'
 audit_output=$(mktemp)
 trap 'rm -f "$audit_output"' EXIT HUP INT TERM
 

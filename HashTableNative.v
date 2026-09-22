@@ -7,7 +7,7 @@
 From Stdlib Require Import List NArith.
 Import ListNotations.
 
-Require Import HashTable HashTableBits HashTableBucket.
+Require Import HashTable HashTableBits HashTableBucket HashTableNativeBits.
 
 Set Implicit Arguments.
 
@@ -431,9 +431,9 @@ Fixpoint native_get {K A : Type} (eqb : K -> K -> bool)
       match fuel with
       | O => None
       | S fuel' =>
-          let slot := chunk full_hash depth in
-          if bitmap_has bitmap slot then
-            match pseq_get (rank bitmap slot) children with
+          let slot := native_chunk full_hash depth in
+          if native_bitmap_has bitmap slot then
+            match pseq_get (native_rank bitmap slot) children with
             | Some child => native_get eqb fuel' (S depth) full_hash key child
             | None => None
             end
@@ -488,7 +488,7 @@ Proof.
   intros K A eqb fuel.
   induction fuel as [|fuel IH]; intros depth full_hash key native;
     destruct native as [|stored_hash stored value|stored_hash entries|bitmap children];
-    cbn [native_get source_of_native get_tree].
+    cbn [native_get native_chunk native_bitmap_has native_rank source_of_native get_tree].
   - reflexivity.
   - reflexivity.
   - reflexivity.
@@ -496,17 +496,24 @@ Proof.
   - reflexivity.
   - reflexivity.
   - reflexivity.
-  - destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent; auto.
+  - destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
+    change (native_bitmap_has bitmap (native_chunk full_hash depth) = true) in Hpresent.
     destruct (pseq_get (rank bitmap (chunk full_hash depth)) children)
       as [child|] eqn:Hchild.
-    + cbn [source_of_native get_tree].
+    + change (pseq_get (native_rank bitmap (native_chunk full_hash depth)) children = Some child) in Hchild.
+      rewrite Hpresent, Hchild.
+      cbn [source_of_native get_tree].
       rewrite (@pseq_get_source_children K A
         (rank bitmap (chunk full_hash depth)) children child Hchild).
       now apply IH.
-    + cbn [source_of_native get_tree].
+    + change (pseq_get (native_rank bitmap (native_chunk full_hash depth)) children = None) in Hchild.
+      rewrite Hpresent, Hchild.
+      cbn [source_of_native get_tree].
       rewrite (@pseq_get_source_children_none K A
         (rank bitmap (chunk full_hash depth)) children Hchild).
       reflexivity.
+    + change (native_bitmap_has bitmap (native_chunk full_hash depth) = false) in Hpresent.
+      rewrite Hpresent. reflexivity.
 Qed.
 
 Lemma native_set_refines :
