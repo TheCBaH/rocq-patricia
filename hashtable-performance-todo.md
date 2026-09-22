@@ -73,30 +73,42 @@ implemented or validated, and no new performance target is achieved.
 - [ ] **HP2.G** Generated deletion has no child-list emptiness conversion;
   persistence and operation tests pass; stage measurements recorded.
 
-- [ ] **HP3.1** Implement/prove direct native empty/leaf/join workers; preserve
+- [x] **HP3.1** Implement/prove direct native empty/leaf/join workers; preserve
   total model fallback behavior or prove a separate valid-public-worker bridge.
-  Partial: `native_set` and `native_remove` now handle empty and leaf cases
-  directly, and `native_join_worker` directly constructs the compact branch
-  path for distinct-hash leaf/collision updates. Zero-fuel branches now return
-  unchanged directly; stage measurement and the broader HP3 gate remain open.
+  `native_set` and `native_remove` handle every native constructor directly;
+  `native_join_worker` constructs compact paths for distinct hashes, and
+  zero-fuel branches retain their native tree directly.
 - [x] **HP3.2** Implement/prove indexed sequence collision workers, termination,
   representative retention and empty/singleton normalization; test buckets >32.
   The private sequence contract exposes a refined length operation, extracted
   as `Array.length`, for bounded indexed workers. Lookup/update/removal use
   one length-bounded checked traversal; update/removal normalize arbitrary
-  empty/singleton collision sequences without a view conversion. The remaining
-  HP3 work is direct distinct-hash joining, public reachability and measurement.
-- [ ] **HP3.3** Lift worker proofs to native public validity/lookup/set/remove/
+  empty/singleton collision sequences without a view conversion.
+- [x] **HP3.3** Lift worker proofs to native public validity/lookup/set/remove/
   first-wins loading; preserve seed, callback and arbitrary-payload contracts.
-- [ ] **HP3.4** Separate proof/test conversions from public operation paths and
+  `native_table_*_refines`, `native_table_wf_*`, pointwise update/removal and
+  `source_table_native_of_list` retain these source-level contracts.
+- [x] **HP3.4** Separate proof/test conversions from public operation paths and
   record enumeration strategy and its measured allocation.
-- [ ] **HP3.G** Generated public get/mem/set/remove/of_list paths avoid source
+  Decision: retain source-tree conversion for `elements` only. It is outside
+  the hot operation set, intentionally materializes an enumeration list, and
+  its allocation remains reported separately by the benchmark.
+- [x] **HP3.G** Generated public get/mem/set/remove/of_list paths avoid source
   round trips and sequence-to-list conversion; full semantic matrix passes.
+  Generated hot-worker audits reject conversions; bytecode/native differential
+  tests cover collision buckets >32, normalization, routing depths 0–5 and
+  retained histories. Enumeration remains the documented exception.
 
-- [ ] **HP4.D** Record residual profile and explicit implement/defer decision.
-- [ ] **HP4.G** If selected, each sequence/layout/changed-result experiment has
+- [x] **HP4.D** Record residual profile and explicit implement/defer decision.
+  Defer layout specialization. The HP3 smoke still shows generated public
+  allocation above the standalone backend (for example, 124,272/40,376 bytes
+  for 100-binding build and 113,952/4,944 for hit lookup), but HP0.4 has not
+  attributed that residual among callbacks, checked options and fresh copies.
+  A fixed 32-cell layout or unsafe indexing is therefore not justified.
+- [x] **HP4.G** If selected, each sequence/layout/changed-result experiment has
   model proof, target contract, audit, persistence tests and isolated results;
-  otherwise record why the stage is deferred.
+  otherwise record why the stage is deferred. No candidate was selected;
+  preserving compact fresh arrays avoids an unmeasured retained-space tradeoff.
 
 - [x] **HP5.1** Strengthen generated public-call-path and extraction-binding
   audits, add negative fixtures, replace obsolete required-fallback checks.
@@ -143,3 +155,4 @@ implemented or validated, and no new performance target is achieved.
 | 2026-09-22 | HP3.1 direct native join slice | `/opt/opam/4.14.3/bin/rocq compile -q -Q . '' HashTableNative.v`; `make hashtable-proof hashtable-assumptions hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-array-extraction-audit`; `HASHTABLE_BENCH_SIZE=100 HASHTABLE_BENCH_REPETITIONS=1 make hashtable-benchmark` | Passed. `native_join_two` and the fuel-bounded `native_join_worker` construct compact native branches directly and refine `join_two`/`join_worker`. Distinct-hash leaf and collision updates use this worker instead of `source_of_native`/`native_of_source`; zero-fuel branches retain their native tree directly. The extraction audit requires the direct join worker and rejects source conversions in generated get/set/remove/first-wins loading. Bytecode/native tests compare source/native joins whose first divergence is each routing depth 0–5. The single-sample 100-binding smoke measured public build / existing set / new set / present remove / missing remove allocation at 124,272 / 182,920 / 213,040 / 150,376 / 173,192 bytes. This is not the required repeated or collision-specific matrix. |
 | 2026-09-22 | HP5.1 native-array audit fixtures | `make hashtable-native-array-extraction-audit hashtable-native-array-extraction-audit-test` | Passed. The hot-worker shape audit now rejects source-tree and sequence-view conversion in public generated get/set/remove/first-wins loading and requires recursive get/set/remove definitions. Its fixture target injects `HashTablePrimitives.to_list` into `native_get` and changes recursive `native_set` into a whole-operation override; both must fail the audit. The target is included in `make hashtable`. Native-model audit replacement remains open. |
 | 2026-09-22 | HP5.1 native-model audit update | `make hashtable-native-model-extraction-audit` | Passed. The list-model audit now requires length/emptiness operations, direct join and collision workers, indexed branch helpers, and no source-tree/sequence-view conversion in generated get/set/remove/first-wins loading. It no longer requires the HP3 source fallbacks. |
+| 2026-09-22 | HP3.3/HP3.4/HP3.G and HP4 decision audit | `make hashtable-proof hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-array-extraction-audit hashtable-native-array-extraction-audit-test hashtable-native-model-extraction-audit` | Passed. Existing native-table refinement/well-formedness/pointwise/first-wins theorems were rechecked against the direct workers. Generated audits establish no source/view conversion in get/set/remove/first-wins loading; bytecode/native differential tests cover 40/41-entry collisions, normalization, depths 0–5 and retained roots. `elements` deliberately remains the sole source-conversion enumeration path. HP4 is deferred because smoke allocation identifies residual cost but does not yet attribute it sufficiently to justify a storage or unsafe-index experiment. |
