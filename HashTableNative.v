@@ -472,6 +472,34 @@ Proof.
 Qed.
 
 (** Lookup, update and removal are recursive compact-child workers. *)
+Definition native_leaf_set {K A : Type} (eqb : K -> K -> bool)
+    (fuel depth : nat) (full_hash : N) (key : K) (value : A)
+    (stored_hash : N) (stored : K) (old : A) : native_tree K A :=
+  if eqb key stored then NativeLeaf stored_hash stored value
+  else if N.eqb full_hash stored_hash
+       then NativeCollision stored_hash
+         (pseq_of_list [(stored, old); (key, value)])
+       else native_of_source
+         (set_tree eqb fuel depth full_hash key value
+           (Leaf stored_hash stored old)).
+
+Lemma native_leaf_set_refines :
+  forall K A (eqb : K -> K -> bool) fuel depth full_hash (key : K) (value : A)
+         stored_hash stored (old : A),
+    source_of_native
+      (native_leaf_set eqb fuel depth full_hash key value stored_hash stored old) =
+    set_tree eqb fuel depth full_hash key value (Leaf stored_hash stored old).
+Proof.
+  intros K A eqb fuel depth full_hash key value stored_hash stored old.
+  unfold native_leaf_set.
+  rewrite set_tree_leaf.
+  destruct (eqb key stored) eqn:Hkey.
+  - reflexivity.
+  - destruct (N.eqb full_hash stored_hash) eqn:Hhash.
+    + reflexivity.
+    + apply source_of_native_of_source.
+Qed.
+
 Fixpoint native_get {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (native : native_tree K A)
     : option A :=
@@ -513,6 +541,9 @@ Fixpoint native_set {K A : Type} (eqb : K -> K -> bool)
             (NativeLeaf full_hash key value) children
         end
       else native_branch_insert_at bitmap slot index (NativeLeaf full_hash key value) children
+  | NativeEmpty, _ => NativeLeaf full_hash key value
+  | NativeLeaf stored_hash stored old, _ =>
+      native_leaf_set eqb fuel depth full_hash key value stored_hash stored old
   | _, _ => native_of_source
       (set_tree eqb fuel depth full_hash key value (source_of_native native))
   end.
@@ -585,6 +616,8 @@ Proof.
   induction fuel as [|fuel IH]; intros depth full_hash key value native;
     destruct native as [|stored_hash stored old|stored_hash entries|bitmap children].
   all: cbn [native_set native_chunk native_bitmap_has native_rank]; try apply source_of_native_of_source.
+  all: try reflexivity.
+  all: try apply native_leaf_set_refines.
   destruct (bitmap_has bitmap (chunk full_hash depth)) eqn:Hpresent.
   - destruct (pseq_get (rank bitmap (chunk full_hash depth)) children)
       as [child|] eqn:Hchild.
