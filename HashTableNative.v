@@ -259,14 +259,22 @@ Proof.
   rewrite nth_error_map, Hget. reflexivity.
 Qed.
 
+Definition native_branch_replace_at {K A : Type} (bitmap : N) (index : nat)
+    (child : native_tree K A) (children : pseq (native_tree K A)) : native_tree K A :=
+  NativeBranch bitmap (pseq_replace index child children).
+
 Definition native_branch_replace {K A : Type} (bitmap slot : N)
     (child : native_tree K A) (children : pseq (native_tree K A)) : native_tree K A :=
-  NativeBranch bitmap (pseq_replace (native_rank bitmap slot) child children).
+  native_branch_replace_at bitmap (native_rank bitmap slot) child children.
+
+Definition native_branch_insert_at {K A : Type} (bitmap slot : N) (index : nat)
+    (child : native_tree K A) (children : pseq (native_tree K A)) : native_tree K A :=
+  NativeBranch (native_bitmap_insert bitmap slot)
+    (pseq_insert index child children).
 
 Definition native_branch_insert {K A : Type} (bitmap slot : N)
     (child : native_tree K A) (children : pseq (native_tree K A)) : native_tree K A :=
-  NativeBranch (native_bitmap_insert bitmap slot)
-    (pseq_insert (native_rank bitmap slot) child children).
+  native_branch_insert_at bitmap slot (native_rank bitmap slot) child children.
 
 Lemma native_branch_replace_bitmap_bound :
   forall K A (bitmap slot : N) (child : native_tree K A)
@@ -343,6 +351,19 @@ Proof.
   cbn. f_equal. apply map_dense_insert.
 Qed.
 
+Lemma source_of_native_branch_insert_at :
+  forall K A (bitmap slot : N) index (child : native_tree K A)
+         (children : pseq (native_tree K A)),
+    source_of_native (native_branch_insert_at bitmap slot index child children) =
+    Branch (N.lor bitmap (bitmap_bit slot))
+      (dense_insert index (source_of_native child)
+        (map source_of_native (pseq_view children))).
+Proof.
+  intros K A bitmap slot index child children.
+  unfold native_branch_insert_at, source_of_native, pseq_insert, pseq_of_list.
+  cbn. f_equal. apply map_dense_insert.
+Qed.
+
 Lemma source_of_native_branch_replace :
   forall K A (bitmap slot : N) (child : native_tree K A)
          (children : pseq (native_tree K A)),
@@ -356,15 +377,31 @@ Proof.
   cbn. f_equal. apply map_dense_replace.
 Qed.
 
+Lemma source_of_native_branch_replace_at :
+  forall K A (bitmap : N) index (child : native_tree K A)
+         (children : pseq (native_tree K A)),
+    source_of_native (native_branch_replace_at bitmap index child children) =
+    Branch bitmap (dense_replace index (source_of_native child)
+      (map source_of_native (pseq_view children))).
+Proof.
+  intros K A bitmap index child children.
+  unfold native_branch_replace_at, source_of_native, pseq_replace, pseq_of_list.
+  cbn. f_equal. apply map_dense_replace.
+Qed.
+
 Definition native_children_remove {K A : Type} (bitmap slot : N) (index : nat)
     (children : pseq (native_tree K A)) : native_tree K A :=
   let children' := pseq_remove index children in
   if pseq_is_empty children' then NativeEmpty
   else NativeBranch (native_bitmap_remove bitmap slot) children'.
 
+Definition native_branch_remove_at {K A : Type} (bitmap slot : N) (index : nat)
+    (children : pseq (native_tree K A)) : native_tree K A :=
+  native_children_remove bitmap slot index children.
+
 Definition native_branch_remove {K A : Type} (bitmap slot : N)
     (children : pseq (native_tree K A)) : native_tree K A :=
-  native_children_remove bitmap slot (native_rank bitmap slot) children.
+  native_branch_remove_at bitmap slot (native_rank bitmap slot) children.
 
 Lemma native_children_remove_bitmap_bound :
   forall K A (bitmap slot : N) index (children : pseq (native_tree K A)),
@@ -421,6 +458,19 @@ Proof.
   apply source_of_native_children_remove.
 Qed.
 
+Lemma source_of_native_branch_remove_at :
+  forall K A (bitmap slot : N) index (children : pseq (native_tree K A)),
+    source_of_native (native_branch_remove_at bitmap slot index children) =
+    match dense_remove index (map source_of_native (pseq_view children)) with
+    | [] => Empty
+    | _ => Branch (N.ldiff bitmap (bitmap_bit slot))
+        (dense_remove index (map source_of_native (pseq_view children)))
+    end.
+Proof.
+  intros K A bitmap slot index children.
+  unfold native_branch_remove_at. apply source_of_native_children_remove.
+Qed.
+
 (** Lookup, update and removal are recursive compact-child workers. *)
 Fixpoint native_get {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (native : native_tree K A)
@@ -454,14 +504,15 @@ Fixpoint native_set {K A : Type} (eqb : K -> K -> bool)
   match native, fuel with
   | NativeBranch bitmap children, S fuel' =>
       let slot := native_chunk full_hash depth in
+      let index := native_rank bitmap slot in
       if native_bitmap_has bitmap slot then
-        match pseq_get (native_rank bitmap slot) children with
-        | Some child => native_branch_replace bitmap slot
+        match pseq_get index children with
+        | Some child => native_branch_replace_at bitmap index
             (native_set eqb fuel' (S depth) full_hash key value child) children
-        | None => native_branch_insert bitmap slot
+        | None => native_branch_insert_at bitmap slot index
             (NativeLeaf full_hash key value) children
         end
-      else native_branch_insert bitmap slot (NativeLeaf full_hash key value) children
+      else native_branch_insert_at bitmap slot index (NativeLeaf full_hash key value) children
   | _, _ => native_of_source
       (set_tree eqb fuel depth full_hash key value (source_of_native native))
   end.
@@ -472,12 +523,13 @@ Fixpoint native_remove {K A : Type} (eqb : K -> K -> bool)
   match native, fuel with
   | NativeBranch bitmap children, S fuel' =>
       let slot := native_chunk full_hash depth in
+      let index := native_rank bitmap slot in
       if native_bitmap_has bitmap slot then
-        match pseq_get (native_rank bitmap slot) children with
+        match pseq_get index children with
         | Some child =>
             match native_remove eqb fuel' (S depth) full_hash key child with
-            | NativeEmpty => native_branch_remove bitmap slot children
-            | child' => native_branch_replace bitmap slot child' children
+            | NativeEmpty => native_branch_remove_at bitmap slot index children
+            | child' => native_branch_replace_at bitmap index child' children
             end
         | None => NativeBranch bitmap children
         end
@@ -541,7 +593,7 @@ Proof.
       assert (Hnativechild :
         pseq_get (native_rank bitmap (native_chunk full_hash depth)) children = Some child) by exact Hchild.
       rewrite Hnativepresent, Hnativechild.
-      rewrite source_of_native_branch_replace.
+      rewrite source_of_native_branch_replace_at.
       rewrite IH.
       cbn [source_of_native set_tree].
       rewrite Hpresent.
@@ -553,7 +605,7 @@ Proof.
       assert (Hnativechild :
         pseq_get (native_rank bitmap (native_chunk full_hash depth)) children = None) by exact Hchild.
       rewrite Hnativepresent, Hnativechild.
-      rewrite source_of_native_branch_insert.
+      rewrite source_of_native_branch_insert_at.
       cbn [source_of_native set_tree].
       rewrite Hpresent.
       rewrite (@pseq_get_source_children_none K A
@@ -562,7 +614,7 @@ Proof.
   - assert (Hnativepresent :
       native_bitmap_has bitmap (native_chunk full_hash depth) = false) by exact Hpresent.
     rewrite Hnativepresent.
-    rewrite source_of_native_branch_insert.
+    rewrite source_of_native_branch_insert_at.
     cbn [source_of_native set_tree].
     rewrite Hpresent.
     reflexivity.
@@ -589,7 +641,7 @@ Proof.
       destruct (native_remove eqb fuel (S depth) full_hash key child)
         as [|child_hash child_key child_value|child_hash child_entries|child_bitmap child_children]
         eqn:Hremove.
-      * rewrite source_of_native_branch_remove.
+      * rewrite source_of_native_branch_remove_at.
         cbn [source_of_native remove_tree].
         rewrite Hpresent.
         rewrite (@pseq_get_source_children K A
@@ -597,7 +649,7 @@ Proof.
         rewrite <- (IH (S depth) full_hash key child).
         rewrite Hremove.
         reflexivity.
-      * rewrite source_of_native_branch_replace.
+      * rewrite source_of_native_branch_replace_at.
         cbn [source_of_native remove_tree].
         rewrite Hpresent.
         rewrite (@pseq_get_source_children K A
@@ -605,7 +657,7 @@ Proof.
         rewrite <- (IH (S depth) full_hash key child).
         rewrite Hremove.
         reflexivity.
-      * rewrite source_of_native_branch_replace.
+      * rewrite source_of_native_branch_replace_at.
         cbn [source_of_native remove_tree].
         rewrite Hpresent.
         rewrite (@pseq_get_source_children K A
@@ -613,7 +665,7 @@ Proof.
         rewrite <- (IH (S depth) full_hash key child).
         rewrite Hremove.
         reflexivity.
-      * rewrite source_of_native_branch_replace.
+      * rewrite source_of_native_branch_replace_at.
         cbn [source_of_native remove_tree].
         rewrite Hpresent.
         rewrite (@pseq_get_source_children K A
