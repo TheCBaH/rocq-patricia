@@ -1,6 +1,7 @@
 type config = {
   repetitions : int;
   warmups : int;
+  live_heap : bool;
   result_file : string;
 }
 
@@ -11,16 +12,24 @@ let positive_env name default =
       let parsed = int_of_string value in
       if parsed < 1 then invalid_arg (name ^ " must be positive") else parsed
 
+let boolean_env name default =
+  match Sys.getenv_opt name with
+  | None -> default
+  | Some "true" -> true
+  | Some "false" -> false
+  | Some _ -> invalid_arg (name ^ " must be true or false")
+
 let config () =
   let repetitions = positive_env "HASHTABLE_BENCH_REPETITIONS" 7 in
   let warmups = positive_env "HASHTABLE_BENCH_WARMUPS" 1 in
+  let live_heap = boolean_env "HASHTABLE_BENCH_LIVE_HEAP" true in
   let result_file =
     match Sys.getenv_opt "HASHTABLE_BENCH_RESULTS" with
     | Some path -> path
     | None -> Filename.concat (Filename.get_temp_dir_name ())
                 (Printf.sprintf "hashtable-performance-%d.jsonl" (Unix.getpid ()))
   in
-  { repetitions; warmups; result_file }
+  { repetitions; warmups; live_heap; result_file }
 
 let active_config = ref None
 let output = ref None
@@ -37,6 +46,11 @@ let history_policy operation =
   if has_suffix "/all-prefix-roots" operation then "all-prefix-roots"
   else if has_suffix "/latest-root" operation then "latest-root"
   else "single-version"
+
+let live_heap_enabled () =
+  match !active_config with
+  | Some settings -> settings.live_heap
+  | None -> invalid_arg "HashTableBenchmarkSupport.live_heap_enabled"
 
 let write_json line =
   match !output with
@@ -72,8 +86,8 @@ let start ~workload ~size ~seed =
   let gc = Gc.get () in
   write_json
     (Printf.sprintf
-       "{\"record\":\"metadata\",\"workload\":%s,\"size\":%d,\"seed\":%d,\"repetitions\":%d,\"warmups\":%d,\"revision\":%s,\"dirty\":%s,\"ocaml_version\":%s,\"word_size\":%d,\"os\":%s,\"release\":%s,\"machine\":%s,\"cpu\":%s,\"gc\":%s}"
-       (json_string workload) size seed settings.repetitions settings.warmups
+       "{\"record\":\"metadata\",\"workload\":%s,\"size\":%d,\"seed\":%d,\"repetitions\":%d,\"warmups\":%d,\"live_heap\":%b,\"revision\":%s,\"dirty\":%s,\"ocaml_version\":%s,\"word_size\":%d,\"os\":%s,\"release\":%s,\"machine\":%s,\"cpu\":%s,\"gc\":%s}"
+       (json_string workload) size seed settings.repetitions settings.warmups settings.live_heap
        (json_string (env "HASHTABLE_BENCH_REVISION"))
        (json_string (env "HASHTABLE_BENCH_DIRTY"))
        (json_string Sys.ocaml_version) Sys.word_size

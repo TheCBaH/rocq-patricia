@@ -26,17 +26,23 @@ require_record() {
   record=$1
   size=$2
   seed=$3
+  case "$size" in
+    100|2000) live_heap=true ;;
+    *) live_heap=false ;;
+  esac
   if [ ! -s "$record" ]; then
     printf 'Matrix record is missing or empty: %s\n' "$record" >&2
     exit 1
   fi
   if ! jq -se --argjson size "$size" --argjson seed "$seed" \
-      --argjson repetitions "$repetitions" --argjson warmups "$warmups" '
+      --argjson repetitions "$repetitions" --argjson warmups "$warmups" \
+      --argjson live_heap "$live_heap" '
         map(select(.record == "metadata")) as $metadata |
         ($metadata | length == 1) and
         ($metadata[0].size == $size) and ($metadata[0].seed == $seed) and
         ($metadata[0].repetitions == $repetitions) and
         ($metadata[0].warmups == $warmups) and
+        ($metadata[0].live_heap == $live_heap) and
         ($metadata[0].revision != "unknown") and
         ($metadata[0].dirty == "false")
       ' "$record" >/dev/null; then
@@ -57,8 +63,8 @@ require_record() {
 require_pair() {
   left=$1
   right=$2
-  left_metadata=$(jq -rc 'select(.record == "metadata") | [.workload, .size, .seed, .repetitions, .warmups, .revision, .dirty] | @json' "$left")
-  right_metadata=$(jq -rc 'select(.record == "metadata") | [.workload, .size, .seed, .repetitions, .warmups, .revision, .dirty] | @json' "$right")
+  left_metadata=$(jq -rc 'select(.record == "metadata") | [.workload, .size, .seed, .repetitions, .warmups, .live_heap, .revision, .dirty] | @json' "$left")
+  right_metadata=$(jq -rc 'select(.record == "metadata") | [.workload, .size, .seed, .repetitions, .warmups, .live_heap, .revision, .dirty] | @json' "$right")
   if [ "$left_metadata" != "$right_metadata" ]; then
     printf 'Matrix pair metadata differs: %s / %s\n' "$left" "$right" >&2
     exit 1

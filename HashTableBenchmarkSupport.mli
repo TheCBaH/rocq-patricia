@@ -7,6 +7,7 @@
 type config = {
   repetitions : int;
   warmups : int;
+  live_heap : bool;
   result_file : string;
 }
 
@@ -25,6 +26,11 @@ val start : workload:string -> size:int -> seed:int -> unit
     rotating the implementation order.  The integer argument selects a
     separately prepared input; [-1] is reserved for warmup input. *)
 val measure : task list -> unit
+
+(** Whether this record includes the separate post-GC live-heap pass.  Matrix
+    runners may disable the expensive pass for large timing-only records while
+    preserving live-heap evidence at smaller representative sizes. *)
+val live_heap_enabled : unit -> bool
 
 (** Measure post-GC live heap while the constructed value remains reachable.
     This is deliberately separate from the allocation and timing samples. *)

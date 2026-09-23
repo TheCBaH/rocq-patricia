@@ -81,6 +81,12 @@ generated extraction trees cannot link in one executable. The full repeated
 size matrix is still pending, so this wiring does not make the historical
 tables comparable.
 
+The matrix records post-GC retained heap at the 100 and 2,000 representative
+sizes, including capped collision histories. Its 10,000 and 100,000 records
+explicitly set `live_heap: false`: they retain the complete timed
+operation/allocation and semantic-validation boundary without repeatedly
+constructing a separate large retained history for every distribution.
+
 ### Generated HAMT, standalone HAMT, AVL, and imperative table
 
 Times are complete checked workloads, not per-operation latency.

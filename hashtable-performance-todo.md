@@ -44,18 +44,21 @@ implemented or validated, and no new performance target is achieved.
   Both integer/string harnesses prepare per-sample inputs before timing, retain
   observable checksums, validate maps/enumeration afterward, and distinguish
   first-wins loading from repeated replacement across their four implementations.
-  Timed checksums retain every warmup/repetition result; one measured result
-  per implementation receives the full independent semantic pass, avoiding
-  repeated quadratic post-timing checks on capped collision workloads.
+  Every warmup/repetition returns an opaque observable checksum; one measured
+  result per implementation is retained for the full independent semantic
+  pass, avoiding repeated-history retention and repeated post-timing checks on
+  capped collision workloads.
   Enumeration equality is checked as sorted binding multisets rather than
   nested `List.mem` scans, preserving duplicate-sensitive validation without
   a quadratic 100,000-entry post-check.
 - [x] **HP0.2** Add latest-root/all-prefix timed policies and controlled live-heap
   measurement with all roots alive; separate mutable single-version results.
   Persistent existing/new-set tasks explicitly time both policies; the all-prefix
-  task retains each root in its sample slot through allocation measurement and
-  validates newest/oldest versions. Post-GC live heap is reported separately;
-  `Hashtbl` remains a prepared single-version comparison.
+  task retains every prefix root through its individual allocation measurement
+  and validates newest/oldest versions. Post-GC live heap is reported
+  separately at the 100/2,000 representative matrix sizes; larger records
+  explicitly declare timing/allocation-only heap scope. `Hashtbl` remains a
+  prepared single-version comparison.
 - [x] **HP0.3** Add matched Patricia/AVL/Hashtbl/HAMT integer/string distributions,
   sizes, seeds, repetitions and machine-readable environment/revision metadata.
   The integer runner includes the constant-hash workload at the
@@ -248,3 +251,4 @@ implemented or validated, and no new performance target is achieved.
 | 2026-09-23 | HP0.1 capped validation regression | `HASHTABLE_BENCH_SIZE=2000 HASHTABLE_BENCH_SEED=0 HASHTABLE_BENCH_PATTERN=constant-hash HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 make hashtable-benchmark`; JSONL assertions | Passed. The formerly prolonged collision case now completed with valid metadata and samples after its one full semantic pass. This confirms the cap is practical while retaining the timed checksums, retained results, and independent correctness validation. |
 | 2026-09-23 | HP0.1 scalable enumeration validation | `make hashtable-benchmark-smoke` after replacing bidirectional `List.mem` checks with sorted binding multiset equality | Passed. Integer/string HAMT and Patricia benchmarks retain exact enumeration content/count and per-binding map checks, while the independent pass avoids quadratic membership scans that would dominate 100,000-entry matrix completion. |
 | 2026-09-23 | HP0.1 bounded repeated-history retention | `make hashtable-benchmark-smoke`; then `HASHTABLE_BENCH_SIZE=2000 HASHTABLE_BENCH_SEED=0 HASHTABLE_BENCH_PATTERN=constant-hash HASHTABLE_BENCH_REPETITIONS=7 HASHTABLE_BENCH_WARMUPS=1 make hashtable-benchmark` | Passed. All four persistent harnesses retain only measured repetition zero's concrete result for the full semantic pass; every warmup and repetition still produces an opaque observable checksum and an independent timing/allocation sample. The 2,000-entry seven-repetition HAMT collision case completed successfully with metadata, 350 samples, 50 summaries, and 7 live-heap records, avoiding the former process-lifetime retention of seven all-prefix histories. |
+| 2026-09-23 | HP0.2 scalable live-heap matrix scope | `make hashtable-benchmark-smoke`; `HASHTABLE_BENCH_SIZE=10000 HASHTABLE_BENCH_LIVE_HEAP=false HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 ./hashtable-benchmark`; JSONL assertions | Passed. The `live_heap` metadata flag records whether a post-GC retained-heap pass was performed. The matrix runner requires it at 100/2,000 (including the capped collision histories) and disables it at 10,000/100,000, where each record still has all timed operation/allocation samples and semantic validation. The high-size direct check emitted one false metadata value, 50 samples, 50 summaries, and no live-heap records; the normal four-executable smoke retained its heap measurements. The matrix validator requires the documented flag and pair equality. |

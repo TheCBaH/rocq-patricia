@@ -16,6 +16,18 @@ seeds=${HASHTABLE_MATRIX_SEEDS:-'0 31 104729'}
 repetitions=${HASHTABLE_BENCH_REPETITIONS:-7}
 warmups=${HASHTABLE_BENCH_WARMUPS:-1}
 
+# Post-GC retained-heap construction is its own measurement, not an input to a
+# timed sample.  Collect it at the 100/2,000 representative sizes (including
+# the capped collision histories), while the 10,000/100,000 records remain
+# complete timing/allocation matrices without repeatedly rebuilding enormous
+# retained histories after each workload.
+live_heap_for_size() {
+  case "$1" in
+    100|2000) printf '%s\n' true ;;
+    *) printf '%s\n' false ;;
+  esac
+}
+
 # Each Make target extracts, compiles, links, and then runs its benchmark.  A
 # matrix has many records, so invoking those targets per record would make the
 # build dominate the measurement campaign.  Establish a clean provenance once,
@@ -38,7 +50,8 @@ bootstrap_integer() {
   HASHTABLE_BENCH_SIZE=100 HASHTABLE_BENCH_SEED=0 \
   HASHTABLE_BENCH_PATTERN=ascending HASHTABLE_BENCH_REPETITIONS=1 \
   HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_BENCH_RESULTS=$record \
-  HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false "$@"
+  HASHTABLE_BENCH_LIVE_HEAP=true HASHTABLE_BENCH_REVISION=$revision \
+  HASHTABLE_BENCH_DIRTY=false "$@"
 }
 
 bootstrap_string() {
@@ -47,7 +60,8 @@ bootstrap_string() {
   HASHTABLE_BENCH_SIZE=100 HASHTABLE_BENCH_SEED=0 \
   HASHTABLE_BENCH_STRING_PATTERN=fixed-width HASHTABLE_BENCH_REPETITIONS=1 \
   HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_BENCH_RESULTS=$record \
-  HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false "$@"
+  HASHTABLE_BENCH_LIVE_HEAP=true HASHTABLE_BENCH_REVISION=$revision \
+  HASHTABLE_BENCH_DIRTY=false "$@"
 }
 
 bootstrap_integer "$bootstrap/hashtable.jsonl" make hashtable-benchmark
@@ -59,10 +73,11 @@ run_integer() {
   size=$1
   seed=$2
   pattern=$3
+  live_heap=$(live_heap_for_size "$size")
   record="$output/integer-size${size}-seed${seed}-${pattern}.jsonl"
   HASHTABLE_BENCH_SIZE=$size HASHTABLE_BENCH_SEED=$seed \
   HASHTABLE_BENCH_PATTERN=$pattern HASHTABLE_BENCH_REPETITIONS=$repetitions \
-  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_RESULTS=$record \
+  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_LIVE_HEAP=$live_heap HASHTABLE_BENCH_RESULTS=$record \
   HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false \
   ./hashtable-benchmark
 }
@@ -71,10 +86,11 @@ run_patricia_integer() {
   size=$1
   seed=$2
   pattern=$3
+  live_heap=$(live_heap_for_size "$size")
   record="$output/patricia-integer-size${size}-seed${seed}-${pattern}.jsonl"
   HASHTABLE_BENCH_SIZE=$size HASHTABLE_BENCH_SEED=$seed \
   HASHTABLE_BENCH_PATTERN=$pattern HASHTABLE_BENCH_REPETITIONS=$repetitions \
-  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_RESULTS=$record \
+  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_LIVE_HEAP=$live_heap HASHTABLE_BENCH_RESULTS=$record \
   HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false \
   ./patricia-matrix-benchmark
 }
@@ -91,10 +107,11 @@ run_string() {
   size=$1
   seed=$2
   pattern=$3
+  live_heap=$(live_heap_for_size "$size")
   record="$output/string-size${size}-seed${seed}-${pattern}.jsonl"
   HASHTABLE_BENCH_SIZE=$size HASHTABLE_BENCH_SEED=$seed \
   HASHTABLE_BENCH_STRING_PATTERN=$pattern HASHTABLE_BENCH_REPETITIONS=$repetitions \
-  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_RESULTS=$record \
+  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_LIVE_HEAP=$live_heap HASHTABLE_BENCH_RESULTS=$record \
   HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false \
   ./hashtable-string-benchmark
 }
@@ -103,10 +120,11 @@ run_patricia_string() {
   size=$1
   seed=$2
   pattern=$3
+  live_heap=$(live_heap_for_size "$size")
   record="$output/patricia-string-size${size}-seed${seed}-${pattern}.jsonl"
   HASHTABLE_BENCH_SIZE=$size HASHTABLE_BENCH_SEED=$seed \
   HASHTABLE_BENCH_STRING_PATTERN=$pattern HASHTABLE_BENCH_REPETITIONS=$repetitions \
-  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_RESULTS=$record \
+  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_LIVE_HEAP=$live_heap HASHTABLE_BENCH_RESULTS=$record \
   HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false \
   ./patricia-string-matrix-benchmark
 }

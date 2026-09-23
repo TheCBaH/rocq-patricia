@@ -186,13 +186,15 @@ let run_persistent name empty of_list set get mem remove elements =
           fail (name ^ " new history latest mismatch")) new_bindings;
     check_map (name ^ " new history oldest") get (Stdlib.List.hd (Stdlib.List.rev added_roots)) bindings;
     check_elements (name ^ " elements") get elements bases.(index) bindings;
-  let latest = Bench.live_heap ~implementation:name ~policy:"latest-root" (fun () ->
-      Stdlib.List.fold_left (fun map (key, value) -> set key value map) (empty ()) bindings) in
-  check_map (name ^ " latest root") get latest bindings;
-  let roots = Bench.live_heap ~implementation:name ~policy:"all-prefix-roots" (fun () ->
-      Stdlib.List.fold_left (fun roots (key, value) -> set key value (Stdlib.List.hd roots) :: roots) [ empty () ] bindings) in
-  if Stdlib.List.length roots <> size + 1 then fail (name ^ " retained root count mismatch");
-  check_map (name ^ " all-prefix root") get (Stdlib.List.hd roots) bindings
+  if Bench.live_heap_enabled () then begin
+    let latest = Bench.live_heap ~implementation:name ~policy:"latest-root" (fun () ->
+        Stdlib.List.fold_left (fun map (key, value) -> set key value map) (empty ()) bindings) in
+    check_map (name ^ " latest root") get latest bindings;
+    let roots = Bench.live_heap ~implementation:name ~policy:"all-prefix-roots" (fun () ->
+        Stdlib.List.fold_left (fun roots (key, value) -> set key value (Stdlib.List.hd roots) :: roots) [ empty () ] bindings) in
+    if Stdlib.List.length roots <> size + 1 then fail (name ^ " retained root count mismatch");
+    check_map (name ^ " all-prefix root") get (Stdlib.List.hd roots) bindings
+  end
 
 let run_hashtbl () =
   let build_first pairs = Stdlib.List.fold_right (fun (key, value) table -> Hashtbl.replace table key value; table)
@@ -255,7 +257,8 @@ let run_hashtbl () =
         fail "Hashtbl present remove mismatch") remove_inputs;
   Array.iter (fun table -> check_map "Hashtbl missing remove" get table bindings) missing_remove_inputs;
   Array.iter (fun table -> check_elements "Hashtbl elements" get elements table bindings) bases;
-  ignore (Bench.live_heap ~implementation:"OCaml Hashtbl" ~policy:"single-version" (fun () -> build_first bindings))
+  if Bench.live_heap_enabled () then
+    ignore (Bench.live_heap ~implementation:"OCaml Hashtbl" ~policy:"single-version" (fun () -> build_first bindings))
 
 let () =
   if size < 1 then fail "HASHTABLE_BENCH_SIZE must be positive";
