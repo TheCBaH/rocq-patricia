@@ -14,6 +14,46 @@ fi
 sizes=${HASHTABLE_MATRIX_SIZES:-'100 2000 10000 100000'}
 seeds=${HASHTABLE_MATRIX_SEEDS:-'0 31 104729'}
 repetitions=${HASHTABLE_BENCH_REPETITIONS:-7}
+warmups=${HASHTABLE_BENCH_WARMUPS:-1}
+
+# Each Make target extracts, compiles, links, and then runs its benchmark.  A
+# matrix has many records, so invoking those targets per record would make the
+# build dominate the measurement campaign.  Establish a clean provenance once,
+# bootstrap each isolated executable once, and execute the linked binary for
+# every measured record below.  The benchmark support reads all record-specific
+# configuration from its environment.
+if ! git diff --quiet --ignore-submodules -- || \
+   ! git diff --cached --quiet --ignore-submodules -- || \
+   [ -n "$(git status --porcelain --untracked-files=all --ignored=no)" ]; then
+  printf 'Refusing to run a matrix from a dirty worktree\n' >&2
+  exit 1
+fi
+revision=$(git rev-parse HEAD)
+bootstrap=$(mktemp -d /tmp/hashtable-performance-bootstrap.XXXXXX)
+trap 'rm -rf "$bootstrap"' EXIT HUP INT TERM
+
+bootstrap_integer() {
+  record=$1
+  shift
+  HASHTABLE_BENCH_SIZE=100 HASHTABLE_BENCH_SEED=0 \
+  HASHTABLE_BENCH_PATTERN=ascending HASHTABLE_BENCH_REPETITIONS=1 \
+  HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_BENCH_RESULTS=$record \
+  HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false "$@"
+}
+
+bootstrap_string() {
+  record=$1
+  shift
+  HASHTABLE_BENCH_SIZE=100 HASHTABLE_BENCH_SEED=0 \
+  HASHTABLE_BENCH_STRING_PATTERN=fixed-width HASHTABLE_BENCH_REPETITIONS=1 \
+  HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_BENCH_RESULTS=$record \
+  HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false "$@"
+}
+
+bootstrap_integer "$bootstrap/hashtable.jsonl" make hashtable-benchmark
+bootstrap_string "$bootstrap/hashtable-string.jsonl" make hashtable-string-benchmark
+bootstrap_integer "$bootstrap/patricia.jsonl" make patricia-matrix-benchmark
+bootstrap_string "$bootstrap/patricia-string.jsonl" make patricia-string-matrix-benchmark
 
 run_integer() {
   size=$1
@@ -22,7 +62,9 @@ run_integer() {
   record="$output/integer-size${size}-seed${seed}-${pattern}.jsonl"
   HASHTABLE_BENCH_SIZE=$size HASHTABLE_BENCH_SEED=$seed \
   HASHTABLE_BENCH_PATTERN=$pattern HASHTABLE_BENCH_REPETITIONS=$repetitions \
-  HASHTABLE_BENCH_RESULTS=$record make hashtable-benchmark
+  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_RESULTS=$record \
+  HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false \
+  ./hashtable-benchmark
 }
 
 run_patricia_integer() {
@@ -32,7 +74,9 @@ run_patricia_integer() {
   record="$output/patricia-integer-size${size}-seed${seed}-${pattern}.jsonl"
   HASHTABLE_BENCH_SIZE=$size HASHTABLE_BENCH_SEED=$seed \
   HASHTABLE_BENCH_PATTERN=$pattern HASHTABLE_BENCH_REPETITIONS=$repetitions \
-  HASHTABLE_BENCH_RESULTS=$record make patricia-matrix-benchmark
+  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_RESULTS=$record \
+  HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false \
+  ./patricia-matrix-benchmark
 }
 
 require_record() {
@@ -50,7 +94,9 @@ run_string() {
   record="$output/string-size${size}-seed${seed}-${pattern}.jsonl"
   HASHTABLE_BENCH_SIZE=$size HASHTABLE_BENCH_SEED=$seed \
   HASHTABLE_BENCH_STRING_PATTERN=$pattern HASHTABLE_BENCH_REPETITIONS=$repetitions \
-  HASHTABLE_BENCH_RESULTS=$record make hashtable-string-benchmark
+  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_RESULTS=$record \
+  HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false \
+  ./hashtable-string-benchmark
 }
 
 run_patricia_string() {
@@ -60,7 +106,9 @@ run_patricia_string() {
   record="$output/patricia-string-size${size}-seed${seed}-${pattern}.jsonl"
   HASHTABLE_BENCH_SIZE=$size HASHTABLE_BENCH_SEED=$seed \
   HASHTABLE_BENCH_STRING_PATTERN=$pattern HASHTABLE_BENCH_REPETITIONS=$repetitions \
-  HASHTABLE_BENCH_RESULTS=$record make patricia-string-matrix-benchmark
+  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_RESULTS=$record \
+  HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false \
+  ./patricia-string-matrix-benchmark
 }
 
 for size in $sizes; do
@@ -103,7 +151,7 @@ done
 
 HASHTABLE_MATRIX_SIZES="$sizes" HASHTABLE_MATRIX_SEEDS="$seeds" \
 HASHTABLE_BENCH_REPETITIONS="$repetitions" \
-HASHTABLE_BENCH_WARMUPS="${HASHTABLE_BENCH_WARMUPS:-1}" \
+HASHTABLE_BENCH_WARMUPS="$warmups" \
   sh ./validate-hashtable-performance-matrix.sh "$output"
 
 printf 'HAMT performance matrix JSONL records: %s\n' "$output"

@@ -34,6 +34,8 @@
 /hashtable-scalar-test
 /hashtable-benchmark
 /hashtable-string-benchmark
+/patricia-matrix-benchmark
+/patricia-string-matrix-benchmark
 /extracted/
 /reference_extracted/
 /hashtable_reference_extracted/
