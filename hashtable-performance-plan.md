@@ -280,11 +280,11 @@ new scalar tests and generated audits. `make all` checks Patricia integration.
 Run a clean checkout/worktree aggregate for final reproducibility rather than
 relying only on cached `.vo` or generated objects. Hosted CI is separate evidence.
 
-Proposed new targets: `hashtable-performance-baseline`,
-`hashtable-performance-matrix`, `hashtable-scalar-test`,
-`hashtable-scalar-test-native`, `hashtable-hot-path-audit`. They do not exist yet;
-implement/document their arguments during the relevant stages. CI should run
-correctness/audit/small workload smoke, not enforce noisy wall-clock thresholds.
+Implemented targets include `hashtable-performance-baseline`,
+`hashtable-performance-matrix`, its explicit
+`hashtable-performance-matrix-validate` evidence check, scalar bytecode/native
+tests, and generated hot-path audits. CI should run correctness/audit/small
+workload smoke, not enforce noisy wall-clock thresholds.
 
 ## Acceptance and stopping rules
 

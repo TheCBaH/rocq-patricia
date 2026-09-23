@@ -101,4 +101,9 @@ for size in $sizes; do
   done
 done
 
+HASHTABLE_MATRIX_SIZES="$sizes" HASHTABLE_MATRIX_SEEDS="$seeds" \
+HASHTABLE_BENCH_REPETITIONS="$repetitions" \
+HASHTABLE_BENCH_WARMUPS="${HASHTABLE_BENCH_WARMUPS:-1}" \
+  sh ./validate-hashtable-performance-matrix.sh "$output"
+
 printf 'HAMT performance matrix JSONL records: %s\n' "$output"

@@ -47,7 +47,10 @@ Patricia map on the three deterministic string distributions. Both are
 intentionally separate executables because the Patricia and HAMT extraction
 trees contain colliding un-namespaced support modules, so their JSONL files are
 paired by workload, size, seed, and repetition metadata rather than linked
-into one process.
+into one process. `make hashtable-performance-matrix-validate` checks an
+existing `HASHTABLE_MATRIX_OUTPUT` directory for the exact configured record
+set, samples/summaries, clean single-revision provenance, and equal HAMT /
+Patricia pair metadata.
 `make hashtable-primitive-benchmark` separately measures checked scalar calls,
 the benchmark hash callback, and fixed-size private-sequence operations when
 profiling is unavailable; set `HASHTABLE_PRIMITIVE_BENCH_ITERATIONS` to adjust
