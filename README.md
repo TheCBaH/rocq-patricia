@@ -40,10 +40,13 @@ timed builds, lookup/membership hits and misses, updates, removals, enumeration
 and retained heap; its output is workload-specific local evidence.
 `make patricia-matrix-benchmark` emits the same JSONL operation boundary for
 the public positive-integer Patricia map, `Map.Make`, and `Hashtbl`; the
-matrix runner invokes it beside each integer HAMT workload. It is intentionally
-a separate executable because the two extraction trees contain colliding
-un-namespaced support modules, so its JSONL files are paired by workload, size,
-seed, and repetition metadata rather than linked into one process.
+matrix runner invokes it beside each integer HAMT workload. The equivalent
+`make patricia-string-matrix-benchmark` covers the public direct-string
+Patricia map on the three deterministic string distributions. Both are
+intentionally separate executables because the Patricia and HAMT extraction
+trees contain colliding un-namespaced support modules, so their JSONL files are
+paired by workload, size, seed, and repetition metadata rather than linked
+into one process.
 `make hashtable-primitive-benchmark` separately measures checked scalar calls,
 the benchmark hash callback, and fixed-size private-sequence operations when
 profiling is unavailable; set `HASHTABLE_PRIMITIVE_BENCH_ITERATIONS` to adjust

@@ -29,7 +29,7 @@ HASHTABLE_ARRAY_RUNTIME_CMX := ../HashTablePrimitives.cmx ../HashTableScalarPrim
 	reference-extraction ocaml reference-ocaml test union-oracle union-oracle-native differential \
 	benchmark benchmark-smoke union-profile map-filter-profile remove-profile reference-profile compiler-config clean
 
-.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-test hashtable-differential hashtable-test-native hashtable-native hashtable-native-model-extraction-audit hashtable-native-model-test hashtable-native-model-test-native hashtable-native-array-extracted hashtable-native-array-extraction-audit hashtable-native-array-extraction-audit-test hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-extract-wrapper-test hashtable-native-extract-wrapper-test-native hashtable-native-extract-differential hashtable-native-extract-differential-native hashtable-native-array-test hashtable-native-array-test-native hashtable-native-primitives-test hashtable-native-primitives-audit hashtable-scalar-primitives-audit hashtable-scalar-test hashtable-scalar-test-bytecode hashtable-native-array-audit hashtable-benchmark hashtable-primitive-benchmark hashtable-benchmark-smoke hashtable-string-benchmark hashtable-string-benchmark-smoke patricia-matrix-benchmark hashtable-performance-matrix hashtable-extraction-audit hashtable-generated-interface-audit hashtable-assumptions
+.PHONY: hashtable hashtable-proof hashtable-skeleton-extraction hashtable-reference hashtable-reference-ocaml hashtable-reference-test hashtable-wrapper-test hashtable-wrapper-test-native hashtable-test hashtable-differential hashtable-test-native hashtable-native hashtable-native-model-extraction-audit hashtable-native-model-test hashtable-native-model-test-native hashtable-native-array-extracted hashtable-native-array-extraction-audit hashtable-native-array-extraction-audit-test hashtable-native-array-extracted-test hashtable-native-array-extracted-test-native hashtable-native-extract-wrapper-test hashtable-native-extract-wrapper-test-native hashtable-native-extract-differential hashtable-native-extract-differential-native hashtable-native-array-test hashtable-native-array-test-native hashtable-native-primitives-test hashtable-native-primitives-audit hashtable-scalar-primitives-audit hashtable-scalar-test hashtable-scalar-test-bytecode hashtable-native-array-audit hashtable-benchmark hashtable-primitive-benchmark hashtable-benchmark-smoke hashtable-string-benchmark hashtable-string-benchmark-smoke patricia-matrix-benchmark patricia-string-matrix-benchmark hashtable-performance-matrix hashtable-extraction-audit hashtable-generated-interface-audit hashtable-assumptions
 
 .PHONY: string-primitive-profile
 .PHONY: string-worker-performance
@@ -282,7 +282,15 @@ patricia-matrix-benchmark: extraction PatriciaMap.mli PatriciaMap.ml HashTableBe
 	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../patricia-matrix-benchmark $$objects ../PatriciaMap.cmx ../HashTableBenchmarkSupport.cmx ../PatriciaMatrixBenchmark.cmx
 	./patricia-matrix-benchmark
 
-hashtable-benchmark-smoke: hashtable-benchmark hashtable-string-benchmark patricia-matrix-benchmark
+patricia-string-matrix-benchmark: extraction StringPatriciaMap.mli StringPatriciaMap.ml HashTableBenchmarkSupport.mli HashTableBenchmarkSupport.ml PatriciaStringMatrixBenchmark.ml
+	$(OCAMLOPT) -c HashTableBenchmarkSupport.mli HashTableBenchmarkSupport.ml
+	cd extracted && $(OCAMLDEP) -sort *.mli *.ml | xargs $(OCAMLOPT) -I .. -c
+	$(OCAMLOPT) -I extracted -c StringPatriciaMap.mli StringPatriciaMap.ml PatriciaStringMatrixBenchmark.ml
+	cd extracted && objects=`$(OCAMLDEP) -sort *.ml | sed 's/\.ml/.cmx/g'` && \
+	  $(OCAMLOPT) -I . -I .. unix.cmxa -o ../patricia-string-matrix-benchmark $$objects ../StringPatriciaMap.cmx ../HashTableBenchmarkSupport.cmx ../PatriciaStringMatrixBenchmark.cmx
+	./patricia-string-matrix-benchmark
+
+hashtable-benchmark-smoke: hashtable-benchmark hashtable-string-benchmark patricia-matrix-benchmark patricia-string-matrix-benchmark
 
 .PHONY: hashtable-performance-baseline
 hashtable-performance-baseline: hashtable-benchmark-smoke
@@ -303,6 +311,8 @@ hashtable-benchmark hashtable-string-benchmark: export HASHTABLE_BENCH_REVISION 
 hashtable-benchmark hashtable-string-benchmark: export HASHTABLE_BENCH_DIRTY := $(shell if git diff --quiet --ignore-submodules --; then echo false; else echo true; fi)
 patricia-matrix-benchmark: export HASHTABLE_BENCH_REVISION := $(shell git rev-parse HEAD)
 patricia-matrix-benchmark: export HASHTABLE_BENCH_DIRTY := $(shell if git diff --quiet --ignore-submodules --; then echo false; else echo true; fi)
+patricia-string-matrix-benchmark: export HASHTABLE_BENCH_REVISION := $(shell git rev-parse HEAD)
+patricia-string-matrix-benchmark: export HASHTABLE_BENCH_DIRTY := $(shell if git diff --quiet --ignore-submodules --; then echo false; else echo true; fi)
 
 hashtable-string-benchmark-smoke: export HASHTABLE_BENCH_SIZE := 100
 hashtable-string-benchmark-smoke: export HASHTABLE_BENCH_SEED := 31

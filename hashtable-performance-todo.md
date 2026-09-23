@@ -59,9 +59,11 @@ implemented or validated, and no new performance target is achieved.
   records now carry explicit `history_policy` values. `PatriciaMatrixBenchmark`
   now supplies a process-level matched integer companion with the same input,
   operation, retention, validation, warmup/repetition, and JSONL-metadata
-  boundary. Its files are deliberately separate because directly linking the
-  two extraction trees collides on shared un-namespaced support modules.
-  Matched string Patricia inputs and the full size/seed matrix remain open.
+  boundary. `PatriciaStringMatrixBenchmark` now supplies the same companion
+  for the fixed-width, mixed-length, and common-prefix string distributions.
+  Its files are deliberately separate because directly linking the two
+  extraction trees collides on shared un-namespaced support modules. The full
+  size/seed matrix remains open.
 - [x] **HP0.4** Profile scalar operations, conversions, primitive copies and
   hashing, or record controlled microbenchmark attribution and its limitations.
   No compatible profiler is installed locally. `hashtable-primitive-benchmark`
@@ -164,7 +166,8 @@ implemented or validated, and no new performance target is achieved.
   repetitions plus a warmup for all current HAMT integer/string distributions.
   A fresh detached worktree now passes `make all`, and the matrix has matched
   integer Patricia records; it still lacks the planned 100/10,000/100,000
-  repeated points, matched Patricia strings, and a clean-worktree matrix.
+  repeated points, the new matched Patricia string records in a full matrix,
+  and a clean-worktree matrix.
 - [x] **HP5.4** Update README, performance note and release/foreign-contract
   inventories; retain source proof versus target testing distinction.
   `README.md`, `hashtable-performance.md`, and
@@ -223,3 +226,4 @@ implemented or validated, and no new performance target is achieved.
 | 2026-09-22 | HP5.3 clean aggregate | Fresh detached worktree at `115c40a`, then `make all` (detached status capture) | Passed, exit status 0. The first clean run exposed an ordering defect: the global assumption script audits all `.v` files, but `make all` had not built HAMT `.vo` files first. `all` now depends on `hashtable-proof` before `assumptions`; the clean re-run compiled both proof families, reported 1,161 declarations closed under the global context, and passed extraction, audits, randomized oracle, union oracle, and optimized/reference differential tests. The clean performance matrix remains separate work. |
 | 2026-09-22 | HP5.3 clean matrix smoke | Fresh detached worktree at `7b0c3c7`, then `HASHTABLE_MATRIX_SIZES=100 HASHTABLE_MATRIX_SEEDS=31 HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_MATRIX_OUTPUT=<tmp> sh ./run-hashtable-performance-matrix.sh` (detached status capture) | Passed, exit status 0. The first clean matrix attempt exposed a second cached-artifact defect: `hashtable-benchmark` depended on `HashTableScalarPrimitives.cmx` without a build rule. The explicit native-object rule now rebuilds it. The clean re-run emitted 11 files: paired HAMT/Patricia integer records for four workloads and three current string records. This is a clean smoke only; the planned repeated four-size matrix and matched Patricia strings remain open. |
 | 2026-09-22 | HP0 named baseline target | `make hashtable-performance-baseline` (detached status capture) | Passed, exit status 0. The new named target runs the 100-entry corrected HAMT integer/string smoke and matched Patricia integer companion with the ordinary seven measured repetitions. It is a reproducible local baseline smoke, not the full performance matrix. |
+| 2026-09-23 | HP0.3 matched string Patricia process boundary | `HASHTABLE_BENCH_SIZE=100 HASHTABLE_BENCH_SEED=31 HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_BENCH_STRING_PATTERN=fixed-width HASHTABLE_BENCH_RESULTS=<tmp> make patricia-string-matrix-benchmark`; `jq` metadata/sample assertions | Passed. `PatriciaStringMatrixBenchmark.ml` uses exactly the fixed-width/mixed-length/common-prefix construction, operation boundaries, retained-root policies, validation, timing protocol, and JSONL schema of the HAMT string benchmark for direct string Patricia, `Stdlib.Map`, and `Hashtbl`. The smoke wrote 80 JSONL records and includes String Patricia samples. Process separation avoids generated support-module collisions; the updated matrix runner pairs each string HAMT file with its direct-string Patricia counterpart. |
