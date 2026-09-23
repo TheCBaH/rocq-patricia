@@ -12,19 +12,21 @@ foreign obligations separately from kernel-checked source statements.
 
 ## Current decision
 
-Feasible: proceed with benchmark correction, bounded scalar realization and
-direct native workers before considering storage changes. Documentation and
-baseline inspection are complete. No performance optimization has been
-implemented or validated, and no new performance target is achieved.
+Bounded scalar realization and direct native workers are implemented. The
+clean 228-record matched matrix and its raw archive are published in the
+[result report](hashtable-performance-results.md). The measured retained-heap
+target is met at 100/2,000 bindings; the ordinary 2× standalone time target
+is unmet for hit lookup. Historical scalar-stage attribution and a paired
+corrected pre-optimization baseline remain open.
 
 | Gate | Depends on | Status / closure condition |
 | --- | --- | --- |
-| HP0 — corrected baseline | Review | Open: reproducible isolated timings, retention modes and attribution |
-| HP1 — scalar realization | HP0 | Open: model/range proofs, target inventory, primitive tests and stage measurements |
-| HP2 — sequence hot path | HP1 | Open: no child-list emptiness conversion, refinement and persistence tests |
-| HP3 — direct workers | HP2 | Open: no public hot-path source round trip or collision-list conversion |
-| HP4 — specialization decision | HP3 + residual profile | Pending: implement only justified candidates, or explicitly defer |
-| HP5 — release evidence | HP1–HP3 + HP4 decision | Open: aggregate checks, matched matrix, boundary documentation and clean build |
+| HP0 — corrected baseline | Review | Partial: current matrix published; matched pre-optimization baseline unavailable |
+| HP1 — scalar realization | HP0 | Partial: proof/audit/tests pass; isolated scalar-stage comparison remains |
+| HP2 — sequence hot path | HP1 | Complete: conversion removed, refinement and persistence evidence recorded |
+| HP3 — direct workers | HP2 | Complete: public hot paths avoid source/sequence-view round trips |
+| HP4 — specialization decision | HP3 + residual profile | Complete: defer with residual-cost uncertainty recorded |
+| HP5 — release evidence | HP1–HP3 + HP4 decision | Complete locally: full paired matrix, clean aggregate and boundary report; hosted CI separate |
 
 ## Review and baseline evidence
 
@@ -84,7 +86,11 @@ implemented or validated, and no new performance target is achieved.
   is the recorded fallback; it isolates checked scalar calls, the hash callback,
   sequence get, fresh edits and `to_list`. It does not attribute call counts
   inside whole-map operations, so it is not a substitute for a sampling trace.
-- [ ] **HP0.G** Publish corrected baseline and remaining attribution uncertainty.
+- [x] **HP0.G** Publish corrected current baseline and remaining attribution
+  uncertainty. The 228-record report and archive provide the corrected
+  operation/retention boundary for future comparisons. A matched corrected
+  pre-optimization baseline was not captured before HP1, so the proposed
+  10× paired historical claim remains unverified and is tracked under HP1.G.
 
 - [x] **HP1.1** Define bounded scalar wrappers and source popcount; prove
   equivalence to `HashTableBits` and range closure for reachable calls.
@@ -174,22 +180,24 @@ implemented or validated, and no new performance target is achieved.
   `make all`, `make hashtable-benchmark-smoke`; integrate proposed new checks.
   The hash-table aggregate (including proof/assumption and generated audits),
   repository aggregate, and two-harness 100-entry benchmark smoke all pass.
-- [ ] **HP5.3** Run clean-checkout aggregate and matched repeated performance
+- [x] **HP5.3** Run clean-checkout aggregate and matched repeated performance
   matrix; record achieved/unmet targets and any repeatable regressions.
-  Partial: the local 2,000-entry three-seed matrix completed with three
-  repetitions plus a warmup for all current HAMT integer/string distributions.
-  A fresh detached worktree now passes `make all`, and the matrix has matched
-  integer Patricia records. A fresh detached worktree now also passes the
-  expanded 100-binding paired matrix smoke (all 26 records, including strings
-  and routing depths). It still lacks the planned repeated 100/2,000/10,000/
-  100,000 points and a clean-worktree full matrix.
+  `make all` passed in a fresh detached checkout at `bd0e69c`. The full
+  100/2,000/10,000/100,000, three-seed, seven-repetition matrix produced
+  228 clean paired records at that revision. The validator accepted them;
+  a record-level audit confirmed all operation/repetition groups. Raw data,
+  checksum, operation ratios, achieved heap target and unmet time target are
+  in the [result report](hashtable-performance-results.md). The historical
+  pre-optimization comparison is qualified there because its harness differs.
 - [x] **HP5.4** Update README, performance note and release/foreign-contract
   inventories; retain source proof versus target testing distinction.
   `README.md`, `hashtable-performance.md`, and
   `hashtable-reference-release.md` now describe scalar/direct-worker status,
   enumeration's explicit exception, model-only source oracles, and the
   remaining foreign/runtime and measurement limits.
-- [ ] **HP5.G** Publish final local decision with proof/test/measurement evidence.
+- [x] **HP5.G** Publish final local decision with proof/test/measurement evidence.
+  The result report keeps correctness evidence distinct from observed target
+  execution and defers storage specialization pending whole-map attribution.
 - [ ] **CI** Record hosted CI result separately; local success is not hosted CI.
 
 ## Validation log
@@ -253,3 +261,5 @@ implemented or validated, and no new performance target is achieved.
 | 2026-09-23 | HP0.1 bounded repeated-history retention | `make hashtable-benchmark-smoke`; then `HASHTABLE_BENCH_SIZE=2000 HASHTABLE_BENCH_SEED=0 HASHTABLE_BENCH_PATTERN=constant-hash HASHTABLE_BENCH_REPETITIONS=7 HASHTABLE_BENCH_WARMUPS=1 make hashtable-benchmark` | Passed. All four persistent harnesses retain only measured repetition zero's concrete result for the full semantic pass; every warmup and repetition still produces an opaque observable checksum and an independent timing/allocation sample. The 2,000-entry seven-repetition HAMT collision case completed successfully with metadata, 350 samples, 50 summaries, and 7 live-heap records, avoiding the former process-lifetime retention of seven all-prefix histories. |
 | 2026-09-23 | HP0.2 scalable live-heap matrix scope | `make hashtable-benchmark-smoke`; `HASHTABLE_BENCH_SIZE=10000 HASHTABLE_BENCH_LIVE_HEAP=false HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 ./hashtable-benchmark`; JSONL assertions | Passed. The `live_heap` metadata flag records whether a post-GC retained-heap pass was performed. The matrix runner requires it at 100/2,000 (including the capped collision histories) and disables it at 10,000/100,000, where each record still has all timed operation/allocation samples and semantic validation. The high-size direct check emitted one false metadata value, 50 samples, 50 summaries, and no live-heap records; the normal four-executable smoke retained its heap measurements. The matrix validator requires the documented flag and pair equality. |
 | 2026-09-23 | HP0.2 mixed live-heap matrix validation | `HASHTABLE_MATRIX_SIZES='100 10000' HASHTABLE_MATRIX_SEEDS=31 HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_MATRIX_OUTPUT=/tmp/patricia-live-heap-scope.0X9TZT sh ./run-hashtable-performance-matrix.sh` | Passed. The self-validating runner built each isolated executable once and accepted exactly 38 clean matched records. The 100-binding record declares `live_heap: true`; its 10,000-binding counterpart declares `false`, proving both the runner's size policy and the validator's expected metadata/pair checks. |
+| 2026-09-23 | HP5.3 full matrix | `HASHTABLE_MATRIX_OUTPUT=/tmp/patricia-full-matrix-final2.kTkf09 make hashtable-performance-matrix-validate`; record-level JSONL audit | Passed: 228 clean paired records at `bd0e69c`, four sizes, three seeds, seven measured repetitions and one warmup. The independent audit found 9,918 complete operation summary/sample groups and 936 expected retained-heap records. The compressed raw archive and quantitative decision are in `hashtable-performance-results.md`. |
+| 2026-09-23 | HP5.3 clean aggregate | Detached worktree at `bd0e69c`, `make all` | Passed, exit 0. All proof/extraction/test recipes in the repository aggregate completed from the clean checkout; full build log at `/tmp/patricia-clean-bd0e69c-make-all.log`. |

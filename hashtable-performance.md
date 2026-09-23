@@ -10,6 +10,8 @@ operations natively, then remove source/list conversions from hot workers.
 The [detailed implementation plan](hashtable-performance-plan.md) records the
 evidence, proof/foreign boundary, dependencies and acceptance gates;
 [the performance tracker](hashtable-performance-todo.md) owns progress.
+The [matched matrix report](hashtable-performance-results.md) summarizes the
+current 228-record, seven-repetition result and links its raw JSONL archive.
 
 ## Implementation status
 
@@ -78,8 +80,8 @@ integer and string companions with the HAMT harnesses' exact input, operation,
 retention, warmup/repetition, and JSONL metadata boundaries. The matrix runner
 pairs these files by workload, size, and seed because the two un-namespaced
 generated extraction trees cannot link in one executable. The full repeated
-size matrix is still pending, so this wiring does not make the historical
-tables comparable.
+size matrix is recorded in the matched matrix report. The historical tables
+still use a different harness boundary.
 
 The matrix records post-GC retained heap at the 100 and 2,000 representative
 sizes, including capped collision histories. Its 10,000 and 100,000 records
@@ -151,8 +153,8 @@ dominates that distribution.
 - Use `Hashtbl` for the fastest mutable single-version table. It does not offer
   retained versions or persistent structural sharing.
 - Patricia performs well against AVL in its measured integer/string
-  lookup/removal and structural-union workloads. Its ranking against HAMT
-  now has matched harnesses but still needs the repeated full matrix.
+  lookup/removal and structural-union workloads. The matched repeated matrix
+  now gives direct operation comparisons with HAMT on the planned inputs.
 - AVL uses less retained memory than Patricia and is a steadier choice when
   comparator-based semantics or long common-prefix string behavior matter.
 - The public HAMT has the desired generated/refined implementation boundary,
@@ -204,10 +206,11 @@ domain and would otherwise create large collision histories.
 
 ## Optimization plan
 
-1. Complete the matched, repeated integer/string/Patricia matrix and obtain
-   whole-map attribution; current histories and smoke points are not enough.
-2. Close public range proofs for scalar calls and complete the scalar-stage
-   measurement matrix.
+1. Obtain whole-map attribution for the residual generated lookup/update
+   allocation and reconstruct a corrected pre-optimization comparison if an
+   exact historical scalar-stage speedup claim is needed.
+2. Keep the completed public scalar range proofs and record any isolated
+   scalar-stage measurement separately from the current full matrix.
 3. Retain the proved indexed sequence and direct workers; no source/view
    conversion remains in the public hot set.
 4. Keep generated public-call audits, their negative fixtures, and bytecode/
