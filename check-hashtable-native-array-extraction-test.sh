@@ -18,6 +18,14 @@ if sh "$audit" "$hot_view" >/dev/null 2>&1; then
   exit 1
 fi
 
+hot_depth_view="$fixture_dir/hot-depth-view.ml"
+sed '/^let native_get_depth0 /a\
+  let _ = HashTablePrimitives.to_list entries in' "$model_file" > "$hot_depth_view"
+if sh "$audit" "$hot_depth_view" >/dev/null 2>&1; then
+  echo "extraction audit accepted a direct-depth sequence-view conversion" >&2
+  exit 1
+fi
+
 whole_override="$fixture_dir/whole-override.ml"
 sed 's/^let rec native_set /let native_set /' "$model_file" > "$whole_override"
 if sh "$audit" "$whole_override" >/dev/null 2>&1; then

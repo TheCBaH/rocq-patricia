@@ -871,6 +871,206 @@ Proof.
       rewrite Hpresent. reflexivity.
 Qed.
 
+(** Public lookup is unrolled over the six routing depths.  Each level is a
+    source-defined worker, and the equations below preserve the total fueled
+    model even for arbitrary modeled trees.  Extraction therefore avoids the
+    closure-producing [nat] case at every branch. *)
+Definition native_get_depth6 {K A : Type} (eqb : K -> K -> bool)
+    (full_hash : N) (key : K) (native : native_tree K A) : option A :=
+  match native with
+  | NativeEmpty => None
+  | NativeLeaf stored_hash stored value =>
+      if native_bounded_eq full_hash stored_hash then
+        if eqb key stored then Some value else None
+      else None
+  | NativeCollision stored_hash entries =>
+      if native_bounded_eq full_hash stored_hash then
+        native_bucket_get eqb key entries 0 (pseq_length entries)
+      else None
+  | NativeBranch _ _ => None
+  end.
+
+Lemma native_get_depth6_eq :
+  forall K A (eqb : K -> K -> bool) full_hash (key : K)
+         (native : native_tree K A),
+    native_get_depth6 eqb full_hash key native =
+    native_get eqb 0 6 full_hash key native.
+Proof. intros. destruct native; reflexivity. Qed.
+
+Definition native_get_depth5 {K A : Type} (eqb : K -> K -> bool)
+    (full_hash : N) (key : K) (native : native_tree K A) : option A :=
+  match native with
+  | NativeEmpty => None
+  | NativeLeaf stored_hash stored value =>
+      if native_bounded_eq full_hash stored_hash then
+        if eqb key stored then Some value else None
+      else None
+  | NativeCollision stored_hash entries =>
+      if native_bounded_eq full_hash stored_hash then
+        native_bucket_get eqb key entries 0 (pseq_length entries)
+      else None
+  | NativeBranch bitmap children =>
+      let slot := native_chunk full_hash 5 in
+      if native_bitmap_has bitmap slot then
+        match pseq_get (native_rank bitmap slot) children with
+        | Some child => native_get_depth6 eqb full_hash key child
+        | None => None
+        end
+      else None
+  end.
+
+Lemma native_get_depth5_eq :
+  forall K A (eqb : K -> K -> bool) full_hash (key : K)
+         (native : native_tree K A),
+    native_get_depth5 eqb full_hash key native =
+    native_get eqb 1 5 full_hash key native.
+Proof. intros. destruct native; reflexivity. Qed.
+
+Definition native_get_depth4 {K A : Type} (eqb : K -> K -> bool)
+    (full_hash : N) (key : K) (native : native_tree K A) : option A :=
+  match native with
+  | NativeEmpty => None
+  | NativeLeaf stored_hash stored value =>
+      if native_bounded_eq full_hash stored_hash then
+        if eqb key stored then Some value else None
+      else None
+  | NativeCollision stored_hash entries =>
+      if native_bounded_eq full_hash stored_hash then
+        native_bucket_get eqb key entries 0 (pseq_length entries)
+      else None
+  | NativeBranch bitmap children =>
+      let slot := native_chunk full_hash 4 in
+      if native_bitmap_has bitmap slot then
+        match pseq_get (native_rank bitmap slot) children with
+        | Some child => native_get_depth5 eqb full_hash key child
+        | None => None
+        end
+      else None
+  end.
+
+Lemma native_get_depth4_eq :
+  forall K A (eqb : K -> K -> bool) full_hash (key : K)
+         (native : native_tree K A),
+    native_get_depth4 eqb full_hash key native =
+    native_get eqb 2 4 full_hash key native.
+Proof. intros. destruct native; reflexivity. Qed.
+
+Definition native_get_depth3 {K A : Type} (eqb : K -> K -> bool)
+    (full_hash : N) (key : K) (native : native_tree K A) : option A :=
+  match native with
+  | NativeEmpty => None
+  | NativeLeaf stored_hash stored value =>
+      if native_bounded_eq full_hash stored_hash then
+        if eqb key stored then Some value else None
+      else None
+  | NativeCollision stored_hash entries =>
+      if native_bounded_eq full_hash stored_hash then
+        native_bucket_get eqb key entries 0 (pseq_length entries)
+      else None
+  | NativeBranch bitmap children =>
+      let slot := native_chunk full_hash 3 in
+      if native_bitmap_has bitmap slot then
+        match pseq_get (native_rank bitmap slot) children with
+        | Some child => native_get_depth4 eqb full_hash key child
+        | None => None
+        end
+      else None
+  end.
+
+Lemma native_get_depth3_eq :
+  forall K A (eqb : K -> K -> bool) full_hash (key : K)
+         (native : native_tree K A),
+    native_get_depth3 eqb full_hash key native =
+    native_get eqb 3 3 full_hash key native.
+Proof. intros. destruct native; reflexivity. Qed.
+
+Definition native_get_depth2 {K A : Type} (eqb : K -> K -> bool)
+    (full_hash : N) (key : K) (native : native_tree K A) : option A :=
+  match native with
+  | NativeEmpty => None
+  | NativeLeaf stored_hash stored value =>
+      if native_bounded_eq full_hash stored_hash then
+        if eqb key stored then Some value else None
+      else None
+  | NativeCollision stored_hash entries =>
+      if native_bounded_eq full_hash stored_hash then
+        native_bucket_get eqb key entries 0 (pseq_length entries)
+      else None
+  | NativeBranch bitmap children =>
+      let slot := native_chunk full_hash 2 in
+      if native_bitmap_has bitmap slot then
+        match pseq_get (native_rank bitmap slot) children with
+        | Some child => native_get_depth3 eqb full_hash key child
+        | None => None
+        end
+      else None
+  end.
+
+Lemma native_get_depth2_eq :
+  forall K A (eqb : K -> K -> bool) full_hash (key : K)
+         (native : native_tree K A),
+    native_get_depth2 eqb full_hash key native =
+    native_get eqb 4 2 full_hash key native.
+Proof. intros. destruct native; reflexivity. Qed.
+
+Definition native_get_depth1 {K A : Type} (eqb : K -> K -> bool)
+    (full_hash : N) (key : K) (native : native_tree K A) : option A :=
+  match native with
+  | NativeEmpty => None
+  | NativeLeaf stored_hash stored value =>
+      if native_bounded_eq full_hash stored_hash then
+        if eqb key stored then Some value else None
+      else None
+  | NativeCollision stored_hash entries =>
+      if native_bounded_eq full_hash stored_hash then
+        native_bucket_get eqb key entries 0 (pseq_length entries)
+      else None
+  | NativeBranch bitmap children =>
+      let slot := native_chunk full_hash 1 in
+      if native_bitmap_has bitmap slot then
+        match pseq_get (native_rank bitmap slot) children with
+        | Some child => native_get_depth2 eqb full_hash key child
+        | None => None
+        end
+      else None
+  end.
+
+Lemma native_get_depth1_eq :
+  forall K A (eqb : K -> K -> bool) full_hash (key : K)
+         (native : native_tree K A),
+    native_get_depth1 eqb full_hash key native =
+    native_get eqb 5 1 full_hash key native.
+Proof. intros. destruct native; reflexivity. Qed.
+
+Definition native_get_depth0 {K A : Type} (eqb : K -> K -> bool)
+    (full_hash : N) (key : K) (native : native_tree K A) : option A :=
+  match native with
+  | NativeEmpty => None
+  | NativeLeaf stored_hash stored value =>
+      if native_bounded_eq full_hash stored_hash then
+        if eqb key stored then Some value else None
+      else None
+  | NativeCollision stored_hash entries =>
+      if native_bounded_eq full_hash stored_hash then
+        native_bucket_get eqb key entries 0 (pseq_length entries)
+      else None
+  | NativeBranch bitmap children =>
+      let slot := native_chunk full_hash 0 in
+      if native_bitmap_has bitmap slot then
+        match pseq_get (native_rank bitmap slot) children with
+        | Some child => native_get_depth1 eqb full_hash key child
+        | None => None
+        end
+      else None
+  end.
+
+Lemma native_get_depth0_eq :
+  forall K A (eqb : K -> K -> bool) full_hash (key : K)
+         (native : native_tree K A),
+    native_get_depth0 eqb full_hash key native =
+    native_get eqb 6 0 full_hash key native.
+Proof. intros. destruct native; reflexivity. Qed.
+
 Lemma native_set_refines :
   forall K A (eqb : K -> K -> bool) fuel depth full_hash (key : K) (value : A)
          (native : native_tree K A),
@@ -1023,7 +1223,7 @@ Definition native_table_remove {K Seed A : Type} (eqb : K -> K -> bool)
 Definition native_table_get {K Seed A : Type} (eqb : K -> K -> bool)
     (hash : Seed -> K -> N) (key : K) (native : native_table K Seed A)
     : option A :=
-  native_get eqb branch_levels 0 (hash (native_table_seed native) key) key
+  native_get_depth0 eqb (hash (native_table_seed native) key) key
     (native_table_root native).
 
 Fixpoint native_table_add_first {K Seed A : Type} (eqb : K -> K -> bool)
@@ -1110,6 +1310,8 @@ Lemma native_table_get_refines :
     get eqb hash key (source_table_of_native native).
 Proof.
   intros K Seed A eqb hash key [seed root].
+  unfold native_table_get.
+  rewrite native_get_depth0_eq.
   exact (@native_get_refines K A eqb branch_levels 0 (hash seed key) key root).
 Qed.
 

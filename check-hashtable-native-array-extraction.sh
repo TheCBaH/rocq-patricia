@@ -31,6 +31,20 @@ for worker in native_get native_set native_remove; do
     echo "missing extracted recursive $worker worker" >&2; exit 1;
   }
 done
+for depth in 0 1 2 3 4 5 6; do
+  grep -Eq "^let native_get_depth$depth " "$model_file" || {
+    echo "missing source-defined lookup depth $depth" >&2; exit 1;
+  }
+done
+for depth in 0 1 2 3 4 5; do
+  next=$((depth + 1))
+  grep -Fq "native_get_depth$next eqb full_hash key child" "$model_file" || {
+    echo "lookup depth $depth does not call the next direct worker" >&2; exit 1;
+  }
+done
+grep -Fq 'native_get_depth0 eqb (hash native.native_table_seed key) key' "$model_file" || {
+  echo "public lookup does not use the direct depth worker" >&2; exit 1;
+}
 for worker in native_join_two native_join_worker; do
   grep -Eq "^let( rec)? $worker" "$model_file" || {
     echo "missing direct native join worker $worker" >&2; exit 1;
@@ -39,7 +53,7 @@ done
 grep -Fq 'else native_join_worker fuel depth full_hash (NativeLeaf' "$model_file" || {
   echo "distinct-hash leaf/collision updates still use a source join fallback" >&2; exit 1;
 }
-for worker in native_get native_set native_remove native_table_add_first native_table_of_list; do
+for worker in native_get native_get_depth0 native_get_depth1 native_get_depth2 native_get_depth3 native_get_depth4 native_get_depth5 native_get_depth6 native_set native_remove native_table_add_first native_table_of_list; do
   if ! awk -v worker="$worker" '
     $0 ~ "^let( rec)? " worker " " { in_worker = 1; next }
     in_worker && /^\(\*\*/ { exit bad }

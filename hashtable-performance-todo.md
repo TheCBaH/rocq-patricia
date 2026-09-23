@@ -28,7 +28,7 @@ build-allocation target for ascending integers and fixed-width strings.
 | HP3 — direct workers | HP2 | Complete: public hot paths avoid source/sequence-view round trips |
 | HP4 — specialization decision | HP3 + residual profile | Complete: defer with residual-cost uncertainty recorded |
 | HP5 — release evidence | HP1–HP3 + HP4 decision | Complete locally: full paired matrix, clean aggregate and boundary report; hosted CI separate |
-| HP6 — close remaining throughput gap | HP5 matrix | In progress: bounded comparison candidate reduces generated hit allocation; full five-way follow-up pending |
+| HP6 — close remaining throughput gap | HP5 matrix | In progress: bounded comparison validated at 2,000; direct-depth lookup candidate and full five-way follow-up pending |
 
 ## Review and baseline evidence
 
@@ -212,16 +212,24 @@ build-allocation target for ascending integers and fixed-width strings.
 
 ## Continued throughput work
 
-- [ ] **HP6.1** Replace reachable recursive extracted hash/slot comparison with
+- [x] **HP6.1** Replace reachable recursive extracted hash/slot comparison with
   bounded native comparison; preserve source equivalence and public range
-  proofs, audit the new bindings, and measure the isolated effect. Candidate
-  source/extraction change passes `make hashtable`, `make all`, and the four
-  benchmark smoke executables; a 2,000-binding, seed-31
-  dirty-worktree screening run lowered public hit allocation from 3.749 to
-  0.604 MB for ascending integers and from 9.509 to 0.594 MB for fixed-width
-  strings. Clean-revision repetition and broader distribution checks remain.
+  proofs, audit the new bindings, and measure the isolated effect. Revision
+  `8026332` passes `make hashtable`, `make all`, and the four benchmark smoke
+  executables. Its clean 2,000-binding, seed-31, seven-repetition matched
+  matrix validated all 26 HAMT/Patricia records. Public hit allocation fell
+  from 3.749 to 0.604 MB for ascending integers and 9.509 to 0.594 MB for
+  fixed-width strings; the [result report](hashtable-performance-results.md)
+  records all five implementations and the raw archive.
 - [ ] **HP6.2** Attribute residual generated lookup/update allocation and CPU
   cost, then pursue only source-refined candidates with measured benefit.
+  A controlled synthetic public-worker profile found 96 allocated bytes per
+  branch in `native_get`; generated extraction showed closure-producing fuel
+  case code. Proved six-depth direct source workers now screen at 16 bytes
+  per branch (the checked `pseq_get` option). The 2,000-binding dirty-worktree
+  run has generated/handcoded hit allocation parity and approximately
+  1.40×/1.26× time for ascending integers/fixed-width strings. Clean matched
+  validation and update-path attribution remain.
 - [ ] **HP6.3** Re-run the matched five-implementation matrix at the final
   revision and publish time, allocation and retained-heap gaps by operation
   and distribution, including capped collision histories.
@@ -291,3 +299,5 @@ build-allocation target for ascending integers and fixed-width strings.
 | 2026-09-23 | HP5.3 clean aggregate | Detached worktree at `bd0e69c`, `make all` | Passed, exit 0. All proof/extraction/test recipes in the repository aggregate completed from the clean checkout; full build log at `/tmp/patricia-clean-bd0e69c-make-all.log`. |
 | 2026-09-23 | HP1.G isolated scalar stage | Detached worktrees at `a160354` and `3bb50a4`; 2,000 bindings, seed 31, one warmup, seven measured repetitions for integer ascending and fixed-width string benchmark targets | Passed all four runs. The benchmark/support files are byte-for-byte unchanged between revisions. Public first-wins integer build allocation fell 216.032/15.153 MB (14.26×) and fixed-width string build allocation fell 243.088/19.596 MB (12.41×); corresponding median times fell 7.390/1.109 ms and 8.886/1.332 ms. The raw JSONL archive and scope caveat are in `hashtable-performance-results.md`. |
 | 2026-09-23 | HP6.1 bounded comparison candidate | `make hashtable`; `make all`; `make hashtable-benchmark-smoke`; 2,000-binding ascending integer/fixed-width string benchmarks, seed 31, one warmup and seven measured repetitions on the working tree | All three aggregate commands passed, including proof, assumption audit, bytecode/native scalar corpus, generated hot-path audits, public/model differential suites and Patricia integration. The screening runs measured public hit allocation at 0.604/0.594 MB versus `bd0e69c` 3.749/9.509 MB; same-run generated/handcoded hit time was 1.50×/1.43×. Worktree was dirty, so these are candidate measurements pending a clean revision. A missing `HashTableNativeBits.vo` prerequisite for `HashTableNative.vo` was repaired after an incremental assumption audit exposed stale `.vo` linkage. |
+| 2026-09-23 | HP6.1 clean matched slice | `HASHTABLE_MATRIX_SIZES=2000 HASHTABLE_MATRIX_SEEDS=31 HASHTABLE_BENCH_REPETITIONS=7 HASHTABLE_MATRIX_OUTPUT=/tmp/patricia-bounded-compare-matched-8026332 sh ./run-hashtable-performance-matrix.sh` | Passed: 26 clean matched records at `8026332`, including constant hash, depths 0–5 and all three string distributions, with seven samples per operation. Across 13 HAMT distributions, generated hit-lookup median time/allocation ratios against `bd0e69c` were 0.62/0.15. Raw archive and five-way representative comparisons are in `hashtable-performance-results.md`. |
+| 2026-09-23 | HP6.2 depth-worker screening | Synthetic 200,000-call allocation profile for modeled-depth 0–6 public lookup, then `make hashtable` and 2,000-binding integer/string seven-repetition smoke | The old recursive `native_get` allocated 16 + 96×depth bytes per successful lookup; the source-defined direct-depth worker allocated 16 + 16×depth. `make hashtable` passed including assumptions, bytecode/native differential/model tests and generated negative-fixture audits. Dirty-worktree public hit allocation reached exact handcoded parity at the two representative 2,000-binding points (integer 127,376 bytes, string 125,712 bytes); clean matrix evidence is pending. |

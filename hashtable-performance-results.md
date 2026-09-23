@@ -143,3 +143,30 @@ costs. The available primitive microbenchmark does not attribute those costs
 inside whole-map operations; no storage specialization is selected without
 that evidence. Correctness proofs, generated-shape audits, and finite target
 tests remain separate from these runtime observations.
+
+## Bounded comparison follow-up at `8026332`
+
+The clean revision `8026332977692d103fe189107fdd23f6a19de9d9` realizes
+bounded hash equality and slot order with guarded native integer comparisons.
+Its 2,000-binding, seed-31, seven-repetition matrix covers all 13 planned
+integer/string distributions at that size, including constant hash and all
+six divergence depths. The validator accepted all 26 paired records. Raw
+samples for all five implementations are in
+[`benchmarks/hashtable-bounded-comparison-matrix-8026332.tar.xz`](benchmarks/hashtable-bounded-comparison-matrix-8026332.tar.xz)
+(SHA-256 `ee61af7e501a22d2a3df7af00e5ca3751d0cb2caeedb699ad49b37867a39dfd3`).
+
+Across the 13 distributions, the median generated hit-lookup allocation
+ratio against `bd0e69c` is 0.15 and its median time ratio is 0.62. No
+operation/allocation group regressed by more than 10%. Two missing-removal
+time medians rose 12–15% while their allocation fell; those timing points
+need repetition before they count as regressions. The constant-hash hit
+allocation is essentially unchanged, as key comparisons within the long
+collision bucket dominate that case.
+
+At ascending integers, repeated-set build times (ms) for generated HAMT,
+handcoded HAMT, Patricia, AVL and mutable `Hashtbl` were respectively
+0.207/0.207/0.040/0.115/0.031; hit lookup was
+0.182/0.113/0.056/0.098/0.032. At fixed-width strings the same order gave
+0.264/0.262/0.090/0.168/0.045 for build and
+0.211/0.145/0.132/0.142/0.048 for hit lookup. The generated/handcoded
+build gap is small at these points, while lookup remains the clearer target.

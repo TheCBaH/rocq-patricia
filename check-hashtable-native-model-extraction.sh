@@ -23,6 +23,12 @@ done
 
 grep -Eq '^let rec native_get' "$model_file" ||
   fail "native_get is missing"
+grep -Fq 'native_get_depth0 eqb (hash native.native_table_seed key) key' "$model_file" ||
+  fail "public lookup does not use the direct depth worker"
+for depth in 0 1 2 3 4 5 6; do
+  grep -Eq "^let native_get_depth$depth " "$model_file" ||
+    fail "source-defined lookup depth $depth is missing"
+done
 grep -Eq 'native_get eqb[0-9]* fuel' "$model_file" ||
   fail "native_get does not visibly recurse through compact children"
 grep -Eq '^let rec native_set' "$model_file" ||
@@ -48,7 +54,7 @@ grep -Fq 'native_branch_replace_at bitmap index' "$model_file" ||
 grep -Eq 'native_collision_remove eqb[0-9]* full_hash key stored_hash entries' "$model_file" ||
   fail "native_remove does not visibly use the direct collision removal worker"
 
-for worker in native_get native_set native_remove native_table_add_first native_table_of_list; do
+for worker in native_get native_get_depth0 native_get_depth1 native_get_depth2 native_get_depth3 native_get_depth4 native_get_depth5 native_get_depth6 native_set native_remove native_table_add_first native_table_of_list; do
   if ! awk -v worker="$worker" '
     $0 ~ "^let( rec)? " worker " " { in_worker = 1; next }
     in_worker && /^\(\*\*/ { exit bad }
