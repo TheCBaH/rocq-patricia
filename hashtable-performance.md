@@ -189,6 +189,13 @@ speedup claim or the required repeated, matched Patricia matrix. The capped
 2,000-entry constant-hash point and primitive measurements are recorded in the
 tracker.
 
+The matrix also has deterministic positive-integer `divergence-depth-0` through
+`divergence-depth-5` inputs: the HAMT callback hashes them so every routing
+chunk before the named depth agrees. Their paired Patricia records use the
+identical keys. These distributions are capped at 100/2,000 bindings, like the
+constant-hash workload, because the later depths have a small remaining hash
+domain and would otherwise create large collision histories.
+
 ## Optimization plan
 
 1. Complete the matched, repeated integer/string/Patricia matrix and obtain

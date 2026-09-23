@@ -61,11 +61,14 @@ implemented or validated, and no new performance target is achieved.
   operation, retention, validation, warmup/repetition, and JSONL-metadata
   boundary. `PatriciaStringMatrixBenchmark` now supplies the same companion
   for the fixed-width, mixed-length, and common-prefix string distributions.
-  Its files are deliberately separate because directly linking the two
-  extraction trees collides on shared un-namespaced support modules. A
-  100-binding runner smoke wrote and metadata-validated all 14 paired records
-  (four integer and three string distributions); the full repeated size/seed
-  matrix remains HP5.3 evidence.
+  The integer matrix also supplies seed-normalized `divergence-depth-0` through
+  `divergence-depth-5` keys, with the same positive inputs for HAMT and
+  Patricia; these expensive later-depth collision shapes are capped at
+  100/2,000 bindings. Its files are deliberately separate because directly
+  linking the two extraction trees collides on shared un-namespaced support
+  modules. A 100-binding runner smoke wrote and metadata-validated all 26
+  paired records (ten integer and three string distributions); the full
+  repeated size/seed matrix remains HP5.3 evidence.
 - [x] **HP0.4** Profile scalar operations, conversions, primitive copies and
   hashing, or record controlled microbenchmark attribution and its limitations.
   No compatible profiler is installed locally. `hashtable-primitive-benchmark`
@@ -229,3 +232,4 @@ implemented or validated, and no new performance target is achieved.
 | 2026-09-22 | HP5.3 clean matrix smoke | Fresh detached worktree at `7b0c3c7`, then `HASHTABLE_MATRIX_SIZES=100 HASHTABLE_MATRIX_SEEDS=31 HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_MATRIX_OUTPUT=<tmp> sh ./run-hashtable-performance-matrix.sh` (detached status capture) | Passed, exit status 0. The first clean matrix attempt exposed a second cached-artifact defect: `hashtable-benchmark` depended on `HashTableScalarPrimitives.cmx` without a build rule. The explicit native-object rule now rebuilds it. The clean re-run emitted 11 files: paired HAMT/Patricia integer records for four workloads and three current string records. This is a clean smoke only; the planned repeated four-size matrix and matched Patricia strings remain open. |
 | 2026-09-22 | HP0 named baseline target | `make hashtable-performance-baseline` (detached status capture) | Passed, exit status 0. The new named target runs the 100-entry corrected HAMT integer/string smoke and matched Patricia integer companion with the ordinary seven measured repetitions. It is a reproducible local baseline smoke, not the full performance matrix. |
 | 2026-09-23 | HP0.3 matched string Patricia process boundary | `HASHTABLE_BENCH_SIZE=100 HASHTABLE_BENCH_SEED=31 HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_BENCH_STRING_PATTERN=fixed-width HASHTABLE_BENCH_RESULTS=<tmp> make patricia-string-matrix-benchmark`; `jq` metadata/sample assertions; `make hashtable-benchmark-smoke`; then the 100/seed-31/one-repetition matrix runner plus JSONL coverage and paired-metadata assertions | Passed. `PatriciaStringMatrixBenchmark.ml` uses exactly the fixed-width/mixed-length/common-prefix construction, operation boundaries, retained-root policies, validation, timing protocol, and JSONL schema of the HAMT string benchmark for direct string Patricia, `Stdlib.Map`, and `Hashtbl`. The focused smoke wrote 80 JSONL records and includes String Patricia samples; the aggregate 100-binding smoke then passed all four integer/string HAMT/Patricia executables at the ordinary seven measured repetitions. The updated runner wrote all 14 expected records, including a matching Patricia string JSONL file for each HAMT string distribution with identical workload/size/seed/repetition/warmup metadata. Process separation avoids generated support-module collisions. |
+| 2026-09-23 | HP0.3 divergence-depth distributions | 100/seed-31/one-repetition matrix runner after adding `divergence-depth-0` through `divergence-depth-5`; JSONL metadata and paired-record assertions | Passed. The expanded runner wrote 26 records: paired HAMT/Patricia results for four ordinary integer distributions, six explicit routing-divergence depths, and three string distributions. The generators use the seed to ensure their HAMT hashes share every chunk before the named depth while retaining strictly positive, disjoint base/fresh/missing keys for the Patricia domain. Depth workloads are capped at 100/2,000 because their shrinking remaining hash domain creates collision histories at larger sizes. |

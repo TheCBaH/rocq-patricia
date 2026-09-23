@@ -80,6 +80,18 @@ for size in $sizes; do
         ;;
       *) printf 'Skipping constant-hash size %s (planned cap: 100/2000)\n' "$size" ;;
     esac
+    case "$size" in
+      100|2000)
+        for pattern in divergence-depth-0 divergence-depth-1 divergence-depth-2 \
+          divergence-depth-3 divergence-depth-4 divergence-depth-5; do
+          run_integer "$size" "$seed" "$pattern"
+          run_patricia_integer "$size" "$seed" "$pattern"
+          require_record "$output/integer-size${size}-seed${seed}-${pattern}.jsonl"
+          require_record "$output/patricia-integer-size${size}-seed${seed}-${pattern}.jsonl"
+        done
+        ;;
+      *) printf 'Skipping divergence-depth size %s (planned cap: 100/2000)\n' "$size" ;;
+    esac
     for pattern in fixed-width mixed-length common-prefix; do
       run_string "$size" "$seed" "$pattern"
       run_patricia_string "$size" "$seed" "$pattern"

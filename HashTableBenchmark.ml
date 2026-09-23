@@ -7,6 +7,12 @@ let pattern = match Sys.getenv_opt "HASHTABLE_BENCH_PATTERN" with
   | Some "shuffled" -> "shuffled"
   | Some "root-slot-collision" -> "root-slot-collision"
   | Some "constant-hash" -> "constant-hash"
+  | Some "divergence-depth-0" -> "divergence-depth-0"
+  | Some "divergence-depth-1" -> "divergence-depth-1"
+  | Some "divergence-depth-2" -> "divergence-depth-2"
+  | Some "divergence-depth-3" -> "divergence-depth-3"
+  | Some "divergence-depth-4" -> "divergence-depth-4"
+  | Some "divergence-depth-5" -> "divergence-depth-5"
   | Some value -> failwith ("unknown HASHTABLE_BENCH_PATTERN " ^ value)
 
 module Key = struct
@@ -25,9 +31,38 @@ let int_env name default = match Sys.getenv_opt name with None -> default | Some
 let size = int_env "HASHTABLE_BENCH_SIZE" 2_000
 let seed = int_env "HASHTABLE_BENCH_SEED" 31
 
+let divergence_depth = match pattern with
+  | "divergence-depth-0" -> Some 0
+  | "divergence-depth-1" -> Some 1
+  | "divergence-depth-2" -> Some 2
+  | "divergence-depth-3" -> Some 3
+  | "divergence-depth-4" -> Some 4
+  | "divergence-depth-5" -> Some 5
+  | _ -> None
+
+(* Make normalized hashes agree through [depth] five-bit chunks, then split
+   at that chunk.  The key uses the benchmark seed so the HAMT callback
+   [(key lxor seed)] produces the intended hash.  Skip the one ordinal that
+   could make a positive Patricia comparison key equal to zero. *)
+let divergence_key depth offset index =
+  let shift = 5 * depth in
+  let forbidden =
+    if seed >= 0 && seed land ((1 lsl shift) - 1) = 0 then Some (seed lsr shift)
+    else None in
+  let ordinal = offset + index in
+  let ordinal = match forbidden with
+    | Some value when ordinal >= value -> ordinal + 1
+    | _ -> ordinal
+  in
+  seed lxor (ordinal lsl shift)
+
+let key_at offset index = match divergence_depth with
+  | Some depth -> divergence_key depth offset index
+  | None when pattern = "root-slot-collision" -> (offset + index) lsl 5
+  | None -> offset + index
+
 let keys =
-  let keys = Array.init size (fun index ->
-      if pattern = "root-slot-collision" then (index + 1) lsl 5 else index + 1) in
+  let keys = Array.init size (key_at 1) in
   if pattern = "shuffled" then begin
     let random = Random.State.make [| seed; size; 0x51eed |] in
     for index = size - 1 downto 1 do
@@ -43,13 +78,11 @@ let duplicate_bindings =
   | (key, value) :: _ -> bindings @ [ key, "duplicate-ignored-" ^ value ]
   | [] -> assert false
 let updated_bindings = Array.to_list (Array.map (fun key -> key, "updated-" ^ string_of_int key) keys)
-let fresh_key index =
-  if pattern = "root-slot-collision" then (size + index + 1) lsl 5
-  else size + index + 1
+let fresh_key index = key_at (size + 1) index
 
 let new_bindings = Array.to_list (Array.mapi (fun index _ -> fresh_key index, "new-" ^ string_of_int index) keys)
 let new_keys = Array.map fst (Array.of_list new_bindings)
-let missing_keys = Array.map (fun key -> key + (2 * size) + 1) keys
+let missing_keys = Array.init size (key_at ((2 * size) + 1))
 let samples () = (Bench.config ()).repetitions + 1
 let slot repetition = if repetition < 0 then samples () - 1 else repetition
 
