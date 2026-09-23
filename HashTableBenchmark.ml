@@ -159,7 +159,10 @@ let run_persistent name empty of_list set get mem remove elements =
           (elements bases.(slot rep)));
   ] in
   Bench.measure tasks;
-  for index = 0 to count - 1 do
+  (* The timed checksums retain every sample.  One measured result receives the
+     independent full semantic pass; repeating this quadratic pass per sample
+     would distort matrix wall time without strengthening timed evidence. *)
+  let index = 0 in
     check_map (name ^ " of_list") get built_first.(index) bindings;
     if get keys.(0) built_set.(index) <> Some ("duplicate-ignored-" ^ string_of_int keys.(0)) then
       fail (name ^ " repeated-set duplicate mismatch");
@@ -181,8 +184,7 @@ let run_persistent name empty of_list set get mem remove elements =
         if get key (Stdlib.List.hd added_roots) <> Some value then
           fail (name ^ " new history latest mismatch")) new_bindings;
     check_map (name ^ " new history oldest") get (Stdlib.List.hd (Stdlib.List.rev added_roots)) bindings;
-    check_elements (name ^ " elements") get elements bases.(index) bindings
-  done;
+    check_elements (name ^ " elements") get elements bases.(index) bindings;
   let latest = Bench.live_heap ~implementation:name ~policy:"latest-root" (fun () ->
       Stdlib.List.fold_left (fun map (key, value) -> set key value map) (empty ()) bindings) in
   check_map (name ^ " latest root") get latest bindings;

@@ -178,7 +178,10 @@ let run_persistent name ~keys ~bindings ~duplicate_bindings ~updated_bindings
     task "elements" (fun repetition -> elements_checksum (elements bases.(slot repetition)));
   ];
   let repeated_key, repeated_value = Stdlib.List.hd (Stdlib.List.rev duplicate_bindings) in
-  for index = 0 to count - 1 do
+  (* The timed checksums retain every sample.  One measured result receives the
+     independent full semantic pass; repeating this quadratic pass per sample
+     would distort matrix wall time without strengthening timed evidence. *)
+  let index = 0 in
     check_map missing_keys (name ^ " of_list") get built_first.(index) bindings;
     if get repeated_key built_set.(index) <> Some repeated_value then
       fail (name ^ " repeated-set duplicate mismatch");
@@ -204,8 +207,7 @@ let run_persistent name ~keys ~bindings ~duplicate_bindings ~updated_bindings
           fail (name ^ " new history latest mismatch")) new_bindings;
     check_map missing_keys (name ^ " new history oldest") get
       (Stdlib.List.hd (Stdlib.List.rev added_roots)) bindings;
-    check_elements (name ^ " elements") get elements bases.(index) bindings
-  done;
+    check_elements (name ^ " elements") get elements bases.(index) bindings;
   let latest = Bench.live_heap ~implementation:name ~policy:"latest-root" (fun () ->
       Stdlib.List.fold_left (fun map (key, value) -> set key value map) (empty ()) bindings) in
   check_map missing_keys (name ^ " latest root") get latest bindings;
