@@ -32,7 +32,16 @@ let () =
       for depth = 0 to 6 do
         if Scalar.chunk hash depth <> ((hash lsr (5 * depth)) land 31) then
           fail "chunk mismatch"
-      done) hashes;
+      done;
+      Stdlib.List.iter (fun other ->
+          if Scalar.bounded_eq hash other <> (hash = other) then
+            fail "bounded_eq mismatch") hashes) hashes;
+  for left = 0 to 31 do
+    for right = 0 to 31 do
+      if Scalar.slot_lt left right <> (left < right) then
+        fail "slot_lt mismatch"
+    done
+  done;
   for word = 0 to 65_535 do check_bitmap word done;
   let random = Random.State.make [| 0x5ca1a2 |] in
   for _ = 1 to 10_000 do
@@ -49,4 +58,10 @@ let () =
     fail "wide bitmap was accepted";
   if not (rejects (fun () -> Scalar.chunk (1 lsl 30) 0)) then
     fail "wide hash was accepted";
+  if not (rejects (fun () -> Scalar.bounded_eq (-1) 0)) then
+    fail "negative equality input was accepted";
+  if not (rejects (fun () -> Scalar.bounded_eq 0 (1 lsl 30))) then
+    fail "wide equality input was accepted";
+  if not (rejects (fun () -> Scalar.slot_lt 0 32)) then
+    fail "wide slot-order input was accepted";
   print_endline "HashTable scalar primitive test passed"

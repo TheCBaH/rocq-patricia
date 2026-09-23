@@ -1,7 +1,7 @@
 # Generated HAMT performance: feasibility and implementation plan
 
-Date: 2026-09-22. Status: HP0–HP4 implementation complete; HP5 matched
-matrix measured, with historical stage attribution still open.
+Date: 2026-09-22. Status: HP0–HP5 locally validated; residual performance
+work continues toward the generated/standalone and mutable-table gaps.
 Evidence and historical measurements: [performance note](hashtable-performance.md).
 Repeated matched results: [matrix report](hashtable-performance-results.md).
 Progress: [performance tracker](hashtable-performance-todo.md).
@@ -307,7 +307,21 @@ timings only to resolve noise or a changed implementation. Semantic changes
 cannot be accepted in exchange for speed. If HP1–HP3 miss targets, publish the
 remaining costs and decide HP4 from evidence. A correct useful improvement can
 be delivered with explicitly unmet targets; do not label performance parity
-achieved. No requirement to beat mutable `Hashtbl` or every Patricia/AVL case.
+achieved. Mutable `Hashtbl` is the throughput reference despite its different
+single-version semantics; the continuing objective is to narrow both its gap
+and the generated/handcoded HAMT gap, with all five implementations reported
+on matched workloads.
+
+### Continued gap-closing work
+
+The [matched matrix report](hashtable-performance-results.md) now compares the
+generated HAMT, handcoded HAMT, mutable `Hashtbl`, Patricia and AVL `Map`.
+It identifies generated hit lookup allocation as the largest ordinary
+generated/handcoded gap. Follow-up changes must preserve the same source
+refinement and foreign-boundary discipline, then be measured against this
+clean matrix revision. A 2,000-binding paired point is sufficient to screen
+an individual candidate; use the full matrix for a final cross-distribution
+claim. Retained roots and constant-hash cases remain separate checks.
 
 Stage order: HP0 → HP1 → HP2 → HP3 → HP4 decision → HP5. Keep stages independently
 reviewable and measurements associated with each revision. If an optimization

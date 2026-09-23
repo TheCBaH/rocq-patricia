@@ -23,11 +23,11 @@ done
 
 grep -Eq '^let rec native_get' "$model_file" ||
   fail "native_get is missing"
-grep -Fq 'native_get eqb0 fuel' "$model_file" ||
+grep -Eq 'native_get eqb[0-9]* fuel' "$model_file" ||
   fail "native_get does not visibly recurse through compact children"
 grep -Eq '^let rec native_set' "$model_file" ||
   fail "native_set is missing"
-grep -Fq 'native_set eqb0 fuel' "$model_file" ||
+grep -Eq 'native_set eqb[0-9]* fuel' "$model_file" ||
   fail "native_set does not visibly recurse through compact children"
 grep -Fq 'native_branch_replace_at bitmap index' "$model_file" ||
   fail "native_set does not visibly replace a compact child"
@@ -35,17 +35,17 @@ grep -Fq 'native_branch_insert_at bitmap slot index' "$model_file" ||
   fail "native_set does not visibly insert a compact child"
 grep -Fq 'native_join_worker fuel depth full_hash' "$model_file" ||
   fail "native_set does not visibly use the direct native join worker"
-grep -Fq 'native_collision_set eqb0 fuel depth full_hash key value' "$model_file" ||
+grep -Eq 'native_collision_set eqb[0-9]* fuel depth full_hash key value' "$model_file" ||
   fail "native_set does not visibly use the direct collision update worker"
 grep -Eq '^let rec native_remove' "$model_file" ||
   fail "native_remove is missing"
-grep -Fq 'native_remove eqb0 fuel' "$model_file" ||
+grep -Eq 'native_remove eqb[0-9]* fuel' "$model_file" ||
   fail "native_remove does not visibly recurse through compact children"
 grep -Fq 'native_branch_remove_at bitmap slot index' "$model_file" ||
   fail "native_remove does not visibly compact an empty child"
 grep -Fq 'native_branch_replace_at bitmap index' "$model_file" ||
   fail "native_remove does not visibly replace a compact child"
-grep -Fq 'native_collision_remove eqb0 full_hash key stored_hash entries' "$model_file" ||
+grep -Eq 'native_collision_remove eqb[0-9]* full_hash key stored_hash entries' "$model_file" ||
   fail "native_remove does not visibly use the direct collision removal worker"
 
 for worker in native_get native_set native_remove native_table_add_first native_table_of_list; do

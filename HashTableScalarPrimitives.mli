@@ -2,10 +2,13 @@
 
     Inputs are non-negative extracted [N] values.  HAMT public routing calls
     them only with a 30-bit hash, depth at most six, a 32-bit bitmap, and a
-    slot in [0,31].  The source theorems model their results; this module is a
+    slot in [0,31].  Equality compares two bounded hashes or slots; order
+    compares two slots. The source theorems model their results; this module is a
     reviewed target obligation, not a kernel proof of OCaml execution. *)
 
 val chunk : int -> int -> int
+val bounded_eq : int -> int -> bool
+val slot_lt : int -> int -> bool
 val bitmap_bit : int -> int
 val bitmap_has : int -> int -> bool
 val rank : int -> int -> int

@@ -20,6 +20,8 @@ Extract Constant HashTableNative.pseq_replace => "HashTablePrimitives.replace".
 Extract Constant HashTableNative.pseq_remove => "HashTablePrimitives.remove".
 
 Extract Constant HashTableNativeBits.native_chunk => "HashTableScalarPrimitives.chunk".
+Extract Constant HashTableNativeBits.native_bounded_eq => "HashTableScalarPrimitives.bounded_eq".
+Extract Constant HashTableNativeBits.native_slot_lt => "HashTableScalarPrimitives.slot_lt".
 Extract Constant HashTableNativeBits.native_bitmap_bit => "HashTableScalarPrimitives.bitmap_bit".
 Extract Constant HashTableNativeBits.native_bitmap_has => "HashTableScalarPrimitives.bitmap_has".
 Extract Constant HashTableNativeBits.native_rank => "HashTableScalarPrimitives.rank".

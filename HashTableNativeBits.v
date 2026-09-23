@@ -4,7 +4,8 @@
     existing logical model and proofs continue to state facts over unbounded
     [N].  The selected extraction binds only these names to OCaml operations.
     Public routing establishes the 30-bit hash, six-level, 32-bit bitmap and
-    slot bounds recorded in the performance plan; target execution of those
+    slot bounds recorded in the performance plan. Equality takes bounded
+    hashes or chunks; order takes two slots. Target execution of those
     bounds is an explicit foreign obligation. *)
 
 From Stdlib Require Import NArith.
@@ -12,6 +13,10 @@ Require Import HashTableBits.
 
 Definition native_chunk (full_hash : N) (depth : nat) : N :=
   chunk full_hash depth.
+
+Definition native_bounded_eq (left right : N) : bool := N.eqb left right.
+
+Definition native_slot_lt (left right : N) : bool := N.ltb left right.
 
 Definition native_bitmap_bit (slot : N) : N := bitmap_bit slot.
 
@@ -28,6 +33,14 @@ Definition native_bitmap_remove (bitmap slot : N) : N :=
 
 Lemma native_chunk_eq : forall full_hash depth,
   native_chunk full_hash depth = chunk full_hash depth.
+Proof. reflexivity. Qed.
+
+Lemma native_bounded_eq_eq : forall left right,
+  native_bounded_eq left right = N.eqb left right.
+Proof. reflexivity. Qed.
+
+Lemma native_slot_lt_eq : forall left right,
+  native_slot_lt left right = N.ltb left right.
 Proof. reflexivity. Qed.
 
 Lemma native_bitmap_bit_eq : forall slot,

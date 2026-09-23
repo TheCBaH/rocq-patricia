@@ -24,8 +24,9 @@ equality and hashing through `HashMap.Make(Key)`. It has a separate
 [tracker](hashtable-todo.md), based on [hashtable.md](hashtable.md). The design
 compares HAMT and CHAMP for OCaml runtime behavior and Rocq proof effort.
 Its list-backed source HAMT, source-reference extraction, generated native
-public wrapper, and finite runtime tests exist. The remaining release work is
-optional workload-specific evaluation. Run `make hashtable` for the implemented
+public wrapper, and finite runtime tests exist. A matched five-implementation
+performance matrix is recorded in the
+[result report](hashtable-performance-results.md). Run `make hashtable` for the implemented
 proof, extraction, audit and differential-test aggregate. `make hashtable-benchmark`
 compares the public generated-native wrapper, the experimental private-array
 backend, `Map.Make`, and OCaml's imperative `Hashtbl` on checked integer build,

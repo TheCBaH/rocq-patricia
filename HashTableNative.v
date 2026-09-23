@@ -483,7 +483,7 @@ Definition native_join_two {K A : Type} (left_hash : N) (left : native_tree K A)
   let left_slot := native_chunk left_hash depth in
   let right_slot := native_chunk right_hash depth in
   let bitmap := native_bitmap_insert (native_bitmap_bit left_slot) right_slot in
-  if N.ltb left_slot right_slot
+  if native_slot_lt left_slot right_slot
   then NativeBranch bitmap (pseq_of_list [left; right])
   else NativeBranch bitmap (pseq_of_list [right; left]).
 
@@ -494,7 +494,7 @@ Lemma native_join_two_refines :
       right_hash (source_of_native right) depth.
 Proof.
   intros K A depth left_hash right_hash left right.
-  unfold native_join_two, join_two, native_chunk, native_bitmap_bit,
+  unfold native_join_two, join_two, native_slot_lt, native_chunk, native_bitmap_bit,
     native_bitmap_insert.
   cbn [source_of_native pseq_of_list].
   destruct (N.ltb (chunk left_hash depth) (chunk right_hash depth)); reflexivity.
@@ -506,7 +506,7 @@ Fixpoint native_join_worker {K A : Type} (fuel depth : nat)
   match fuel with
   | O => native_join_two left_hash left right_hash right depth
   | S fuel' =>
-      if N.eqb (native_chunk left_hash depth) (native_chunk right_hash depth)
+      if native_bounded_eq (native_chunk left_hash depth) (native_chunk right_hash depth)
       then NativeBranch (native_bitmap_bit (native_chunk left_hash depth))
              (pseq_of_list [native_join_worker fuel' (S depth)
                left_hash left right_hash right])
@@ -523,6 +523,7 @@ Proof.
   induction fuel as [|fuel IH]; intros depth left_hash right_hash left right.
   - cbn [native_join_worker join_worker]. apply native_join_two_refines.
   - cbn [native_join_worker join_worker].
+    unfold native_bounded_eq.
     destruct (N.eqb (chunk left_hash depth) (chunk right_hash depth)) eqn:Hslots.
     + change (N.eqb (native_chunk left_hash depth)
         (native_chunk right_hash depth) = true) in Hslots.
@@ -543,7 +544,7 @@ Definition native_leaf_set {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (value : A)
     (stored_hash : N) (stored : K) (old : A) : native_tree K A :=
   if eqb key stored then NativeLeaf stored_hash stored value
-  else if N.eqb full_hash stored_hash
+  else if native_bounded_eq full_hash stored_hash
        then NativeCollision stored_hash
          (pseq_of_list [(stored, old); (key, value)])
        else native_join_worker fuel depth full_hash
@@ -557,7 +558,7 @@ Lemma native_leaf_set_refines :
     set_tree eqb fuel depth full_hash key value (Leaf stored_hash stored old).
 Proof.
   intros K A eqb fuel depth full_hash key value stored_hash stored old.
-  unfold native_leaf_set.
+  unfold native_leaf_set, native_bounded_eq.
   rewrite set_tree_leaf.
   destruct (eqb key stored) eqn:Hkey.
   - reflexivity.
@@ -569,7 +570,7 @@ Qed.
 Definition native_leaf_remove {K A : Type} (eqb : K -> K -> bool)
     (full_hash : N) (key : K) (stored_hash : N) (stored : K) (value : A)
     : native_tree K A :=
-  if N.eqb full_hash stored_hash then
+  if native_bounded_eq full_hash stored_hash then
     if eqb key stored then NativeEmpty else NativeLeaf stored_hash stored value
   else NativeLeaf stored_hash stored value.
 
@@ -581,7 +582,7 @@ Lemma native_leaf_remove_refines :
     remove_tree eqb fuel depth full_hash key (Leaf stored_hash stored value).
 Proof.
   intros K A eqb fuel depth full_hash key stored_hash stored value.
-  unfold native_leaf_remove.
+  unfold native_leaf_remove, native_bounded_eq.
   rewrite remove_tree_leaf.
   destruct (N.eqb full_hash stored_hash) eqn:Hhash.
   - destruct (eqb key stored) eqn:Hkey; reflexivity.
@@ -675,7 +676,7 @@ Qed.
 Definition native_collision_set {K A : Type} (eqb : K -> K -> bool)
     (fuel depth : nat) (full_hash : N) (key : K) (value : A)
     (stored_hash : N) (entries : pseq (K * A)) : native_tree K A :=
-  if N.eqb full_hash stored_hash then
+  if native_bounded_eq full_hash stored_hash then
     native_normalize_collision stored_hash
       (native_bucket_set eqb key value entries O (pseq_length entries))
   else native_join_worker fuel depth full_hash
@@ -690,7 +691,7 @@ Lemma native_collision_set_refines :
       (Collision stored_hash (pseq_view entries)).
 Proof.
   intros K A eqb fuel depth full_hash key value stored_hash entries.
-  unfold native_collision_set.
+  unfold native_collision_set, native_bounded_eq.
   destruct (N.eqb full_hash stored_hash) eqn:Hhash.
   - rewrite set_tree_collision, Hhash.
     rewrite native_normalize_collision_refines.
@@ -734,7 +735,7 @@ Qed.
 Definition native_collision_remove {K A : Type} (eqb : K -> K -> bool)
     (full_hash : N) (key : K) (stored_hash : N) (entries : pseq (K * A))
     : native_tree K A :=
-  if N.eqb full_hash stored_hash then
+  if native_bounded_eq full_hash stored_hash then
     native_normalize_collision stored_hash
       (native_bucket_remove eqb key entries O (pseq_length entries))
   else NativeCollision stored_hash entries.
@@ -748,7 +749,7 @@ Lemma native_collision_remove_refines :
       (Collision stored_hash (pseq_view entries)).
 Proof.
   intros K A eqb fuel depth full_hash key stored_hash entries.
-  unfold native_collision_remove.
+  unfold native_collision_remove, native_bounded_eq.
   destruct (N.eqb full_hash stored_hash) eqn:Hhash.
   - rewrite remove_tree_collision, Hhash.
     rewrite native_normalize_collision_refines.
@@ -764,11 +765,11 @@ Fixpoint native_get {K A : Type} (eqb : K -> K -> bool)
   match native with
   | NativeEmpty => None
   | NativeLeaf stored_hash stored value =>
-      if N.eqb full_hash stored_hash then
+      if native_bounded_eq full_hash stored_hash then
         if eqb key stored then Some value else None
       else None
   | NativeCollision stored_hash entries =>
-      if N.eqb full_hash stored_hash then
+      if native_bounded_eq full_hash stored_hash then
         native_bucket_get eqb key entries 0 (pseq_length entries)
       else None
   | NativeBranch bitmap children =>
@@ -842,7 +843,7 @@ Proof.
   intros K A eqb fuel.
   induction fuel as [|fuel IH]; intros depth full_hash key native;
     destruct native as [|stored_hash stored value|stored_hash entries|bitmap children];
-    cbn [native_get native_chunk native_bitmap_has native_rank source_of_native get_tree].
+    cbn [native_get native_bounded_eq native_chunk native_bitmap_has native_rank source_of_native get_tree].
   all: try (rewrite native_bucket_get_refines, pseq_length_view,
     bucket_get_index_spec; reflexivity).
   - reflexivity.

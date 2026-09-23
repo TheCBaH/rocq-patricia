@@ -8,6 +8,10 @@ The archive contains raw samples, per-operation median/min/max summaries,
 machine and GC metadata, and representative post-GC live-heap measurements.
 Its SHA-256 is `4cdd88917f6b61b9d9e2ef7deb24ff282f19ad8f74132a6b4de1b5e7e5c5b375`.
 
+The isolated scalar-stage runs are archived in
+[`benchmarks/hashtable-scalar-stage-a160354-3bb50a4.tar.xz`](benchmarks/hashtable-scalar-stage-a160354-3bb50a4.tar.xz)
+(SHA-256 `15778257115977d7214b728eb27ebf9f50a361fdef6364641bd5d4b1e7001ab6`).
+
 ## Scope and validation
 
 The matrix uses sizes 100, 2,000, 10,000 and 100,000; seeds 0, 31 and
@@ -59,6 +63,39 @@ build medians of 0.593/0.349 ms and 5.146/1.280 MB; hit lookup was
 medians were 0.055/0.056 ms for integers and 0.141/0.126 ms for strings.
 These are whole-operation runs over the input set, not per-key latencies.
 
+The following matched 2,000-binding, seed-31 **time medians in milliseconds**
+show all five implementations. The integer workload uses ascending positive
+keys; the string workload uses fixed-width keys. Existing-key set uses the
+latest-root policy for persistent maps and a prepared single-version table
+for `Hashtbl`. Each cell is taken from the indicated implementation's
+record; `Map` and `Hashtbl` are included in both paired processes, and the
+table uses their HAMT-process samples.
+
+| Integer operation | Generated HAMT | Handcoded HAMT | Patricia | AVL `Map` | Mutable `Hashtbl` |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Repeated-set build | 0.332 | 0.204 | 0.041 | 0.116 | 0.031 |
+| Hit lookup | 0.300 | 0.114 | 0.056 | 0.099 | 0.032 |
+| Existing-key set | 0.656 | 0.356 | 0.140 | 0.219 | 0.077 |
+| Present removal | 0.464 | 0.248 | 0.051 | 0.081 | 0.051 |
+
+| String operation | Generated HAMT | Handcoded HAMT | String Patricia | AVL `Map` | Mutable `Hashtbl` |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Repeated-set build | 0.400 | 0.258 | 0.098 | 0.175 | 0.042 |
+| Hit lookup | 0.548 | 0.144 | 0.126 | 0.134 | 0.047 |
+| Existing-key set | 0.934 | 0.437 | 0.366 | 0.308 | 0.107 |
+| Present removal | 0.750 | 0.325 | 0.092 | 0.113 | 0.060 |
+
+Over all 72 ordinary size/seed/distribution records, median generated/`Hashtbl`
+time ratios are 10.63× for repeated-set build, 9.97× for hit lookup, 8.55×
+for existing-key set and 10.66× for present removal. The corresponding
+generated/handcoded ratios are 1.39×, 3.08×, 1.65× and 1.95×. Mutable
+`Hashtbl` updates one table in place, while the other four maps preserve old
+roots; these ratios describe measured workload cost, not equivalent storage
+semantics. At this 2,000-binding point, integer hit lookup allocated 3.749 MB
+in generated HAMT, 0.127 MB in handcoded HAMT and 0.032 MB in `Hashtbl`;
+the string figures were 9.509, 0.126 and 0.032 MB. Reducing generated hit
+lookup allocation is the clearest immediate path toward both comparisons.
+
 The depth and collision records remain separate. At 2,000 bindings, seed 31,
 the public/standalone build time ratio ranged from 1.72× to 2.80× over
 divergence depths 0–5, while hit lookup ranged from 2.65× to 4.44×. The
@@ -74,13 +111,28 @@ post-GC observational measurements and do not prove a target heap theorem.
 
 ## Engineering decision
 
-The historical pre-optimization 2,000-binding build allocations were
-215.905 MB for integers and 243.088 MB for strings. The current corresponding
-measurements are 5.340 MB and 5.146 MB, respectively. The apparent reductions
-are about 40× and 47×, but the historical harness predates the corrected
-operation boundaries and seven-repetition protocol. Thus the proposed 10×
-**paired corrected-baseline** target cannot be claimed from these two runs.
-The corrected current matrix is the reproducible baseline for future work.
+An isolated seven-repetition comparison on this machine used revisions
+`a160354` immediately before native scalar routing and `3bb50a4` after
+bounded scalar bitmap edits. `HashTableBenchmark.ml`,
+`HashTableStringBenchmark.ml`, and their shared support files are identical
+at those revisions. At 2,000 bindings and seed 31, the generated public
+`of_list` integer build fell from 216.032 MB to 15.153 MB allocated (14.26×)
+and from 7.390 ms to 1.109 ms. Fixed-width string build fell from 243.088 MB
+to 19.596 MB (12.41×) and from 8.886 ms to 1.332 ms. This meets the
+proposed 10× build-allocation target for the two historical distributions
+**at the scalar stage under an identical harness**. The string harness at
+these revisions has the older operation set, so its stage result should not
+be treated as a direct comparison with the modern full matrix.
+Integer hit lookup allocation fell from 109.788 MB to 3.749 MB (29.28×),
+and fixed-width string hit lookup fell from 136.767 MB to 9.509 MB (14.38×).
+The public workers still used source joins and collision fallbacks at this
+stage; the comparison isolates the scalar-routing/bitmap-edit tranche from
+the later direct-worker work, rather than each individual scalar primitive.
+
+The final corrected matrix's corresponding build allocations are 5.340 MB
+and 5.146 MB. The smaller values are encouraging, but its harness has since
+changed; we do not assign that entire difference to one optimization stage.
+The current matrix is the reproducible baseline for future work.
 
 The proposed ordinary-operation 2× standalone median-time target is unmet:
 hit lookup exceeded 2× in all 72 ordinary records, and other operations have

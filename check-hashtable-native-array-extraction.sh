@@ -17,13 +17,13 @@ grep -Eq '^let rec native_bucket_set' "$model_file" || {
 grep -Eq '^let rec native_bucket_remove' "$model_file" || {
   echo "missing indexed native collision removal worker" >&2; exit 1;
 }
-grep -Fq 'native_bucket_get eqb0 key entries 0 (pseq_length entries)' "$model_file" || {
+grep -Eq 'native_bucket_get eqb[0-9]* key entries 0 \(pseq_length entries\)' "$model_file" || {
   echo "native collision lookup does not use the bounded indexed worker" >&2; exit 1;
 }
-grep -Fq 'native_collision_set eqb0 fuel depth full_hash key value stored_hash entries' "$model_file" || {
+grep -Eq 'native_collision_set eqb[0-9]* fuel depth full_hash key value stored_hash entries' "$model_file" || {
   echo "native collision update does not use the bounded indexed worker" >&2; exit 1;
 }
-grep -Fq 'native_collision_remove eqb0 full_hash key stored_hash entries' "$model_file" || {
+grep -Eq 'native_collision_remove eqb[0-9]* full_hash key stored_hash entries' "$model_file" || {
   echo "native collision removal does not use the bounded indexed worker" >&2; exit 1;
 }
 for worker in native_get native_set native_remove; do
@@ -53,7 +53,7 @@ for operation in native_empty native_table_is_empty native_table_get native_tabl
   grep -Eq "^let( rec)? $operation" "$model_file" || { echo "missing native table API $operation" >&2; exit 1; }
 done
 if [ -f "$scalar_file" ]; then
-  for binding in chunk bitmap_has rank bitmap_insert bitmap_remove; do
+  for binding in chunk bounded_eq slot_lt bitmap_has rank bitmap_insert bitmap_remove; do
     grep -Fq "HashTableScalarPrimitives.$binding" "$scalar_file" || {
       echo "missing scalar binding $binding" >&2; exit 1;
     }
@@ -67,5 +67,11 @@ if [ -f "$scalar_file" ]; then
   if [ "$scalar_routes" -lt 3 ]; then
     echo "native get/set/remove do not all route through scalar chunk" >&2; exit 1
   fi
+  grep -Fq 'native_bounded_eq full_hash stored_hash' "$model_file" || {
+    echo "native hash comparison still bypasses bounded equality" >&2; exit 1;
+  }
+  grep -Fq 'native_slot_lt left_slot right_slot' "$model_file" || {
+    echo "native join order still bypasses bounded comparison" >&2; exit 1;
+  }
 fi
 echo "Hash-table native-array extraction audit: pseq alone binds to private arrays; recursive native workers remain extracted"

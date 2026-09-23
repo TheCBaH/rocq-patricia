@@ -547,10 +547,11 @@ StringPatriciaUnion.vo: StringBits.vo StringPatricia.vo
 StringPatriciaUnionProof.vo: StringPatriciaProof.vo StringPatriciaUnion.vo
 NativeHeapRefinement.vo: PatriciaUnionProof.vo StringPatriciaUnionProof.vo
 HashTableBits.vo: HashTableSpec.vo
+HashTableNativeBits.vo: HashTableBits.vo
 HashTableBucket.vo: HashTableSpec.vo HashTableBits.vo
 HashTable.vo: HashTableSpec.vo HashTableBits.vo HashTableBucket.vo
 HashTableProof.vo: HashTable.vo HashTableBucket.vo
-HashTableNative.vo: HashTable.vo HashTableBits.vo
+HashTableNative.vo: HashTable.vo HashTableBits.vo HashTableNativeBits.vo
 HashTableNativeProof.vo: HashTableNative.vo
 HashTableArrayRefinement.vo: HashTableNative.vo HashTableBits.vo
 HashTableSkeleton.vo: HashTableSpec.vo HashTableBits.vo

@@ -16,17 +16,19 @@ Bounded scalar realization and direct native workers are implemented. The
 clean 228-record matched matrix and its raw archive are published in the
 [result report](hashtable-performance-results.md). The measured retained-heap
 target is met at 100/2,000 bindings; the ordinary 2× standalone time target
-is unmet for hit lookup. Historical scalar-stage attribution and a paired
-corrected pre-optimization baseline remain open.
+was unmet for hit lookup at `bd0e69c`. The isolated 2,000-binding scalar-stage comparison
+uses identical pre/post harness files and exceeds the proposed 10×
+build-allocation target for ascending integers and fixed-width strings.
 
 | Gate | Depends on | Status / closure condition |
 | --- | --- | --- |
-| HP0 — corrected baseline | Review | Partial: current matrix published; matched pre-optimization baseline unavailable |
-| HP1 — scalar realization | HP0 | Partial: proof/audit/tests pass; isolated scalar-stage comparison remains |
+| HP0 — corrected baseline | Review | Complete: current full matrix, pre-scalar paired point, retention policies and attribution limits published |
+| HP1 — scalar realization | HP0 | Complete: proof/audit/tests and isolated 2,000-binding scalar-stage comparison |
 | HP2 — sequence hot path | HP1 | Complete: conversion removed, refinement and persistence evidence recorded |
 | HP3 — direct workers | HP2 | Complete: public hot paths avoid source/sequence-view round trips |
 | HP4 — specialization decision | HP3 + residual profile | Complete: defer with residual-cost uncertainty recorded |
 | HP5 — release evidence | HP1–HP3 + HP4 decision | Complete locally: full paired matrix, clean aggregate and boundary report; hosted CI separate |
+| HP6 — close remaining throughput gap | HP5 matrix | In progress: bounded comparison candidate reduces generated hit allocation; full five-way follow-up pending |
 
 ## Review and baseline evidence
 
@@ -88,9 +90,10 @@ corrected pre-optimization baseline remain open.
   inside whole-map operations, so it is not a substitute for a sampling trace.
 - [x] **HP0.G** Publish corrected current baseline and remaining attribution
   uncertainty. The 228-record report and archive provide the corrected
-  operation/retention boundary for future comparisons. A matched corrected
-  pre-optimization baseline was not captured before HP1, so the proposed
-  10× paired historical claim remains unverified and is tracked under HP1.G.
+  operation/retention boundary for future comparisons. The recovered
+  pre-scalar 2,000-binding pair has identical historical harness files;
+  the pre-scalar four-size matrix was not run, and whole-map attribution
+  remains limited to controlled primitive/stage comparisons.
 
 - [x] **HP1.1** Define bounded scalar wrappers and source popcount; prove
   equivalence to `HashTableBits` and range closure for reachable calls.
@@ -113,8 +116,15 @@ corrected pre-optimization baseline remain open.
   The same corpus now runs through explicit bytecode and native targets: all
   slots, hashes 0/`2^30-1`, depths 0–6, all 16-bit words, 10,000 deterministic
   32-bit masks, full bitmap, and invalid target-domain inputs.
-- [ ] **HP1.G** Proof/audit/test pass; generated arithmetic inspection and isolated
-  scalar-stage measurements recorded against HP0.
+- [x] **HP1.G** Proof/audit/test pass; generated arithmetic inspection and isolated
+  scalar-stage measurements recorded against HP0. The same 2,000-binding,
+  seed-31, seven-repetition harness at `a160354`/`3bb50a4` measured public
+  integer first-wins build allocation of 216.032/15.153 MB (14.26× lower)
+  and fixed-width string build allocation of 243.088/19.596 MB (12.41×
+  lower). The [report](hashtable-performance-results.md) archives raw
+  samples and distinguishes the older string operation set from the current
+  full matrix. Public scalar range/shape proof and foreign-inventory
+  evidence is in HP1.1–HP1.4 and the validation log.
 
 - [x] **HP2.1** Add proved sequence emptiness and its array contract/binding;
   replace deletion's child-view check and reprove refinement.
@@ -200,6 +210,22 @@ corrected pre-optimization baseline remain open.
   execution and defers storage specialization pending whole-map attribution.
 - [ ] **CI** Record hosted CI result separately; local success is not hosted CI.
 
+## Continued throughput work
+
+- [ ] **HP6.1** Replace reachable recursive extracted hash/slot comparison with
+  bounded native comparison; preserve source equivalence and public range
+  proofs, audit the new bindings, and measure the isolated effect. Candidate
+  source/extraction change passes `make hashtable`, `make all`, and the four
+  benchmark smoke executables; a 2,000-binding, seed-31
+  dirty-worktree screening run lowered public hit allocation from 3.749 to
+  0.604 MB for ascending integers and from 9.509 to 0.594 MB for fixed-width
+  strings. Clean-revision repetition and broader distribution checks remain.
+- [ ] **HP6.2** Attribute residual generated lookup/update allocation and CPU
+  cost, then pursue only source-refined candidates with measured benefit.
+- [ ] **HP6.3** Re-run the matched five-implementation matrix at the final
+  revision and publish time, allocation and retained-heap gaps by operation
+  and distribution, including capped collision histories.
+
 ## Validation log
 
 | Date | Scope | Command / evidence | Result |
@@ -263,3 +289,5 @@ corrected pre-optimization baseline remain open.
 | 2026-09-23 | HP0.2 mixed live-heap matrix validation | `HASHTABLE_MATRIX_SIZES='100 10000' HASHTABLE_MATRIX_SEEDS=31 HASHTABLE_BENCH_REPETITIONS=1 HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_MATRIX_OUTPUT=/tmp/patricia-live-heap-scope.0X9TZT sh ./run-hashtable-performance-matrix.sh` | Passed. The self-validating runner built each isolated executable once and accepted exactly 38 clean matched records. The 100-binding record declares `live_heap: true`; its 10,000-binding counterpart declares `false`, proving both the runner's size policy and the validator's expected metadata/pair checks. |
 | 2026-09-23 | HP5.3 full matrix | `HASHTABLE_MATRIX_OUTPUT=/tmp/patricia-full-matrix-final2.kTkf09 make hashtable-performance-matrix-validate`; record-level JSONL audit | Passed: 228 clean paired records at `bd0e69c`, four sizes, three seeds, seven measured repetitions and one warmup. The independent audit found 9,918 complete operation summary/sample groups and 936 expected retained-heap records. The compressed raw archive and quantitative decision are in `hashtable-performance-results.md`. |
 | 2026-09-23 | HP5.3 clean aggregate | Detached worktree at `bd0e69c`, `make all` | Passed, exit 0. All proof/extraction/test recipes in the repository aggregate completed from the clean checkout; full build log at `/tmp/patricia-clean-bd0e69c-make-all.log`. |
+| 2026-09-23 | HP1.G isolated scalar stage | Detached worktrees at `a160354` and `3bb50a4`; 2,000 bindings, seed 31, one warmup, seven measured repetitions for integer ascending and fixed-width string benchmark targets | Passed all four runs. The benchmark/support files are byte-for-byte unchanged between revisions. Public first-wins integer build allocation fell 216.032/15.153 MB (14.26×) and fixed-width string build allocation fell 243.088/19.596 MB (12.41×); corresponding median times fell 7.390/1.109 ms and 8.886/1.332 ms. The raw JSONL archive and scope caveat are in `hashtable-performance-results.md`. |
+| 2026-09-23 | HP6.1 bounded comparison candidate | `make hashtable`; `make all`; `make hashtable-benchmark-smoke`; 2,000-binding ascending integer/fixed-width string benchmarks, seed 31, one warmup and seven measured repetitions on the working tree | All three aggregate commands passed, including proof, assumption audit, bytecode/native scalar corpus, generated hot-path audits, public/model differential suites and Patricia integration. The screening runs measured public hit allocation at 0.604/0.594 MB versus `bd0e69c` 3.749/9.509 MB; same-run generated/handcoded hit time was 1.50×/1.43×. Worktree was dirty, so these are candidate measurements pending a clean revision. A missing `HashTableNativeBits.vo` prerequisite for `HashTableNative.vo` was repaired after an incremental assumption audit exposed stale `.vo` linkage. |

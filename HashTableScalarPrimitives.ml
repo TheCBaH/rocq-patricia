@@ -9,6 +9,22 @@ let checked_bitmap bitmap =
   if bitmap < 0 || bitmap >= (1 lsl 32) then
     invalid_arg "HashTable scalar bitmap domain"
 
+let checked_hash hash =
+  if hash < 0 || hash >= (1 lsl 30) then
+    invalid_arg "HashTable scalar hash domain"
+
+let bounded_eq left right =
+  require_64_bit ();
+  checked_hash left;
+  checked_hash right;
+  left = right
+
+let slot_lt left right =
+  require_64_bit ();
+  checked_slot left;
+  checked_slot right;
+  left < right
+
 let chunk hash depth =
   require_64_bit ();
   if hash < 0 || hash >= (1 lsl 30) || depth < 0 || depth > 6 then

@@ -58,6 +58,8 @@ Fixpoint native_get_scalar_safe {K A : Type} (fuel depth : nat)
   (full_hash < hash_space)%N /\
   depth + fuel <= branch_levels /\
   match fuel, native with
+  | _, NativeLeaf stored_hash _ _ => (stored_hash < hash_space)%N
+  | _, NativeCollision stored_hash _ => (stored_hash < hash_space)%N
   | S fuel', NativeBranch bitmap children =>
       (bitmap < bitmap_limit)%N /\
       match native_bitmap_has bitmap (native_chunk full_hash depth) with
@@ -80,11 +82,16 @@ Proof.
   intros K Seed A E hash seed fuel.
   induction fuel as [|fuel IH]; intros depth prefix full_hash native
     Hhash Hdepth Hwf.
-  - destruct native; cbn [native_get_scalar_safe]; repeat split; try assumption; try lia; exact I.
+  - destruct native as [|stored_hash stored value|stored_hash entries|bitmap children];
+      cbn [native_get_scalar_safe]; repeat split; try assumption; try lia; try exact I.
+    + inversion Hwf; assumption.
+    + eapply wf_collision_hash_bound; exact Hwf.
   - destruct native as [|stored_hash stored value|stored_hash entries|bitmap children].
     + cbn [native_get_scalar_safe]. repeat split; try assumption; try lia; exact I.
-    + cbn [native_get_scalar_safe]. repeat split; try assumption; try lia; exact I.
-    + cbn [native_get_scalar_safe]. repeat split; try assumption; try lia; exact I.
+    + cbn [native_get_scalar_safe]. repeat split; try assumption; try lia.
+      inversion Hwf; assumption.
+    + cbn [native_get_scalar_safe]. repeat split; try assumption; try lia.
+      eapply wf_collision_hash_bound; exact Hwf.
     + cbn [native_get_scalar_safe source_of_native].
       split; [exact Hhash|]. split; [exact Hdepth|].
       inversion Hwf as [| | |actual_depth actual_prefix actual_bitmap actual_children
