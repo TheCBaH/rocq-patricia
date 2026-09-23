@@ -114,8 +114,7 @@ let check_elements name get elements map expected =
   let found = elements map in
   if Stdlib.List.length found <> Stdlib.List.length expected then
     fail (name ^ " element count mismatch");
-  if not (Stdlib.List.for_all (fun binding -> Stdlib.List.mem binding expected) found)
-     || not (Stdlib.List.for_all (fun binding -> Stdlib.List.mem binding found) expected) then
+  if Stdlib.List.sort Stdlib.compare found <> Stdlib.List.sort Stdlib.compare expected then
     fail (name ^ " element binding mismatch");
   Stdlib.List.iter (fun (key, value) ->
       if get key map <> Some value then fail (name ^ " element mismatch")) expected
