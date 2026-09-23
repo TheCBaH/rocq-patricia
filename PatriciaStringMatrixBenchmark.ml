@@ -87,24 +87,26 @@ let check_elements name get elements map expected =
 let run_persistent name empty of_list set get mem remove elements =
   let count = samples () in
   let bases = Array.init count (fun _ -> of_list duplicate_bindings) in
-  let built_first = Array.make count (empty ()) in
-  let built_set = Array.make count (empty ()) in
-  let changed = Array.make count (empty ()) in
-  let added = Array.make count (empty ()) in
-  let changed_histories = Array.make count [ empty () ] in
-  let added_histories = Array.make count [ empty () ] in
-  let removed = Array.make count (empty ()) in
-  let missing_removed = Array.make count (empty ()) in
+  let built_first = Array.make 1 (empty ()) in
+  let built_set = Array.make 1 (empty ()) in
+  let changed = Array.make 1 (empty ()) in
+  let added = Array.make 1 (empty ()) in
+  let changed_histories = Array.make 1 [ empty () ] in
+  let added_histories = Array.make 1 [ empty () ] in
+  let removed = Array.make 1 (empty ()) in
+  let missing_removed = Array.make 1 (empty ()) in
+  let retain repetition results value =
+    if repetition = 0 then results.(0) <- value in
   let task operation run = { Bench.implementation = name; operation; run } in
   Bench.measure [
     task "build/of_list-first-wins" (fun repetition ->
         let result = of_list duplicate_bindings in
-        built_first.(slot repetition) <- result;
+        retain repetition built_first result;
         match get keys.(0) result with Some value -> Stdlib.String.length value | None -> -1);
     task "build/repeated-set" (fun repetition ->
         let result = Stdlib.List.fold_left (fun map (key, value) -> set key value map)
             (empty ()) duplicate_bindings in
-        built_set.(slot repetition) <- result;
+        retain repetition built_set result;
         match get keys.(0) result with Some value -> Stdlib.String.length value | None -> -1);
     task "lookup/hit" (fun repetition -> lookup_checksum get bases.(slot repetition) keys);
     task "lookup/miss" (fun repetition -> lookup_checksum get bases.(slot repetition) missing_keys);
@@ -113,40 +115,40 @@ let run_persistent name empty of_list set get mem remove elements =
     task "set/existing/latest-root" (fun repetition ->
         let result = Stdlib.List.fold_left (fun map (key, value) -> set key value map)
             bases.(slot repetition) updated_bindings in
-        changed.(slot repetition) <- result;
+        retain repetition changed result;
         lookup_checksum get result keys);
     task "set/new/latest-root" (fun repetition ->
         let result = Stdlib.List.fold_left (fun map (key, value) -> set key value map)
             bases.(slot repetition) new_bindings in
-        added.(slot repetition) <- result;
+        retain repetition added result;
         lookup_checksum get result new_keys);
     task "set/existing/all-prefix-roots" (fun repetition ->
         let roots = Stdlib.List.fold_left
             (fun roots (key, value) -> set key value (Stdlib.List.hd roots) :: roots)
             [ bases.(slot repetition) ] updated_bindings in
-        changed_histories.(slot repetition) <- roots;
+        retain repetition changed_histories roots;
         lookup_checksum get (Stdlib.List.hd roots) keys);
     task "set/new/all-prefix-roots" (fun repetition ->
         let roots = Stdlib.List.fold_left
             (fun roots (key, value) -> set key value (Stdlib.List.hd roots) :: roots)
             [ bases.(slot repetition) ] new_bindings in
-        added_histories.(slot repetition) <- roots;
+        retain repetition added_histories roots;
         lookup_checksum get (Stdlib.List.hd roots) new_keys);
     task "remove/present" (fun repetition ->
         let result = Stdlib.List.fold_left (fun map (key, _) -> remove key map)
             bases.(slot repetition) bindings in
-        removed.(slot repetition) <- result;
+        retain repetition removed result;
         lookup_checksum get result keys);
     task "remove/missing" (fun repetition ->
         let result = Array.fold_left (fun map key -> remove key map)
             bases.(slot repetition) missing_keys in
-        missing_removed.(slot repetition) <- result;
+        retain repetition missing_removed result;
         lookup_checksum get result keys);
     task "elements" (fun repetition -> elements_checksum elements bases.(slot repetition));
   ];
-  (* The timed checksums retain every sample.  One measured result receives the
-     independent full semantic pass; repeating this quadratic pass per sample
-     would distort matrix wall time without strengthening timed evidence. *)
+  (* Every timed task returns an observable checksum.  Retain one measured
+     result for the independent full semantic pass without retaining the other
+     full collision histories until the benchmark process exits. *)
   let index = 0 in
     check_map (name ^ " of_list") get built_first.(index) bindings;
     if get keys.(0) built_set.(index) <> Some ("duplicate-ignored-" ^ string_of_int 0) then
