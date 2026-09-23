@@ -72,13 +72,14 @@ also outside the timer. The Patricia command uses a separate
 `ocamlopt` harness with 10,000 bindings per input tree and includes more
 operations, randomized insertion, and several string distributions. Therefore
 the two tables below must not be used to compare a HAMT number directly with a
-Patricia number. `make patricia-matrix-benchmark` now provides a separate
-process-level integer companion with the HAMT harness's exact input,
-operation, retention, warmup/repetition, and JSONL metadata boundary. The
-matrix runner pairs those files by workload, size, and seed because the two
-un-namespaced generated extraction trees cannot link in one executable. The
-new companion has not yet supplied matched Patricia string inputs or the full
-repeated size matrix, so it does not make the historical tables comparable.
+Patricia number. `make patricia-matrix-benchmark` and
+`make patricia-string-matrix-benchmark` now provide separate process-level
+integer and string companions with the HAMT harnesses' exact input, operation,
+retention, warmup/repetition, and JSONL metadata boundaries. The matrix runner
+pairs these files by workload, size, and seed because the two un-namespaced
+generated extraction trees cannot link in one executable. The full repeated
+size matrix is still pending, so this wiring does not make the historical
+tables comparable.
 
 ### Generated HAMT, standalone HAMT, AVL, and imperative table
 
@@ -145,7 +146,7 @@ dominates that distribution.
   retained versions or persistent structural sharing.
 - Patricia performs well against AVL in its measured integer/string
   lookup/removal and structural-union workloads. Its ranking against HAMT
-  still needs a matched harness.
+  now has matched harnesses but still needs the repeated full matrix.
 - AVL uses less retained memory than Patricia and is a steadier choice when
   comparator-based semantics or long common-prefix string behavior matter.
 - The public HAMT has the desired generated/refined implementation boundary,

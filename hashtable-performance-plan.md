@@ -1,6 +1,7 @@
 # Generated HAMT performance: feasibility and implementation plan
 
-Date: 2026-09-22. Status: HP0 benchmark correction in progress.
+Date: 2026-09-22. Status: HP0–HP4 implementation complete; HP5 repeated
+matrix/reproducibility evidence in progress.
 Evidence and historical measurements: [performance note](hashtable-performance.md).
 Progress: [performance tracker](hashtable-performance-todo.md).
 The [design](hashtable-design.md) remains the API/representation contract;
