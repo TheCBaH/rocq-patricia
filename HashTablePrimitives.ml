@@ -65,7 +65,19 @@ let bucket_set eqb key value entries index remaining =
       replace position (stored, value) entries
   | None, insertion -> insert insertion (key, value) entries
 
+let rec bucket_remove_short eqb key entries index remaining =
+  if remaining <= 0 then entries
+  else match get index entries with
+    | None -> entries
+    | Some (stored, _) ->
+        if eqb key stored then remove index entries
+        else bucket_remove_short eqb key entries (index + 1) (remaining - 1)
+
 let bucket_remove eqb key entries index remaining =
-  match bucket_scan eqb key entries index remaining with
-  | Some position, _ -> remove position entries
-  | None, _ -> entries
+  (* Small collision buckets avoid the mutable-loop setup on the common
+     short-removal path. Long buckets keep the low-allocation scan. *)
+  if Array.length entries <= 8 then
+    bucket_remove_short eqb key entries index remaining
+  else match bucket_scan eqb key entries index remaining with
+    | Some position, _ -> remove position entries
+    | None, _ -> entries

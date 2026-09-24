@@ -199,6 +199,47 @@ entry; its target option and recursive-call costs remain visible. These
 figures are a reason to retain collision inputs in the final matrix and not
 to infer parity from the ordinary lookup result.
 
+## Bounded collision scans at `952fe24`
+
+The clean revision `952fe24` binds the three proved first-match bucket
+workers to bounded scans in the private array adapter. The target contract
+states their list-view behavior; target tests cover duplicate keys, custom
+equivalences, off-end indices and budgets, and fresh changed updates. The
+extraction audit requires these exact bindings. The 2,000-binding, seed-31,
+seven-repetition matrix validated all 26 paired records. Raw samples are in
+[`benchmarks/hashtable-bucket-scan-matrix-952fe24.tar.xz`](benchmarks/hashtable-bucket-scan-matrix-952fe24.tar.xz)
+(SHA-256 `c3138bf1337afaed96c5cc7800460452298f594955c10d115271b95fb5be1cf9`).
+
+For 2,000 constant-hash integer keys, generated lookup hit fell from
+8.346 to 3.871 ms and from 160.112 MB to 0.112 MB allocated; the handcoded
+HAMT measured 3.178 ms and the same 0.112 MB allocation. First-wins build
+fell from 42.170 to 28.982 ms and from 464.568 to 16.504 MB allocated.
+At routing divergence depth 5, generated lookup hit fell from 0.591 to
+0.440 ms and from 5.304 to 0.304 MB allocated; handcoded lookup allocated
+the same 0.304 MB. Across the 13 distributions, the median new/old time
+ratio is 1.01 for ordinary build and hit lookup; the median allocation ratio
+is 1.00 because unchanged ordinary paths do not call the bucket adapter.
+
+Constant-hash present removal still took 19.337 ms in generated HAMT versus
+0.037 ms in the handcoded HAMT. The generated bucket is a persistent array:
+removing every key copies each shrinking array. The handcoded bucket is a
+list, and this workload removes keys in list-head order. Closing that
+particular gap requires a different collision representation and fresh
+source/target proof; it cannot follow from a faster scan alone.
+
+Two >10% time rises in the clean slice were repeated with standalone
+seven-repetition runs from detached clean checkouts. At depth 4, generated
+present removal was 0.565 ms before and 0.775 ms after the adapter binding
+(3.300/3.230 MB allocated); this is a measured local regression amid larger
+lookup and collision-build gains. A target-only tail-recursive scan
+experiment was slower and discarded. A short-bucket removal path screened at
+0.673 ms while keeping the constant-hash results; the final matrix includes
+that path. Root-slot new-set reversed its apparent rise in the clean rerun,
+0.617/0.585 ms, with identical allocation and no bucket scan on that
+workload. The four raw rerun records are in
+[`benchmarks/hashtable-bucket-regression-reruns-dfb8680-952fe24.tar.xz`](benchmarks/hashtable-bucket-regression-reruns-dfb8680-952fe24.tar.xz)
+(SHA-256 `8f84be1ae5219565077ca8257e54428b1a1f4624f8e31da8941b35aea330330f`).
+
 ## Matrix runtime policy
 
 The original full matrix used `Gc.compact` before every timed sample. A

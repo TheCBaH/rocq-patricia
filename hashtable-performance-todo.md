@@ -221,7 +221,7 @@ build-allocation target for ascending integers and fixed-width strings.
   from 3.749 to 0.604 MB for ascending integers and 9.509 to 0.594 MB for
   fixed-width strings; the [result report](hashtable-performance-results.md)
   records all five implementations and the raw archive.
-- [ ] **HP6.2** Attribute residual generated lookup/update allocation and CPU
+- [x] **HP6.2** Attribute residual generated lookup/update allocation and CPU
   cost, then pursue only source-refined candidates with measured benefit.
   A controlled synthetic public-worker profile found 96 allocated bytes per
   branch in `native_get`; generated extraction showed closure-producing fuel
@@ -234,11 +234,16 @@ build-allocation target for ascending integers and fixed-width strings.
   points. Collision lookup and removal remain much farther apart; checked
   indexed bucket traversal is a source-visible cause. A bounded array-adapter
   scan now removes the per-entry target options/closure cost while retaining
-  source-defined first-match semantics. Dirty-worktree 2,000-binding
-  constant-hash hit allocation fell 160.112 MB to 0.112 MB, with hit time
-  8.346 to 3.877 ms; clean matched validation remains. Persistent array
-  copying during long-bucket removal remains an attributed cost, and the final
-  cross-distribution judgment remains.
+  source-defined first-match semantics. Clean `952fe24` paired validation
+  confirms constant-hash hit allocation fell 160.112 MB to 0.112 MB, with hit
+  time 8.346 to 3.871 ms. Persistent array copying during long-bucket
+  removal remains an attributed cost. Clean reruns put depth-4 present
+  removal at 0.565/0.775 ms before/after the binding; a short-bucket path
+  screened at 0.673 ms and preserves the constant-hash gains. Root-slot
+  new-set reversed its apparent rise in the clean rerun (0.617/0.585 ms),
+  confirming timing uncertainty. The local regression and residual
+  representation cost are published in the result report; the cross-seed
+  judgment belongs to HP6.3.
 - [ ] **HP6.3** Re-run the matched five-implementation matrix at the final
   revision and publish time, allocation and retained-heap gaps by operation
   and distribution, including capped collision histories.
@@ -313,3 +318,6 @@ build-allocation target for ascending integers and fixed-width strings.
 | 2026-09-24 | HP6.2 clean direct-depth slice | Clean `dfb8680` 2,000-binding, seed-31, seven-repetition matrix; `make all` in detached checkout | Passed: all 26 paired records validated; median generated lookup-hit time/allocation versus `8026332` across 13 distributions is 0.88/0.21. Ordinary integer/string hit allocation equals handcoded exactly; collision and deep-divergence gaps remain. Raw archive and five-way scope are in the result report. |
 | 2026-09-24 | HP6 matrix runtime policy | Seven-repetition ascending-integer diagnostics at 10,000/100,000 bindings | At 10,000, compact/major/minor pre-sample GC took 12.0/6.3/0.9 seconds; at 100,000, major/minor took 101.6/19.2 seconds. Runner and validator now record/use minor collection for large timing-only records, while retaining compaction for 100/2,000 records with post-GC heap passes. Historical records without the policy field mean compact. |
 | 2026-09-24 | HP6.2 bounded bucket candidate | `make all`; `make hashtable hashtable-benchmark-smoke`; `make hashtable-native-primitives-test hashtable-native-array-extraction-audit-test`; dirty 2,000-binding, seed-31, seven-repetition integer constant-hash and ascending runs | Passed proof/assumption, generated audit and negative fixture, bytecode/native differential, finite adapter contract, and benchmark checks. Constant-hash generated hit time/allocation fell from 8.346 ms/160.112 MB to 3.877 ms/0.112 MB; ordinary build/lookup/update allocations were unchanged. Long-bucket present removal retained the array-copy cost (21.058 to 19.398 ms); clean paired measurement is pending. |
+| 2026-09-24 | HP6.2 clean bounded bucket slice | Clean `952fe24` 2,000-binding, seed-31, seven-repetition matrix and per-operation comparison against `dfb8680` | Passed: all 26 paired records validated. Constant-hash hit fell to 3.871 ms/0.112 MB; depth-5 hit to 0.440 ms/0.304 MB. Ordinary operation allocation medians stayed exact and time medians near parity with the preceding revision. Isolated >10% time increases in depth-4 present removal and root-slot new set need repetition. Raw archive and attribution are in the result report. |
+| 2026-09-24 | HP6.2 regression check and clean aggregate | Detached `952fe24` checkout `make all`; four clean revision-stamped seven-repetition reruns at depth-4 removal and root-slot new set on `dfb8680` and `952fe24`; target-only scan screens | Clean aggregate passed. Depth-4 removal rose 0.565 to 0.775 ms with slightly lower allocation; a short-bucket path screened at 0.673 ms and kept the constant-hash gain. Root-slot new-set reversed the apparent rise at 0.617/0.585 ms with identical allocation, showing timing uncertainty. Raw reruns are archived in the result report. |
+| 2026-09-24 | HP6.2 short-bucket removal screen | `make all hashtable-benchmark-smoke`; dirty 2,000-binding seed-31 seven-repetition depth-4 and constant-hash benchmarks | Passed aggregate and smoke. Short buckets use a source-shaped direct scan, long buckets retain the low-allocation array scan. Depth-4 present removal screened at 0.673 ms, versus 0.775 ms for the original array scan; constant-hash hit stayed at 3.822 ms/0.112 MB and present removal at 19.506 ms. Clean final matrix remains HP6.3. |

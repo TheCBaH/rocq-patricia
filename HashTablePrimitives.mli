@@ -1,5 +1,6 @@
-(** Private-storage sequence primitives for the future compact HAMT backend.
-    Every mutating-style operation returns fresh storage. *)
+(** Private-storage sequence primitives for the compact HAMT backend.
+    Changed updates return fresh storage; a missing bucket removal may reuse
+    its input because the source bucket worker returns it unchanged. *)
 
 type 'a t
 

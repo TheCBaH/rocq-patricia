@@ -43,7 +43,8 @@ let rec source_bucket_remove eqb key entries index remaining =
 let check_bucket_contract () =
   let shapes =
     [ []; [1, 11]; [1, 11; 2, 22]; [1, 11; 2, 22; 1, 33];
-      [1, 11; 1, 22; 1, 33; 3, 44] ]
+      [1, 11; 1, 22; 1, 33; 3, 44];
+      List.init 12 (fun i -> (i mod 3, i)) ]
   in
   let equalities = [ (=); (fun a b -> a mod 2 = b mod 2) ] in
   List.iter (fun entries ->
