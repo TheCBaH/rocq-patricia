@@ -15,7 +15,13 @@ sizes=${HASHTABLE_MATRIX_SIZES:-'100 2000 10000 100000'}
 seeds=${HASHTABLE_MATRIX_SEEDS:-'0 31 104729'}
 repetitions=${HASHTABLE_BENCH_REPETITIONS:-7}
 warmups=${HASHTABLE_BENCH_WARMUPS:-1}
+high_gc_policy=${HASHTABLE_MATRIX_GC_POLICY_HIGH:-minor}
 expected=0
+
+case "$high_gc_policy" in
+  compact|major|minor) ;;
+  *) printf 'Invalid high-size GC policy: %s\n' "$high_gc_policy" >&2; exit 2 ;;
+esac
 
 if [ ! -d "$output" ]; then
   printf 'Matrix record directory is missing: %s\n' "$output" >&2
@@ -27,8 +33,8 @@ require_record() {
   size=$2
   seed=$3
   case "$size" in
-    100|2000) live_heap=true ;;
-    *) live_heap=false ;;
+    100|2000) live_heap=true; pre_sample_gc=compact ;;
+    *) live_heap=false; pre_sample_gc=$high_gc_policy ;;
   esac
   if [ ! -s "$record" ]; then
     printf 'Matrix record is missing or empty: %s\n' "$record" >&2
@@ -36,13 +42,14 @@ require_record() {
   fi
   if ! jq -se --argjson size "$size" --argjson seed "$seed" \
       --argjson repetitions "$repetitions" --argjson warmups "$warmups" \
-      --argjson live_heap "$live_heap" '
+      --argjson live_heap "$live_heap" --arg pre_sample_gc "$pre_sample_gc" '
         map(select(.record == "metadata")) as $metadata |
         ($metadata | length == 1) and
         ($metadata[0].size == $size) and ($metadata[0].seed == $seed) and
         ($metadata[0].repetitions == $repetitions) and
         ($metadata[0].warmups == $warmups) and
         ($metadata[0].live_heap == $live_heap) and
+        (($metadata[0].pre_sample_gc // "compact") == $pre_sample_gc) and
         ($metadata[0].revision != "unknown") and
         ($metadata[0].dirty == "false")
       ' "$record" >/dev/null; then
@@ -63,8 +70,8 @@ require_record() {
 require_pair() {
   left=$1
   right=$2
-  left_metadata=$(jq -rc 'select(.record == "metadata") | [.workload, .size, .seed, .repetitions, .warmups, .live_heap, .revision, .dirty] | @json' "$left")
-  right_metadata=$(jq -rc 'select(.record == "metadata") | [.workload, .size, .seed, .repetitions, .warmups, .live_heap, .revision, .dirty] | @json' "$right")
+  left_metadata=$(jq -rc 'select(.record == "metadata") | [.workload, .size, .seed, .repetitions, .warmups, .live_heap, (.pre_sample_gc // "compact"), .revision, .dirty] | @json' "$left")
+  right_metadata=$(jq -rc 'select(.record == "metadata") | [.workload, .size, .seed, .repetitions, .warmups, .live_heap, (.pre_sample_gc // "compact"), .revision, .dirty] | @json' "$right")
   if [ "$left_metadata" != "$right_metadata" ]; then
     printf 'Matrix pair metadata differs: %s / %s\n' "$left" "$right" >&2
     exit 1

@@ -1,6 +1,6 @@
 # Generated HAMT performance tracker
 
-Last updated: 2026-09-23.
+Last updated: 2026-09-24.
 Contract and acceptance: [implementation plan](hashtable-performance-plan.md).
 Measurements: [performance note](hashtable-performance.md).
 This tracker is separate from [H0–H5](hashtable-todo.md) and Patricia work.
@@ -228,8 +228,12 @@ build-allocation target for ascending integers and fixed-width strings.
   case code. Proved six-depth direct source workers now screen at 16 bytes
   per branch (the checked `pseq_get` option). The 2,000-binding dirty-worktree
   run has generated/handcoded hit allocation parity and approximately
-  1.40×/1.26× time for ascending integers/fixed-width strings. Clean matched
-  validation and update-path attribution remain.
+  1.40×/1.26× time for ascending integers/fixed-width strings. The clean
+  `dfb8680` seven-repetition, 26-record matrix confirms exact ordinary
+  generated/handcoded lookup allocation parity and 1.45×/1.23× time at those
+  points. Collision lookup and removal remain much farther apart; checked
+  indexed bucket traversal is a source-visible cause. Update-path attribution
+  and the final cross-distribution judgment remain.
 - [ ] **HP6.3** Re-run the matched five-implementation matrix at the final
   revision and publish time, allocation and retained-heap gaps by operation
   and distribution, including capped collision histories.
@@ -301,3 +305,5 @@ build-allocation target for ascending integers and fixed-width strings.
 | 2026-09-23 | HP6.1 bounded comparison candidate | `make hashtable`; `make all`; `make hashtable-benchmark-smoke`; 2,000-binding ascending integer/fixed-width string benchmarks, seed 31, one warmup and seven measured repetitions on the working tree | All three aggregate commands passed, including proof, assumption audit, bytecode/native scalar corpus, generated hot-path audits, public/model differential suites and Patricia integration. The screening runs measured public hit allocation at 0.604/0.594 MB versus `bd0e69c` 3.749/9.509 MB; same-run generated/handcoded hit time was 1.50×/1.43×. Worktree was dirty, so these are candidate measurements pending a clean revision. A missing `HashTableNativeBits.vo` prerequisite for `HashTableNative.vo` was repaired after an incremental assumption audit exposed stale `.vo` linkage. |
 | 2026-09-23 | HP6.1 clean matched slice | `HASHTABLE_MATRIX_SIZES=2000 HASHTABLE_MATRIX_SEEDS=31 HASHTABLE_BENCH_REPETITIONS=7 HASHTABLE_MATRIX_OUTPUT=/tmp/patricia-bounded-compare-matched-8026332 sh ./run-hashtable-performance-matrix.sh` | Passed: 26 clean matched records at `8026332`, including constant hash, depths 0–5 and all three string distributions, with seven samples per operation. Across 13 HAMT distributions, generated hit-lookup median time/allocation ratios against `bd0e69c` were 0.62/0.15. Raw archive and five-way representative comparisons are in `hashtable-performance-results.md`. |
 | 2026-09-23 | HP6.2 depth-worker screening | Synthetic 200,000-call allocation profile for modeled-depth 0–6 public lookup, then `make hashtable` and 2,000-binding integer/string seven-repetition smoke | The old recursive `native_get` allocated 16 + 96×depth bytes per successful lookup; the source-defined direct-depth worker allocated 16 + 16×depth. `make hashtable` passed including assumptions, bytecode/native differential/model tests and generated negative-fixture audits. Dirty-worktree public hit allocation reached exact handcoded parity at the two representative 2,000-binding points (integer 127,376 bytes, string 125,712 bytes); clean matrix evidence is pending. |
+| 2026-09-24 | HP6.2 clean direct-depth slice | Clean `dfb8680` 2,000-binding, seed-31, seven-repetition matrix; `make all` in detached checkout | Passed: all 26 paired records validated; median generated lookup-hit time/allocation versus `8026332` across 13 distributions is 0.88/0.21. Ordinary integer/string hit allocation equals handcoded exactly; collision and deep-divergence gaps remain. Raw archive and five-way scope are in the result report. |
+| 2026-09-24 | HP6 matrix runtime policy | Seven-repetition ascending-integer diagnostics at 10,000/100,000 bindings | At 10,000, compact/major/minor pre-sample GC took 12.0/6.3/0.9 seconds; at 100,000, major/minor took 101.6/19.2 seconds. Runner and validator now record/use minor collection for large timing-only records, while retaining compaction for 100/2,000 records with post-GC heap passes. Historical records without the policy field mean compact. |

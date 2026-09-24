@@ -170,3 +170,45 @@ handcoded HAMT, Patricia, AVL and mutable `Hashtbl` were respectively
 0.264/0.262/0.090/0.168/0.045 for build and
 0.211/0.145/0.132/0.142/0.048 for hit lookup. The generated/handcoded
 build gap is small at these points, while lookup remains the clearer target.
+
+## Direct-depth lookup follow-up at `dfb8680`
+
+The clean revision `dfb86808ae1a7f65247d467094fcc6621b6fa452` routes
+public lookup through six source-defined depth workers. Their source
+equivalence to the fueled worker is proved. The same 2,000-binding, seed-31,
+seven-repetition matrix accepted all 26 paired records. Raw samples are in
+[`benchmarks/hashtable-direct-depth-matrix-dfb8680.tar.xz`](benchmarks/hashtable-direct-depth-matrix-dfb8680.tar.xz)
+(SHA-256 `328474c86571bf23dd1ac2a5e4f400f8b56d06fb6f34fee31ff931cdaaca10f4`).
+Across the 13 distributions, median generated lookup-hit time and allocation
+ratios against `8026332` are 0.88 and 0.21. The generated/handcoded hit-time
+ratio is 1.48 at this slice; their median allocation ratio is 1.00.
+
+For ascending integers, generated/handcoded repeated-set build medians were
+0.203/0.208 ms, lookup hit 0.164/0.113 ms, existing-key set
+0.448/0.366 ms, and present removal 0.303/0.257 ms. For fixed-width strings
+the corresponding medians were 0.263/0.261, 0.176/0.143, 0.495/0.426 and
+0.358/0.317 ms. Generated hit lookup allocated exactly the same amount as the
+handcoded HAMT in these two distributions: 127,376 and 125,712 bytes.
+
+The collision cases remain separate. At 2,000 constant-hash integer keys,
+generated/handcoded lookup allocated 160.112/0.112 MB and took
+8.346/3.186 ms; present removal took 21.058/0.037 ms. At routing divergence
+depth 5, lookup allocated 5.304/0.304 MB and took 0.591/0.239 ms. The
+source bucket worker performs a checked indexed access at each collision
+entry; its target option and recursive-call costs remain visible. These
+figures are a reason to retain collision inputs in the final matrix and not
+to infer parity from the ordinary lookup result.
+
+## Matrix runtime policy
+
+The original full matrix used `Gc.compact` before every timed sample. A
+100,000-binding ascending-integer, seven-repetition diagnostic took about
+102 seconds with `Gc.full_major` and 19 seconds with `Gc.minor`; at 10,000,
+the corresponding compact/major/minor times were 12.0/6.3/0.9 seconds.
+The matrix runner now uses compaction for 100/2,000-binding records and a
+minor collection for 10,000/100,000-binding records. A metadata field records
+the selected policy, and the validator checks it. The historical archives
+lack that field and mean `compact`; validate those with
+`HASHTABLE_MATRIX_GC_POLICY_HIGH=compact`. Large-size timed samples can vary
+when major GC occurs during a sample, so the final report will show medians
+and the raw ranges rather than claim that the policy makes timings identical.

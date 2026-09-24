@@ -2,6 +2,7 @@ type config = {
   repetitions : int;
   warmups : int;
   live_heap : bool;
+  pre_sample_gc : string;
   result_file : string;
 }
 
@@ -23,13 +24,20 @@ let config () =
   let repetitions = positive_env "HASHTABLE_BENCH_REPETITIONS" 7 in
   let warmups = positive_env "HASHTABLE_BENCH_WARMUPS" 1 in
   let live_heap = boolean_env "HASHTABLE_BENCH_LIVE_HEAP" true in
+  let pre_sample_gc =
+    match Sys.getenv_opt "HASHTABLE_BENCH_PRE_SAMPLE_GC" with
+    | None | Some "compact" -> "compact"
+    | Some "major" -> "major"
+    | Some "minor" -> "minor"
+    | Some _ -> invalid_arg "HASHTABLE_BENCH_PRE_SAMPLE_GC must be compact, major or minor"
+  in
   let result_file =
     match Sys.getenv_opt "HASHTABLE_BENCH_RESULTS" with
     | Some path -> path
     | None -> Filename.concat (Filename.get_temp_dir_name ())
                 (Printf.sprintf "hashtable-performance-%d.jsonl" (Unix.getpid ()))
   in
-  { repetitions; warmups; live_heap; result_file }
+  { repetitions; warmups; live_heap; pre_sample_gc; result_file }
 
 let active_config = ref None
 let output = ref None
@@ -86,8 +94,9 @@ let start ~workload ~size ~seed =
   let gc = Gc.get () in
   write_json
     (Printf.sprintf
-       "{\"record\":\"metadata\",\"workload\":%s,\"size\":%d,\"seed\":%d,\"repetitions\":%d,\"warmups\":%d,\"live_heap\":%b,\"revision\":%s,\"dirty\":%s,\"ocaml_version\":%s,\"word_size\":%d,\"os\":%s,\"release\":%s,\"machine\":%s,\"cpu\":%s,\"gc\":%s}"
+       "{\"record\":\"metadata\",\"workload\":%s,\"size\":%d,\"seed\":%d,\"repetitions\":%d,\"warmups\":%d,\"live_heap\":%b,\"pre_sample_gc\":%s,\"revision\":%s,\"dirty\":%s,\"ocaml_version\":%s,\"word_size\":%d,\"os\":%s,\"release\":%s,\"machine\":%s,\"cpu\":%s,\"gc\":%s}"
        (json_string workload) size seed settings.repetitions settings.warmups settings.live_heap
+       (json_string settings.pre_sample_gc)
        (json_string (env "HASHTABLE_BENCH_REVISION"))
        (json_string (env "HASHTABLE_BENCH_DIRTY"))
        (json_string Sys.ocaml_version) Sys.word_size
@@ -134,7 +143,12 @@ let add_sample task sample =
   Hashtbl.replace task_samples task (sample :: previous)
 
 let timed task repetition =
-  Gc.compact ();
+  let settings = match !active_config with Some value -> value | None -> invalid_arg "HashTableBenchmarkSupport.start" in
+  (match settings.pre_sample_gc with
+   | "compact" -> Gc.compact ()
+   | "major" -> Gc.full_major ()
+   | "minor" -> Gc.minor ()
+   | _ -> assert false);
   let before = Gc.allocated_bytes () in
   let started = Unix.gettimeofday () in
   let checksum = Sys.opaque_identity (task.run repetition) in

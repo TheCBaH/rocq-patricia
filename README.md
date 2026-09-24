@@ -52,6 +52,11 @@ into one process. `make hashtable-performance-matrix-validate` checks an
 existing `HASHTABLE_MATRIX_OUTPUT` directory for the exact configured record
 set, samples/summaries, clean single-revision provenance, and equal HAMT /
 Patricia pair metadata.
+For large timing-only matrix records (10,000/100,000 bindings), the runner
+uses a minor collection before timed samples; the 100/2,000-binding records
+retain compaction and post-GC heap measurement. Set
+`HASHTABLE_MATRIX_GC_POLICY_HIGH=compact` to reproduce or validate historical
+full-matrix GC policy. Every new record states its policy in JSONL metadata.
 `make hashtable-primitive-benchmark` separately measures checked scalar calls,
 the benchmark hash callback, and fixed-size private-sequence operations when
 profiling is unavailable; set `HASHTABLE_PRIMITIVE_BENCH_ITERATIONS` to adjust

@@ -15,6 +15,12 @@ sizes=${HASHTABLE_MATRIX_SIZES:-'100 2000 10000 100000'}
 seeds=${HASHTABLE_MATRIX_SEEDS:-'0 31 104729'}
 repetitions=${HASHTABLE_BENCH_REPETITIONS:-7}
 warmups=${HASHTABLE_BENCH_WARMUPS:-1}
+high_gc_policy=${HASHTABLE_MATRIX_GC_POLICY_HIGH:-minor}
+
+case "$high_gc_policy" in
+  compact|major|minor) ;;
+  *) printf 'Invalid high-size GC policy: %s\n' "$high_gc_policy" >&2; exit 2 ;;
+esac
 
 # Post-GC retained-heap construction is its own measurement, not an input to a
 # timed sample.  Collect it at the 100/2,000 representative sizes (including
@@ -25,6 +31,16 @@ live_heap_for_size() {
   case "$1" in
     100|2000) printf '%s\n' true ;;
     *) printf '%s\n' false ;;
+  esac
+}
+
+# Keep compaction for representative live-heap sizes. A minor collection before
+# large timed samples avoids repeated full-heap scans; record and validate the
+# policy in every JSONL metadata record.
+gc_policy_for_size() {
+  case "$1" in
+    100|2000) printf '%s\n' compact ;;
+    *) printf '%s\n' "$high_gc_policy" ;;
   esac
 }
 
@@ -51,6 +67,7 @@ bootstrap_integer() {
   HASHTABLE_BENCH_PATTERN=ascending HASHTABLE_BENCH_REPETITIONS=1 \
   HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_BENCH_RESULTS=$record \
   HASHTABLE_BENCH_LIVE_HEAP=true HASHTABLE_BENCH_REVISION=$revision \
+  HASHTABLE_BENCH_PRE_SAMPLE_GC=compact \
   HASHTABLE_BENCH_DIRTY=false "$@"
 }
 
@@ -61,6 +78,7 @@ bootstrap_string() {
   HASHTABLE_BENCH_STRING_PATTERN=fixed-width HASHTABLE_BENCH_REPETITIONS=1 \
   HASHTABLE_BENCH_WARMUPS=1 HASHTABLE_BENCH_RESULTS=$record \
   HASHTABLE_BENCH_LIVE_HEAP=true HASHTABLE_BENCH_REVISION=$revision \
+  HASHTABLE_BENCH_PRE_SAMPLE_GC=compact \
   HASHTABLE_BENCH_DIRTY=false "$@"
 }
 
@@ -74,10 +92,11 @@ run_integer() {
   seed=$2
   pattern=$3
   live_heap=$(live_heap_for_size "$size")
+  pre_sample_gc=$(gc_policy_for_size "$size")
   record="$output/integer-size${size}-seed${seed}-${pattern}.jsonl"
   HASHTABLE_BENCH_SIZE=$size HASHTABLE_BENCH_SEED=$seed \
   HASHTABLE_BENCH_PATTERN=$pattern HASHTABLE_BENCH_REPETITIONS=$repetitions \
-  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_LIVE_HEAP=$live_heap HASHTABLE_BENCH_RESULTS=$record \
+  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_LIVE_HEAP=$live_heap HASHTABLE_BENCH_PRE_SAMPLE_GC=$pre_sample_gc HASHTABLE_BENCH_RESULTS=$record \
   HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false \
   ./hashtable-benchmark
 }
@@ -87,10 +106,11 @@ run_patricia_integer() {
   seed=$2
   pattern=$3
   live_heap=$(live_heap_for_size "$size")
+  pre_sample_gc=$(gc_policy_for_size "$size")
   record="$output/patricia-integer-size${size}-seed${seed}-${pattern}.jsonl"
   HASHTABLE_BENCH_SIZE=$size HASHTABLE_BENCH_SEED=$seed \
   HASHTABLE_BENCH_PATTERN=$pattern HASHTABLE_BENCH_REPETITIONS=$repetitions \
-  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_LIVE_HEAP=$live_heap HASHTABLE_BENCH_RESULTS=$record \
+  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_LIVE_HEAP=$live_heap HASHTABLE_BENCH_PRE_SAMPLE_GC=$pre_sample_gc HASHTABLE_BENCH_RESULTS=$record \
   HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false \
   ./patricia-matrix-benchmark
 }
@@ -108,10 +128,11 @@ run_string() {
   seed=$2
   pattern=$3
   live_heap=$(live_heap_for_size "$size")
+  pre_sample_gc=$(gc_policy_for_size "$size")
   record="$output/string-size${size}-seed${seed}-${pattern}.jsonl"
   HASHTABLE_BENCH_SIZE=$size HASHTABLE_BENCH_SEED=$seed \
   HASHTABLE_BENCH_STRING_PATTERN=$pattern HASHTABLE_BENCH_REPETITIONS=$repetitions \
-  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_LIVE_HEAP=$live_heap HASHTABLE_BENCH_RESULTS=$record \
+  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_LIVE_HEAP=$live_heap HASHTABLE_BENCH_PRE_SAMPLE_GC=$pre_sample_gc HASHTABLE_BENCH_RESULTS=$record \
   HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false \
   ./hashtable-string-benchmark
 }
@@ -121,10 +142,11 @@ run_patricia_string() {
   seed=$2
   pattern=$3
   live_heap=$(live_heap_for_size "$size")
+  pre_sample_gc=$(gc_policy_for_size "$size")
   record="$output/patricia-string-size${size}-seed${seed}-${pattern}.jsonl"
   HASHTABLE_BENCH_SIZE=$size HASHTABLE_BENCH_SEED=$seed \
   HASHTABLE_BENCH_STRING_PATTERN=$pattern HASHTABLE_BENCH_REPETITIONS=$repetitions \
-  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_LIVE_HEAP=$live_heap HASHTABLE_BENCH_RESULTS=$record \
+  HASHTABLE_BENCH_WARMUPS=$warmups HASHTABLE_BENCH_LIVE_HEAP=$live_heap HASHTABLE_BENCH_PRE_SAMPLE_GC=$pre_sample_gc HASHTABLE_BENCH_RESULTS=$record \
   HASHTABLE_BENCH_REVISION=$revision HASHTABLE_BENCH_DIRTY=false \
   ./patricia-string-matrix-benchmark
 }
@@ -170,6 +192,7 @@ done
 HASHTABLE_MATRIX_SIZES="$sizes" HASHTABLE_MATRIX_SEEDS="$seeds" \
 HASHTABLE_BENCH_REPETITIONS="$repetitions" \
 HASHTABLE_BENCH_WARMUPS="$warmups" \
+HASHTABLE_MATRIX_GC_POLICY_HIGH="$high_gc_policy" \
   sh ./validate-hashtable-performance-matrix.sh "$output"
 
 printf 'HAMT performance matrix JSONL records: %s\n' "$output"

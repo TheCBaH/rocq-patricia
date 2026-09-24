@@ -8,6 +8,7 @@ type config = {
   repetitions : int;
   warmups : int;
   live_heap : bool;
+  pre_sample_gc : string;
   result_file : string;
 }
 
