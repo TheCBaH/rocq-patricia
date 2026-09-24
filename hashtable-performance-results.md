@@ -474,6 +474,10 @@ different storage semantics from the persistent maps. The generated HAMT stays
 close to the handcoded HAMT for build and is about 1.2–1.3× slower on hit
 lookup.
 
+Generated and handcoded HAMT hit-lookup allocation is exactly equal in all 54
+short-string records. The median generated/Patricia hit-allocation ratio is
+4.27×; for repeated-set build, generated/handcoded allocation is 1.53×.
+
 At 100,000 keys, the median max/min spread of each record's seven hit samples
 was 1.36 for generated HAMT, 1.43 for handcoded HAMT, 1.25 for Patricia, 1.21
 for AVL, and 1.23 for mutable `Hashtbl`. The earlier finding that order matters
