@@ -12,12 +12,15 @@ foreign obligations separately from kernel-checked source statements.
 
 ## Current decision
 
-Bounded scalar realization and direct native workers are implemented. The
-clean 228-record matched matrix and its raw archive are published in the
-[result report](hashtable-performance-results.md). The measured retained-heap
-target is met at 100/2,000 bindings; the ordinary 2× standalone time target
-was unmet for hit lookup at `bd0e69c`. The isolated 2,000-binding scalar-stage comparison
-uses identical pre/post harness files and exceeds the proposed 10×
+The final clean 228-record matrix at `bccd2a9` is published in the
+[result report](hashtable-performance-results.md). Over comparable
+100/2,000-binding ordinary records, generated/handcoded hit time narrowed
+from 3.25× to 1.47× and generated/mutable hit time from 8.91× to 3.83×.
+Generated and handcoded ordinary lookup allocation is exactly equal in all
+72 final records. The measured retained-heap limit is met. The strict 2×
+time bound remains unmet in three ordinary hit records, and persistent-array
+constant-hash removal remains much slower than the handcoded list bucket.
+The isolated scalar-stage comparison also exceeds the proposed 10×
 build-allocation target for ascending integers and fixed-width strings.
 
 | Gate | Depends on | Status / closure condition |
@@ -28,7 +31,7 @@ build-allocation target for ascending integers and fixed-width strings.
 | HP3 — direct workers | HP2 | Complete: public hot paths avoid source/sequence-view round trips |
 | HP4 — specialization decision | HP3 + residual profile | Complete: defer with residual-cost uncertainty recorded |
 | HP5 — release evidence | HP1–HP3 + HP4 decision | Complete locally: full paired matrix, clean aggregate and boundary report; hosted CI separate |
-| HP6 — close remaining throughput gap | HP5 matrix | In progress: bounded comparison validated at 2,000; direct-depth lookup candidate and full five-way follow-up pending |
+| HP6 — close remaining throughput gap | HP5 matrix | Complete locally: clean final five-way matrix, archive, bounded regression audit and remaining gaps published; hosted CI separate |
 
 ## Review and baseline evidence
 
@@ -244,9 +247,15 @@ build-allocation target for ascending integers and fixed-width strings.
   confirming timing uncertainty. The local regression and residual
   representation cost are published in the result report; the cross-seed
   judgment belongs to HP6.3.
-- [ ] **HP6.3** Re-run the matched five-implementation matrix at the final
+- [x] **HP6.3** Re-run the matched five-implementation matrix at the final
   revision and publish time, allocation and retained-heap gaps by operation
-  and distribution, including capped collision histories.
+  and distribution, including capped collision histories. Clean `bccd2a9`
+  passed `make all` in a detached checkout and the full 228-record matrix
+  validator. An independent audit found 9,918 complete operation summaries,
+  69,426 seven-repetition samples and 936 heap records. The report compares
+  all five implementations over 72 ordinary records, gives per-distribution
+  time/allocation gaps, separates 42 capped collision records, and records
+  the remaining mutable and handcoded gaps plus the raw archive checksum.
 
 ## Validation log
 
@@ -321,3 +330,4 @@ build-allocation target for ascending integers and fixed-width strings.
 | 2026-09-24 | HP6.2 clean bounded bucket slice | Clean `952fe24` 2,000-binding, seed-31, seven-repetition matrix and per-operation comparison against `dfb8680` | Passed: all 26 paired records validated. Constant-hash hit fell to 3.871 ms/0.112 MB; depth-5 hit to 0.440 ms/0.304 MB. Ordinary operation allocation medians stayed exact and time medians near parity with the preceding revision. Isolated >10% time increases in depth-4 present removal and root-slot new set need repetition. Raw archive and attribution are in the result report. |
 | 2026-09-24 | HP6.2 regression check and clean aggregate | Detached `952fe24` checkout `make all`; four clean revision-stamped seven-repetition reruns at depth-4 removal and root-slot new set on `dfb8680` and `952fe24`; target-only scan screens | Clean aggregate passed. Depth-4 removal rose 0.565 to 0.775 ms with slightly lower allocation; a short-bucket path screened at 0.673 ms and kept the constant-hash gain. Root-slot new-set reversed the apparent rise at 0.617/0.585 ms with identical allocation, showing timing uncertainty. Raw reruns are archived in the result report. |
 | 2026-09-24 | HP6.2 short-bucket removal screen | `make all hashtable-benchmark-smoke`; dirty 2,000-binding seed-31 seven-repetition depth-4 and constant-hash benchmarks | Passed aggregate and smoke. Short buckets use a source-shaped direct scan, long buckets retain the low-allocation array scan. Depth-4 present removal screened at 0.673 ms, versus 0.775 ms for the original array scan; constant-hash hit stayed at 3.822 ms/0.112 MB and present removal at 19.506 ms. Clean final matrix remains HP6.3. |
+| 2026-09-24 | HP6.3 final clean aggregate and matrix | Detached `bccd2a9` checkout `make all`; `HASHTABLE_MATRIX_OUTPUT=/tmp/patricia-final-matrix-bccd2a9 sh ./run-hashtable-performance-matrix.sh`; independent JSONL operation/repetition audit | Passed. The runner validated 228 clean paired records across four sizes, three seeds and seven repetitions. Independent audit counted 9,918 summaries, 69,426 samples with complete repetition groups and 936 representative heap records. The large-record minor-GC policy reduced elapsed matrix runtime to about 18 minutes 8 seconds on this host. Raw archive, checksum, all-five comparison, per-distribution gaps and residual cases are in the result report. |

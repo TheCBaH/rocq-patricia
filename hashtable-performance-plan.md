@@ -314,14 +314,17 @@ on matched workloads.
 
 ### Continued gap-closing work
 
-The [matched matrix report](hashtable-performance-results.md) now compares the
+The [matched matrix report](hashtable-performance-results.md) compares the
 generated HAMT, handcoded HAMT, mutable `Hashtbl`, Patricia and AVL `Map`.
-It identifies generated hit lookup allocation as the largest ordinary
-generated/handcoded gap. Follow-up changes must preserve the same source
-refinement and foreign-boundary discipline, then be measured against this
-clean matrix revision. A 2,000-binding paired point is sufficient to screen
-an individual candidate; use the full matrix for a final cross-distribution
-claim. Retained roots and constant-hash cases remain separate checks.
+The original baseline identified generated hit-lookup allocation as the
+largest ordinary generated/handcoded gap. The final `bccd2a9` matrix closes
+that allocation gap across all 72 ordinary records and documents the
+remaining time, update-allocation and long-collision-removal costs. Further
+changes must preserve the same source refinement and foreign-boundary
+discipline, then be measured against this final clean matrix. A 2,000-binding
+paired point can screen an individual candidate; use the full matrix for a
+cross-distribution claim. Retained roots and constant-hash cases remain
+separate checks.
 
 Stage order: HP0 → HP1 → HP2 → HP3 → HP4 decision → HP5. Keep stages independently
 reviewable and measurements associated with each revision. If an optimization

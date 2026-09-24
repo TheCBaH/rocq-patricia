@@ -11,7 +11,8 @@ The [detailed implementation plan](hashtable-performance-plan.md) records the
 evidence, proof/foreign boundary, dependencies and acceptance gates;
 [the performance tracker](hashtable-performance-todo.md) owns progress.
 The [matched matrix report](hashtable-performance-results.md) summarizes the
-current 228-record, seven-repetition result and links its raw JSONL archive.
+final clean `bccd2a9` 228-record, seven-repetition five-way result and links
+its raw JSONL archive alongside the original corrected baseline.
 
 ## Implementation status
 

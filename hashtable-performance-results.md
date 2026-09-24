@@ -1,5 +1,9 @@
 # Generated HAMT matched performance matrix
 
+Latest complete five-way matrix: clean `bccd2a9` on 2026-09-24; see
+[final matrix and decision](#final-five-way-matrix-at-bccd2a9) below. The
+earlier sections preserve the original corrected baseline and isolated stages.
+
 Date: 2026-09-23. Source revision: `bd0e69c6f6d8a701ce727412c8483ce14c291156` (clean).
 The complete 228 JSONL records are archived in
 [`benchmarks/hashtable-performance-matrix-bd0e69c.tar.xz`](benchmarks/hashtable-performance-matrix-bd0e69c.tar.xz).
@@ -251,5 +255,142 @@ minor collection for 10,000/100,000-binding records. A metadata field records
 the selected policy, and the validator checks it. The historical archives
 lack that field and mean `compact`; validate those with
 `HASHTABLE_MATRIX_GC_POLICY_HIGH=compact`. Large-size timed samples can vary
-when major GC occurs during a sample, so the final report will show medians
-and the raw ranges rather than claim that the policy makes timings identical.
+when major GC occurs during a sample. The final results report medians and
+retain the raw ranges rather than assuming identical timing conditions.
+
+## Final five-way matrix at `bccd2a9`
+
+Revision `bccd2a95d91454f08d76f046a5dabf39f6096687` passed `make all`
+in a detached clean checkout and the four-size matrix runner. The raw data
+are in
+[`benchmarks/hashtable-performance-matrix-bccd2a9.tar.xz`](benchmarks/hashtable-performance-matrix-bccd2a9.tar.xz)
+(SHA-256 `b9e6137ef3b7a4ad7a0a9c5e7a4ddfc100e162a3c5d3e96eb989365ef544e987`).
+The validator accepted 228 clean paired HAMT/Patricia records. An independent
+audit found 9,918 operation summaries, 69,426 samples with every repetition
+index 0–6, and 936 retained-heap records. Sizes, seeds, distributions and
+operation boundaries match the original matrix. The run took about 18 minutes
+8 seconds from log creation to the final validator message on this host.
+
+The 100 and 2,000-binding records use pre-sample compaction and measure
+post-GC retained heap. The 10,000 and 100,000-binding records use a minor
+collection before each timed sample and omit the expensive retained-heap
+pass. Every record states its policy. Ratios below compare implementations
+within the same record. At 100,000 bindings, the generated HAMT's median
+sample max/min ranges across ordinary records were 2.17 for repeated-set
+build, 1.38 for hit lookup, 1.89 for existing set and 1.62 for present
+removal; interpret individual large-size timings with those ranges in view.
+
+### Ordinary operations across all five implementations
+
+The following entries are medians of per-record median-time ratios over the
+72 ordinary records: six integer/string distributions × four sizes × three
+seeds. Each ratio is **generated HAMT / named implementation**; values above
+one mean the generated HAMT took longer. The Patricia value comes from the
+paired process, while the other three competitors share the HAMT process.
+
+| Operation | Handcoded HAMT | Mutable `Hashtbl` | Patricia | AVL `Map` |
+| --- | ---: | ---: | ---: | ---: |
+| Repeated-set build | 1.10× | 7.53× | 2.75× | 1.77× |
+| Hit lookup | 1.44× | 4.80× | 2.75× | 1.84× |
+| Existing-key set, latest root | 1.25× | 5.82× | 2.56× | 2.06× |
+| Present removal | 1.19× | 6.66× | 4.96× | 3.87× |
+
+For each ordinary distribution, the next table gives generated/handcoded
+median **time / allocation** ratios over its 12 size/seed records. The
+separate mutable table gives generated/`Hashtbl` median **time** ratios for
+the same operations. Constant-hash and divergence inputs remain separate.
+
+| Distribution | Build time / allocation | Hit time / allocation | Existing set time / allocation | Present removal time / allocation |
+| --- | ---: | ---: | ---: | ---: |
+| Integer ascending | 1.16 / 1.49 | 1.45 / 1.00 | 1.28 / 1.47 | 1.21 / 1.56 |
+| Integer shuffled | 1.13 / 1.50 | 1.46 / 1.00 | 1.26 / 1.47 | 1.17 / 1.57 |
+| Integer root-slot collision | 1.26 / 1.62 | 1.65 / 1.00 | 1.47 / 1.57 | 1.37 / 1.68 |
+| String fixed-width | 1.04 / 1.53 | 1.35 / 1.00 | 1.16 / 1.48 | 1.17 / 1.60 |
+| String mixed-length | 1.03 / 1.53 | 1.20 / 1.00 | 1.22 / 1.49 | 1.12 / 1.60 |
+| String common-prefix | 1.00 / 1.53 | 1.07 / 1.00 | 1.06 / 1.49 | 1.04 / 1.60 |
+
+| Distribution | Build vs mutable | Hit vs mutable | Existing set vs mutable | Present removal vs mutable |
+| --- | ---: | ---: | ---: | ---: |
+| Integer ascending | 8.99× | 5.32× | 6.46× | 6.62× |
+| Integer shuffled | 10.17× | 4.92× | 6.39× | 7.66× |
+| Integer root-slot collision | 12.50× | 6.72× | 8.48× | 9.16× |
+| String fixed-width | 6.86× | 4.10× | 5.38× | 6.18× |
+| String mixed-length | 5.25× | 4.10× | 4.76× | 5.97× |
+| String common-prefix | 2.50× | 1.93× | 2.40× | 2.36× |
+
+Hit and miss lookup and membership allocated exactly the same bytes in the
+generated and handcoded HAMTs in all 72 ordinary records. Build and update
+still allocate roughly 1.5–1.6× as much in the generated backend. Mutable
+`Hashtbl` updates a single table; the persistent maps produce new roots, so
+their update/allocation ratios describe different storage semantics. At
+2,000 bindings, seed 31, ascending integer generated/handcoded/Patricia/AVL/
+mutable hit times were 0.164/0.116/0.069/0.102/0.033 ms; fixed-width string
+hit times were 0.175/0.141/0.131/0.138/0.046 ms. Their generated/handcoded
+hit allocations were 127,376/127,376 and 125,712/125,712 bytes, respectively.
+
+### Progress against the original compact-policy baseline
+
+The following comparison uses only the 36 ordinary 100/2,000-binding records,
+where both `bd0e69c` and `bccd2a9` used compaction and the same workload
+boundaries. New/old columns are medians of each record's generated-HAMT
+ratio; gap columns are medians of generated/competitor ratios at each stage.
+
+| Operation | Generated time new/old | Generated allocation new/old | Handcoded time gap old → new | Mutable time gap old → new |
+| --- | ---: | ---: | ---: | ---: |
+| Repeated-set build | 0.76 | 0.55 | 1.52× → 1.06× | 8.08× → 6.32× |
+| Hit lookup | 0.47 | 0.015 | 3.25× → 1.47× | 8.91× → 3.83× |
+| Existing-key set | 0.66 | 0.20 | 1.95× → 1.25× | 5.77× → 4.13× |
+| Present removal | 0.61 | 0.17 | 2.00× → 1.18× | 7.72× → 4.72× |
+
+The ordinary twofold handcoded time bound now holds for 69/72 hit-lookup
+records, 71/72 repeated-set builds, and all 72 existing-key set and present
+removal records. It is still not universal: the largest ordinary hit ratio
+was 2.24×. The mutable gap narrowed substantially but remains 3.83× for
+hit lookup and 4.72–6.32× for the other three operations in the comparable
+compact-policy subset. No parity with mutable `Hashtbl` is claimed.
+
+### Capped collisions and retained heap
+
+At the 2,000-binding cap, the next table gives median generated/handcoded
+**time / allocation** ratios over three seeds for each integer collision
+distribution. The 100-binding cap is also measured in the raw archive; its
+individual times are short enough to be more sensitive to timer noise.
+
+| Distribution | Build time / allocation | Hit time / allocation | Existing set time / allocation | Present removal time / allocation |
+| --- | ---: | ---: | ---: | ---: |
+| Constant hash | 1.34 / 0.17 | 1.17 / 1.00 | 1.52 / 0.34 | 525.31 / 93.25 |
+| Divergence depth 0 | 0.85 / 1.48 | 1.43 / 1.00 | 1.22 / 1.48 | 1.21 / 1.60 |
+| Divergence depth 1 | 1.31 / 1.61 | 1.71 / 1.00 | 1.38 / 1.59 | 1.38 / 1.73 |
+| Divergence depth 2 | 1.40 / 1.73 | 1.98 / 1.00 | 1.59 / 1.68 | 1.50 / 1.84 |
+| Divergence depth 3 | 1.41 / 1.84 | 2.00 / 1.00 | 1.87 / 1.76 | 1.60 / 1.94 |
+| Divergence depth 4 | 1.75 / 1.93 | 2.28 / 1.00 | 1.73 / 1.74 | 2.12 / 1.95 |
+| Divergence depth 5 | 0.81 / 0.83 | 1.75 / 1.00 | 1.02 / 0.95 | 2.36 / 2.63 |
+
+At 2,000 constant-hash keys, over three seeds, the median generated/handcoded
+hit-time ratio was 1.17× with equal allocation. Repeated-set build was 1.34×
+as slow but allocated only 0.17× as much. Present removal remained 525× as
+slow and allocated 93× as much because it repeatedly copies a shrinking
+persistent array while the handcoded list bucket removes the head. At
+divergence depth 5, hit lookup was 1.75× as slow with equal allocation;
+present removal was 2.36× as slow and allocated 2.63× as much. All 42 capped
+integer records and their Patricia companions remain in the archive, with
+latest-root and all-prefix history policies measured separately.
+
+Across all 78 paired HAMT records with a heap pass, the largest generated/
+handcoded retained-heap ratios were 1.000266 for the latest root and 1.000027
+for all-prefix roots, below the planned 5% growth limit. Constant-hash
+generated retained heap was smaller than handcoded retained heap because the
+two collision representations differ. These post-GC measurements are finite
+target observations, while source correctness, array-view contracts and
+foreign OCaml realization remain separate obligations.
+
+| Distribution, 100/2,000 bindings | Largest latest-root ratio | Largest all-prefix ratio |
+| --- | ---: | ---: |
+| Integer ascending | 1.000000 | 1.000000 |
+| Integer shuffled | 1.000000 | 1.000013 |
+| Integer root-slot collision | 1.000000 | 1.000018 |
+| Integer constant hash | 0.668885 | 0.203552 |
+| Integer divergence depths 0–5 | 1.000266 | 1.000023 |
+| String fixed-width | 1.000149 | 1.000027 |
+| String mixed-length | 1.000150 | 1.000027 |
+| String common-prefix | 1.000000 | 1.000000 |
