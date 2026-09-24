@@ -13,6 +13,9 @@ fi
 
 sizes=${HASHTABLE_MATRIX_SIZES:-'100 2000 10000 100000'}
 seeds=${HASHTABLE_MATRIX_SEEDS:-'0 31 104729'}
+include_integer=${HASHTABLE_MATRIX_INCLUDE_INTEGER:-true}
+include_string=${HASHTABLE_MATRIX_INCLUDE_STRING:-true}
+string_patterns=${HASHTABLE_MATRIX_STRING_PATTERNS:-'fixed-width mixed-length common-prefix'}
 repetitions=${HASHTABLE_BENCH_REPETITIONS:-7}
 warmups=${HASHTABLE_BENCH_WARMUPS:-1}
 high_gc_policy=${HASHTABLE_MATRIX_GC_POLICY_HIGH:-minor}
@@ -20,6 +23,10 @@ high_gc_policy=${HASHTABLE_MATRIX_GC_POLICY_HIGH:-minor}
 case "$high_gc_policy" in
   compact|major|minor) ;;
   *) printf 'Invalid high-size GC policy: %s\n' "$high_gc_policy" >&2; exit 2 ;;
+esac
+case "$include_integer:$include_string" in
+  true:true|true:false|false:true) ;;
+  *) printf 'Invalid matrix implementation selection: %s:%s\n' "$include_integer" "$include_string" >&2; exit 2 ;;
 esac
 
 # Post-GC retained-heap construction is its own measurement, not an input to a
@@ -82,10 +89,14 @@ bootstrap_string() {
   HASHTABLE_BENCH_DIRTY=false "$@"
 }
 
-bootstrap_integer "$bootstrap/hashtable.jsonl" make hashtable-benchmark
-bootstrap_string "$bootstrap/hashtable-string.jsonl" make hashtable-string-benchmark
-bootstrap_integer "$bootstrap/patricia.jsonl" make patricia-matrix-benchmark
-bootstrap_string "$bootstrap/patricia-string.jsonl" make patricia-string-matrix-benchmark
+if [ "$include_integer" = true ]; then
+  bootstrap_integer "$bootstrap/hashtable.jsonl" make hashtable-benchmark
+  bootstrap_integer "$bootstrap/patricia.jsonl" make patricia-matrix-benchmark
+fi
+if [ "$include_string" = true ]; then
+  bootstrap_string "$bootstrap/hashtable-string.jsonl" make hashtable-string-benchmark
+  bootstrap_string "$bootstrap/patricia-string.jsonl" make patricia-string-matrix-benchmark
+fi
 
 run_integer() {
   size=$1
@@ -153,13 +164,14 @@ run_patricia_string() {
 
 for size in $sizes; do
   for seed in $seeds; do
-    for pattern in ascending shuffled root-slot-collision; do
+    if [ "$include_integer" = true ]; then
+      for pattern in ascending shuffled root-slot-collision; do
       run_integer "$size" "$seed" "$pattern"
       run_patricia_integer "$size" "$seed" "$pattern"
       require_record "$output/integer-size${size}-seed${seed}-${pattern}.jsonl"
       require_record "$output/patricia-integer-size${size}-seed${seed}-${pattern}.jsonl"
-    done
-    case "$size" in
+      done
+      case "$size" in
       100|2000)
         run_integer "$size" "$seed" constant-hash
         run_patricia_integer "$size" "$seed" constant-hash
@@ -167,8 +179,8 @@ for size in $sizes; do
         require_record "$output/patricia-integer-size${size}-seed${seed}-constant-hash.jsonl"
         ;;
       *) printf 'Skipping constant-hash size %s (planned cap: 100/2000)\n' "$size" ;;
-    esac
-    case "$size" in
+      esac
+      case "$size" in
       100|2000)
         for pattern in divergence-depth-0 divergence-depth-1 divergence-depth-2 \
           divergence-depth-3 divergence-depth-4 divergence-depth-5; do
@@ -179,13 +191,16 @@ for size in $sizes; do
         done
         ;;
       *) printf 'Skipping divergence-depth size %s (planned cap: 100/2000)\n' "$size" ;;
-    esac
-    for pattern in fixed-width mixed-length common-prefix; do
+      esac
+    fi
+    if [ "$include_string" = true ]; then
+      for pattern in $string_patterns; do
       run_string "$size" "$seed" "$pattern"
       run_patricia_string "$size" "$seed" "$pattern"
       require_record "$output/string-size${size}-seed${seed}-${pattern}.jsonl"
       require_record "$output/patricia-string-size${size}-seed${seed}-${pattern}.jsonl"
-    done
+      done
+    fi
   done
 done
 
@@ -193,6 +208,9 @@ HASHTABLE_MATRIX_SIZES="$sizes" HASHTABLE_MATRIX_SEEDS="$seeds" \
 HASHTABLE_BENCH_REPETITIONS="$repetitions" \
 HASHTABLE_BENCH_WARMUPS="$warmups" \
 HASHTABLE_MATRIX_GC_POLICY_HIGH="$high_gc_policy" \
+HASHTABLE_MATRIX_INCLUDE_INTEGER="$include_integer" \
+HASHTABLE_MATRIX_INCLUDE_STRING="$include_string" \
+HASHTABLE_MATRIX_STRING_PATTERNS="$string_patterns" \
   sh ./validate-hashtable-performance-matrix.sh "$output"
 
 printf 'HAMT performance matrix JSONL records: %s\n' "$output"

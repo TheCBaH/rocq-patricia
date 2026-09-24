@@ -13,6 +13,9 @@ fi
 output=$1
 sizes=${HASHTABLE_MATRIX_SIZES:-'100 2000 10000 100000'}
 seeds=${HASHTABLE_MATRIX_SEEDS:-'0 31 104729'}
+include_integer=${HASHTABLE_MATRIX_INCLUDE_INTEGER:-true}
+include_string=${HASHTABLE_MATRIX_INCLUDE_STRING:-true}
+string_patterns=${HASHTABLE_MATRIX_STRING_PATTERNS:-'fixed-width mixed-length common-prefix'}
 repetitions=${HASHTABLE_BENCH_REPETITIONS:-7}
 warmups=${HASHTABLE_BENCH_WARMUPS:-1}
 high_gc_policy=${HASHTABLE_MATRIX_GC_POLICY_HIGH:-minor}
@@ -21,6 +24,10 @@ expected=0
 case "$high_gc_policy" in
   compact|major|minor) ;;
   *) printf 'Invalid high-size GC policy: %s\n' "$high_gc_policy" >&2; exit 2 ;;
+esac
+case "$include_integer:$include_string" in
+  true:true|true:false|false:true) ;;
+  *) printf 'Invalid matrix implementation selection: %s:%s\n' "$include_integer" "$include_string" >&2; exit 2 ;;
 esac
 
 if [ ! -d "$output" ]; then
@@ -102,10 +109,11 @@ require_paired_string() {
 
 for size in $sizes; do
   for seed in $seeds; do
-    for pattern in ascending shuffled root-slot-collision; do
+    if [ "$include_integer" = true ]; then
+      for pattern in ascending shuffled root-slot-collision; do
       require_paired_pattern "$size" "$seed" "$pattern"
-    done
-    case "$size" in
+      done
+      case "$size" in
       100|2000)
         require_paired_pattern "$size" "$seed" constant-hash
         for pattern in divergence-depth-0 divergence-depth-1 divergence-depth-2 \
@@ -113,10 +121,13 @@ for size in $sizes; do
           require_paired_pattern "$size" "$seed" "$pattern"
         done
         ;;
-    esac
-    for pattern in fixed-width mixed-length common-prefix; do
+      esac
+    fi
+    if [ "$include_string" = true ]; then
+      for pattern in $string_patterns; do
       require_paired_string "$size" "$seed" "$pattern"
-    done
+      done
+    fi
   done
 done
 

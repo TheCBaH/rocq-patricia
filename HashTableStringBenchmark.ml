@@ -23,15 +23,32 @@ let seed =
   | None -> 31
   | Some value -> int_of_string value
 
-type workload = Fixed_width | Mixed_length | Common_prefix
+type workload = Fixed_width | Mixed_length | Common_prefix | Short of int * bool
 
 let workload =
   match Sys.getenv_opt "HASHTABLE_BENCH_STRING_PATTERN" with
   | None | Some "fixed-width" -> Fixed_width
   | Some "mixed-length" -> Mixed_length
   | Some "common-prefix" -> Common_prefix
+  | Some "short-4" -> Short (4, false)
+  | Some "short-5" -> Short (5, false)
+  | Some "short-6" -> Short (6, false)
+  | Some "short-4-shuffled" -> Short (4, true)
+  | Some "short-5-shuffled" -> Short (5, true)
+  | Some "short-6-shuffled" -> Short (6, true)
   | Some value ->
       failwith ("HashTable string benchmark: unknown HASHTABLE_BENCH_STRING_PATTERN " ^ value)
+
+let short_key width index =
+  let alphabet = "0123456789abcdefghijklmnopqrstuvwxyz" in
+  let result = Bytes.make width '0' in
+  let remaining = ref index in
+  for position = width - 1 downto 0 do
+    Bytes.set result position (Stdlib.String.get alphabet (!remaining mod 36));
+    remaining := !remaining / 36
+  done;
+  if !remaining <> 0 then invalid_arg "short string key exceeds width";
+  Bytes.to_string result
 
 let workload_name, key_of_index =
   match workload with
@@ -45,12 +62,31 @@ let workload_name, key_of_index =
       let prefix = String.make 192 'p' in
       "192-byte common-prefix string keys", (fun index ->
           prefix ^ Printf.sprintf ":%08d" index)
+  | Short (width, shuffled) ->
+      Printf.sprintf "%d-character base-36 string keys (%s order)" width
+        (if shuffled then "shuffled" else "ascending"),
+      short_key width
 
 let fail message = failwith ("HashTable string benchmark: " ^ message)
 
 let () = if size < 1 then fail "HASHTABLE_BENCH_SIZE must be positive"
+let () = match workload with
+  | Short (width, _) ->
+      let capacity = 36 * 36 * 36 * 36 * (if width = 4 then 1 else if width = 5 then 36 else 36 * 36) in
+      if size > capacity / 3 then fail "short string key space is too small for base, fresh and missing keys"
+  | _ -> ()
 
-let keys = Array.init size key_of_index
+let keys =
+  let result = Array.init size key_of_index in
+  (match workload with
+   | Short (_, true) ->
+       let random = Random.State.make [| seed; size; 0x51eed |] in
+       for index = size - 1 downto 1 do
+         let other = Random.State.int random (index + 1) in
+         let value = result.(index) in result.(index) <- result.(other); result.(other) <- value
+       done
+   | _ -> ());
+  result
 let bindings = Array.to_list (Array.mapi (fun index key -> key, string_of_int index) keys)
 let duplicate_bindings =
   match bindings with
@@ -60,9 +96,13 @@ let updated_bindings =
   Array.to_list (Array.map (fun key -> key, "updated-" ^ key) keys)
 let new_bindings =
   Array.to_list (Array.mapi (fun index _ ->
-      "fresh:" ^ key_of_index (size + index), "new-" ^ string_of_int index) keys)
+      (match workload with Short _ -> key_of_index (size + index)
+       | _ -> "fresh:" ^ key_of_index (size + index)),
+      "new-" ^ string_of_int index) keys)
 let new_keys = Array.map fst (Array.of_list new_bindings)
-let missing_keys = Array.map (fun key -> "missing:" ^ key) keys
+let missing_keys = match workload with
+  | Short _ -> Array.init size (fun index -> key_of_index (2 * size + index))
+  | _ -> Array.map (fun key -> "missing:" ^ key) keys
 let samples () = (Bench.config ()).repetitions + 1
 let slot repetition = if repetition < 0 then samples () - 1 else repetition
 
