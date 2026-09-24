@@ -394,3 +394,89 @@ foreign OCaml realization remain separate obligations.
 | String fixed-width | 1.000149 | 1.000027 |
 | String mixed-length | 1.000150 | 1.000027 |
 | String common-prefix | 1.000000 | 1.000000 |
+
+## Four- to six-character string follow-up at `15048d3`
+
+The raw records are in
+[`benchmarks/hashtable-short-strings-15048d3.tar.xz`](benchmarks/hashtable-short-strings-15048d3.tar.xz)
+(SHA-256 `8536fd44f048d5b8985cd15366d19fb902d0ac874884fffa511d44856ab56cc0`).
+The string-only runner accepted 108 clean, paired HAMT/Patricia JSONL records:
+three fixed lengths (4, 5, 6), ascending and shuffled orders, three sizes
+(2,000, 10,000, 100,000), and three seeds (0, 31, 104729). Each task had one
+warmup and seven timed repetitions on the same aarch64 host and OCaml 4.14.3.
+The independent record audit found 32,886 samples, 4,698 summaries, and 216
+post-GC live-heap records, with seven samples in every task group.
+
+Keys use fixed-width base-36 encoding. Base keys, newly inserted keys, and
+missing-query keys are disjoint and **all have the requested length**. The
+shuffled variant permutes both insertion and hit-query order, so it measures
+their combined effect; its fresh and missing query arrays retain numeric order.
+At 2,000 keys, samples use pre-sample compaction and post-GC heap measurement;
+10,000 and 100,000 use a minor collection and omit the heap pass, matching the
+earlier matrix policy. The older string workloads used different key alphabets,
+lengths, and fresh/missing prefixes, so differences from that matrix do not
+isolate string length.
+
+### Hit lookup across all five implementations
+
+Times are milliseconds for a full pass over all keys, computed as the median
+of the three per-seed sample medians. The Patricia executable is separate but
+has matching input and metadata. Ordered and shuffled rows contain the same
+key set at each length and size.
+
+| Key length | Size | Order | Generated HAMT | Handcoded HAMT | Patricia | AVL `Map` | Mutable `Hashtbl` |
+| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| 4 | 2,000 | ordered | 0.179 | 0.138 | 0.115 | 0.135 | 0.045 |
+| 4 | 2,000 | shuffled | 0.179 | 0.142 | 0.158 | 0.178 | 0.046 |
+| 5 | 2,000 | ordered | 0.173 | 0.145 | 0.114 | 0.133 | 0.050 |
+| 5 | 2,000 | shuffled | 0.172 | 0.142 | 0.167 | 0.178 | 0.052 |
+| 6 | 2,000 | ordered | 0.176 | 0.142 | 0.115 | 0.133 | 0.045 |
+| 6 | 2,000 | shuffled | 0.177 | 0.141 | 0.159 | 0.177 | 0.049 |
+| 4 | 10,000 | ordered | 1.024 | 0.852 | 0.656 | 0.815 | 0.215 |
+| 4 | 10,000 | shuffled | 1.026 | 0.852 | 1.153 | 1.273 | 0.228 |
+| 5 | 10,000 | ordered | 1.027 | 0.869 | 0.665 | 0.833 | 0.219 |
+| 5 | 10,000 | shuffled | 1.026 | 0.867 | 1.157 | 1.246 | 0.255 |
+| 6 | 10,000 | ordered | 1.036 | 0.881 | 0.665 | 0.822 | 0.222 |
+| 6 | 10,000 | shuffled | 1.031 | 0.871 | 1.207 | 1.296 | 0.234 |
+| 4 | 100,000 | ordered | 24.832 | 13.172 | 6.972 | 9.906 | 3.127 |
+| 4 | 100,000 | shuffled | 26.326 | 18.071 | 29.378 | 25.747 | 3.446 |
+| 5 | 100,000 | ordered | 25.180 | 17.394 | 7.098 | 9.761 | 3.125 |
+| 5 | 100,000 | shuffled | 27.149 | 18.729 | 29.368 | 25.254 | 3.901 |
+| 6 | 100,000 | ordered | 24.317 | 19.972 | 7.044 | 10.019 | 3.016 |
+| 6 | 100,000 | shuffled | 25.935 | 19.240 | 33.785 | 22.666 | 3.605 |
+
+The following ratios are medians of **per-record median-time ratios** across
+27 records per order (three lengths × three sizes × three seeds). Each entry is
+generated HAMT divided by the named implementation; above 1 means the
+generated HAMT took longer. `Set` and `remove` each include a complete lookup
+pass over the result in the timed task, so those ratios are combined-operation
+measurements rather than isolated update or deletion costs.
+
+| Order and operation | Handcoded HAMT | Patricia | AVL `Map` | Mutable `Hashtbl` |
+| --- | ---: | ---: | ---: | ---: |
+| Ordered repeated-set build | 1.02× | 3.02× | 1.82× | 10.20× |
+| Ordered hit lookup | 1.22× | 1.57× | 1.31× | 4.71× |
+| Ordered miss lookup | 1.11× | 1.30× | 1.12× | 3.07× |
+| Ordered existing-key set plus lookup | 1.15× | 1.81× | 2.00× | 8.33× |
+| Ordered present removal plus lookup | 1.12× | 5.30× | 3.39× | 7.91× |
+| Shuffled repeated-set build | 1.03× | 0.81× | 0.95× | 7.91× |
+| Shuffled hit lookup | 1.25× | 0.89× | 0.99× | 4.46× |
+| Shuffled miss lookup | 1.11× | 1.27× | 1.29× | 3.00× |
+| Shuffled existing-key set plus lookup | 1.16× | 0.92× | 1.08× | 7.53× |
+| Shuffled present removal plus lookup | 1.09× | 1.23× | 1.34× | 7.91× |
+
+At 10,000 keys, changing length from four to six characters changes generated
+HAMT hit time by only about 1% within either order. The larger effect is order:
+Patricia leads the persistent maps on ordered hits, while both HAMTs beat
+Patricia on shuffled hits at 10,000 and 100,000 keys. Mutable `Hashtbl` is
+fastest for hit lookup in every row, although its in-place updates have
+different storage semantics from the persistent maps. The generated HAMT stays
+close to the handcoded HAMT for build and is about 1.2–1.3× slower on hit
+lookup.
+
+At 100,000 keys, the median max/min spread of each record's seven hit samples
+was 1.36 for generated HAMT, 1.43 for handcoded HAMT, 1.25 for Patricia, 1.21
+for AVL, and 1.23 for mutable `Hashtbl`. The earlier finding that order matters
+survives across all three seeds and lengths, but these timings remain local to
+this machine, runtime, hash functions, and benchmark protocol. In particular,
+mutable `Hashtbl` uses its default hash while the HAMTs use `seeded_hash`.
