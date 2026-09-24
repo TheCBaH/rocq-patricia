@@ -12,3 +12,6 @@ val get : int -> 'a t -> 'a option
 val insert : int -> 'a -> 'a t -> 'a t
 val replace : int -> 'a -> 'a t -> 'a t
 val remove : int -> 'a t -> 'a t
+val bucket_get : ('k -> 'k -> bool) -> 'k -> ('k * 'v) t -> int -> int -> 'v option
+val bucket_set : ('k -> 'k -> bool) -> 'k -> 'v -> ('k * 'v) t -> int -> int -> ('k * 'v) t
+val bucket_remove : ('k -> 'k -> bool) -> 'k -> ('k * 'v) t -> int -> int -> ('k * 'v) t

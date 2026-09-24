@@ -17,6 +17,11 @@ grep -Eq '^let rec native_bucket_set' "$model_file" || {
 grep -Eq '^let rec native_bucket_remove' "$model_file" || {
   echo "missing indexed native collision removal worker" >&2; exit 1;
 }
+for operation in get set remove; do
+  grep -Fq "let rec native_bucket_$operation = HashTablePrimitives.bucket_$operation" "$model_file" || {
+    echo "native bucket $operation is not bound to the checked array adapter" >&2; exit 1;
+  }
+done
 grep -Eq 'native_bucket_get eqb[0-9]* key entries 0 \(pseq_length entries\)' "$model_file" || {
   echo "native collision lookup does not use the bounded indexed worker" >&2; exit 1;
 }

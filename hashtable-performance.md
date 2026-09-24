@@ -35,6 +35,13 @@ allocation is measured separately. Bytecode/native model tests cover 40/41
 entry constant-hash buckets, singleton/empty normalization, divergence at
 routing depths 0–5, and retained versions.
 
+The collision get/set/remove source workers have separately stated foreign
+array-view contracts. Their target adapter performs one bounded scan over the
+private array, then a fresh copy for a changed bucket. Generated binding
+audits and finite adapter tests cover this extraction boundary; the source
+worker refinements remain kernel-checked. Long collision removal still copies
+the shrinking array, unlike the handcoded HAMT's list bucket.
+
 Storage specialization is deliberately deferred. The remaining smoke gap to
 the standalone backend has not been attributed sufficiently among callbacks,
 checked options, and fresh compact-array copies to justify a fixed-width or

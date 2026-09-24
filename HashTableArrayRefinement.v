@@ -22,6 +22,12 @@ Record array_sequence_contract : Type := {
   array_insert : forall {A}, nat -> A -> array_seq A -> array_seq A;
   array_replace : forall {A}, nat -> A -> array_seq A -> array_seq A;
   array_remove : forall {A}, nat -> array_seq A -> array_seq A;
+  array_bucket_get : forall {K A}, (K -> K -> bool) -> K ->
+      array_seq (K * A) -> nat -> nat -> option A;
+  array_bucket_set : forall {K A}, (K -> K -> bool) -> K -> A ->
+      array_seq (K * A) -> nat -> nat -> array_seq (K * A);
+  array_bucket_remove : forall {K A}, (K -> K -> bool) -> K ->
+      array_seq (K * A) -> nat -> nat -> array_seq (K * A);
   array_fresh : forall {A}, array_seq A -> array_seq A -> Prop;
   array_of_list_view : forall A (items : list A),
       array_view (array_of_list items) = items;
@@ -40,6 +46,20 @@ Record array_sequence_contract : Type := {
   array_remove_view : forall A index (items : array_seq A),
       array_view (array_remove index items) =
         dense_remove index (array_view items);
+  array_bucket_get_view : forall K A (eqb : K -> K -> bool) key
+      (items : array_seq (K * A)) index remaining,
+      array_bucket_get eqb key items index remaining =
+        native_bucket_get eqb key (pseq_of_list (array_view items)) index remaining;
+  array_bucket_set_view : forall K A (eqb : K -> K -> bool) key value
+      (items : array_seq (K * A)) index remaining,
+      array_view (array_bucket_set eqb key value items index remaining) =
+        pseq_view (native_bucket_set eqb key value
+          (pseq_of_list (array_view items)) index remaining);
+  array_bucket_remove_view : forall K A (eqb : K -> K -> bool) key
+      (items : array_seq (K * A)) index remaining,
+      array_view (array_bucket_remove eqb key items index remaining) =
+        pseq_view (native_bucket_remove eqb key
+          (pseq_of_list (array_view items)) index remaining);
   array_insert_fresh : forall A index (item : A) (items : array_seq A),
       array_fresh items (array_insert index item items);
   array_replace_fresh : forall A index (item : A) (items : array_seq A),
@@ -100,6 +120,42 @@ Proof.
   intros C A target model Hrefines.
   unfold array_pseq_refines in Hrefines.
   rewrite array_length_view, pseq_length_view, Hrefines. reflexivity.
+Qed.
+
+Lemma array_bucket_get_refines :
+  forall (C : array_sequence_contract) K A (eqb : K -> K -> bool) key
+         (target : array_seq C (K * A)) (model : pseq (K * A)) index remaining,
+    array_pseq_refines C target model ->
+    array_bucket_get C eqb key target index remaining =
+      native_bucket_get eqb key model index remaining.
+Proof.
+  intros C K A eqb key target [items] index remaining Hrefines.
+  unfold array_pseq_refines in Hrefines.
+  rewrite array_bucket_get_view, Hrefines. reflexivity.
+Qed.
+
+Lemma array_bucket_set_refines :
+  forall (C : array_sequence_contract) K A (eqb : K -> K -> bool) key value
+         (target : array_seq C (K * A)) (model : pseq (K * A)) index remaining,
+    array_pseq_refines C target model ->
+    array_pseq_refines C (array_bucket_set C eqb key value target index remaining)
+      (native_bucket_set eqb key value model index remaining).
+Proof.
+  intros C K A eqb key value target [items] index remaining Hrefines.
+  unfold array_pseq_refines in *.
+  rewrite array_bucket_set_view, Hrefines. reflexivity.
+Qed.
+
+Lemma array_bucket_remove_refines :
+  forall (C : array_sequence_contract) K A (eqb : K -> K -> bool) key
+         (target : array_seq C (K * A)) (model : pseq (K * A)) index remaining,
+    array_pseq_refines C target model ->
+    array_pseq_refines C (array_bucket_remove C eqb key target index remaining)
+      (native_bucket_remove eqb key model index remaining).
+Proof.
+  intros C K A eqb key target [items] index remaining Hrefines.
+  unfold array_pseq_refines in *.
+  rewrite array_bucket_remove_view, Hrefines. reflexivity.
 Qed.
 
 Lemma array_pseq_insert_refines :

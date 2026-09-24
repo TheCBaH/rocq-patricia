@@ -33,4 +33,11 @@ if sh "$audit" "$whole_override" >/dev/null 2>&1; then
   exit 1
 fi
 
+bucket_override="$fixture_dir/bucket-override.ml"
+sed 's/^let rec native_bucket_get = HashTablePrimitives.bucket_get$/let rec native_bucket_get = HashTablePrimitives.bucket_remove/' "$model_file" > "$bucket_override"
+if sh "$audit" "$bucket_override" >/dev/null 2>&1; then
+  echo "extraction audit accepted a wrong bucket primitive binding" >&2
+  exit 1
+fi
+
 echo "Hash-table native-array extraction audit negative fixtures passed"

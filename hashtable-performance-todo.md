@@ -232,8 +232,13 @@ build-allocation target for ascending integers and fixed-width strings.
   `dfb8680` seven-repetition, 26-record matrix confirms exact ordinary
   generated/handcoded lookup allocation parity and 1.45×/1.23× time at those
   points. Collision lookup and removal remain much farther apart; checked
-  indexed bucket traversal is a source-visible cause. Update-path attribution
-  and the final cross-distribution judgment remain.
+  indexed bucket traversal is a source-visible cause. A bounded array-adapter
+  scan now removes the per-entry target options/closure cost while retaining
+  source-defined first-match semantics. Dirty-worktree 2,000-binding
+  constant-hash hit allocation fell 160.112 MB to 0.112 MB, with hit time
+  8.346 to 3.877 ms; clean matched validation remains. Persistent array
+  copying during long-bucket removal remains an attributed cost, and the final
+  cross-distribution judgment remains.
 - [ ] **HP6.3** Re-run the matched five-implementation matrix at the final
   revision and publish time, allocation and retained-heap gaps by operation
   and distribution, including capped collision histories.
@@ -307,3 +312,4 @@ build-allocation target for ascending integers and fixed-width strings.
 | 2026-09-23 | HP6.2 depth-worker screening | Synthetic 200,000-call allocation profile for modeled-depth 0–6 public lookup, then `make hashtable` and 2,000-binding integer/string seven-repetition smoke | The old recursive `native_get` allocated 16 + 96×depth bytes per successful lookup; the source-defined direct-depth worker allocated 16 + 16×depth. `make hashtable` passed including assumptions, bytecode/native differential/model tests and generated negative-fixture audits. Dirty-worktree public hit allocation reached exact handcoded parity at the two representative 2,000-binding points (integer 127,376 bytes, string 125,712 bytes); clean matrix evidence is pending. |
 | 2026-09-24 | HP6.2 clean direct-depth slice | Clean `dfb8680` 2,000-binding, seed-31, seven-repetition matrix; `make all` in detached checkout | Passed: all 26 paired records validated; median generated lookup-hit time/allocation versus `8026332` across 13 distributions is 0.88/0.21. Ordinary integer/string hit allocation equals handcoded exactly; collision and deep-divergence gaps remain. Raw archive and five-way scope are in the result report. |
 | 2026-09-24 | HP6 matrix runtime policy | Seven-repetition ascending-integer diagnostics at 10,000/100,000 bindings | At 10,000, compact/major/minor pre-sample GC took 12.0/6.3/0.9 seconds; at 100,000, major/minor took 101.6/19.2 seconds. Runner and validator now record/use minor collection for large timing-only records, while retaining compaction for 100/2,000 records with post-GC heap passes. Historical records without the policy field mean compact. |
+| 2026-09-24 | HP6.2 bounded bucket candidate | `make all`; `make hashtable hashtable-benchmark-smoke`; `make hashtable-native-primitives-test hashtable-native-array-extraction-audit-test`; dirty 2,000-binding, seed-31, seven-repetition integer constant-hash and ascending runs | Passed proof/assumption, generated audit and negative fixture, bytecode/native differential, finite adapter contract, and benchmark checks. Constant-hash generated hit time/allocation fell from 8.346 ms/160.112 MB to 3.877 ms/0.112 MB; ordinary build/lookup/update allocations were unchanged. Long-bucket present removal retained the array-copy cost (21.058 to 19.398 ms); clean paired measurement is pending. |

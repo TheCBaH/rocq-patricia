@@ -34,3 +34,38 @@ let remove index items =
     Array.blit items (index + 1) result index (size - index - 1);
     result
   end
+
+(* The source bucket workers inspect at most [remaining] entries, stopping at
+   the first missing index.  Keep the scan inside the private array adapter so
+   extracted nat cases and checked [get] options are not allocated per entry. *)
+let bucket_scan eqb query entries index remaining =
+  let size = Array.length entries in
+  if index < 0 || remaining <= 0 then (None, index)
+  else begin
+    let position = ref index in
+    let left = ref remaining in
+    let found = ref None in
+    while !position < size && !left > 0 && !found = None do
+      let stored, _ = entries.(!position) in
+      if eqb query stored then found := Some !position
+      else begin incr position; decr left end
+    done;
+    (!found, !position)
+  end
+
+let bucket_get eqb query entries index remaining =
+  match bucket_scan eqb query entries index remaining with
+  | Some position, _ -> let _, value = entries.(position) in Some value
+  | None, _ -> None
+
+let bucket_set eqb key value entries index remaining =
+  match bucket_scan eqb key entries index remaining with
+  | Some position, _ ->
+      let stored, _ = entries.(position) in
+      replace position (stored, value) entries
+  | None, insertion -> insert insertion (key, value) entries
+
+let bucket_remove eqb key entries index remaining =
+  match bucket_scan eqb key entries index remaining with
+  | Some position, _ -> remove position entries
+  | None, _ -> entries

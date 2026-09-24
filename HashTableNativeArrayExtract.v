@@ -18,6 +18,9 @@ Extract Constant HashTableNative.pseq_length => "HashTablePrimitives.length".
 Extract Constant HashTableNative.pseq_insert => "HashTablePrimitives.insert".
 Extract Constant HashTableNative.pseq_replace => "HashTablePrimitives.replace".
 Extract Constant HashTableNative.pseq_remove => "HashTablePrimitives.remove".
+Extract Constant HashTableNative.native_bucket_get => "HashTablePrimitives.bucket_get".
+Extract Constant HashTableNative.native_bucket_set => "HashTablePrimitives.bucket_set".
+Extract Constant HashTableNative.native_bucket_remove => "HashTablePrimitives.bucket_remove".
 
 Extract Constant HashTableNativeBits.native_chunk => "HashTableScalarPrimitives.chunk".
 Extract Constant HashTableNativeBits.native_bounded_eq => "HashTableScalarPrimitives.bounded_eq".
