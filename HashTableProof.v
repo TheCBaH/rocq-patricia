@@ -145,7 +145,8 @@ Lemma prefix_matches_app_prefix :
     (full_hash < hash_space)%N /\
     prefix_matches full_hash depth prefix.
 
-  Inductive wf : nat -> list N -> tree K A -> Prop :=
+  (* The existing proofs use the ordinary induction principle for this invariant. *)
+  #[warnings="-register-all"] Inductive wf : nat -> list N -> tree K A -> Prop :=
   | wf_empty : forall depth prefix, wf depth prefix Empty
   | wf_leaf : forall depth prefix full_hash key value,
       full_hash = hash seed key ->
@@ -847,7 +848,7 @@ Proof.
      as [slot [_ Hchildwf]].
    pose proof ((proj1 (Forall_forall _ _)) IH child Hchild) as Hih.
    assert (Hchild_length : length (prefix ++ [slot]) = S depth).
-   { rewrite app_length, Hlength. simpl. lia. }
+   { rewrite length_app, Hlength. simpl. lia. }
    specialize (Hih (S depth) (prefix ++ [slot]) Hchild_length Hchildwf entry Hin).
    + apply prefix_matches_app_prefix with (suffix := [slot]).
      exact Hih.
@@ -870,7 +871,7 @@ Proof.
  assert (Hprefix : prefix_matches (hash seed (fst entry)) (S depth)
      (prefix ++ [slot])).
  { apply wf_binding_prefix_matches with (t := child).
-   - rewrite app_length, Hlength. simpl. lia.
+   - rewrite length_app, Hlength. simpl. lia.
    - exact Hchildwf.
    - exact Hin. }
  assert (Hslot : chunk (hash seed (fst entry)) depth = slot).
@@ -904,7 +905,7 @@ Proof.
  assert (Hprefix : prefix_matches (hash seed (fst entry)) (S depth)
    (prefix ++ [slot])).
  { eapply wf_binding_prefix_matches.
-   - rewrite app_length, Hlength. cbn. lia.
+   - rewrite length_app, Hlength. cbn. lia.
    - exact Hchildwf.
    - exact Hin. }
  unfold prefix_matches in Hprefix.
@@ -1027,7 +1028,7 @@ Proof.
    { assert (Hotherprefix : prefix_matches (hash seed (fst entry)) (S depth)
        (prefix ++ [routed])).
      { eapply wf_binding_prefix_matches.
-       - rewrite app_length, Hlength. cbn. lia.
+       - rewrite length_app, Hlength. cbn. lia.
        - exact Hotherwf'.
        - exact Hentry. }
      unfold prefix_matches in Hotherprefix.
@@ -1050,7 +1051,7 @@ Proof.
    { assert (Hotherprefix : prefix_matches (hash seed (fst entry)) (S depth)
        (prefix ++ [routed])).
      { eapply wf_binding_prefix_matches.
-       - rewrite app_length, Hlength. cbn. lia.
+       - rewrite length_app, Hlength. cbn. lia.
        - exact Hotherwf'.
        - exact Hentry. }
      unfold prefix_matches in Hotherprefix.
@@ -1144,13 +1145,13 @@ Proof.
  assert (Hleft_prefix : prefix_matches (hash seed (fst left_entry))
    (S depth) (prefix ++ [left_slot])).
  { eapply wf_binding_prefix_matches.
-   - rewrite app_length, Hlength. simpl. lia.
+   - rewrite length_app, Hlength. simpl. lia.
    - exact Hleft.
    - exact Hleft_entry. }
  assert (Hright_prefix : prefix_matches (hash seed (fst right_entry))
    (S depth) (prefix ++ [right_slot])).
  { eapply wf_binding_prefix_matches.
-   - rewrite app_length, Hlength. simpl. lia.
+   - rewrite length_app, Hlength. simpl. lia.
    - exact Hright.
    - exact Hright_entry. }
  assert (Hleft_slot : chunk (hash seed (fst left_entry)) depth = left_slot).
@@ -1190,7 +1191,7 @@ Proof.
  assert (Hprefix : prefix_matches (hash seed (fst entry)) (S depth)
    (prefix ++ [sibling_slot])).
  { eapply wf_binding_prefix_matches.
-   - rewrite app_length, Hlength. simpl. lia.
+   - rewrite length_app, Hlength. simpl. lia.
    - exact Hwf.
    - exact Hentry. }
  assert (Hsibling : chunk (hash seed (fst entry)) depth = sibling_slot).
@@ -1759,7 +1760,7 @@ Proof.
      * apply IH with (left_key := left_key) (left_value := left_value)
          (right_key := right_key) (right_value := right_value).
        -- lia.
-       -- simpl. rewrite app_length. simpl. lia.
+       -- simpl. rewrite length_app. simpl. lia.
        -- exact Hdifferent.
        -- apply (wf_leaf_descend (full_hash := left_hash)
             (key := left_key) (value := left_value)); auto.
@@ -1841,7 +1842,7 @@ Proof.
      * exact Hequal.
      * apply IH with (left_key := left_key) (left_value := left_value).
        -- lia.
-       -- simpl. rewrite app_length. simpl. lia.
+       -- simpl. rewrite length_app. simpl. lia.
        -- exact Hdifferent.
        -- apply (wf_leaf_descend (full_hash := left_hash)
             (key := left_key) (value := left_value)); auto.
@@ -1923,7 +1924,7 @@ Proof.
      * exact Hequal.
      * apply IH with (right_key := right_key) (right_value := right_value).
        -- lia.
-       -- simpl. rewrite app_length. simpl. lia.
+       -- simpl. rewrite length_app. simpl. lia.
        -- exact Hdifferent.
        -- apply (wf_collision_descend (full_hash := left_hash)
             (entries := left_entries)); auto.
@@ -2005,7 +2006,7 @@ Proof.
      * exact Hequal.
      * apply IH.
        -- lia.
-       -- simpl. rewrite app_length. simpl. lia.
+       -- simpl. rewrite length_app. simpl. lia.
        -- exact Hdifferent.
        -- apply (wf_collision_descend (full_hash := left_hash)
             (entries := left_entries)); auto.
@@ -3424,7 +3425,7 @@ Proof.
     { eapply wf_branch_dense_get_binding; eauto.
       rewrite Hentry_hash. reflexivity. }
     assert (Hnextlength : length (prefix ++ [chunk full_hash depth]) = S depth).
-    { rewrite app_length, Hlength. cbn. lia. }
+    { rewrite length_app, Hlength. cbn. lia. }
     assert (Hnextprefix : prefix_matches full_hash (S depth)
       (prefix ++ [chunk full_hash depth])).
     { apply prefix_matches_append_slot; assumption. }
@@ -5682,7 +5683,7 @@ Proof.
       eapply get_tree_after_set_branch_child_self; eauto.
       eapply IH with (prefix := prefix ++ [chunk full_hash depth]); eauto.
       * rewrite <- Hfuel. lia.
-      * rewrite app_length, Hlength. cbn. lia.
+      * rewrite length_app, Hlength. cbn. lia.
       * apply prefix_matches_append_slot; assumption.
     + eapply get_tree_after_set_branch_slot_absent_self_wf.
       * exact Hwf.
@@ -5903,7 +5904,7 @@ Proof.
       * destruct (wf_branch_ranked_child Hwf (chunk_bound full_hash depth) Hroute)
           as [child [Hchild [Hchildnonempty Hchildwf]]].
         assert (Hnextlength : length (prefix ++ [chunk full_hash depth]) = S depth).
-        { rewrite app_length, Hlength. cbn. lia. }
+        { rewrite length_app, Hlength. cbn. lia. }
         assert (Hnextprefix : prefix_matches full_hash (S depth)
           (prefix ++ [chunk full_hash depth])).
         { apply prefix_matches_append_slot; assumption. }
@@ -7396,7 +7397,7 @@ Proof.
   intros K Seed A E hash eqb entries.
   induction entries as [|[key value] tail IH];
     intros m query Hequiv Heqb Hcongruent Hbound Hquery_bound Hwf.
-  - simpl [add_first]. destruct (get eqb hash query m); reflexivity.
+  - cbn [add_first]. destruct (get eqb hash query m); reflexivity.
   - destruct (get eqb hash query m) as [old_value|] eqn:Hquery.
     + change (get eqb hash query (add_first eqb hash ((key, value) :: tail) m) =
         Some old_value).
@@ -7590,7 +7591,7 @@ Proof.
     { eapply (IH (S depth) (prefix ++ [chunk full_hash depth]) full_hash key
         value child stored old_value).
       - lia.
-      - rewrite app_length, Hlength. simpl. lia.
+      - rewrite length_app, Hlength. simpl. lia.
       - exact Hequiv.
       - exact Heqb.
       - exact Hcongruent.

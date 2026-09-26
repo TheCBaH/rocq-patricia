@@ -177,7 +177,8 @@ Proof.
   rewrite pseq_remove_view. now apply dense_remove_length_hit.
 Qed.
 
-Inductive native_tree (K A : Type) : Type :=
+(* Refinement proofs use the native tree through its list view. *)
+#[warnings="-register-all"] Inductive native_tree (K A : Type) : Type :=
 | NativeEmpty
 | NativeLeaf (full_hash : N) (key : K) (value : A)
 | NativeCollision (full_hash : N) (entries : pseq (K * A))

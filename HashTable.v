@@ -11,7 +11,8 @@ Require Import HashTableSpec HashTableBits HashTableBucket.
 
 Set Implicit Arguments.
 
-Inductive tree (K A : Type) : Type :=
+(* The nested branch list has its own structural induction below. *)
+#[warnings="-register-all"] Inductive tree (K A : Type) : Type :=
 | Empty
 | Leaf (full_hash : N) (key : K) (value : A)
 | Collision (full_hash : N) (entries : list (K * A))

@@ -632,24 +632,19 @@ Proof.
   pose proof (N.div_mod (h / 1048576) 32 ltac:(lia)) as E4.
   pose proof (N.div_mod (h / 33554432) 32 ltac:(lia)) as E5.
   assert (Q1 : (h / 32 / 32 = h / 1024)%N).
-  { change (h / 32 / 32 = h / (32 * 32))%N. apply N.div_div.
-    - discriminate. - discriminate. }
+  { change (h / 32 / 32 = h / (32 * 32))%N. apply N.Div0.div_div. }
   assert (Q2 : (h / 1024 / 32 = h / 32768)%N).
-  { change (h / 1024 / 32 = h / (1024 * 32))%N. apply N.div_div.
-    - discriminate. - discriminate. }
+  { change (h / 1024 / 32 = h / (1024 * 32))%N. apply N.Div0.div_div. }
   assert (Q3 : (h / 32768 / 32 = h / 1048576)%N).
-  { change (h / 32768 / 32 = h / (32768 * 32))%N. apply N.div_div.
-    - discriminate. - discriminate. }
+  { change (h / 32768 / 32 = h / (32768 * 32))%N. apply N.Div0.div_div. }
   assert (Q4 : (h / 1048576 / 32 = h / 33554432)%N).
-  { change (h / 1048576 / 32 = h / (1048576 * 32))%N. apply N.div_div.
-    - discriminate. - discriminate. }
+  { change (h / 1048576 / 32 = h / (1048576 * 32))%N. apply N.Div0.div_div. }
   assert (Q5 : (h / 33554432 / 32 = 0)%N).
-  { rewrite N.div_div.
+  { rewrite N.Div0.div_div.
     - change (h / 1073741824 = 0)%N.
       apply (proj1 (N.le_0_r _)). apply (proj1 (N.lt_succ_r _ 0)).
-      apply N.div_lt_upper_bound;
-        [discriminate | change (h < 1073741824 * 1)%N; exact Hbound].
-    - discriminate. - discriminate. }
+      apply N.Div0.div_lt_upper_bound.
+      change (h < 1073741824 * 1)%N; exact Hbound. }
   rewrite Q1 in E1. rewrite Q2 in E2. rewrite Q3 in E3.
   rewrite Q4 in E4. rewrite Q5 in E5.
   nia.
@@ -919,7 +914,7 @@ Proof.
     as [before [after [Hold [Hrank Hnew]]]].
   rewrite <- !occupied_slots_length_popcount.
   rewrite Hold, Hnew.
-  repeat rewrite app_length. simpl. lia.
+  repeat rewrite length_app. simpl. lia.
 Qed.
 
 Lemma occupied_slots_from_lor_bit_away :
@@ -1008,7 +1003,7 @@ Proof.
     as [before [after [Hold [Hrank Hnew]]]].
   rewrite <- !occupied_slots_length_popcount.
   rewrite Hold, Hnew.
-  repeat rewrite app_length. simpl. lia.
+  repeat rewrite length_app. simpl. lia.
 Qed.
 
 Lemma rank_lor_bit :

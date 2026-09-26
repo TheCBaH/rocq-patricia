@@ -13,7 +13,8 @@ Require Import HashTableSpec.
 
 Set Implicit Arguments.
 
-Inductive node (K A : Type) : Type :=
+(* The prototype does not use generated nested induction schemes. *)
+#[warnings="-register-all"] Inductive node (K A : Type) : Type :=
 | NodeEmpty
 | NodeLeaf (full_hash : N) (key : K) (value : A)
 | NodeCollision (full_hash : N) (entries : list (K * A))

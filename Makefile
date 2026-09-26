@@ -552,7 +552,7 @@ HashTableBucket.vo: HashTableSpec.vo HashTableBits.vo
 HashTable.vo: HashTableSpec.vo HashTableBits.vo HashTableBucket.vo
 HashTableProof.vo: HashTable.vo HashTableBucket.vo
 HashTableNative.vo: HashTable.vo HashTableBits.vo HashTableNativeBits.vo
-HashTableNativeProof.vo: HashTableNative.vo
+HashTableNativeProof.vo: HashTableNative.vo HashTableProof.vo
 HashTableArrayRefinement.vo: HashTableNative.vo HashTableBits.vo
 HashTableSkeleton.vo: HashTableSpec.vo HashTableBits.vo
 
