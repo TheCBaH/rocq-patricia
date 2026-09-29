@@ -7,6 +7,7 @@ RUN set -eux;\
   curl\
   git\
   make\
+  ripgrep\
   wget\
   xz-utils\
 ;\
