@@ -14,40 +14,41 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Set up OCaml
-        uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: "4.14.3"
+      - name: Install opam and ripgrep
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends opam ripgrep
+
+      - name: Set up opam switch
+        run: |
+          opam init --bare --disable-sandboxing -y
+          opam switch create patricia 4.14.3
+          echo "$(opam var bin)" >> "$GITHUB_PATH"
 
       - name: Install Rocq
-        run: opam install rocq-core.9.2.0 rocq-stdlib.9.1.0
-
-      - name: Install ripgrep
-        run: sudo apt-get install -y --no-install-recommends ripgrep
+        run: opam install -y rocq-core.9.2.0 rocq-stdlib.9.1.0
 
       - name: Proof, extraction, and functional tests
         run: >-
-          opam exec -- make
+          make
           ROCQ=rocq OCAMLC=ocamlc OCAMLOPT=ocamlopt OCAMLDEP=ocamldep
 
       - name: Native specialized-union oracle
         run: >-
-          opam exec -- make union-oracle-native
+          make union-oracle-native
           ROCQ=rocq OCAMLC=ocamlc OCAMLOPT=ocamlopt OCAMLDEP=ocamldep
 
       - name: Hash-table proof and reference checks
         run: >-
-          opam exec -- make hashtable
+          make hashtable
           ROCQ=rocq OCAMLC=ocamlc OCAMLOPT=ocamlopt OCAMLDEP=ocamldep
 
       - name: Hash-table checked benchmark smoke test
         run: >-
-          opam exec -- make hashtable-benchmark-smoke
+          make hashtable-benchmark-smoke
           ROCQ=rocq OCAMLC=ocamlc OCAMLOPT=ocamlopt OCAMLDEP=ocamldep
 
       - name: Checked benchmark smoke test
         run: >-
-          opam exec -- make benchmark-smoke
+          make benchmark-smoke
           ROCQ=rocq OCAMLC=ocamlc OCAMLOPT=ocamlopt OCAMLDEP=ocamldep
 
   verify-dune:
@@ -56,16 +57,17 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Set up OCaml
-        uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: "4.14.3"
+      - name: Install opam and ripgrep
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends opam ripgrep
+
+      - name: Set up opam switch
+        run: |
+          opam init --bare --disable-sandboxing -y
+          opam switch create patricia 4.14.3
+          echo "$(opam var bin)" >> "$GITHUB_PATH"
 
       - name: Install Rocq and dune
-        run: opam install rocq-core.9.2.0 rocq-stdlib.9.1.0 dune
-
-      - name: Install ripgrep
-        run: sudo apt-get install -y --no-install-recommends ripgrep
+        run: opam install -y rocq-core.9.2.0 rocq-stdlib.9.1.0 dune
 
       - name: Dune build and test
-        run: opam exec -- dune build @runtest
+        run: dune build @runtest
