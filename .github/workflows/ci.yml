@@ -19,14 +19,11 @@ jobs:
         with:
           ocaml-compiler: "4.14.3"
 
-      - name: Install Rocq and dune
-        run: opam install rocq-core.9.2.0 rocq-stdlib.9.1.0 dune
+      - name: Install Rocq
+        run: opam install rocq-core.9.2.0 rocq-stdlib.9.1.0
 
       - name: Install ripgrep
         run: sudo apt-get install -y --no-install-recommends ripgrep
-
-      - name: Dune build and test
-        run: opam exec -- dune build @runtest
 
       - name: Proof, extraction, and functional tests
         run: >-
@@ -52,3 +49,23 @@ jobs:
         run: >-
           opam exec -- make benchmark-smoke
           ROCQ=rocq OCAMLC=ocamlc OCAMLOPT=ocamlopt OCAMLDEP=ocamldep
+
+  verify-dune:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "4.14.3"
+
+      - name: Install Rocq and dune
+        run: opam install rocq-core.9.2.0 rocq-stdlib.9.1.0 dune
+
+      - name: Install ripgrep
+        run: sudo apt-get install -y --no-install-recommends ripgrep
+
+      - name: Dune build and test
+        run: opam exec -- dune build @runtest
