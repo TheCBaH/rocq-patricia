@@ -20,7 +20,7 @@ jobs:
           ocaml-compiler: "4.14.3"
 
       - name: Install Rocq and dune
-        run: opam install rocq-core.9.2.0 rocq-stdlib.9.2.0 dune
+        run: opam install rocq-core.9.2.0 rocq-stdlib.9.1.0 dune
 
       - name: Install ripgrep
         run: sudo apt-get install -y --no-install-recommends ripgrep
