@@ -1,0 +1,14 @@
+{
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "version": "2.7.0",
+      "resolved": "ghcr.io/devcontainers/features/common-utils@sha256:3f63bbee7418dc940d9e5e7ab93ef3049acfe4dba3085b17ee45fe307fdba4e5",
+      "integrity": "sha256:3f63bbee7418dc940d9e5e7ab93ef3049acfe4dba3085b17ee45fe307fdba4e5"
+    },
+    "ghcr.io/thecbah/ocaml-features/ocaml:1": {
+      "version": "1.0.0",
+      "resolved": "ghcr.io/thecbah/ocaml-features/ocaml@sha256:81f1fe3cfb909acc948a5a5e67ecd6a42600dd1e77966292e34901a5651f95f9",
+      "integrity": "sha256:81f1fe3cfb909acc948a5a5e67ecd6a42600dd1e77966292e34901a5651f95f9"
+    }
+  }
+}

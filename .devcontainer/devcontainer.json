@@ -1,0 +1,32 @@
+// For format details, see https://aka.ms/devcontainer.json.
+{
+    "name": "patricia",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": "true",
+            "username": "vscode",
+            "userUid": "1000",
+            "userGid": "1000",
+            "upgradePackages": "false"
+        },
+        "ghcr.io/thecbah/ocaml-features/ocaml:1": {
+            "version": "4.14.3",
+            "packages": "ocamlformat#0.28.1 rocq-prover"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ocamllabs.ocaml-platform"
+            ]
+        }
+    },
+    "remoteUser": "vscode",
+    "postCreateCommand": {
+        "opam": "sudo .devcontainer/fix-opam-owner.sh $(id -u) $(id -g)"
+    },
+    "waitFor": "postCreateCommand"
+}
