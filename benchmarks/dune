@@ -1,0 +1,4 @@
+(library
+ (name string_bits_baseline)
+ (wrapped false)
+ (modules StringBitsBaseline))

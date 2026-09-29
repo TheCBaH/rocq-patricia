@@ -1,0 +1,44 @@
+; `rocq compile` runs chdir'd to the workspace root so `-Q . ''` maps the
+; root as PatriciaExtract.v's Require Import list expects, and so its own
+; `Set Extraction Output Directory "extracted"` lands here.
+
+(rule
+ (targets
+  Ascii.ml Ascii.mli
+  BinNat.ml BinNat.mli
+  BinNums.ml BinNums.mli
+  BinPos.ml BinPos.mli
+  Datatypes.ml Datatypes.mli
+  Nat.ml Nat.mli
+  NativeStringWorker.ml NativeStringWorker.mli
+  PatriciaBits.ml PatriciaBits.mli
+  PatriciaInternal.ml PatriciaInternal.mli
+  PatriciaUnion.ml PatriciaUnion.mli
+  PeanoNat.ml PeanoNat.mli
+  PosDef.ml PosDef.mli
+  String.ml String.mli
+  StringBits.ml StringBits.mli
+  StringPatriciaInternal.ml StringPatriciaInternal.mli
+  StringPatriciaUnion.ml StringPatriciaUnion.mli)
+ (deps
+  ../PatriciaExtract.v ../PatriciaBits.vo ../Patricia.vo ../PatriciaUnion.vo
+  ../StringBits.vo ../StringPatricia.vo ../StringPatriciaUnion.vo
+  ../NativeStringWorker.vo)
+ (action
+  (chdir %{workspace_root}
+   (progn
+    (run %{bin:rocq} compile -q -Q . "" PatriciaExtract.v)
+    (run mv extracted/Patricia.ml extracted/PatriciaInternal.ml)
+    (run mv extracted/Patricia.mli extracted/PatriciaInternal.mli)
+    (run mv extracted/StringPatricia.ml extracted/StringPatriciaInternal.ml)
+    (run mv extracted/StringPatricia.mli extracted/StringPatriciaInternal.mli)
+    (run sed -i "s/^open Patricia$/open PatriciaInternal/"
+     extracted/PatriciaUnion.ml extracted/PatriciaUnion.mli)
+    (run sed -i "s/^open StringPatricia$/open StringPatriciaInternal/"
+     extracted/StringPatriciaUnion.ml extracted/StringPatriciaUnion.mli)))))
+
+(library
+ (name patricia_extracted)
+ (wrapped false)
+ (flags (:standard -w -a))
+ (modules :standard))

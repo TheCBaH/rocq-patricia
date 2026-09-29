@@ -1,0 +1,32 @@
+(rule
+ (targets
+  BinNat.ml BinNat.mli
+  BinNums.ml BinNums.mli
+  BinPos.ml BinPos.mli
+  Datatypes.ml Datatypes.mli
+  HashTable.ml HashTable.mli
+  HashTableBits.ml HashTableBits.mli
+  HashTableBucket.ml HashTableBucket.mli
+  HashTableNative.ml HashTableNative.mli
+  HashTableNativeBits.ml HashTableNativeBits.mli
+  List.ml List.mli
+  ListDef.ml ListDef.mli
+  Nat.ml Nat.mli
+  PosDef.ml PosDef.mli)
+ (deps
+  ../HashTableNativeArrayExtract.v ../HashTableSpec.vo ../HashTableBits.vo
+  ../HashTableNativeBits.vo ../HashTableBucket.vo ../HashTable.vo
+  ../HashTableNative.vo)
+ (action
+  (chdir %{workspace_root}
+   (run %{bin:rocq} compile -q -Q . "" HashTableNativeArrayExtract.v))))
+
+; The extraction realizes HashTableNative/HashTableNativeBits primitives as
+; calls into the hand-written HashTablePrimitives/HashTableScalarPrimitives
+; (see the `Extract Constant` bindings in ../HashTableNativeArrayExtract.v).
+(library
+ (name hashtable_native_array_extracted)
+ (wrapped false)
+ (flags (:standard -w -a))
+ (libraries hashtable_primitives hashtable_scalar_primitives)
+ (modules :standard))

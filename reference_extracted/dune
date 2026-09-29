@@ -1,0 +1,38 @@
+; Unlike PatriciaExtract.v, this extraction has no post-processing step: no
+; module name collides with a hand-written wrapper, so nothing is renamed.
+
+(rule
+ (targets
+  Ascii.ml Ascii.mli
+  BinNat.ml BinNat.mli
+  BinNums.ml BinNums.mli
+  BinPos.ml BinPos.mli
+  Bool.ml Bool.mli
+  Datatypes.ml Datatypes.mli
+  Nat.ml Nat.mli
+  Patricia.ml Patricia.mli
+  PatriciaBits.ml PatriciaBits.mli
+  PeanoNat.ml PeanoNat.mli
+  PosDef.ml PosDef.mli
+  String.ml String.mli
+  StringBits.ml StringBits.mli
+  StringPatricia.ml StringPatricia.mli)
+ (deps
+  ../PatriciaReferenceExtract.v ../PatriciaBits.vo ../Patricia.vo
+  ../StringBits.vo ../StringPatricia.vo)
+ (action
+  (chdir %{workspace_root}
+   (run %{bin:rocq} compile -q -Q . "" PatriciaReferenceExtract.v))))
+
+; The Makefile deletes the generated String.{cmi,cmo,cmx,o} before linking:
+; this backend's extraction emits an empty [String] unit which would shadow
+; [Stdlib.String] used elsewhere. Exclude it from the library the same way.
+
+; Wrapped (dune's default): submodules are namespaced under Patricia_reference,
+; the same role the Makefile's `ocamlc -pack -o PatriciaReference.cmo` played
+; (this library's namespace collides at the bare-module level with the main
+; extraction otherwise: both extract BinNat, Datatypes, Patricia, ...).
+(library
+ (name patricia_reference)
+ (flags (:standard -w -a))
+ (modules :standard \ String))

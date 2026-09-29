@@ -1,3 +1,4 @@
+/_build/
 *.aux
 *.glob
 *.vo
@@ -36,12 +37,17 @@
 /hashtable-string-benchmark
 /patricia-matrix-benchmark
 /patricia-string-matrix-benchmark
-/extracted/
-/reference_extracted/
-/hashtable_reference_extracted/
+/extracted/*
+!/extracted/dune
+/reference_extracted/*
+!/reference_extracted/dune
+/hashtable_reference_extracted/*
+!/hashtable_reference_extracted/dune
 /hashtable_skeleton_extracted/
-/hashtable_extracted/
-/hashtable_native_array_extracted/
+/hashtable_extracted/*
+!/hashtable_extracted/dune
+/hashtable_native_array_extracted/*
+!/hashtable_native_array_extracted/dune
 /hashtable-native-extract-wrapper-test
 /hashtable-native-extract-wrapper-native-test
 /hashtable-native-extract-differential-test

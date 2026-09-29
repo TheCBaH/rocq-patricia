@@ -1,0 +1,516 @@
+; The Makefile compiled everything with plain ocamlc/ocamlopt and no -w
+; flags, so only default-on warnings were ever non-fatal notices, never
+; build failures. Match that: dune's own default profile promotes many
+; warnings to errors, which neither the hand-written nor the Rocq-extracted
+; sources here were written against.
+(env
+ (_
+  (flags (:standard -w -a))))
+
+; Root build: Rocq proofs use a flat (unqualified) logical root, matching
+; the original Makefile's `rocq compile -q -Q . ''`. Dune's built-in coq
+; stanza always assigns a theory a real logical name, which would force
+; every `.v` file's bare `Require Import Foo` to become `From Name Require
+; Foo`; these rules invoke `rocq` directly instead so the `.v` sources stay
+; untouched.
+
+(rule
+ (targets PatriciaBits.vo PatriciaBits.glob)
+ (deps PatriciaBits.v)
+ (action (run %{bin:rocq} compile -q -Q . "" PatriciaBits.v)))
+
+(rule
+ (targets Patricia.vo Patricia.glob)
+ (deps Patricia.v PatriciaBits.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" Patricia.v)))
+
+(rule
+ (targets PatriciaProof.vo PatriciaProof.glob)
+ (deps PatriciaProof.v PatriciaBits.vo Patricia.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" PatriciaProof.v)))
+
+(rule
+ (targets StringBits.vo StringBits.glob)
+ (deps StringBits.v)
+ (action (run %{bin:rocq} compile -q -Q . "" StringBits.v)))
+
+(rule
+ (targets StringPatricia.vo StringPatricia.glob)
+ (deps StringPatricia.v StringBits.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" StringPatricia.v)))
+
+(rule
+ (targets NativeRefinement.vo NativeRefinement.glob)
+ (deps NativeRefinement.v PatriciaBits.vo StringBits.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" NativeRefinement.v)))
+
+(rule
+ (targets NativeStringWorker.vo NativeStringWorker.glob)
+ (deps NativeStringWorker.v NativeRefinement.vo StringBits.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" NativeStringWorker.v)))
+
+(rule
+ (targets StringPatriciaProof.vo StringPatriciaProof.glob)
+ (deps StringPatriciaProof.v StringBits.vo StringPatricia.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" StringPatriciaProof.v)))
+
+(rule
+ (targets PatriciaUnion.vo PatriciaUnion.glob)
+ (deps PatriciaUnion.v PatriciaBits.vo Patricia.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" PatriciaUnion.v)))
+
+(rule
+ (targets PatriciaUnionProof.vo PatriciaUnionProof.glob)
+ (deps PatriciaUnionProof.v PatriciaProof.vo PatriciaUnion.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" PatriciaUnionProof.v)))
+
+(rule
+ (targets StringPatriciaUnion.vo StringPatriciaUnion.glob)
+ (deps StringPatriciaUnion.v StringBits.vo StringPatricia.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" StringPatriciaUnion.v)))
+
+(rule
+ (targets StringPatriciaUnionProof.vo StringPatriciaUnionProof.glob)
+ (deps StringPatriciaUnionProof.v StringPatriciaProof.vo StringPatriciaUnion.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" StringPatriciaUnionProof.v)))
+
+(rule
+ (targets NativeHeapRefinement.vo NativeHeapRefinement.glob)
+ (deps NativeHeapRefinement.v PatriciaUnionProof.vo StringPatriciaUnionProof.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" NativeHeapRefinement.v)))
+
+(rule
+ (targets HashTableSpec.vo HashTableSpec.glob)
+ (deps HashTableSpec.v)
+ (action (run %{bin:rocq} compile -q -Q . "" HashTableSpec.v)))
+
+(rule
+ (targets HashTableBits.vo HashTableBits.glob)
+ (deps HashTableBits.v HashTableSpec.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" HashTableBits.v)))
+
+(rule
+ (targets HashTableNativeBits.vo HashTableNativeBits.glob)
+ (deps HashTableNativeBits.v HashTableBits.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" HashTableNativeBits.v)))
+
+(rule
+ (targets HashTableBucket.vo HashTableBucket.glob)
+ (deps HashTableBucket.v HashTableSpec.vo HashTableBits.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" HashTableBucket.v)))
+
+(rule
+ (targets HashTable.vo HashTable.glob)
+ (deps HashTable.v HashTableSpec.vo HashTableBits.vo HashTableBucket.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" HashTable.v)))
+
+(rule
+ (targets HashTableProof.vo HashTableProof.glob)
+ (deps HashTableProof.v HashTable.vo HashTableBucket.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" HashTableProof.v)))
+
+(rule
+ (targets HashTableNative.vo HashTableNative.glob)
+ (deps HashTableNative.v HashTable.vo HashTableBits.vo HashTableNativeBits.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" HashTableNative.v)))
+
+(rule
+ (targets HashTableNativeProof.vo HashTableNativeProof.glob)
+ (deps HashTableNativeProof.v HashTableNative.vo HashTableProof.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" HashTableNativeProof.v)))
+
+(rule
+ (targets HashTableArrayRefinement.vo HashTableArrayRefinement.glob)
+ (deps HashTableArrayRefinement.v HashTableNative.vo HashTableBits.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" HashTableArrayRefinement.v)))
+
+(rule
+ (targets HashTableSkeleton.vo HashTableSkeleton.glob)
+ (deps HashTableSkeleton.v HashTableSpec.vo HashTableBits.vo)
+ (action (run %{bin:rocq} compile -q -Q . "" HashTableSkeleton.v)))
+
+(alias
+ (name proof)
+ (deps
+  PatriciaBits.vo Patricia.vo PatriciaProof.vo StringBits.vo NativeRefinement.vo
+  NativeStringWorker.vo StringPatricia.vo StringPatriciaProof.vo PatriciaUnion.vo
+  PatriciaUnionProof.vo StringPatriciaUnion.vo StringPatriciaUnionProof.vo
+  NativeHeapRefinement.vo))
+
+(alias
+ (name hashtable-proof)
+ (deps
+  HashTableSpec.vo HashTableBits.vo HashTableNativeBits.vo HashTableBucket.vo
+  HashTable.vo HashTableProof.vo HashTableNative.vo HashTableNativeProof.vo
+  HashTableArrayRefinement.vo HashTableSkeleton.vo))
+
+; Extraction rules live in each output subdirectory's own `dune` file (dune
+; rejects targets like "extracted/Foo.ml" from a parent directory's rule);
+; see extracted/dune and reference_extracted/dune.
+
+; --- Root OCaml modules --------------------------------------------------
+; All `(wrapped false)`: hand-written and extracted sources reference each
+; other by bare module name throughout (the Makefile compiled everything
+; with plain `-I <dir>`, never OCaml's module-alias wrapping), so keeping
+; libraries unwrapped avoids touching any of that source.
+
+(library
+ (name patricia)
+ (wrapped false)
+ (modules PatriciaMap StringPatriciaMap)
+ (libraries patricia_extracted))
+
+(library
+ (name hashtable_primitives)
+ (wrapped false)
+ (modules HashTablePrimitives))
+
+(library
+ (name hashtable_scalar_primitives)
+ (wrapped false)
+ (modules HashTableScalarPrimitives))
+
+(library
+ (name hash_map)
+ (wrapped false)
+ (modules HashMap)
+ (libraries hashtable_native_array_extracted))
+
+(library
+ (name hash_map_native)
+ (wrapped false)
+ (modules HashMapNative)
+ (libraries hashtable_primitives))
+
+(library
+ (name hash_map_native_extract)
+ (wrapped false)
+ (modules HashMapNativeExtract)
+ (libraries hashtable_native_array_extracted))
+
+(library
+ (name hashtable_reference)
+ (wrapped false)
+ (modules HashTableReference)
+ (libraries hashtable_reference_extracted))
+
+(library
+ (name hashtable_test_hash)
+ (wrapped false)
+ (modules HashTableTestHash))
+
+(library
+ (name hashtable_benchmark_support)
+ (wrapped false)
+ (libraries unix)
+ (modules HashTableBenchmarkSupport))
+
+; --- Patricia test/benchmark/profile executables -------------------------
+
+(executable
+ (name patriciaTest)
+ (modules PatriciaTest)
+ (libraries patricia_extracted patricia))
+
+(rule (alias runtest) (action (run ./patriciaTest.exe)))
+
+(executable
+ (name patriciaUnionTest)
+ (modes exe byte)
+ (modules PatriciaUnionTest)
+ (libraries patricia_extracted))
+
+(rule (alias runtest) (action (run ./patriciaUnionTest.exe)))
+(rule (alias runtest) (action (run ./patriciaUnionTest.bc)))
+
+(executable
+ (name patriciaDifferentialTest)
+ (modules PatriciaDifferentialTest)
+ (libraries patricia_extracted patricia_reference))
+
+(rule (alias runtest) (action (run ./patriciaDifferentialTest.exe)))
+
+(executable
+ (name patriciaBenchmark)
+ (modules PatriciaBenchmark)
+ (libraries patricia hashtable_benchmark_support unix))
+
+(executable
+ (name patriciaUnionProfile)
+ (modules PatriciaUnionProfile)
+ (libraries patricia_extracted unix))
+
+(executable
+ (name patriciaSetProfile)
+ (modules PatriciaSetProfile)
+ (libraries patricia_extracted unix))
+
+(executable
+ (name patriciaMapFilterProfile)
+ (modules PatriciaMapFilterProfile)
+ (libraries patricia_extracted patricia unix))
+
+(executable
+ (name patriciaRemoveProfile)
+ (modules PatriciaRemoveProfile)
+ (libraries patricia_extracted patricia unix))
+
+(executable
+ (name patriciaReferenceProfile)
+ (modules PatriciaReferenceProfile)
+ (libraries patricia_reference unix))
+
+(executable
+ (name stringPrimitiveProfile)
+ (modules StringPrimitiveProfile)
+ (libraries patricia_extracted patricia_reference string_bits_baseline unix))
+
+(executable
+ (name patriciaMatrixBenchmark)
+ (modules PatriciaMatrixBenchmark)
+ (libraries patricia hashtable_benchmark_support unix))
+
+(executable
+ (name patriciaStringMatrixBenchmark)
+ (modules PatriciaStringMatrixBenchmark)
+ (libraries patricia hashtable_benchmark_support unix))
+
+; --- HashTable test/benchmark executables ---------------------------------
+
+(executable
+ (name hashTableReferenceTest)
+ (modules HashTableReferenceTest)
+ (libraries hashtable_reference_extracted hashtable_test_hash))
+
+(rule (alias runtest) (action (run ./hashTableReferenceTest.exe)))
+
+(executable
+ (name hashMapTest)
+ (modes exe byte)
+ (modules HashMapTest)
+ (libraries hash_map))
+
+(rule (alias runtest) (action (run ./hashMapTest.exe)))
+(rule (alias runtest) (action (run ./hashMapTest.bc)))
+
+(executable
+ (name hashTableDifferentialTest)
+ (modes exe byte)
+ (modules HashTableDifferentialTest)
+ (libraries hash_map))
+
+(rule (alias runtest) (action (run ./hashTableDifferentialTest.exe)))
+(rule (alias runtest) (action (run ./hashTableDifferentialTest.bc)))
+
+(executable
+ (name hashTableNativeModelTest)
+ (modes exe byte)
+ (modules HashTableNativeModelTest)
+ (libraries hashtable_extracted))
+
+(rule (alias runtest) (action (run ./hashTableNativeModelTest.exe)))
+(rule (alias runtest) (action (run ./hashTableNativeModelTest.bc)))
+
+; Same source as HashTableNativeModelTest.ml, linked against the "native
+; array" extraction instead of the plain "native model" one; copied under a
+; different module name since a module may only belong to one stanza per
+; directory.
+(rule
+ (target HashTableNativeArrayExtractedTest.ml)
+ (action (copy HashTableNativeModelTest.ml HashTableNativeArrayExtractedTest.ml)))
+
+(executable
+ (name hashTableNativeArrayExtractedTest)
+ (modes exe byte)
+ (modules HashTableNativeArrayExtractedTest)
+ (libraries hashtable_native_array_extracted))
+
+(rule (alias runtest) (action (run ./hashTableNativeArrayExtractedTest.exe)))
+(rule (alias runtest) (action (run ./hashTableNativeArrayExtractedTest.bc)))
+
+; The Makefile builds these two by sed-substituting HashMap.Make ->
+; HashMapNativeExtract.Make over the wrapper/differential sources, to run
+; the same test logic against the extracted-wrapper module.
+(rule
+ (target HashMapNativeExtractTest.ml)
+ (deps HashMapTest.ml)
+ (action
+  (with-stdout-to HashMapNativeExtractTest.ml
+   (run sed "s/HashMap\\.Make/HashMapNativeExtract.Make/g" HashMapTest.ml))))
+
+(executable
+ (name hashMapNativeExtractTest)
+ (modes exe byte)
+ (modules HashMapNativeExtractTest)
+ (libraries hash_map_native_extract))
+
+(rule (alias runtest) (action (run ./hashMapNativeExtractTest.exe)))
+(rule (alias runtest) (action (run ./hashMapNativeExtractTest.bc)))
+
+(rule
+ (target HashTableNativeExtractDifferentialTest.ml)
+ (deps HashTableDifferentialTest.ml)
+ (action
+  (with-stdout-to HashTableNativeExtractDifferentialTest.ml
+   (run sed "s/HashMap\\.Make/HashMapNativeExtract.Make/g" HashTableDifferentialTest.ml))))
+
+(executable
+ (name hashTableNativeExtractDifferentialTest)
+ (modes exe byte)
+ (modules HashTableNativeExtractDifferentialTest)
+ (libraries hash_map_native_extract))
+
+(rule (alias runtest) (action (run ./hashTableNativeExtractDifferentialTest.exe)))
+(rule (alias runtest) (action (run ./hashTableNativeExtractDifferentialTest.bc)))
+
+(executable
+ (name hashMapNativeTest)
+ (modes exe byte)
+ (modules HashMapNativeTest)
+ (libraries hash_map hash_map_native))
+
+(rule (alias runtest) (action (run ./hashMapNativeTest.exe)))
+(rule (alias runtest) (action (run ./hashMapNativeTest.bc)))
+
+(executable
+ (name hashTablePrimitivesTest)
+ (modules HashTablePrimitivesTest)
+ (libraries hashtable_primitives))
+
+(rule (alias runtest) (action (run ./hashTablePrimitivesTest.exe)))
+
+(executable
+ (name hashTableScalarPrimitivesTest)
+ (modes exe byte)
+ (modules HashTableScalarPrimitivesTest)
+ (libraries hashtable_scalar_primitives))
+
+(rule (alias runtest) (action (run ./hashTableScalarPrimitivesTest.exe)))
+(rule (alias runtest) (action (run ./hashTableScalarPrimitivesTest.bc)))
+
+(executable
+ (name hashTableBenchmark)
+ (modules HashTableBenchmark)
+ (libraries hash_map hash_map_native hashtable_benchmark_support unix))
+
+(executable
+ (name hashTablePrimitiveBenchmark)
+ (modules HashTablePrimitiveBenchmark)
+ (libraries hashtable_primitives hashtable_scalar_primitives
+  hashtable_benchmark_support unix))
+
+(executable
+ (name hashTableStringBenchmark)
+ (modules HashTableStringBenchmark)
+ (libraries hash_map hash_map_native hashtable_benchmark_support unix))
+
+; --- Shell-script structural/assumption audits ----------------------------
+; These are lint/invariant checks over generated or hand-written sources,
+; not part of the OCaml build graph; left as plain scripts (per the Makefile)
+; and just wired into `dune build @runtest` for parity with `make all`
+; and `make hashtable`.
+
+(rule
+ (alias runtest)
+ (deps
+  check-assumptions.sh (glob_files *.v) (glob_files *.vo))
+ (action (run sh check-assumptions.sh %{bin:rocq} -q -Q . "")))
+
+(rule
+ (alias runtest)
+ (deps
+  check-hashtable-assumptions.sh
+  HashTableSpec.v HashTableBits.v HashTableNativeBits.v HashTableBucket.v
+  HashTable.v HashTableProof.v HashTableNative.v HashTableNativeProof.v
+  HashTableArrayRefinement.v HashTableSkeleton.v
+  HashTableSpec.vo HashTableBits.vo HashTableNativeBits.vo HashTableBucket.vo
+  HashTable.vo HashTableProof.vo HashTableNative.vo HashTableNativeProof.vo
+  HashTableArrayRefinement.vo HashTableSkeleton.vo)
+ (action (run sh check-hashtable-assumptions.sh %{bin:rocq} -q -Q . "")))
+
+(rule
+ (alias runtest)
+ (deps check-extraction-boundary.sh PatriciaExtract.v)
+ (action (run sh check-extraction-boundary.sh PatriciaExtract.v)))
+
+(rule
+ (alias runtest)
+ (deps check-native-string-workers.sh PatriciaExtract.v
+  extracted/NativeStringWorker.ml)
+ (action
+  (run sh check-native-string-workers.sh PatriciaExtract.v
+   extracted/NativeStringWorker.ml)))
+
+(rule
+ (alias runtest)
+ (deps check-native-union-realizers.sh extracted/PatriciaUnion.ml
+  extracted/StringPatriciaUnion.ml)
+ (action
+  (run sh check-native-union-realizers.sh extracted/PatriciaUnion.ml
+   extracted/StringPatriciaUnion.ml)))
+
+(rule
+ (alias runtest)
+ (deps check-cached-representative-consumers.sh
+  extracted/StringPatriciaInternal.ml extracted/StringPatriciaUnion.ml
+  PatriciaExtract.v)
+ (action
+  (run sh check-cached-representative-consumers.sh
+   extracted/StringPatriciaInternal.ml extracted/StringPatriciaUnion.ml
+   PatriciaExtract.v)))
+
+(rule
+ (alias runtest)
+ (deps check-hashtable-generated-interface.sh
+  hashtable_reference_extracted/HashTable.mli)
+ (action
+  (run sh check-hashtable-generated-interface.sh
+   hashtable_reference_extracted/HashTable.mli)))
+
+(rule
+ (alias runtest)
+ (deps check-hashtable-extraction-boundary.sh HashMap.mli HashMap.ml)
+ (action (run sh check-hashtable-extraction-boundary.sh HashMap.mli HashMap.ml)))
+
+(rule
+ (alias runtest)
+ (deps check-hashtable-native-array-backend.sh HashMapNative.ml HashMap.ml)
+ (action
+  (run sh check-hashtable-native-array-backend.sh HashMapNative.ml HashMap.ml)))
+
+(rule
+ (alias runtest)
+ (deps check-hashtable-native-model-extraction.sh
+  hashtable_extracted/HashTableNative.ml)
+ (action
+  (run sh check-hashtable-native-model-extraction.sh
+   hashtable_extracted/HashTableNative.ml)))
+
+(rule
+ (alias runtest)
+ (deps check-hashtable-native-array-extraction.sh
+  hashtable_native_array_extracted/HashTableNative.ml)
+ (action
+  (run sh check-hashtable-native-array-extraction.sh
+   hashtable_native_array_extracted/HashTableNative.ml)))
+
+(rule
+ (alias runtest)
+ (deps check-hashtable-native-array-extraction-test.sh
+  check-hashtable-native-array-extraction.sh
+  hashtable_native_array_extracted/HashTableNative.ml)
+ (action
+  (run sh check-hashtable-native-array-extraction-test.sh
+   hashtable_native_array_extracted/HashTableNative.ml
+   ./check-hashtable-native-array-extraction.sh)))
+
+(rule
+ (alias runtest)
+ (deps check-hashtable-primitives.sh HashTablePrimitives.ml)
+ (action (run sh check-hashtable-primitives.sh HashTablePrimitives.ml)))
+
+(rule
+ (alias runtest)
+ (deps check-hashtable-scalar-primitives.sh HashTableScalarPrimitives.ml)
+ (action
+  (run sh check-hashtable-scalar-primitives.sh HashTableScalarPrimitives.ml)))

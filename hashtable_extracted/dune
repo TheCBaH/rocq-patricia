@@ -1,0 +1,27 @@
+(rule
+ (targets
+  BinNat.ml BinNat.mli
+  BinNums.ml BinNums.mli
+  BinPos.ml BinPos.mli
+  Datatypes.ml Datatypes.mli
+  HashTable.ml HashTable.mli
+  HashTableBits.ml HashTableBits.mli
+  HashTableBucket.ml HashTableBucket.mli
+  HashTableNative.ml HashTableNative.mli
+  HashTableNativeBits.ml HashTableNativeBits.mli
+  List.ml List.mli
+  ListDef.ml ListDef.mli
+  Nat.ml Nat.mli
+  PosDef.ml PosDef.mli)
+ (deps
+  ../HashTableExtract.v ../HashTableSpec.vo ../HashTableBits.vo
+  ../HashTableBucket.vo ../HashTable.vo ../HashTableNative.vo)
+ (action
+  (chdir %{workspace_root}
+   (run %{bin:rocq} compile -q -Q . "" HashTableExtract.v))))
+
+(library
+ (name hashtable_extracted)
+ (wrapped false)
+ (flags (:standard -w -a))
+ (modules :standard))
