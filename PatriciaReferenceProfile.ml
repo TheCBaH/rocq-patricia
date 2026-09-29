@@ -17,8 +17,8 @@ module String_avl = Map.Make (struct
   let compare = Stdlib.String.compare
 end)
 
-module Integer = Patricia_reference.Patricia
-module Strings = Patricia_reference.StringPatricia
+module Integer = PatriciaReference.Patricia
+module Strings = PatriciaReference.StringPatricia
 
 let positive_env name default =
   match Sys.getenv_opt name with

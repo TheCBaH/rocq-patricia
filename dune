@@ -226,7 +226,7 @@
 (executable
  (name patriciaDifferentialTest)
  (modules PatriciaDifferentialTest)
- (libraries patricia_extracted patricia_reference))
+ (libraries patricia_extracted patriciaReference))
 
 (rule (alias runtest) (action (run ./patriciaDifferentialTest.exe)))
 
@@ -258,12 +258,12 @@
 (executable
  (name patriciaReferenceProfile)
  (modules PatriciaReferenceProfile)
- (libraries patricia_reference unix))
+ (libraries patriciaReference unix))
 
 (executable
  (name stringPrimitiveProfile)
  (modules StringPrimitiveProfile)
- (libraries patricia_extracted patricia_reference string_bits_baseline unix))
+ (libraries patricia_extracted patriciaReference string_bits_baseline unix))
 
 (executable
  (name patriciaMatrixBenchmark)

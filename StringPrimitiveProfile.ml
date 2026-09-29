@@ -10,7 +10,7 @@
 module Native = StringBitsBaseline
 module Selected = StringBits
 module Candidate = NativeStringWorker
-module Oracle = Patricia_reference.StringBits
+module Oracle = PatriciaReference.StringBits
 
 type sample = { seconds : float; words : float; checksum : int }
 

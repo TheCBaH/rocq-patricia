@@ -2,11 +2,11 @@
    generated directly from the executable Rocq definitions. *)
 
 module Integer_native = PatriciaInternal
-module Integer_reference = Patricia_reference.Patricia
+module Integer_reference = PatriciaReference.Patricia
 module String_native = StringPatriciaInternal
-module String_reference = Patricia_reference.StringPatricia
+module String_reference = PatriciaReference.StringPatricia
 module String_bits_native = StringBits
-module String_bits_reference = Patricia_reference.StringBits
+module String_bits_reference = PatriciaReference.StringBits
 
 let fail context =
   failwith ("Patricia extraction differential mismatch: " ^ context)

@@ -28,11 +28,15 @@
 ; this backend's extraction emits an empty [String] unit which would shadow
 ; [Stdlib.String] used elsewhere. Exclude it from the library the same way.
 
-; Wrapped (dune's default): submodules are namespaced under Patricia_reference,
+; Wrapped (dune's default): submodules are namespaced under PatriciaReference,
 ; the same role the Makefile's `ocamlc -pack -o PatriciaReference.cmo` played
 ; (this library's namespace collides at the bare-module level with the main
-; extraction otherwise: both extract BinNat, Datatypes, Patricia, ...).
+; extraction otherwise: both extract BinNat, Datatypes, Patricia, ...). The
+; library name is deliberately camelCase, not the usual snake_case: dune
+; derives the wrapper module by capitalizing the first letter only, so this
+; is what makes the wrapper come out as `PatriciaReference` rather than
+; `Patricia_reference` and match the name callers (and the Makefile) use.
 (library
- (name patricia_reference)
+ (name patriciaReference)
  (flags (:standard -w -a))
  (modules :standard \ String))
